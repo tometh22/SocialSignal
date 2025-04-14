@@ -162,41 +162,41 @@ export const analysisTypes = [
   { value: "deep", label: "Análisis Profundo" },
 ];
 
-// Project type options
+// Opciones de tipo de proyecto
 export const projectTypes = [
-  { value: "executive", label: "Executive Report" },
-  { value: "comprehensive", label: "Comprehensive Report" },
-  { value: "campaign", label: "Campaign Lifecycle Reports" },
-  { value: "always-on", label: "Always-On Fee-Based Service" },
+  { value: "executive", label: "Informe Ejecutivo" },
+  { value: "comprehensive", label: "Informe Integral" },
+  { value: "campaign", label: "Informes de Ciclo de Campaña" },
+  { value: "always-on", label: "Servicio Continuo Basado en Tarifas" },
 ];
 
-// Mentions volume options
+// Opciones de volumen de menciones
 export const mentionsVolumeOptions = [
-  { value: "small", label: "1k - 10k mentions" },
-  { value: "medium", label: "10k - 50k mentions" },
-  { value: "large", label: "50k - 200k mentions" },
-  { value: "xlarge", label: "200k+ mentions" },
+  { value: "small", label: "1k - 10k menciones" },
+  { value: "medium", label: "10k - 50k menciones" },
+  { value: "large", label: "50k - 200k menciones" },
+  { value: "xlarge", label: "200k+ menciones" },
 ];
 
-// Countries covered options
+// Opciones de países cubiertos
 export const countriesCoveredOptions = [
-  { value: "1", label: "Single country" },
-  { value: "2-5", label: "2-5 countries" },
-  { value: "6-10", label: "6-10 countries" },
-  { value: "10+", label: "10+ countries" },
+  { value: "1", label: "Un solo país" },
+  { value: "2-5", label: "2-5 países" },
+  { value: "6-10", label: "6-10 países" },
+  { value: "10+", label: "10+ países" },
 ];
 
-// Client engagement level options
+// Opciones de nivel de participación del cliente
 export const clientEngagementOptions = [
-  { value: "low", label: "Low (Minimal revisions)" },
-  { value: "medium", label: "Medium (2-3 revision cycles)" },
-  { value: "high", label: "High (Multiple touchpoints)" },
+  { value: "low", label: "Bajo (Revisiones mínimas)" },
+  { value: "medium", label: "Medio (2-3 ciclos de revisión)" },
+  { value: "high", label: "Alto (Múltiples interacciones)" },
 ];
 
-// Quotation status options
+// Opciones de estado de cotización
 export const quotationStatusOptions = [
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-  { value: "in-negotiation", label: "In Negotiation" },
+  { value: "pending", label: "Pendiente" },
+  { value: "approved", label: "Aprobado" },
+  { value: "rejected", label: "Rechazado" },
+  { value: "in-negotiation", label: "En Negociación" },
 ];
