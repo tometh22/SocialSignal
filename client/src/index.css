@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Estilos para el asistente de cotización */
+.wizard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card-select {
+  transition: all 0.2s ease-in-out;
+}
+
+.card-select:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.card-select.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+  background-color: rgba(var(--color-primary-rgb), 0.05);
+}
+
+/* Variables de color */
+:root {
+  --color-primary: hsl(214.3 100% 48.6%);
+  --color-primary-rgb: 25, 118, 210;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

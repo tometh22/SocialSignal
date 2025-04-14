@@ -26,27 +26,28 @@ export default function QuoteWizard() {
     }
   };
 
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return <ProjectDetails onNext={nextStep} />;
+      case 2:
+        return <TeamResources onPrevious={previousStep} onNext={nextStep} />;
+      case 3:
+        return <ReportTemplates onPrevious={previousStep} onNext={nextStep} />;
+      case 4:
+        return <ReviewQuote onPrevious={previousStep} />;
+      default:
+        return <ProjectDetails onNext={nextStep} />;
+    }
+  };
+
   return (
     <>
       {/* Progress indicator */}
       <ProgressIndicator currentStep={currentStep} />
       
-      {/* Wizard step content */}
-      <div className={`wizard-step ${currentStep === 1 ? 'active' : ''}`}>
-        <ProjectDetails onNext={nextStep} />
-      </div>
-      
-      <div className={`wizard-step ${currentStep === 2 ? 'active' : ''}`}>
-        <TeamResources onPrevious={previousStep} onNext={nextStep} />
-      </div>
-      
-      <div className={`wizard-step ${currentStep === 3 ? 'active' : ''}`}>
-        <ReportTemplates onPrevious={previousStep} onNext={nextStep} />
-      </div>
-      
-      <div className={`wizard-step ${currentStep === 4 ? 'active' : ''}`}>
-        <ReviewQuote onPrevious={previousStep} />
-      </div>
+      {/* Render only the current step */}
+      {renderStepContent()}
     </>
   );
 }
