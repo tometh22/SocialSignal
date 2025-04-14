@@ -49,8 +49,8 @@ export default function ManageQuotes() {
       );
       
       toast({
-        title: "Status updated",
-        description: `Quotation status has been updated to ${newStatus}.`,
+        title: "Estado actualizado",
+        description: `El estado de la cotización ha sido actualizado a ${translateStatus(newStatus)}.`,
       });
       
       refetch();
@@ -58,7 +58,7 @@ export default function ManageQuotes() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update quotation status.",
+        description: "No se pudo actualizar el estado de la cotización.",
         variant: "destructive",
       });
     }
@@ -100,24 +100,34 @@ export default function ManageQuotes() {
     }
   };
 
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': 'Pendiente',
+      'approved': 'Aprobada',
+      'rejected': 'Rechazada',
+      'in-negotiation': 'En Negociación'
+    };
+    return statusMap[status] || status;
+  };
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Manage Quotations</h2>
+        <h2 className="text-lg font-semibold text-neutral-900">Gestionar Cotizaciones</h2>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle>Quotations</CardTitle>
+              <CardTitle>Cotizaciones</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <div className="relative flex-grow">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
-                    placeholder="Search by project name..."
+                    placeholder="Buscar por nombre de proyecto..."
                     className="pl-10"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -126,33 +136,33 @@ export default function ManageQuotes() {
                 <div className="w-full md:w-64">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Filter by status" />
+                      <SelectValue placeholder="Filtrar por estado" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="in-negotiation">In Negotiation</SelectItem>
+                      <SelectItem value="all">Todos los Estados</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="approved">Aprobada</SelectItem>
+                      <SelectItem value="rejected">Rechazada</SelectItem>
+                      <SelectItem value="in-negotiation">En Negociación</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               {isLoading ? (
-                <div className="text-center py-8">Loading quotations...</div>
+                <div className="text-center py-8">Cargando cotizaciones...</div>
               ) : filteredQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-neutral-200">
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Project Name</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Client ID</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Analysis Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Created</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Nombre del Proyecto</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">ID Cliente</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Tipo de Análisis</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Creación</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Estado</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Total</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Actions</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -167,7 +177,7 @@ export default function ManageQuotes() {
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(quote.status)}`}>
                               {getStatusIcon(quote.status)}
-                              <span className="ml-1.5">{quote.status.charAt(0).toUpperCase() + quote.status.slice(1).replace('-', ' ')}</span>
+                              <span className="ml-1.5">{translateStatus(quote.status)}</span>
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-neutral-900">
@@ -177,11 +187,11 @@ export default function ManageQuotes() {
                             <div className="flex items-center space-x-2">
                               <Button variant="outline" size="sm" onClick={() => openStatusDialog(quote)}>
                                 <Edit className="h-4 w-4 mr-1" />
-                                Status
+                                Estado
                               </Button>
                               <Button variant="outline" size="sm">
                                 <Eye className="h-4 w-4 mr-1" />
-                                View
+                                Ver
                               </Button>
                             </div>
                           </td>
@@ -193,8 +203,8 @@ export default function ManageQuotes() {
               ) : (
                 <div className="text-center py-8 text-neutral-500">
                   {searchTerm || statusFilter !== "all"
-                    ? "No quotations match your search criteria."
-                    : "No quotations found."}
+                    ? "No hay cotizaciones que coincidan con tu búsqueda."
+                    : "No se encontraron cotizaciones."}
                 </div>
               )}
             </CardContent>
@@ -205,42 +215,42 @@ export default function ManageQuotes() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Quotation Status</DialogTitle>
+            <DialogTitle>Actualizar Estado de Cotización</DialogTitle>
             <DialogDescription>
-              Change the status of this quotation. Updating to "In Negotiation" allows for additional adjustments.
+              Cambia el estado de esta cotización. Actualizarla a "En Negociación" permite realizar ajustes adicionales.
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
             <div className="mb-4">
-              <h4 className="text-sm font-medium mb-2">Current Status:</h4>
+              <h4 className="text-sm font-medium mb-2">Estado Actual:</h4>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${selectedQuote ? getStatusClass(selectedQuote.status) : ''}`}>
                 {selectedQuote && getStatusIcon(selectedQuote.status)}
                 <span className="ml-1.5">
-                  {selectedQuote?.status.charAt(0).toUpperCase() + selectedQuote?.status.slice(1).replace('-', ' ')}
+                  {selectedQuote && translateStatus(selectedQuote.status)}
                 </span>
               </span>
             </div>
 
             <div className="mb-4">
-              <h4 className="text-sm font-medium mb-2">New Status:</h4>
+              <h4 className="text-sm font-medium mb-2">Nuevo Estado:</h4>
               <Select value={newStatus} onValueChange={setNewStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select new status" />
+                  <SelectValue placeholder="Seleccionar nuevo estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="in-negotiation">In Negotiation</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                  <SelectItem value="approved">Aprobada</SelectItem>
+                  <SelectItem value="rejected">Rechazada</SelectItem>
+                  <SelectItem value="in-negotiation">En Negociación</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleStatusChange}>Update Status</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleStatusChange}>Actualizar Estado</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

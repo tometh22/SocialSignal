@@ -35,20 +35,31 @@ export default function Dashboard() {
         .slice(0, 5)
     : [];
 
+  // Helper functions to translate status
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': 'Pendiente',
+      'approved': 'Aprobada',
+      'rejected': 'Rechazada',
+      'in-negotiation': 'En Negociación'
+    };
+    return statusMap[status] || status;
+  };
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Dashboard</h2>
+        <h2 className="text-lg font-semibold text-neutral-900">Panel Principal</h2>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="text-2xl font-bold text-neutral-900">Social Listening Quotation System</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">Sistema de Cotización de Escucha Social</h1>
             <Link href="/new-quote">
               <Button className="mt-4 sm:mt-0">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Create New Quote
+                Crear Nueva Cotización
               </Button>
             </Link>
           </div>
@@ -56,8 +67,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Pending</CardTitle>
-                <CardDescription>Quotes awaiting review</CardDescription>
+                <CardTitle className="text-lg font-medium">Pendientes</CardTitle>
+                <CardDescription>Cotizaciones en espera de revisión</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
@@ -69,8 +80,8 @@ export default function Dashboard() {
             
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Approved</CardTitle>
-                <CardDescription>Quotes accepted by clients</CardDescription>
+                <CardTitle className="text-lg font-medium">Aprobadas</CardTitle>
+                <CardDescription>Cotizaciones aceptadas por clientes</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
@@ -82,8 +93,8 @@ export default function Dashboard() {
             
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Rejected</CardTitle>
-                <CardDescription>Quotes declined by clients</CardDescription>
+                <CardTitle className="text-lg font-medium">Rechazadas</CardTitle>
+                <CardDescription>Cotizaciones rechazadas por clientes</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
@@ -95,8 +106,8 @@ export default function Dashboard() {
             
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">In Negotiation</CardTitle>
-                <CardDescription>Quotes being negotiated</CardDescription>
+                <CardTitle className="text-lg font-medium">En Negociación</CardTitle>
+                <CardDescription>Cotizaciones en proceso de negociación</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center">
@@ -109,22 +120,22 @@ export default function Dashboard() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Recent Quotations</CardTitle>
-              <CardDescription>The 5 most recently created quotations</CardDescription>
+              <CardTitle>Cotizaciones Recientes</CardTitle>
+              <CardDescription>Las 5 cotizaciones creadas más recientemente</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="text-center py-4">Loading recent quotations...</div>
+                <div className="text-center py-4">Cargando cotizaciones recientes...</div>
               ) : recentQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-neutral-200">
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Project Name</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Client</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Analysis Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Created</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Nombre del Proyecto</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Cliente</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Tipo de Análisis</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Creación</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Estado</th>
                         <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Total</th>
                       </tr>
                     </thead>
@@ -132,7 +143,7 @@ export default function Dashboard() {
                       {recentQuotations.map((quote) => (
                         <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50">
                           <td className="px-4 py-3 text-sm text-neutral-900">{quote.projectName}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">Client {quote.clientId}</td>
+                          <td className="px-4 py-3 text-sm text-neutral-900">Cliente {quote.clientId}</td>
                           <td className="px-4 py-3 text-sm text-neutral-900">{quote.analysisType}</td>
                           <td className="px-4 py-3 text-sm text-neutral-900">
                             {new Date(quote.createdAt).toLocaleDateString()}
@@ -144,7 +155,7 @@ export default function Dashboard() {
                               ${quote.status === 'rejected' ? 'bg-red-100 text-red-800' : ''}
                               ${quote.status === 'in-negotiation' ? 'bg-blue-100 text-blue-800' : ''}
                             `}>
-                              {quote.status.charAt(0).toUpperCase() + quote.status.slice(1).replace('-', ' ')}
+                              {translateStatus(quote.status)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-neutral-900">
@@ -156,12 +167,12 @@ export default function Dashboard() {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-4 text-neutral-500">No quotations found. Create your first quote!</div>
+                <div className="text-center py-4 text-neutral-500">No se encontraron cotizaciones. ¡Crea tu primera cotización!</div>
               )}
               
               <div className="mt-4 flex justify-end">
                 <Link href="/manage-quotes">
-                  <Button variant="outline">View All Quotations</Button>
+                  <Button variant="outline">Ver Todas las Cotizaciones</Button>
                 </Link>
               </div>
             </CardContent>
