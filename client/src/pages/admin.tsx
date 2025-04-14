@@ -36,6 +36,8 @@ import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
 import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
+import { InlineEditRole } from "@/components/admin/inline-edit-role";
+import { InlineEditTemplate } from "@/components/admin/inline-edit-template";
 
 // Role form schema
 const roleSchema = z.object({
@@ -400,17 +402,10 @@ export default function Admin() {
                       </TableHeader>
                       <TableBody>
                         {roles.map(role => (
-                          <TableRow key={role.id}>
-                            <TableCell className="font-medium">{role.name}</TableCell>
-                            <TableCell>{role.description || "-"}</TableCell>
-                            <TableCell>${role.defaultRate.toFixed(2)}/hr</TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => openEditRoleDialog(role)}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <InlineEditRole 
+                            key={role.id} 
+                            role={role} 
+                          />
                         ))}
                       </TableBody>
                     </Table>
@@ -499,27 +494,10 @@ export default function Admin() {
                       </TableHeader>
                       <TableBody>
                         {templates.map(template => (
-                          <TableRow key={template.id}>
-                            <TableCell className="font-medium">{template.name}</TableCell>
-                            <TableCell className="max-w-xs truncate">{template.description || "-"}</TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                ${template.complexity === 'low' ? 'bg-green-100 text-green-800' : ''}
-                                ${template.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' : ''}
-                                ${template.complexity === 'high' ? 'bg-red-100 text-red-800' : ''}
-                                ${template.complexity === 'variable' ? 'bg-blue-100 text-blue-800' : ''}
-                              `}>
-                                {template.complexity.charAt(0).toUpperCase() + template.complexity.slice(1)}
-                              </span>
-                            </TableCell>
-                            <TableCell>{template.pageRange || "-"}</TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => openEditTemplateDialog(template)}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <InlineEditTemplate 
+                            key={template.id} 
+                            template={template} 
+                          />
                         ))}
                       </TableBody>
                     </Table>
