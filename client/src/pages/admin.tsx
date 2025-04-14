@@ -35,6 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
+import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 
 // Role form schema
 const roleSchema = z.object({
@@ -453,17 +454,11 @@ export default function Admin() {
                       </TableHeader>
                       <TableBody>
                         {personnel.map(person => (
-                          <TableRow key={person.id}>
-                            <TableCell className="font-medium">{person.name}</TableCell>
-                            <TableCell>{getRoleName(person.roleId)}</TableCell>
-                            <TableCell>${person.hourlyRate.toFixed(2)}/hr</TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="outline" size="sm" onClick={() => openEditPersonnelDialog(person)}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <InlineEditPersonnel 
+                            key={person.id}
+                            person={person}
+                            roles={roles}
+                          />
                         ))}
                       </TableBody>
                     </Table>
