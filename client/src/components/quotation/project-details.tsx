@@ -206,6 +206,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
 
           <div>
             <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Análisis</Label>
+            <p className="text-xs text-neutral-500 mb-2">El enfoque analítico aplicado a los datos (básico, avanzado, predictivo)</p>
             <Select 
               value={projectDetails.analysisType || ""}
               onValueChange={(value) => updateProjectDetails({ analysisType: value })}
@@ -225,6 +226,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           
           <div>
             <Label htmlFor="project-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Proyecto</Label>
+            <p className="text-xs text-neutral-500 mb-2">El objetivo principal del proyecto (ejecutivo, competitivo, temático)</p>
             <Select 
               value={projectDetails.projectType || ""}
               onValueChange={(value) => updateProjectDetails({ projectType: value })}

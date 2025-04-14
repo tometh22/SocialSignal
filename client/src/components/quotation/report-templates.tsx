@@ -130,6 +130,15 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-xl font-semibold text-neutral-900 mb-6">Plantillas de Informe</h3>
       
+      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <h4 className="text-base font-medium text-blue-700">¿Cuál es la diferencia?</h4>
+        <p className="text-sm text-blue-600 mt-1">
+          En el paso 1 seleccionaste el <strong>Tipo de Análisis</strong> (metodología y enfoque analítico).
+          Ahora debes elegir una <strong>Plantilla de Informe</strong> específica que define la estructura,
+          formato y presentación del entregable final al cliente.
+        </p>
+      </div>
+      
       <p className="text-sm text-neutral-600 mb-6">Selecciona una plantilla de informe que mejor se adapte a los requisitos de tu proyecto. La selección de la plantilla puede afectar la cotización general según la complejidad y la personalización requerida.</p>
       
       <div className="mb-6">
@@ -289,7 +298,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
           
           <div className="lg:col-span-1">
             <h4 className="text-base font-medium text-neutral-700 mb-3">Distribución de Costos</h4>
-            <div className="bg-neutral-100 p-4 rounded-lg h-48">
+            <div className="bg-neutral-100 p-4 rounded-lg h-60">
               {getCostFactorsData().length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -297,19 +306,19 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                       data={getCostFactorsData()}
                       cx="50%"
                       cy="50%"
-                      outerRadius={60}
+                      outerRadius={50}
                       fill="#8884d8"
                       dataKey="value"
                       nameKey="name"
-                      label={({ name }) => name}
-                      labelLine={false}
+                      labelLine={true}
+                      label
                     >
                       {getCostFactorsData().map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value: any) => [`+${(value * 100).toFixed(0)}%`, "Impacto"]} />
-                    <Legend />
+                    <Legend verticalAlign="bottom" height={36} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -321,7 +330,9 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
           </div>
         </div>
         
-        <CostBreakdown teamMembers={teamMembers} showComplexity={true} />
+        <div className="mt-6">
+          <CostBreakdown teamMembers={teamMembers} showComplexity={true} />
+        </div>
       </div>
     </div>
   );
