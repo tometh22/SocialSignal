@@ -288,6 +288,9 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
             // Check if this role is currently selected
             const isSelected = teamMembers.some(member => member.roleId === role.id);
             
+            // Check if this role is recommended
+            const isRecommended = recommendedRoleIds.includes(role.id);
+            
             // Find the team member for this role if it exists
             const teamMember = teamMembers.find(member => member.roleId === role.id);
             
@@ -296,7 +299,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                 key={role.id}
                 className={cn(
                   "card-select p-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 cursor-pointer",
-                  isSelected && "selected"
+                  isSelected && "selected",
+                  isRecommended && !isSelected && "border-blue-300 border-dashed"
                 )}
                 onClick={() => toggleRoleSelection(role.id, !isSelected)}
               >
@@ -310,7 +314,14 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                   </div>
                   <div className="ml-3 flex-1">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-base font-medium text-neutral-800">{role.name}</h5>
+                      <div className="flex items-center">
+                        <h5 className="text-base font-medium text-neutral-800">{role.name}</h5>
+                        {isRecommended && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Recomendado
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm font-mono text-neutral-600">${role.defaultRate.toFixed(2)}/hr</span>
                     </div>
                     <p className="text-sm text-neutral-600 mt-1">{role.description}</p>
@@ -343,11 +354,17 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                                 <SelectValue placeholder="Seleccionar miembro" />
                               </SelectTrigger>
                               <SelectContent>
-                                {getPersonnelByRole(role.id).map(person => (
-                                  <SelectItem key={person.id} value={person.id.toString()}>
-                                    {person.name} (${person.hourlyRate.toFixed(2)}/hr)
-                                  </SelectItem>
-                                ))}
+                                {getPersonnelByRole(role.id).length > 0 ? (
+                                  getPersonnelByRole(role.id).map(person => (
+                                    <SelectItem key={person.id} value={person.id.toString()}>
+                                      {person.name} (${person.hourlyRate.toFixed(2)}/hr)
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="px-2 py-2 text-sm text-neutral-500">
+                                    No hay personal disponible para este rol
+                                  </div>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
