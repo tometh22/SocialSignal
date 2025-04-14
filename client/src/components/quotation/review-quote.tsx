@@ -401,7 +401,7 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
       
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
-          <span className="material-icons mr-1">arrow_back</span>
+          <span className="mr-1">←</span>
           Atrás
         </Button>
         
@@ -419,7 +419,7 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
             className="flex items-center"
           >
             {isSaving ? "Generando..." : "Generar Cotización"}
-            <span className="material-icons ml-1">check_circle</span>
+            <span className="ml-1">✓</span>
           </Button>
         </div>
       </div>

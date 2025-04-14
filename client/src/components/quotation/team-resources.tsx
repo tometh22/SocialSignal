@@ -275,13 +275,13 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
       
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
-          <span className="material-icons mr-1">arrow_back</span>
+          <span className="mr-1">←</span>
           Atrás
         </Button>
         
         <Button type="button" onClick={handleContinue} className="flex items-center">
           Continuar
-          <span className="material-icons ml-1">arrow_forward</span>
+          <span className="ml-1">→</span>
         </Button>
       </div>
 

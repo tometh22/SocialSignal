@@ -32,8 +32,52 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   } = useQuoteContext();
 
   // Get templates from API
-  const { data: templates } = useQuery<ReportTemplate[]>({
+  const { data: originalTemplates } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
+  });
+  
+  // Traducción de plantillas
+  const templates = originalTemplates?.map(template => {
+    // Traducciones
+    const nameTranslations: Record<string, string> = {
+      "Executive Dashboard": "Panel Ejecutivo",
+      "Comprehensive Analysis": "Análisis Completo",
+      "Campaign Performance": "Rendimiento de Campaña",
+      "Custom Template": "Plantilla Personalizada"
+    };
+    
+    const descriptionTranslations: Record<string, string> = {
+      "Concise, high-level metrics with key insights and strategic recommendations. Ideal for executive stakeholders.": 
+        "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
+      "Detailed evaluation with extensive metrics, audience segmentation, and demographic breakdown.": 
+        "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
+      "Pre, during, and post campaign analysis with KPI tracking and comparative benchmark data.": 
+        "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
+      "Build a custom report structure based on specific client requirements and project goals.": 
+        "Crea una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto."
+    };
+    
+    const featuresTranslations: Record<string, string> = {
+      "Core metrics only": "Solo métricas principales",
+      "Advanced metrics": "Métricas avanzadas",
+      "Trend analysis": "Análisis de tendencias",
+      "Custom metrics": "Métricas personalizadas"
+    };
+    
+    const pageRangeTranslations: Record<string, string> = {
+      "5-10 pages": "5-10 páginas",
+      "15-25 pages": "15-25 páginas",
+      "20-30 pages": "20-30 páginas",
+      "Variable length": "Longitud variable"
+    };
+    
+    return {
+      ...template,
+      name: nameTranslations[template.name] || template.name,
+      description: descriptionTranslations[template.description] || template.description,
+      features: featuresTranslations[template.features] || template.features,
+      pageRange: pageRangeTranslations[template.pageRange] || template.pageRange
+    };
   });
 
   // Update cost calculations when template changes
@@ -146,13 +190,13 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
-          <span className="material-icons mr-1">arrow_back</span>
+          <span className="mr-1">←</span>
           Atrás
         </Button>
         
         <Button type="button" onClick={handleContinue} className="flex items-center">
           Continuar
-          <span className="material-icons ml-1">arrow_forward</span>
+          <span className="ml-1">→</span>
         </Button>
       </div>
 
