@@ -13,7 +13,7 @@ import { useEffect } from "react";
 function App() {
   // Set document title
   useEffect(() => {
-    document.title = "Social Listening Quotation System";
+    document.title = "Sistema de Cotización de Escucha Social";
   }, []);
 
   return (

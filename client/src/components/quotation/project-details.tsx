@@ -17,9 +17,9 @@ import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const clientSchema = z.object({
-  name: z.string().min(1, "Client name is required"),
+  name: z.string().min(1, "El nombre del cliente es obligatorio"),
   contactName: z.string().optional(),
-  contactEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
+  contactEmail: z.string().email("Dirección de correo inválida").optional().or(z.literal("")),
   contactPhone: z.string().optional(),
 });
 
@@ -35,28 +35,34 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
     calculateBaseCost
   } = useQuoteContext();
 
+  // Define interfaces for the option types
+  interface Option {
+    value: string;
+    label: string;
+  }
+
   // Get options and clients from API
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
 
-  const { data: analysisTypes } = useQuery({
+  const { data: analysisTypes } = useQuery<Option[]>({
     queryKey: ["/api/options/analysis-types"],
   });
 
-  const { data: projectTypes } = useQuery({
+  const { data: projectTypes } = useQuery<Option[]>({
     queryKey: ["/api/options/project-types"],
   });
 
-  const { data: mentionsVolume } = useQuery({
+  const { data: mentionsVolume } = useQuery<Option[]>({
     queryKey: ["/api/options/mentions-volume"],
   });
 
-  const { data: countriesCovered } = useQuery({
+  const { data: countriesCovered } = useQuery<Option[]>({
     queryKey: ["/api/options/countries-covered"],
   });
 
-  const { data: clientEngagement } = useQuery({
+  const { data: clientEngagement } = useQuery<Option[]>({
     queryKey: ["/api/options/client-engagement"],
   });
 
@@ -79,8 +85,8 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
       
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
-        title: "Success",
-        description: "Client created successfully.",
+        title: "Éxito",
+        description: "Cliente creado correctamente.",
       });
       
       // Update the selected client in the form
@@ -91,7 +97,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create client.",
+        description: "No se pudo crear el cliente.",
         variant: "destructive",
       });
     }
@@ -109,8 +115,8 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
       !projectDetails.clientEngagement
     ) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
+        title: "Información Incompleta",
+        description: "Por favor, completa todos los campos requeridos.",
         variant: "destructive",
       });
       return false;
@@ -149,18 +155,18 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
   return (
     <>
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-xl font-semibold text-neutral-900 mb-6">Project Details</h3>
+        <h3 className="text-xl font-semibold text-neutral-900 mb-6">Detalles del Proyecto</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <Label htmlFor="client" className="block text-sm font-medium text-neutral-700 mb-1">Client Name</Label>
+            <Label htmlFor="client" className="block text-sm font-medium text-neutral-700 mb-1">Nombre del Cliente</Label>
             <div className="flex gap-2">
               <Select
                 value={projectDetails.clientId ? projectDetails.clientId.toString() : ""}
                 onValueChange={(value) => updateProjectDetails({ clientId: parseInt(value) })}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a client" />
+                  <SelectValue placeholder="Selecciona un cliente" />
                 </SelectTrigger>
                 <SelectContent>
                   {clients?.map((client) => (
@@ -171,7 +177,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
                   <SelectItem value="new">
                     <span className="flex items-center">
                       <PlusCircle className="w-4 h-4 mr-2" />
-                      New Client...
+                      Nuevo Cliente...
                     </span>
                   </SelectItem>
                 </SelectContent>
@@ -188,24 +194,24 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           </div>
           
           <div>
-            <Label htmlFor="project-name" className="block text-sm font-medium text-neutral-700 mb-1">Project Name</Label>
+            <Label htmlFor="project-name" className="block text-sm font-medium text-neutral-700 mb-1">Nombre del Proyecto</Label>
             <Input
               id="project-name"
               type="text"
-              placeholder="Enter project name"
+              placeholder="Ingresa el nombre del proyecto"
               value={projectDetails.projectName || ""}
               onChange={(e) => updateProjectDetails({ projectName: e.target.value })}
             />
           </div>
 
           <div>
-            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Analysis Type</Label>
+            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Análisis</Label>
             <Select 
               value={projectDetails.analysisType || ""}
               onValueChange={(value) => updateProjectDetails({ analysisType: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select analysis type" />
+                <SelectValue placeholder="Selecciona tipo de análisis" />
               </SelectTrigger>
               <SelectContent>
                 {analysisTypes?.map((type) => (
@@ -218,13 +224,13 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           </div>
           
           <div>
-            <Label htmlFor="project-type" className="block text-sm font-medium text-neutral-700 mb-1">Project Type</Label>
+            <Label htmlFor="project-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Proyecto</Label>
             <Select 
               value={projectDetails.projectType || ""}
               onValueChange={(value) => updateProjectDetails({ projectType: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select project type" />
+                <SelectValue placeholder="Selecciona tipo de proyecto" />
               </SelectTrigger>
               <SelectContent>
                 {projectTypes?.map((type) => (
@@ -238,17 +244,17 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
         </div>
         
         <div className="mt-6">
-          <h4 className="text-lg font-medium text-neutral-800 mb-4">Project Scope</h4>
+          <h4 className="text-lg font-medium text-neutral-800 mb-4">Alcance del Proyecto</h4>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <Label htmlFor="mentions" className="block text-sm font-medium text-neutral-700 mb-1">Estimated Mentions</Label>
+              <Label htmlFor="mentions" className="block text-sm font-medium text-neutral-700 mb-1">Menciones Estimadas</Label>
               <Select 
                 value={projectDetails.mentionsVolume || ""}
                 onValueChange={(value) => updateProjectDetails({ mentionsVolume: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select range" />
+                  <SelectValue placeholder="Selecciona rango" />
                 </SelectTrigger>
                 <SelectContent>
                   {mentionsVolume?.map((option) => (
@@ -261,13 +267,13 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
             </div>
             
             <div>
-              <Label htmlFor="countries" className="block text-sm font-medium text-neutral-700 mb-1">Countries Covered</Label>
+              <Label htmlFor="countries" className="block text-sm font-medium text-neutral-700 mb-1">Países Cubiertos</Label>
               <Select 
                 value={projectDetails.countriesCovered || ""}
                 onValueChange={(value) => updateProjectDetails({ countriesCovered: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select range" />
+                  <SelectValue placeholder="Selecciona rango" />
                 </SelectTrigger>
                 <SelectContent>
                   {countriesCovered?.map((option) => (
@@ -280,13 +286,13 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
             </div>
             
             <div>
-              <Label htmlFor="engagement" className="block text-sm font-medium text-neutral-700 mb-1">Client Engagement Level</Label>
+              <Label htmlFor="engagement" className="block text-sm font-medium text-neutral-700 mb-1">Nivel de Participación del Cliente</Label>
               <Select 
                 value={projectDetails.clientEngagement || ""}
                 onValueChange={(value) => updateProjectDetails({ clientEngagement: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select level" />
+                  <SelectValue placeholder="Selecciona nivel" />
                 </SelectTrigger>
                 <SelectContent>
                   {clientEngagement?.map((option) => (
@@ -302,7 +308,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
 
         <div className="flex justify-end mt-6">
           <Button type="button" onClick={handleContinue} className="flex items-center">
-            Continue
+            Continuar
             <span className="material-icons ml-1">arrow_forward</span>
           </Button>
         </div>
@@ -312,7 +318,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
       <Dialog open={newClientDialogOpen} onOpenChange={setNewClientDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
+            <DialogTitle>Añadir Nuevo Cliente</DialogTitle>
           </DialogHeader>
           
           <Form {...clientForm}>
@@ -322,9 +328,9 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Client Name</FormLabel>
+                    <FormLabel>Nombre del Cliente</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter client name" {...field} />
+                      <Input placeholder="Ingresa nombre del cliente" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -336,9 +342,9 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
                 name="contactName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
+                    <FormLabel>Persona de Contacto</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter contact name" {...field} />
+                      <Input placeholder="Ingresa nombre de contacto" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -350,9 +356,9 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
                 name="contactEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Correo Electrónico</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter email address" {...field} />
+                      <Input placeholder="Ingresa dirección de correo" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -364,9 +370,9 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
                 name="contactPhone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>Teléfono</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter phone number" {...field} />
+                      <Input placeholder="Ingresa número de teléfono" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -375,10 +381,10 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
 
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={() => setNewClientDialogOpen(false)}>
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button type="submit">
-                  Add Client
+                  Añadir Cliente
                 </Button>
               </DialogFooter>
             </form>
