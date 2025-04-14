@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 // Clients table
 export const clients = pgTable("clients", {
@@ -18,6 +19,10 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   contactPhone: true,
 });
 
+export const clientsRelations = relations(clients, ({ many }) => ({
+  quotations: many(quotations),
+}));
+
 // Team roles table
 export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
@@ -32,6 +37,10 @@ export const insertRoleSchema = createInsertSchema(roles).pick({
   defaultRate: true,
 });
 
+export const rolesRelations = relations(roles, ({ many }) => ({
+  personnel: many(personnel),
+}));
+
 // Team personnel table
 export const personnel = pgTable("personnel", {
   id: serial("id").primaryKey(),
@@ -45,6 +54,11 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   roleId: true,
   hourlyRate: true,
 });
+
+export const personnelRelations = relations(personnel, ({ one, many }) => ({
+  role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
+  quotationTeamMembers: many(quotationTeamMembers),
+}));
 
 // Report templates table
 export const reportTemplates = pgTable("report_templates", {
@@ -63,6 +77,10 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
   pageRange: true,
   features: true,
 });
+
+export const reportTemplatesRelations = relations(reportTemplates, ({ many }) => ({
+  quotations: many(quotations),
+}));
 
 // Quotations table
 export const quotations = pgTable("quotations", {
@@ -93,6 +111,12 @@ export const insertQuotationSchema = createInsertSchema(quotations).omit({
   updatedAt: true,
 });
 
+export const quotationsRelations = relations(quotations, ({ one, many }) => ({
+  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
+  template: one(reportTemplates, { fields: [quotations.templateId], references: [reportTemplates.id] }),
+  teamMembers: many(quotationTeamMembers),
+}));
+
 // Quotation team members junction table
 export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
@@ -106,6 +130,11 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
 export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers).omit({
   id: true,
 });
+
+export const quotationTeamMembersRelations = relations(quotationTeamMembers, ({ one }) => ({
+  quotation: one(quotations, { fields: [quotationTeamMembers.quotationId], references: [quotations.id] }),
+  personnel: one(personnel, { fields: [quotationTeamMembers.personnelId], references: [personnel.id] }),
+}));
 
 // Types
 export type Client = typeof clients.$inferSelect;
