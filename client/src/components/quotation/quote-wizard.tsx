@@ -31,9 +31,9 @@ export default function QuoteWizard() {
       case 1:
         return <ProjectDetails onNext={nextStep} />;
       case 2:
-        return <TeamResources onPrevious={previousStep} onNext={nextStep} />;
-      case 3:
         return <ReportTemplates onPrevious={previousStep} onNext={nextStep} />;
+      case 3:
+        return <TeamResources onPrevious={previousStep} onNext={nextStep} />;
       case 4:
         return <ReviewQuote onPrevious={previousStep} />;
       default:

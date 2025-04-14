@@ -5,8 +5,8 @@ interface ProgressIndicatorProps {
 export default function ProgressIndicator({ currentStep }: ProgressIndicatorProps) {
   const steps = [
     { number: 1, label: "Detalles del Proyecto" },
-    { number: 2, label: "Equipo y Recursos" },
-    { number: 3, label: "Plantillas de Informe" },
+    { number: 2, label: "Plantillas de Informe" },
+    { number: 3, label: "Equipo y Recursos" },
     { number: 4, label: "Revisión y Cotización" },
   ];
 
