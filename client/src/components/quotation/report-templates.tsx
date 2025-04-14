@@ -24,8 +24,10 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
     selectedTemplateId,
     templateCustomization,
     teamMembers,
+    recommendedRoleIds,
     updateReportTemplate,
     updateTemplateCustomization,
+    addRecommendedRoles,
     calculateTotalCost,
     complexityFactors,
     quotationData
@@ -121,6 +123,18 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   // Handle continue button click
   const handleContinue = () => {
     if (validateForm()) {
+      calculateTotalCost();
+      onNext();
+    }
+  };
+  
+  // Esta función avisará al usuario que se utilizarán los roles recomendados en el siguiente paso
+  const handleRecommendedContinue = () => {
+    if (validateForm()) {
+      toast({
+        title: "Roles Recomendados",
+        description: "Se utilizarán roles recomendados basados en la plantilla seleccionada.",
+      });
       calculateTotalCost();
       onNext();
     }
