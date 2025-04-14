@@ -73,7 +73,7 @@ export default function Sidebar() {
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-center h-16 px-4 border-b border-neutral-200">
-            <h1 className="text-xl font-semibold text-neutral-900">Quotation System</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">Sistema de Cotización</h1>
           </div>
 
           <div className="flex flex-col flex-grow overflow-y-auto">
@@ -127,7 +127,7 @@ export default function Sidebar() {
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="flex flex-col w-64 border-r border-neutral-200 bg-white">
           <div className="flex items-center justify-center h-16 px-4 border-b border-neutral-200">
-            <h1 className="text-xl font-semibold text-neutral-900">Quotation System</h1>
+            <h1 className="text-xl font-semibold text-neutral-900">Sistema de Cotización</h1>
           </div>
 
           <div className="flex flex-col flex-grow overflow-y-auto">

@@ -159,35 +159,35 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       {/* Cost breakdown with chart visualization */}
       <div className="bg-white rounded-lg shadow mt-6 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-neutral-800">Cost Breakdown</h3>
+          <h3 className="text-lg font-medium text-neutral-800">Desglose de Costos</h3>
           <div>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Updated
+              Actualizado
             </span>
           </div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2">
-            <h4 className="text-base font-medium text-neutral-700 mb-3">Cost Factors</h4>
+            <h4 className="text-base font-medium text-neutral-700 mb-3">Factores de Costo</h4>
             <div className="overflow-hidden rounded-lg border border-neutral-200">
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Category</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Item</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Impact</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Categoría</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Elemento</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Impacto</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {quotationData.analysisType && (
                     <tr>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Analysis Type</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">Tipo de Análisis</td>
                       <td className="px-4 py-2 text-sm text-neutral-900">{quotationData.analysisType}</td>
                       <td className="px-4 py-2">
                         {complexityFactors.analysisTypeFactor > 0 && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning bg-opacity-10 text-warning">
-                            +{(complexityFactors.analysisTypeFactor * 100).toFixed(0)}% cost
+                            +{(complexityFactors.analysisTypeFactor * 100).toFixed(0)}% costo
                           </span>
                         )}
                       </td>
@@ -195,12 +195,12 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   )}
                   {quotationData.mentionsVolume && (
                     <tr>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Mentions Volume</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">Volumen de Menciones</td>
                       <td className="px-4 py-2 text-sm text-neutral-900">{quotationData.mentionsVolume}</td>
                       <td className="px-4 py-2">
                         {complexityFactors.mentionsVolumeFactor > 0 && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning bg-opacity-10 text-warning">
-                            +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(0)}% cost
+                            +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(0)}% costo
                           </span>
                         )}
                       </td>
@@ -208,12 +208,12 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   )}
                   {quotationData.countriesCovered && (
                     <tr>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Countries</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">Países</td>
                       <td className="px-4 py-2 text-sm text-neutral-900">{quotationData.countriesCovered}</td>
                       <td className="px-4 py-2">
                         {complexityFactors.countriesFactor > 0 && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning bg-opacity-10 text-warning">
-                            +{(complexityFactors.countriesFactor * 100).toFixed(0)}% cost
+                            +{(complexityFactors.countriesFactor * 100).toFixed(0)}% costo
                           </span>
                         )}
                       </td>
@@ -221,14 +221,14 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   )}
                   {selectedTemplateId && templates && (
                     <tr>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Template</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">Plantilla</td>
                       <td className="px-4 py-2 text-sm text-neutral-900">
                         {templates.find(t => t.id === selectedTemplateId)?.name}
                       </td>
                       <td className="px-4 py-2">
                         {complexityFactors.templateFactor > 0 && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning bg-opacity-10 text-warning">
-                            +{(complexityFactors.templateFactor * 100).toFixed(0)}% cost
+                            +{(complexityFactors.templateFactor * 100).toFixed(0)}% costo
                           </span>
                         )}
                       </td>
@@ -240,7 +240,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
           </div>
           
           <div className="lg:col-span-1">
-            <h4 className="text-base font-medium text-neutral-700 mb-3">Cost Distribution</h4>
+            <h4 className="text-base font-medium text-neutral-700 mb-3">Distribución de Costos</h4>
             <div className="bg-neutral-100 p-4 rounded-lg h-48">
               {getCostFactorsData().length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -260,13 +260,13 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => [`+${(value * 100).toFixed(0)}%`, "Impact"]} />
+                    <Tooltip formatter={(value: any) => [`+${(value * 100).toFixed(0)}%`, "Impacto"]} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-sm text-neutral-500">No complexity factors applied</p>
+                  <p className="text-sm text-neutral-500">No hay factores de complejidad aplicados</p>
                 </div>
               )}
             </div>
