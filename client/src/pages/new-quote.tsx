@@ -1,4 +1,5 @@
 import QuoteWizard from "@/components/quotation/quote-wizard";
+import { QuoteProvider } from "@/context/quote-context";
 
 export default function NewQuote() {
   return (
@@ -9,7 +10,9 @@ export default function NewQuote() {
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto wizard-container">
-          <QuoteWizard />
+          <QuoteProvider>
+            <QuoteWizard />
+          </QuoteProvider>
         </div>
       </div>
     </div>
