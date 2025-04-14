@@ -18,12 +18,12 @@ export default function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigationItems = [
-    { href: "/", label: "Dashboard", icon: Home },
-    { href: "/new-quote", label: "New Quote", icon: PlusCircle },
-    { href: "/manage-quotes", label: "Manage Quotes", icon: List },
-    { href: "/clients", label: "Clients", icon: Users },
-    { href: "/history", label: "History", icon: History },
-    { href: "/admin", label: "Admin Panel", icon: Settings },
+    { href: "/", label: "Panel Principal", icon: Home },
+    { href: "/new-quote", label: "Nueva Cotización", icon: PlusCircle },
+    { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List },
+    { href: "/clients", label: "Clientes", icon: Users },
+    { href: "/history", label: "Historial", icon: History },
+    { href: "/admin", label: "Panel Admin", icon: Settings },
   ];
 
   // Toggle mobile menu
@@ -81,26 +81,26 @@ export default function Sidebar() {
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href}>
-                    <a
+                  <Link 
+                    key={item.href} 
+                    href={item.href}
+                    onClick={handleNavigation}
+                    className={cn(
+                      "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                      location === item.href
+                        ? "bg-primary text-white"
+                        : "text-neutral-700 hover:bg-neutral-100"
+                    )}
+                  >
+                    <Icon
                       className={cn(
-                        "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                        "mr-3 h-5 w-5",
                         location === item.href
-                          ? "bg-primary text-white"
-                          : "text-neutral-700 hover:bg-neutral-100"
+                          ? "text-white text-opacity-80"
+                          : "text-neutral-400"
                       )}
-                      onClick={handleNavigation}
-                    >
-                      <Icon
-                        className={cn(
-                          "mr-3 h-5 w-5",
-                          location === item.href
-                            ? "text-white text-opacity-80"
-                            : "text-neutral-400"
-                        )}
-                      />
-                      {item.label}
-                    </a>
+                    />
+                    {item.label}
                   </Link>
                 );
               })}
@@ -135,25 +135,25 @@ export default function Sidebar() {
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href}>
-                    <a
+                  <Link 
+                    key={item.href} 
+                    href={item.href}
+                    className={cn(
+                      "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                      location === item.href
+                        ? "bg-primary text-white"
+                        : "text-neutral-700 hover:bg-neutral-100"
+                    )}
+                  >
+                    <Icon
                       className={cn(
-                        "flex items-center px-3 py-2 text-sm font-medium rounded-md",
+                        "mr-3 h-5 w-5",
                         location === item.href
-                          ? "bg-primary text-white"
-                          : "text-neutral-700 hover:bg-neutral-100"
+                          ? "text-white text-opacity-80"
+                          : "text-neutral-400"
                       )}
-                    >
-                      <Icon
-                        className={cn(
-                          "mr-3 h-5 w-5",
-                          location === item.href
-                            ? "text-white text-opacity-80"
-                            : "text-neutral-400"
-                        )}
-                      />
-                      {item.label}
-                    </a>
+                    />
+                    {item.label}
                   </Link>
                 );
               })}
