@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import {
   insertQuotationSchema,
   insertQuotationTeamMemberSchema
 } from "@shared/schema";
+import { reinitializeDatabase } from "./reinit-data";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Clients routes
@@ -353,6 +354,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/options/client-engagement", async (_, res) => {
     const options = await storage.getClientEngagementOptions();
     res.json(options);
+  });
+
+  // Admin route para reinicializar la base de datos con los nuevos datos
+  app.post("/api/admin/reinit-database", async (req, res) => {
+    try {
+      await reinitializeDatabase();
+      res.json({ message: "Database reinitialized successfully" });
+    } catch (error) {
+      console.error("Error reinitializing database:", error);
+      res.status(500).json({ message: "Failed to reinitialize database" });
+    }
   });
 
   const httpServer = createServer(app);

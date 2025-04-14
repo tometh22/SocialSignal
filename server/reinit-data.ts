@@ -1,16 +1,17 @@
 import { db } from "./db";
 import { roles, personnel, clients, reportTemplates } from "@shared/schema";
 
-export async function initializeDatabase() {
+export async function reinitializeDatabase() {
   try {
-    // Verificar si ya hay datos en la base de datos
-    const existingRoles = await db.select().from(roles);
-    if (existingRoles.length > 0) {
-      console.log("La base de datos ya contiene datos. Omitiendo inicialización.");
-      return;
-    }
+    console.log("Reinicializando la base de datos...");
 
-    console.log("Inicializando base de datos con datos de muestra...");
+    // Eliminar todos los datos existentes (en orden para respetar las restricciones de clave externa)
+    await db.delete(personnel);
+    await db.delete(reportTemplates);
+    await db.delete(clients);
+    await db.delete(roles);
+
+    console.log("Datos existentes eliminados. Insertando nuevos datos...");
 
     // Insertar roles
     const [seniorAnalyst] = await db.insert(roles).values({
@@ -39,16 +40,6 @@ export async function initializeDatabase() {
 
     // Insertar personal
     await db.insert(personnel).values([
-      // Miembros originales
-      { name: "John Davis", roleId: seniorAnalyst.id, hourlyRate: 85 },
-      { name: "Sarah Miller", roleId: seniorAnalyst.id, hourlyRate: 90 },
-      { name: "Michael Wong", roleId: seniorAnalyst.id, hourlyRate: 85 },
-      { name: "Alex Chen", roleId: dataScientist.id, hourlyRate: 95 },
-      { name: "Emma Rodriguez", roleId: dataScientist.id, hourlyRate: 100 },
-      { name: "Rachel Kim", roleId: contentSpecialist.id, hourlyRate: 75 },
-      { name: "Jason Thompson", roleId: contentSpecialist.id, hourlyRate: 80 },
-      { name: "David Johnson", roleId: projectManager.id, hourlyRate: 80 },
-      
       // Nuevos miembros (Abril 2025)
       { name: "Tomi C", roleId: seniorAnalyst.id, hourlyRate: 22.9 },
       { name: "Vicky P", roleId: seniorAnalyst.id, hourlyRate: 20.3 },
@@ -125,8 +116,8 @@ export async function initializeDatabase() {
       }
     ]);
 
-    console.log("Inicialización de datos completada con éxito.");
+    console.log("Reinicialización de datos completada con éxito.");
   } catch (error) {
-    console.error("Error al inicializar la base de datos:", error);
+    console.error("Error al reinicializar la base de datos:", error);
   }
 }
