@@ -53,12 +53,14 @@ interface QuoteContextType {
   totalAmount: number;
   complexityFactors: ComplexityFactors;
   quotationData: QuotationData;
+  quoteOption: "roles" | "team";
   updateProjectDetails: (details: Partial<ProjectDetails>) => void;
   addTeamMember: (member: Omit<TeamMember, "id">) => void;
   updateTeamMember: (id: string, member: TeamMember) => void;
   removeTeamMember: (id: string) => void;
   updateReportTemplate: (templateId: number) => void;
   updateTemplateCustomization: (customization: string) => void;
+  updateQuoteOption: (option: "roles" | "team") => void;
   analyzeInputs: () => void;
   calculateBaseCost: () => void;
   calculateTotalCost: () => void;
@@ -72,6 +74,9 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Team members
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  
+  // Quote option
+  const [quoteOption, setQuoteOption] = useState<"roles" | "team">("roles");
   
   // Report template
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
@@ -153,6 +158,13 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateTemplateCustomization = useCallback((customization: string) => {
     setTemplateCustomization(customization);
   }, []);
+  
+  // Update quote option
+  const updateQuoteOption = useCallback((option: "roles" | "team") => {
+    setQuoteOption(option);
+    // Limpiar miembros del equipo cuando se cambia la opción
+    setTeamMembers([]);
+  }, []);
 
   // Analyze inputs to determine complexity factors
   const analyzeInputs = useCallback(() => {
@@ -230,12 +242,14 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     totalAmount,
     complexityFactors,
     quotationData,
+    quoteOption,
     updateProjectDetails,
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
     updateReportTemplate,
     updateTemplateCustomization,
+    updateQuoteOption,
     analyzeInputs,
     calculateBaseCost,
     calculateTotalCost

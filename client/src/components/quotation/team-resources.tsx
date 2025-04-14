@@ -18,11 +18,10 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
-    calculateTotalCost
+    calculateTotalCost,
+    quoteOption,
+    updateQuoteOption
   } = useQuoteContext();
-  
-  // Estado para controlar la opción de cotización: "roles" o "miembros"
-  const [quoteOption, setQuoteOption] = useState<"roles" | "team">("roles");
 
   // Get roles and personnel from API
   const { data: roles } = useQuery<Role[]>({
@@ -170,7 +169,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
           <Button
             type="button"
             variant={quoteOption === "roles" ? "default" : "outline"}
-            onClick={() => setQuoteOption("roles")}
+            onClick={() => updateQuoteOption("roles")}
             className="flex-1"
           >
             Por Roles (Tarifas Estándar)
@@ -178,7 +177,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
           <Button
             type="button"
             variant={quoteOption === "team" ? "default" : "outline"}
-            onClick={() => setQuoteOption("team")}
+            onClick={() => updateQuoteOption("team")}
             className="flex-1"
           >
             Por Miembros Específicos
