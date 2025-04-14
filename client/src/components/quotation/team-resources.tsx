@@ -294,13 +294,16 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
             // Find the team member for this role if it exists
             const teamMember = teamMembers.find(member => member.roleId === role.id);
             
+            // Debug information
+            console.log(`Rol ${role.id} (${role.name}): seleccionado=${isSelected}, recomendado=${isRecommended}`);
+            
             return (
               <div
                 key={role.id}
                 className={cn(
-                  "card-select p-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 cursor-pointer",
-                  isSelected && "selected",
-                  isRecommended && !isSelected && "border-blue-300 border-dashed"
+                  "card-select p-4 border rounded-lg hover:bg-neutral-50 cursor-pointer transition-all",
+                  isSelected ? "selected border-green-400 bg-green-50 hover:bg-green-50" : "border-neutral-300",
+                  isRecommended && !isSelected && "border-blue-400 border-dashed border-2"
                 )}
                 onClick={() => toggleRoleSelection(role.id, !isSelected)}
               >
@@ -403,16 +406,48 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
         </div>
       </div>
       
-      <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
-        <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
-          <span className="mr-1">←</span>
-          Atrás
-        </Button>
+      <div className="pt-4 border-t border-neutral-200">
+        <div className="flex items-center justify-between mb-4">
+          <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
+            <span className="mr-1">←</span>
+            Atrás
+          </Button>
+
+          <div className="flex gap-3">
+            {recommendedRoleIds.length > 0 && teamMembers.length === 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                onClick={() => {
+                  addRecommendedRoles();
+                  toast({
+                    title: "Roles Recomendados Añadidos",
+                    description: `Se han añadido ${recommendedRoleIds.length} roles recomendados a tu equipo.`,
+                  });
+                  calculateTotalCost();
+                }}
+              >
+                <span className="mr-1">✓</span>
+                Aplicar {recommendedRoleIds.length} Roles Recomendados
+              </Button>
+            )}
+            <Button type="button" onClick={handleContinue} className="flex items-center">
+              Continuar
+              <span className="ml-1">→</span>
+            </Button>
+          </div>
+        </div>
         
-        <Button type="button" onClick={handleContinue} className="flex items-center">
-          Continuar
-          <span className="ml-1">→</span>
-        </Button>
+        {recommendedRoleIds.length > 0 && teamMembers.length === 0 && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+            <h5 className="text-base font-medium text-blue-700">Roles Recomendados Disponibles</h5>
+            <p className="text-sm text-blue-600 mt-1">
+              Hay {recommendedRoleIds.length} roles recomendados para este proyecto basados en la plantilla seleccionada.
+              Puedes aplicarlos automáticamente o configurar el equipo manualmente.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Cost breakdown */}

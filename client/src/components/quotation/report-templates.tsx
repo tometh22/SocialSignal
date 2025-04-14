@@ -238,10 +238,10 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   onNext();
                 }
               }}
-              className="flex items-center"
+              className="flex items-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
             >
               <span className="mr-1">✓</span>
-              Usar Roles Recomendados
+              Usar {recommendedRoleIds.length} Roles Recomendados
             </Button>
             
             <Button type="button" onClick={handleContinue} className="flex items-center">

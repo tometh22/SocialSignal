@@ -146,11 +146,14 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Report template operations
   const updateReportTemplate = useCallback((templateId: number) => {
+    console.log("Actualizando plantilla a:", templateId);
     setSelectedTemplateId(templateId);
     
     // Update template complexity factor
     if (templates) {
       const template = templates.find(t => t.id === templateId);
+      console.log("Plantilla encontrada:", template);
+      
       if (template) {
         const templateFactor = getTemplateFactor(template.complexity);
         setComplexityFactors(prev => ({
@@ -179,6 +182,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           recommendedIds = [9, 11];
         }
         
+        console.log("Configurando roles recomendados:", recommendedIds);
         setRecommendedRoleIds(recommendedIds);
       }
     }
@@ -271,26 +275,43 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Función para añadir roles recomendados al equipo basado en la plantilla seleccionada
   const addRecommendedRoles = useCallback(() => {
-    // Limpiar roles existentes si estamos en modo "roles"
-    if (quoteOption === "roles" && roles) {
-      setTeamMembers([]);
-      
+    console.log("Añadiendo roles recomendados:", recommendedRoleIds);
+    
+    // Siempre limpiamos roles existentes al añadir los recomendados
+    setTeamMembers([]);
+    
+    if (roles) {
       // Para cada rol recomendado, añadirlo al equipo si existe
       recommendedRoleIds.forEach(roleId => {
         const role = roles.find(r => r.id === roleId);
+        console.log("Procesando rol recomendado:", roleId, role);
+        
         if (role) {
           // Añadir el rol con configuración predeterminada
-          addTeamMember({
+          const newMember = {
             roleId: role.id,
             personnelId: null,
             hours: 10, // Horas predeterminadas
             rate: role.defaultRate,
             cost: 10 * role.defaultRate
-          });
+          };
+          
+          console.log("Añadiendo miembro:", newMember);
+          
+          // Usamos directamente la función en lugar de la versión memorizada
+          // para evitar problemas de dependencias en useCallback
+          setTeamMembers(prev => [...prev, {
+            ...newMember,
+            id: uuidv4()
+          }]);
         }
       });
+      
+      console.log("Roles recomendados añadidos");
+    } else {
+      console.log("No hay roles disponibles para añadir");
     }
-  }, [recommendedRoleIds, quoteOption, addTeamMember, roles]);
+  }, [recommendedRoleIds, roles]);
 
   const value = {
     projectDetails,
