@@ -28,27 +28,27 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
 
   // Helper functions to get names
   const getPersonnelName = (personnelId: number | null) => {
-    if (!personnelId || !allPersonnel) return "Not assigned";
+    if (!personnelId || !allPersonnel) return "No asignado";
     const person = allPersonnel.find(p => p.id === personnelId);
-    return person ? person.name : "Not assigned";
+    return person ? person.name : "No asignado";
   };
 
   const getRoleName = (roleId: number) => {
-    if (!roles) return "Unknown Role";
+    if (!roles) return "Rol Desconocido";
     const role = roles.find(r => r.id === roleId);
-    return role ? role.name : "Unknown Role";
+    return role ? role.name : "Rol Desconocido";
   };
 
   return (
     <div className="bg-white rounded-lg">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-neutral-800">
-          {showComplexity ? "Updated Cost Breakdown" : "Preliminary Cost Estimate"}
+          {showComplexity ? "Desglose de Costos Actualizado" : "Estimación Preliminar de Costos"}
         </h3>
         {showComplexity && (
           <div>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success bg-opacity-10 text-success">
-              Updated
+              Actualizado
             </span>
           </div>
         )}
@@ -56,16 +56,16 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
 
       {teamMembers.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-base font-medium text-neutral-700 mb-3">Team Cost Breakdown</h4>
+          <h4 className="text-base font-medium text-neutral-700 mb-3">Desglose de Costos del Equipo</h4>
           <div className="overflow-hidden rounded-lg border border-neutral-200">
             <table className="min-w-full divide-y divide-neutral-200">
               <thead className="bg-neutral-50">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Team Member</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rate</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Hours</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Cost</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rol</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Miembro del Equipo</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Tarifa</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Horas</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Costo</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-neutral-200">
@@ -89,7 +89,7 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
                   </tr>
                 ))}
                 <tr className="bg-neutral-50">
-                  <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Total Base Cost</td>
+                  <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Costo Base Total</td>
                   <td className="px-4 py-2 text-sm font-mono font-medium text-neutral-900">
                     ${baseCost.toFixed(2)}
                   </td>
@@ -102,28 +102,28 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="p-4 bg-neutral-100 rounded-lg">
-          <div className="text-sm text-neutral-600 mb-1">Base Cost</div>
+          <div className="text-sm text-neutral-600 mb-1">Costo Base</div>
           <div className="text-2xl font-mono font-medium">{formatCurrency(baseCost)}</div>
         </div>
         
         {showComplexity && complexityAdjustment > 0 && (
           <div className="p-4 bg-neutral-100 rounded-lg">
-            <div className="text-sm text-neutral-600 mb-1">Complexity Adjustment</div>
+            <div className="text-sm text-neutral-600 mb-1">Ajuste por Complejidad</div>
             <div className="text-2xl font-mono font-medium">{formatCurrency(complexityAdjustment)}</div>
             <div className="text-xs text-neutral-500 mt-1">
-              +{(complexityAdjustment / baseCost * 100).toFixed(0)}% from factors
+              +{(complexityAdjustment / baseCost * 100).toFixed(0)}% por factores
             </div>
           </div>
         )}
         
         <div className="p-4 bg-neutral-100 rounded-lg">
-          <div className="text-sm text-neutral-600 mb-1">Standard Markup (2×)</div>
+          <div className="text-sm text-neutral-600 mb-1">Margen Estándar (2×)</div>
           <div className="text-2xl font-mono font-medium">{formatCurrency(markupAmount)}</div>
         </div>
         
         <div className="p-4 bg-primary bg-opacity-10 rounded-lg border border-primary">
           <div className="text-sm text-primary mb-1">
-            {showComplexity ? "Total Quote" : "Total Preliminary Quote"}
+            {showComplexity ? "Cotización Total" : "Cotización Preliminar Total"}
           </div>
           <div className="text-2xl font-mono font-medium text-primary">{formatCurrency(totalAmount)}</div>
         </div>

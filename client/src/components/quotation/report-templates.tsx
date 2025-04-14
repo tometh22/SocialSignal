@@ -45,8 +45,8 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   const validateForm = () => {
     if (!selectedTemplateId) {
       toast({
-        title: "Template Required",
-        description: "Please select a report template.",
+        title: "Plantilla Requerida",
+        description: "Por favor, selecciona una plantilla de informe.",
         variant: "destructive",
       });
       return false;
@@ -57,11 +57,11 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   // Prepare data for cost factors chart
   const getCostFactorsData = () => {
     const factorsData = [
-      { name: "Analysis Type", value: complexityFactors.analysisTypeFactor || 0 },
-      { name: "Mentions Volume", value: complexityFactors.mentionsVolumeFactor || 0 },
-      { name: "Countries", value: complexityFactors.countriesFactor || 0 },
-      { name: "Client Engagement", value: complexityFactors.clientEngagementFactor || 0 },
-      { name: "Template", value: complexityFactors.templateFactor || 0 },
+      { name: "Tipo de Análisis", value: complexityFactors.analysisTypeFactor || 0 },
+      { name: "Volumen de Menciones", value: complexityFactors.mentionsVolumeFactor || 0 },
+      { name: "Países", value: complexityFactors.countriesFactor || 0 },
+      { name: "Participación del Cliente", value: complexityFactors.clientEngagementFactor || 0 },
+      { name: "Plantilla", value: complexityFactors.templateFactor || 0 },
     ].filter(factor => factor.value > 0);
     
     return factorsData;
@@ -80,9 +80,9 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Report Templates</h3>
+      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Plantillas de Informe</h3>
       
-      <p className="text-sm text-neutral-600 mb-6">Select a report template that best fits your project requirements. The template selection may affect the overall quote based on complexity and required customization.</p>
+      <p className="text-sm text-neutral-600 mb-6">Selecciona una plantilla de informe que mejor se adapte a los requisitos de tu proyecto. La selección de la plantilla puede afectar la cotización general según la complejidad y la personalización requerida.</p>
       
       <div className="mb-6">
         <RadioGroup 
@@ -132,13 +132,13 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       </div>
       
       <div className="p-4 bg-neutral-100 rounded-lg mb-6">
-        <h4 className="text-base font-medium text-neutral-800 mb-3">Template Customization</h4>
-        <p className="text-sm text-neutral-600 mb-3">Specify any custom requirements or modifications needed for the selected template.</p>
+        <h4 className="text-base font-medium text-neutral-800 mb-3">Personalización de Plantilla</h4>
+        <p className="text-sm text-neutral-600 mb-3">Especifica cualquier requisito personalizado o modificación necesaria para la plantilla seleccionada.</p>
         
         <Textarea
           className="w-full"
           rows={3}
-          placeholder="Describe any special requirements or customizations needed..."
+          placeholder="Describe cualquier requisito especial o personalización necesaria..."
           value={templateCustomization || ""}
           onChange={(e) => updateTemplateCustomization(e.target.value)}
         />
@@ -147,11 +147,11 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
           <span className="material-icons mr-1">arrow_back</span>
-          Back
+          Atrás
         </Button>
         
         <Button type="button" onClick={handleContinue} className="flex items-center">
-          Continue
+          Continuar
           <span className="material-icons ml-1">arrow_forward</span>
         </Button>
       </div>

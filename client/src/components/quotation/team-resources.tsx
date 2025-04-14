@@ -117,8 +117,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
   const validateForm = () => {
     if (teamMembers.length === 0) {
       toast({
-        title: "Team Required",
-        description: "Please select at least one team role.",
+        title: "Equipo Requerido",
+        description: "Por favor, selecciona al menos un rol para el equipo.",
         variant: "destructive",
       });
       return false;
@@ -128,8 +128,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     const missingPersonnel = teamMembers.some(member => member.personnelId === null);
     if (missingPersonnel) {
       toast({
-        title: "Team Member Required",
-        description: "Please assign a team member to each selected role.",
+        title: "Miembro del Equipo Requerido",
+        description: "Por favor, asigna un miembro del equipo a cada rol seleccionado.",
         variant: "destructive",
       });
       return false;
@@ -148,12 +148,12 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Team & Resources</h3>
+      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Equipo y Recursos</h3>
       
       {/* Team roles selection */}
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-neutral-800 mb-4">Team Roles</h4>
-        <p className="text-sm text-neutral-600 mb-4">Select the roles required for this project. You can specify hours and select specific team members.</p>
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Roles del Equipo</h4>
+        <p className="text-sm text-neutral-600 mb-4">Selecciona los roles necesarios para este proyecto. Puedes especificar horas y seleccionar miembros específicos del equipo.</p>
         
         <div className="space-y-4">
           {roles?.map(role => {
@@ -190,7 +190,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                     {isSelected && teamMember && (
                       <div className="mt-3 grid grid-cols-2 gap-4">
                         <div>
-                          <Label className="block text-sm font-medium text-neutral-700 mb-1">Estimated Hours</Label>
+                          <Label className="block text-sm font-medium text-neutral-700 mb-1">Horas Estimadas</Label>
                           <Input
                             type="number"
                             min="1"
@@ -202,7 +202,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                         </div>
                         
                         <div>
-                          <Label className="block text-sm font-medium text-neutral-700 mb-1">Team Member</Label>
+                          <Label className="block text-sm font-medium text-neutral-700 mb-1">Miembro del Equipo</Label>
                           <Select
                             value={teamMember.personnelId?.toString() || ""}
                             onValueChange={(value) => handlePersonnelChange(teamMember.id, parseInt(value))}
@@ -211,7 +211,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                               onClick={(e) => e.stopPropagation()}
                               className="w-full"
                             >
-                              <SelectValue placeholder="Select member" />
+                              <SelectValue placeholder="Seleccionar miembro" />
                             </SelectTrigger>
                             <SelectContent>
                               {getPersonnelByRole(role.id).map(person => (
@@ -235,11 +235,11 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
           <span className="material-icons mr-1">arrow_back</span>
-          Back
+          Atrás
         </Button>
         
         <Button type="button" onClick={handleContinue} className="flex items-center">
-          Continue
+          Continuar
           <span className="material-icons ml-1">arrow_forward</span>
         </Button>
       </div>
