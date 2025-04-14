@@ -15,12 +15,14 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
   const { toast } = useToast();
   const {
     teamMembers,
+    recommendedRoleIds,
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
     calculateTotalCost,
     quoteOption,
     updateQuoteOption,
+    addRecommendedRoles,
     baseCost,
     complexityAdjustment,
     markupAmount,
@@ -205,6 +207,32 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
               Al seleccionar miembros específicos, puedes asignar personas concretas a cada rol 
               y utilizar sus tarifas individuales en lugar de las tarifas estándar de los roles.
             </p>
+          </div>
+        )}
+        
+        {quoteOption === "roles" && recommendedRoleIds.length > 0 && teamMembers.length === 0 && (
+          <div className="mb-4">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-3">
+              <h5 className="text-base font-medium text-blue-700">Roles Recomendados Disponibles</h5>
+              <p className="text-sm text-blue-600 mt-1">
+                Basado en la plantilla seleccionada, tenemos {recommendedRoleIds.length} roles recomendados para este proyecto.
+              </p>
+            </div>
+            <Button 
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                addRecommendedRoles();
+                toast({
+                  title: "Roles Recomendados Aplicados",
+                  description: `Se han añadido ${recommendedRoleIds.length} roles recomendados a tu equipo.`,
+                });
+              }}
+            >
+              <span className="mr-1">✓</span>
+              Aplicar Roles Recomendados
+            </Button>
           </div>
         )}
         

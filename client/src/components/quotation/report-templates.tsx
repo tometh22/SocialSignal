@@ -215,16 +215,51 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
         />
       </div>
       
-      <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
-        <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
-          <span className="mr-1">←</span>
-          Atrás
-        </Button>
+      <div className="pt-4 border-t border-neutral-200">
+        <div className="flex items-center justify-between mb-4">
+          <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
+            <span className="mr-1">←</span>
+            Atrás
+          </Button>
+          
+          <div className="flex space-x-3">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => {
+                if (validateForm()) {
+                  // Primero configuramos para usar roles recomendados
+                  addRecommendedRoles();
+                  toast({
+                    title: "Roles Recomendados",
+                    description: `Se aplicarán ${recommendedRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
+                  });
+                  calculateTotalCost();
+                  onNext();
+                }
+              }}
+              className="flex items-center"
+            >
+              <span className="mr-1">✓</span>
+              Usar Roles Recomendados
+            </Button>
+            
+            <Button type="button" onClick={handleContinue} className="flex items-center">
+              Continuar
+              <span className="ml-1">→</span>
+            </Button>
+          </div>
+        </div>
         
-        <Button type="button" onClick={handleContinue} className="flex items-center">
-          Continuar
-          <span className="ml-1">→</span>
-        </Button>
+        {recommendedRoleIds.length > 0 && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
+            <h5 className="text-base font-medium text-blue-700">Roles Recomendados Disponibles</h5>
+            <p className="text-sm text-blue-600 mt-1">
+              La plantilla seleccionada sugiere {recommendedRoleIds.length} roles específicos para este proyecto.
+              Puedes aplicar estos roles automáticamente o configurar el equipo manualmente en el siguiente paso.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Cost breakdown with chart visualization */}
