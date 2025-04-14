@@ -20,7 +20,11 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     removeTeamMember,
     calculateTotalCost,
     quoteOption,
-    updateQuoteOption
+    updateQuoteOption,
+    baseCost,
+    complexityAdjustment,
+    markupAmount,
+    totalAmount
   } = useQuoteContext();
 
   // Get roles and personnel from API
@@ -194,6 +198,63 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
             : "Selecciona los roles y asigna miembros específicos del equipo para este proyecto."}
         </p>
         
+        {quoteOption === "team" && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+            <h5 className="text-base font-medium text-blue-700">Modo de cotización personalizada</h5>
+            <p className="text-sm text-blue-600 mt-1">
+              Al seleccionar miembros específicos, puedes asignar personas concretas a cada rol 
+              y utilizar sus tarifas individuales en lugar de las tarifas estándar de los roles.
+            </p>
+          </div>
+        )}
+        
+        {/* Botón para agregar miembro personalizado (solo en modo miembros específicos) */}
+        {quoteOption === "team" && (
+          <div className="mb-4">
+            <Button 
+              type="button"
+              variant="outline"
+              className="w-full flex items-center justify-center border-dashed border-2"
+              onClick={(e) => {
+                e.preventDefault();
+                // Abre un diálogo o modal para crear un nuevo miembro personalizado
+                // Por ahora, agregaremos uno con datos predeterminados
+                if (roles && roles.length > 0) {
+                  const defaultRole = roles[0];
+                  addTeamMember({
+                    roleId: defaultRole.id,
+                    personnelId: null,
+                    hours: 10,
+                    rate: defaultRole.defaultRate,
+                    cost: 10 * defaultRole.defaultRate
+                  });
+                  toast({
+                    title: "Miembro Personalizado Añadido",
+                    description: "Se ha añadido un nuevo miembro al equipo. Personaliza sus detalles.",
+                  });
+                }
+              }}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="mr-2"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Agregar Miembro Personalizado
+            </Button>
+          </div>
+        )}
+        
         <div className="space-y-4">
           {roles?.map(role => {
             // Check if this role is currently selected
@@ -263,6 +324,30 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                             </Select>
                           </div>
                         )}
+                        
+                        {quoteOption === "team" && teamMember.personnelId && (
+                          <div className="col-span-2 mt-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="block text-sm font-medium text-neutral-700">Tarifa Aplicada</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={teamMember.rate}
+                                onChange={(e) => {
+                                  const newRate = parseFloat(e.target.value) || 0;
+                                  updateTeamMember(teamMember.id, {
+                                    ...teamMember,
+                                    rate: newRate,
+                                    cost: teamMember.hours * newRate
+                                  });
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-32 text-right"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -286,8 +371,115 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
       </div>
 
       {/* Cost breakdown */}
-      <div className="mt-6">
-        <CostBreakdown teamMembers={teamMembers} />
+      <div className="mt-6 bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-neutral-800">Estimación Preliminar de Costos</h3>
+          <div>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              Actualizado
+            </span>
+          </div>
+        </div>
+
+        {/* Costos detallados */}
+        <div className="mb-6">
+          <h4 className="text-base font-medium text-neutral-700 mb-3">Desglose de Costos del Equipo</h4>
+          <div className="overflow-hidden rounded-lg border border-neutral-200">
+            <table className="min-w-full divide-y divide-neutral-200">
+              <thead className="bg-neutral-50">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rol</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {quoteOption === "team" ? "Miembro del Equipo" : "No asignado"}
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Tarifa</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Horas</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Costo</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-neutral-200">
+                {teamMembers.map(member => {
+                  // Encontrar datos del personal/rol
+                  const roleName = getRoleName(member.roleId);
+                  const personnelName = member.personnelId 
+                    ? allPersonnel?.find(p => p.id === member.personnelId)?.name || "No asignado" 
+                    : "No asignado";
+                  
+                  return (
+                    <tr key={member.id}>
+                      <td className="px-4 py-2 text-sm text-neutral-900">{roleName}</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">
+                        {quoteOption === "team" 
+                          ? personnelName 
+                          : <span className="text-neutral-400">No asignado</span>}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">${member.rate.toFixed(2)}/hr</td>
+                      <td className="px-4 py-2 text-sm text-neutral-900">{member.hours}</td>
+                      <td className="px-4 py-2 text-sm font-medium text-neutral-900 flex justify-between items-center">
+                        <span>${member.cost.toFixed(2)}</span>
+                        {quoteOption === "team" && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              removeTeamMember(member.id);
+                              toast({
+                                title: "Miembro Eliminado",
+                                description: "El miembro del equipo ha sido eliminado de la cotización.",
+                              });
+                            }}
+                          >
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="16" 
+                              height="16" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            >
+                              <path d="M3 6h18"></path>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            </svg>
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-neutral-50 font-medium">
+                  <td colSpan={4} className="px-4 py-2 text-sm text-right">Costo Base Total</td>
+                  <td className="px-4 py-2 text-sm">${baseCost.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Resumen de costos */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-neutral-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-neutral-700 mb-1">Costo Base</h5>
+            <p className="text-2xl font-mono font-semibold">${baseCost.toFixed(2)}</p>
+          </div>
+          <div className="bg-neutral-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-neutral-700 mb-1">
+              Ajuste por Complejidad {complexityAdjustment > 0 && `(+${(complexityAdjustment/baseCost*100).toFixed(0)}%)`}
+            </h5>
+            <p className="text-2xl font-mono font-semibold">${complexityAdjustment.toFixed(2)}</p>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h5 className="text-sm font-medium text-blue-700 mb-1">Margen Estándar (2×)</h5>
+            <p className="text-2xl font-mono font-semibold text-blue-700">${totalAmount.toFixed(2)}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

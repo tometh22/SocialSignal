@@ -162,8 +162,17 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Update quote option
   const updateQuoteOption = useCallback((option: "roles" | "team") => {
     setQuoteOption(option);
-    // Limpiar miembros del equipo cuando se cambia la opción
+    
+    // Al cambiar la opción, reseteamos el equipo para empezar de nuevo
     setTeamMembers([]);
+    
+    // Cuando cambiamos a opción por equipo, debemos reflejar correctamente
+    // que se usarán tarifas personalizadas por miembro en lugar de tarifas estándar
+    if (option === "team") {
+      console.log("Cambiando a cotización por miembros específicos");
+    } else {
+      console.log("Cambiando a cotización por roles estándar");
+    }
   }, []);
 
   // Analyze inputs to determine complexity factors
