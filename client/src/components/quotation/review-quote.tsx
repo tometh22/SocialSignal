@@ -173,36 +173,36 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Review & Generate Quote</h3>
+      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Revisar y Generar Cotización</h3>
       
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-neutral-800 mb-4">Project Summary</h4>
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Resumen del Proyecto</h4>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <h5 className="text-sm font-medium text-neutral-600 mb-2">Client & Project Details</h5>
+            <h5 className="text-sm font-medium text-neutral-600 mb-2">Cliente y Detalles del Proyecto</h5>
             <div className="p-4 bg-neutral-100 rounded-lg">
               <dl className="space-y-3">
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Client</dt>
+                  <dt className="text-sm text-neutral-600">Cliente</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.clientId ? getClientName(projectDetails.clientId) : "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Project Name</dt>
+                  <dt className="text-sm text-neutral-600">Nombre del Proyecto</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.projectName || "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Analysis Type</dt>
+                  <dt className="text-sm text-neutral-600">Tipo de Análisis</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.analysisType || "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Project Type</dt>
+                  <dt className="text-sm text-neutral-600">Tipo de Proyecto</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.projectType || "--"}
                   </dd>
@@ -212,29 +212,29 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
           </div>
           
           <div>
-            <h5 className="text-sm font-medium text-neutral-600 mb-2">Scope Parameters</h5>
+            <h5 className="text-sm font-medium text-neutral-600 mb-2">Parámetros de Alcance</h5>
             <div className="p-4 bg-neutral-100 rounded-lg">
               <dl className="space-y-3">
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Mentions</dt>
+                  <dt className="text-sm text-neutral-600">Menciones</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.mentionsVolume || "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Countries Covered</dt>
+                  <dt className="text-sm text-neutral-600">Países Cubiertos</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.countriesCovered || "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Client Engagement</dt>
+                  <dt className="text-sm text-neutral-600">Participación del Cliente</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {projectDetails.clientEngagement || "--"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Template</dt>
+                  <dt className="text-sm text-neutral-600">Plantilla</dt>
                   <dd className="text-sm font-medium text-neutral-900">
                     {selectedTemplateId ? getTemplateName(selectedTemplateId) : "--"}
                   </dd>
@@ -244,16 +244,16 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
           </div>
         </div>
         
-        <h5 className="text-sm font-medium text-neutral-600 mb-2">Team & Resources</h5>
+        <h5 className="text-sm font-medium text-neutral-600 mb-2">Equipo y Recursos</h5>
         <div className="overflow-hidden rounded-lg border border-neutral-200 mb-6">
           <table className="min-w-full divide-y divide-neutral-200">
             <thead className="bg-neutral-50">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Team Member</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rate</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Hours</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Cost</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rol</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Miembro del Equipo</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Tarifa</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Horas</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Costo</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-200">
@@ -306,7 +306,7 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
                 </tr>
               ))}
               <tr className="bg-neutral-50">
-                <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Total Base Cost</td>
+                <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Costo Base Total</td>
                 <td className="px-4 py-2 text-sm font-mono font-medium text-neutral-900">
                   ${baseCost.toFixed(2)}
                 </td>
@@ -317,41 +317,41 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
       </div>
       
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-neutral-800 mb-4">Final Quote</h4>
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Cotización Final</h4>
         
         <div className="p-6 border border-primary rounded-lg bg-primary bg-opacity-5 mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-3">
-              <h5 className="text-base font-medium text-neutral-800 mb-3">Quote Breakdown</h5>
+              <h5 className="text-base font-medium text-neutral-800 mb-3">Desglose de Cotización</h5>
               <div className="space-y-3">
                 <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Base Cost (Team Hours)</span>
+                  <span className="text-sm text-neutral-600">Costo Base (Horas de Equipo)</span>
                   <span className="text-sm font-mono font-medium text-neutral-900">
                     {formatCurrency(baseCost)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
                   <span className="text-sm text-neutral-600">
-                    Complexity Adjustments ({(complexityAdjustment / baseCost * 100).toFixed(0)}%)
+                    Ajustes por Complejidad ({(complexityAdjustment / baseCost * 100).toFixed(0)}%)
                   </span>
                   <span className="text-sm font-mono font-medium text-neutral-900">
                     {formatCurrency(complexityAdjustment)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Adjusted Base Cost</span>
+                  <span className="text-sm text-neutral-600">Costo Base Ajustado</span>
                   <span className="text-sm font-mono font-medium text-neutral-900">
                     {formatCurrency(baseCost + complexityAdjustment)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Standard Markup (2×)</span>
+                  <span className="text-sm text-neutral-600">Margen Estándar (2×)</span>
                   <span className="text-sm font-mono font-medium text-neutral-900">
                     {formatCurrency(markupAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-1">
-                  <span className="text-base font-medium text-neutral-800">Total Quote</span>
+                  <span className="text-base font-medium text-neutral-800">Cotización Total</span>
                   <span className="text-base font-mono font-medium text-primary">
                     {formatCurrency(adjustedAmount || totalAmount)}
                   </span>
@@ -360,9 +360,9 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
             </div>
             
             <div className="lg:col-span-2">
-              <h5 className="text-base font-medium text-neutral-800 mb-3">Quote Adjustments</h5>
+              <h5 className="text-base font-medium text-neutral-800 mb-3">Ajustes de Cotización</h5>
               <div className="mb-3">
-                <Label className="block text-sm font-medium text-neutral-700 mb-1">Adjust Final Quote</Label>
+                <Label className="block text-sm font-medium text-neutral-700 mb-1">Ajustar Cotización Final</Label>
                 <div className="flex items-center">
                   <Input
                     type="number"
@@ -374,11 +374,11 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
                 </div>
               </div>
               <div className="mb-3">
-                <Label className="block text-sm font-medium text-neutral-700 mb-1">Adjustment Reason</Label>
+                <Label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de Ajuste</Label>
                 <Textarea
                   className="w-full"
                   rows={2}
-                  placeholder="Enter reason for adjustment (if any)..."
+                  placeholder="Ingrese motivo del ajuste (si aplica)..."
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
                 />
@@ -388,11 +388,11 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
         </div>
         
         <div className="p-4 bg-neutral-100 rounded-lg mb-6">
-          <Label className="block text-sm font-medium text-neutral-700 mb-1">Additional Notes</Label>
+          <Label className="block text-sm font-medium text-neutral-700 mb-1">Notas Adicionales</Label>
           <Textarea
             className="w-full"
             rows={3}
-            placeholder="Additional project notes or special considerations..."
+            placeholder="Notas adicionales o consideraciones especiales del proyecto..."
             value={additionalNotes}
             onChange={(e) => setAdditionalNotes(e.target.value)}
           />
@@ -402,7 +402,7 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
       <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
         <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
           <span className="material-icons mr-1">arrow_back</span>
-          Back
+          Atrás
         </Button>
         
         <div className="flex space-x-4">
@@ -411,14 +411,14 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
             disabled={isSaving}
             onClick={() => navigate("/")}
           >
-            Cancel
+            Cancelar
           </Button>
           <Button
             disabled={isSaving}
             onClick={generateQuote}
             className="flex items-center"
           >
-            {isSaving ? "Generating..." : "Generate Quote"}
+            {isSaving ? "Generando..." : "Generar Cotización"}
             <span className="material-icons ml-1">check_circle</span>
           </Button>
         </div>
