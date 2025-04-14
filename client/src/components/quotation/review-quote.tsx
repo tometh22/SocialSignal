@@ -28,7 +28,8 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
     baseCost,
     markupAmount,
     totalAmount,
-    calculateTotalCost
+    calculateTotalCost,
+    updateTeamMember
   } = useQuoteContext();
 
   // Get client info
@@ -265,10 +266,39 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
                     {member.personnelId ? getPersonnelName(member.personnelId) : "--"}
                   </td>
                   <td className="px-4 py-2 text-sm font-mono text-neutral-900">
-                    ${member.rate.toFixed(2)}/hr
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={member.rate}
+                      onChange={(e) => {
+                        const newRate = parseFloat(e.target.value) || 0;
+                        updateTeamMember(member.id, {
+                          ...member,
+                          rate: newRate,
+                          cost: member.hours * newRate
+                        });
+                        calculateTotalCost();
+                      }}
+                      className="w-24 h-8 text-sm font-mono"
+                    />
                   </td>
                   <td className="px-4 py-2 text-sm text-neutral-900">
-                    {member.hours}
+                    <Input
+                      type="number"
+                      min="0"
+                      value={member.hours}
+                      onChange={(e) => {
+                        const newHours = parseInt(e.target.value) || 0;
+                        updateTeamMember(member.id, {
+                          ...member,
+                          hours: newHours,
+                          cost: newHours * member.rate
+                        });
+                        calculateTotalCost();
+                      }}
+                      className="w-20 h-8 text-sm"
+                    />
                   </td>
                   <td className="px-4 py-2 text-sm font-mono text-neutral-900">
                     ${member.cost.toFixed(2)}

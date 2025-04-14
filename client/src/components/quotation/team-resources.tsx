@@ -20,6 +20,9 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     removeTeamMember,
     calculateTotalCost
   } = useQuoteContext();
+  
+  // Estado para controlar la opción de cotización: "roles" o "miembros"
+  const [quoteOption, setQuoteOption] = useState<"roles" | "team">("roles");
 
   // Get roles and personnel from API
   const { data: roles } = useQuery<Role[]>({
@@ -124,15 +127,23 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
       return false;
     }
 
-    // Check if all team members have personnel assigned
-    const missingPersonnel = teamMembers.some(member => member.personnelId === null);
-    if (missingPersonnel) {
-      toast({
-        title: "Miembro del Equipo Requerido",
-        description: "Por favor, asigna un miembro del equipo a cada rol seleccionado.",
-        variant: "destructive",
-      });
-      return false;
+    // Si estamos cotizando por roles, no necesitamos verificar personal asignado
+    if (quoteOption === "roles") {
+      return true;
+    }
+
+    // Solo verificamos el personal si estamos cotizando por miembros del equipo
+    if (quoteOption === "team") {
+      // Check if all team members have personnel assigned
+      const missingPersonnel = teamMembers.some(member => member.personnelId === null);
+      if (missingPersonnel) {
+        toast({
+          title: "Miembro del Equipo Requerido",
+          description: "Por favor, asigna un miembro del equipo a cada rol seleccionado.",
+          variant: "destructive",
+        });
+        return false;
+      }
     }
 
     return true;
@@ -150,10 +161,39 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-xl font-semibold text-neutral-900 mb-6">Equipo y Recursos</h3>
       
+      {/* Opciones de cotización */}
+      <div className="mb-6">
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Tipo de Cotización</h4>
+        <p className="text-sm text-neutral-600 mb-4">Elige cómo quieres cotizar este proyecto:</p>
+        
+        <div className="flex space-x-4 mb-6">
+          <Button
+            type="button"
+            variant={quoteOption === "roles" ? "default" : "outline"}
+            onClick={() => setQuoteOption("roles")}
+            className="flex-1"
+          >
+            Por Roles (Tarifas Estándar)
+          </Button>
+          <Button
+            type="button"
+            variant={quoteOption === "team" ? "default" : "outline"}
+            onClick={() => setQuoteOption("team")}
+            className="flex-1"
+          >
+            Por Miembros Específicos
+          </Button>
+        </div>
+      </div>
+      
       {/* Team roles selection */}
       <div className="mb-6">
         <h4 className="text-lg font-medium text-neutral-800 mb-4">Roles del Equipo</h4>
-        <p className="text-sm text-neutral-600 mb-4">Selecciona los roles necesarios para este proyecto. Puedes especificar horas y seleccionar miembros específicos del equipo.</p>
+        <p className="text-sm text-neutral-600 mb-4">
+          {quoteOption === "roles" 
+            ? "Selecciona los roles necesarios para este proyecto y especifica las horas estimadas."
+            : "Selecciona los roles y asigna miembros específicos del equipo para este proyecto."}
+        </p>
         
         <div className="space-y-4">
           {roles?.map(role => {
@@ -188,7 +228,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                     <p className="text-sm text-neutral-600 mt-1">{role.description}</p>
                     
                     {isSelected && teamMember && (
-                      <div className="mt-3 grid grid-cols-2 gap-4">
+                      <div className={`mt-3 grid ${quoteOption === "team" ? "grid-cols-2" : "grid-cols-1"} gap-4`}>
                         <div>
                           <Label className="block text-sm font-medium text-neutral-700 mb-1">Horas Estimadas</Label>
                           <Input
@@ -201,27 +241,29 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                           />
                         </div>
                         
-                        <div>
-                          <Label className="block text-sm font-medium text-neutral-700 mb-1">Miembro del Equipo</Label>
-                          <Select
-                            value={teamMember.personnelId?.toString() || ""}
-                            onValueChange={(value) => handlePersonnelChange(teamMember.id, parseInt(value))}
-                          >
-                            <SelectTrigger
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full"
+                        {quoteOption === "team" && (
+                          <div>
+                            <Label className="block text-sm font-medium text-neutral-700 mb-1">Miembro del Equipo</Label>
+                            <Select
+                              value={teamMember.personnelId?.toString() || ""}
+                              onValueChange={(value) => handlePersonnelChange(teamMember.id, parseInt(value))}
                             >
-                              <SelectValue placeholder="Seleccionar miembro" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getPersonnelByRole(role.id).map(person => (
-                                <SelectItem key={person.id} value={person.id.toString()}>
-                                  {person.name} (${person.hourlyRate.toFixed(2)}/hr)
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                              <SelectTrigger
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full"
+                              >
+                                <SelectValue placeholder="Seleccionar miembro" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getPersonnelByRole(role.id).map(person => (
+                                  <SelectItem key={person.id} value={person.id.toString()}>
+                                    {person.name} (${person.hourlyRate.toFixed(2)}/hr)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
