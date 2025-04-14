@@ -309,7 +309,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
         <div className="flex justify-end mt-6">
           <Button type="button" onClick={handleContinue} className="flex items-center">
             Continuar
-            <span className="material-icons ml-1">arrow_forward</span>
+            <span className="ml-1">→</span>
           </Button>
         </div>
       </div>

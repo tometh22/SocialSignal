@@ -36,49 +36,53 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
     queryKey: ["/api/templates"],
   });
   
+  // Función para traducir textos
+  const translateText = (text: string | null, translations: Record<string, string>): string => {
+    if (!text) return "";
+    return translations[text] || text;
+  };
+  
+  // Traducciones para las plantillas
+  const nameTranslations: Record<string, string> = {
+    "Executive Dashboard": "Panel Ejecutivo",
+    "Comprehensive Analysis": "Análisis Completo",
+    "Campaign Performance": "Rendimiento de Campaña",
+    "Custom Template": "Plantilla Personalizada"
+  };
+  
+  const descriptionTranslations: Record<string, string> = {
+    "Concise, high-level metrics with key insights and strategic recommendations. Ideal for executive stakeholders.": 
+      "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
+    "Detailed evaluation with extensive metrics, audience segmentation, and demographic breakdown.": 
+      "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
+    "Pre, during, and post campaign analysis with KPI tracking and comparative benchmark data.": 
+      "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
+    "Build a custom report structure based on specific client requirements and project goals.": 
+      "Crea una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto."
+  };
+  
+  const featuresTranslations: Record<string, string> = {
+    "Core metrics only": "Solo métricas principales",
+    "Advanced metrics": "Métricas avanzadas",
+    "Trend analysis": "Análisis de tendencias",
+    "Custom metrics": "Métricas personalizadas"
+  };
+  
+  const pageRangeTranslations: Record<string, string> = {
+    "5-10 pages": "5-10 páginas",
+    "15-25 pages": "15-25 páginas",
+    "20-30 pages": "20-30 páginas",
+    "Variable length": "Longitud variable"
+  };
+  
   // Traducción de plantillas
-  const templates = originalTemplates?.map(template => {
-    // Traducciones
-    const nameTranslations: Record<string, string> = {
-      "Executive Dashboard": "Panel Ejecutivo",
-      "Comprehensive Analysis": "Análisis Completo",
-      "Campaign Performance": "Rendimiento de Campaña",
-      "Custom Template": "Plantilla Personalizada"
-    };
-    
-    const descriptionTranslations: Record<string, string> = {
-      "Concise, high-level metrics with key insights and strategic recommendations. Ideal for executive stakeholders.": 
-        "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
-      "Detailed evaluation with extensive metrics, audience segmentation, and demographic breakdown.": 
-        "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
-      "Pre, during, and post campaign analysis with KPI tracking and comparative benchmark data.": 
-        "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
-      "Build a custom report structure based on specific client requirements and project goals.": 
-        "Crea una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto."
-    };
-    
-    const featuresTranslations: Record<string, string> = {
-      "Core metrics only": "Solo métricas principales",
-      "Advanced metrics": "Métricas avanzadas",
-      "Trend analysis": "Análisis de tendencias",
-      "Custom metrics": "Métricas personalizadas"
-    };
-    
-    const pageRangeTranslations: Record<string, string> = {
-      "5-10 pages": "5-10 páginas",
-      "15-25 pages": "15-25 páginas",
-      "20-30 pages": "20-30 páginas",
-      "Variable length": "Longitud variable"
-    };
-    
-    return {
-      ...template,
-      name: nameTranslations[template.name] || template.name,
-      description: descriptionTranslations[template.description] || template.description,
-      features: featuresTranslations[template.features] || template.features,
-      pageRange: pageRangeTranslations[template.pageRange] || template.pageRange
-    };
-  });
+  const templates = originalTemplates?.map(template => ({
+    ...template,
+    name: translateText(template.name, nameTranslations),
+    description: translateText(template.description, descriptionTranslations),
+    features: translateText(template.features, featuresTranslations),
+    pageRange: translateText(template.pageRange, pageRangeTranslations)
+  }));
 
   // Update cost calculations when template changes
   useEffect(() => {
