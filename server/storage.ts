@@ -8,6 +8,8 @@ import {
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // Client operations
@@ -348,4 +350,180 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Implementación de la base de datos
+export class DatabaseStorage implements IStorage {
+  // Client operations
+  async getClients(): Promise<Client[]> {
+    return await db.select().from(clients);
+  }
+
+  async getClient(id: number): Promise<Client | undefined> {
+    const [client] = await db.select().from(clients).where(eq(clients.id, id));
+    return client;
+  }
+
+  async createClient(client: InsertClient): Promise<Client> {
+    const [newClient] = await db.insert(clients).values(client).returning();
+    return newClient;
+  }
+
+  async updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined> {
+    const [updatedClient] = await db
+      .update(clients)
+      .set(client)
+      .where(eq(clients.id, id))
+      .returning();
+    return updatedClient;
+  }
+
+  // Role operations
+  async getRoles(): Promise<Role[]> {
+    return await db.select().from(roles);
+  }
+
+  async getRole(id: number): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id));
+    return role;
+  }
+
+  async createRole(role: InsertRole): Promise<Role> {
+    const [newRole] = await db.insert(roles).values(role).returning();
+    return newRole;
+  }
+
+  async updateRole(id: number, role: Partial<InsertRole>): Promise<Role | undefined> {
+    const [updatedRole] = await db
+      .update(roles)
+      .set(role)
+      .where(eq(roles.id, id))
+      .returning();
+    return updatedRole;
+  }
+
+  // Personnel operations
+  async getPersonnel(): Promise<Personnel[]> {
+    return await db.select().from(personnel);
+  }
+
+  async getPersonnelByRole(roleId: number): Promise<Personnel[]> {
+    return await db.select().from(personnel).where(eq(personnel.roleId, roleId));
+  }
+
+  async getPersonnelById(id: number): Promise<Personnel | undefined> {
+    const [person] = await db.select().from(personnel).where(eq(personnel.id, id));
+    return person;
+  }
+
+  async createPersonnel(person: InsertPersonnel): Promise<Personnel> {
+    const [newPersonnel] = await db.insert(personnel).values(person).returning();
+    return newPersonnel;
+  }
+
+  async updatePersonnel(id: number, person: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
+    const [updatedPersonnel] = await db
+      .update(personnel)
+      .set(person)
+      .where(eq(personnel.id, id))
+      .returning();
+    return updatedPersonnel;
+  }
+
+  // Report template operations
+  async getReportTemplates(): Promise<ReportTemplate[]> {
+    return await db.select().from(reportTemplates);
+  }
+
+  async getReportTemplate(id: number): Promise<ReportTemplate | undefined> {
+    const [template] = await db.select().from(reportTemplates).where(eq(reportTemplates.id, id));
+    return template;
+  }
+
+  async createReportTemplate(template: InsertReportTemplate): Promise<ReportTemplate> {
+    const [newTemplate] = await db.insert(reportTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateReportTemplate(id: number, template: Partial<InsertReportTemplate>): Promise<ReportTemplate | undefined> {
+    const [updatedTemplate] = await db
+      .update(reportTemplates)
+      .set(template)
+      .where(eq(reportTemplates.id, id))
+      .returning();
+    return updatedTemplate;
+  }
+
+  // Quotation operations
+  async getQuotations(): Promise<Quotation[]> {
+    return await db.select().from(quotations);
+  }
+
+  async getQuotationsByClient(clientId: number): Promise<Quotation[]> {
+    return await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+  }
+
+  async getQuotation(id: number): Promise<Quotation | undefined> {
+    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, id));
+    return quotation;
+  }
+
+  async createQuotation(quotation: InsertQuotation): Promise<Quotation> {
+    const [newQuotation] = await db.insert(quotations).values(quotation).returning();
+    return newQuotation;
+  }
+
+  async updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined> {
+    const [updatedQuotation] = await db
+      .update(quotations)
+      .set({ ...quotation, updatedAt: new Date() })
+      .where(eq(quotations.id, id))
+      .returning();
+    return updatedQuotation;
+  }
+
+  async updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined> {
+    const [updatedQuotation] = await db
+      .update(quotations)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(quotations.id, id))
+      .returning();
+    return updatedQuotation;
+  }
+
+  // Quotation team members operations
+  async getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]> {
+    return await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+  }
+
+  async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
+    const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
+    return newMember;
+  }
+
+  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
+    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+  }
+
+  // Get option lists
+  async getAnalysisTypes() {
+    return analysisTypes;
+  }
+
+  async getProjectTypes() {
+    return projectTypes;
+  }
+
+  async getMentionsVolumeOptions() {
+    return mentionsVolumeOptions;
+  }
+
+  async getCountriesCoveredOptions() {
+    return countriesCoveredOptions;
+  }
+
+  async getClientEngagementOptions() {
+    return clientEngagementOptions;
+  }
+}
+
+// Exportar la implementación de la base de datos en lugar de la memoria
+export const storage = new DatabaseStorage();
