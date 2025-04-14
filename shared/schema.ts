@@ -155,11 +155,11 @@ export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
 export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
 export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
 
-// Analysis type options
+// Opciones de tipo de análisis
 export const analysisTypes = [
-  { value: "basic", label: "Basic Analysis" },
-  { value: "standard", label: "Standard Analysis" },
-  { value: "deep", label: "Deep Analysis" },
+  { value: "basic", label: "Análisis Básico" },
+  { value: "standard", label: "Análisis Estándar" },
+  { value: "deep", label: "Análisis Profundo" },
 ];
 
 // Project type options

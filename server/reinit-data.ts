@@ -15,26 +15,26 @@ export async function reinitializeDatabase() {
 
     // Insertar roles
     const [seniorAnalyst] = await db.insert(roles).values({
-      name: "Senior Analyst",
-      description: "Provides expertise in analyzing complex social data and creating strategic insights.",
+      name: "Analista Senior",
+      description: "Proporciona experiencia en análisis de datos sociales complejos y creación de insights estratégicos.",
       defaultRate: 85
     }).returning();
 
     const [dataScientist] = await db.insert(roles).values({
-      name: "Data Scientist",
-      description: "Develops custom metrics and advanced data modeling for deeper insights.",
+      name: "Científico de Datos",
+      description: "Desarrolla métricas personalizadas y modelado avanzado de datos para insights más profundos.",
       defaultRate: 95
     }).returning();
 
     const [contentSpecialist] = await db.insert(roles).values({
-      name: "Content Specialist",
-      description: "Creates engaging visualizations and narrative for report presentation.",
+      name: "Especialista en Contenido",
+      description: "Crea visualizaciones atractivas y narrativa para la presentación de informes.",
       defaultRate: 75
     }).returning();
 
     const [projectManager] = await db.insert(roles).values({
-      name: "Project Manager",
-      description: "Oversees project delivery and client communication.",
+      name: "Gerente de Proyecto",
+      description: "Supervisa la entrega del proyecto y la comunicación con el cliente.",
       defaultRate: 80
     }).returning();
 
@@ -65,54 +65,54 @@ export async function reinitializeDatabase() {
     // Insertar clientes
     await db.insert(clients).values([
       {
-        name: "Acme Corporation",
-        contactName: "Jane Doe",
-        contactEmail: "jane@acmecorp.com",
-        contactPhone: "+1-555-123-4567"
+        name: "Corporación Acme",
+        contactName: "Juana Pérez",
+        contactEmail: "juana@acmecorp.com",
+        contactPhone: "+54-11-4123-4567"
       },
       {
-        name: "TechStart Inc.",
-        contactName: "John Smith",
-        contactEmail: "john@techstart.com",
-        contactPhone: "+1-555-987-6543"
+        name: "TechStart Argentina",
+        contactName: "Juan González",
+        contactEmail: "juan@techstart.com.ar",
+        contactPhone: "+54-11-4987-6543"
       },
       {
-        name: "Global Media Group",
-        contactName: "Emily Wilson",
-        contactEmail: "emily@globalmedia.com",
-        contactPhone: "+1-555-456-7890"
+        name: "Grupo Mediático Global",
+        contactName: "Elena Martínez",
+        contactEmail: "elena@globalmedia.com.ar",
+        contactPhone: "+54-11-4456-7890"
       }
     ]);
 
     // Insertar plantillas de informes
     await db.insert(reportTemplates).values([
       {
-        name: "Executive Dashboard",
-        description: "Concise, high-level metrics with key insights and strategic recommendations. Ideal for executive stakeholders.",
+        name: "Dashboard Ejecutivo",
+        description: "Métricas concisas de alto nivel con insights clave y recomendaciones estratégicas. Ideal para stakeholders ejecutivos.",
         complexity: "low",
-        pageRange: "5-10 pages",
-        features: "Core metrics only"
+        pageRange: "5-10 páginas",
+        features: "Solo métricas básicas"
       },
       {
-        name: "Comprehensive Analysis",
-        description: "Detailed evaluation with extensive metrics, audience segmentation, and demographic breakdown.",
+        name: "Análisis Integral",
+        description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
         complexity: "medium",
-        pageRange: "15-25 pages",
-        features: "Advanced metrics"
+        pageRange: "15-25 páginas",
+        features: "Métricas avanzadas"
       },
       {
-        name: "Campaign Performance",
-        description: "Pre, during, and post campaign analysis with KPI tracking and comparative benchmark data.",
+        name: "Rendimiento de Campaña",
+        description: "Análisis pre, durante y post campaña con seguimiento de KPIs y datos comparativos de referencia.",
         complexity: "high",
-        pageRange: "20-30 pages",
-        features: "Trend analysis"
+        pageRange: "20-30 páginas",
+        features: "Análisis de tendencias"
       },
       {
-        name: "Custom Template",
-        description: "Build a custom report structure based on specific client requirements and project goals.",
+        name: "Plantilla Personalizada",
+        description: "Construye una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
         complexity: "variable",
-        pageRange: "Variable length",
-        features: "Custom metrics"
+        pageRange: "Longitud variable",
+        features: "Métricas personalizadas"
       }
     ]);
 
