@@ -1,0 +1,398 @@
+import { useEffect, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuoteContext } from "@/context/quote-context";
+import { Client, ReportTemplate, Personnel, Role, InsertQuotation, InsertQuotationTeamMember } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+import { formatCurrency } from "@/lib/utils";
+
+export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [isSaving, setIsSaving] = useState(false);
+  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [adjustedAmount, setAdjustedAmount] = useState<number | null>(null);
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  
+  const {
+    projectDetails,
+    teamMembers,
+    selectedTemplateId,
+    templateCustomization,
+    complexityAdjustment,
+    baseCost,
+    markupAmount,
+    totalAmount,
+    calculateTotalCost
+  } = useQuoteContext();
+
+  // Get client info
+  const { data: clients } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  // Get template info
+  const { data: templates } = useQuery<ReportTemplate[]>({
+    queryKey: ["/api/templates"],
+  });
+
+  // Get personnel info
+  const { data: allPersonnel } = useQuery<Personnel[]>({
+    queryKey: ["/api/personnel"],
+  });
+
+  // Get roles info
+  const { data: roles } = useQuery<Role[]>({
+    queryKey: ["/api/roles"],
+  });
+
+  // Calculate final values
+  useEffect(() => {
+    calculateTotalCost();
+    setAdjustedAmount(totalAmount);
+  }, [calculateTotalCost, totalAmount]);
+
+  // Helper functions to get names
+  const getClientName = (clientId: number) => {
+    if (!clients) return "Unknown Client";
+    const client = clients.find(c => c.id === clientId);
+    return client ? client.name : "Unknown Client";
+  };
+
+  const getTemplateName = (templateId: number) => {
+    if (!templates) return "Unknown Template";
+    const template = templates.find(t => t.id === templateId);
+    return template ? template.name : "Unknown Template";
+  };
+
+  const getPersonnelName = (personnelId: number) => {
+    if (!allPersonnel) return "Unknown";
+    const person = allPersonnel.find(p => p.id === personnelId);
+    return person ? person.name : "Unknown";
+  };
+
+  const getRoleName = (roleId: number) => {
+    if (!roles) return "Unknown Role";
+    const role = roles.find(r => r.id === roleId);
+    return role ? role.name : "Unknown Role";
+  };
+
+  // Handle adjusted amount change
+  const handleAdjustedAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value) && value >= 0) {
+      setAdjustedAmount(value);
+    }
+  };
+
+  // Create quotation mutation
+  const createQuotationMutation = useMutation({
+    mutationFn: async (quotation: InsertQuotation) => {
+      const response = await apiRequest("POST", "/api/quotations", quotation);
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      // Add team members to the quotation
+      await Promise.all(
+        teamMembers.map(async (member) => {
+          if (member.personnelId) {
+            const teamMemberData: InsertQuotationTeamMember = {
+              quotationId: data.id,
+              personnelId: member.personnelId,
+              hours: member.hours,
+              rate: member.rate,
+              cost: member.cost
+            };
+            
+            await apiRequest("POST", "/api/quotation-team", teamMemberData);
+          }
+        })
+      );
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+      
+      toast({
+        title: "Success",
+        description: "Quotation has been generated successfully.",
+      });
+      
+      navigate("/manage-quotes");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate quotation.",
+        variant: "destructive",
+      });
+      setIsSaving(false);
+    }
+  });
+
+  // Generate final quote
+  const generateQuote = async () => {
+    if (!projectDetails.clientId || !projectDetails.projectName) {
+      toast({
+        title: "Missing Information",
+        description: "Client and project name are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+
+    const finalAmount = adjustedAmount || totalAmount;
+    
+    const quotationData: InsertQuotation = {
+      clientId: projectDetails.clientId,
+      projectName: projectDetails.projectName,
+      analysisType: projectDetails.analysisType || "basic",
+      projectType: projectDetails.projectType || "executive",
+      mentionsVolume: projectDetails.mentionsVolume || "small",
+      countriesCovered: projectDetails.countriesCovered || "1",
+      clientEngagement: projectDetails.clientEngagement || "low",
+      templateId: selectedTemplateId || undefined,
+      templateCustomization: templateCustomization || undefined,
+      baseCost: baseCost,
+      complexityAdjustment: complexityAdjustment,
+      markupAmount: markupAmount,
+      totalAmount: finalAmount,
+      adjustmentReason: adjustmentReason || undefined,
+      additionalNotes: additionalNotes || undefined,
+      status: "pending"
+    };
+
+    createQuotationMutation.mutate(quotationData);
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Review & Generate Quote</h3>
+      
+      <div className="mb-6">
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Project Summary</h4>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <h5 className="text-sm font-medium text-neutral-600 mb-2">Client & Project Details</h5>
+            <div className="p-4 bg-neutral-100 rounded-lg">
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Client</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.clientId ? getClientName(projectDetails.clientId) : "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Project Name</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.projectName || "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Analysis Type</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.analysisType || "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Project Type</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.projectType || "--"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          
+          <div>
+            <h5 className="text-sm font-medium text-neutral-600 mb-2">Scope Parameters</h5>
+            <div className="p-4 bg-neutral-100 rounded-lg">
+              <dl className="space-y-3">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Mentions</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.mentionsVolume || "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Countries Covered</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.countriesCovered || "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Client Engagement</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {projectDetails.clientEngagement || "--"}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-neutral-600">Template</dt>
+                  <dd className="text-sm font-medium text-neutral-900">
+                    {selectedTemplateId ? getTemplateName(selectedTemplateId) : "--"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+        
+        <h5 className="text-sm font-medium text-neutral-600 mb-2">Team & Resources</h5>
+        <div className="overflow-hidden rounded-lg border border-neutral-200 mb-6">
+          <table className="min-w-full divide-y divide-neutral-200">
+            <thead className="bg-neutral-50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Team Member</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rate</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Hours</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Cost</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-neutral-200">
+              {teamMembers.map((member) => (
+                <tr key={member.id}>
+                  <td className="px-4 py-2 text-sm text-neutral-900">
+                    {getRoleName(member.roleId)}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-neutral-900">
+                    {member.personnelId ? getPersonnelName(member.personnelId) : "--"}
+                  </td>
+                  <td className="px-4 py-2 text-sm font-mono text-neutral-900">
+                    ${member.rate.toFixed(2)}/hr
+                  </td>
+                  <td className="px-4 py-2 text-sm text-neutral-900">
+                    {member.hours}
+                  </td>
+                  <td className="px-4 py-2 text-sm font-mono text-neutral-900">
+                    ${member.cost.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+              <tr className="bg-neutral-50">
+                <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Total Base Cost</td>
+                <td className="px-4 py-2 text-sm font-mono font-medium text-neutral-900">
+                  ${baseCost.toFixed(2)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div className="mb-6">
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Final Quote</h4>
+        
+        <div className="p-6 border border-primary rounded-lg bg-primary bg-opacity-5 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-3">
+              <h5 className="text-base font-medium text-neutral-800 mb-3">Quote Breakdown</h5>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+                  <span className="text-sm text-neutral-600">Base Cost (Team Hours)</span>
+                  <span className="text-sm font-mono font-medium text-neutral-900">
+                    {formatCurrency(baseCost)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+                  <span className="text-sm text-neutral-600">
+                    Complexity Adjustments ({(complexityAdjustment / baseCost * 100).toFixed(0)}%)
+                  </span>
+                  <span className="text-sm font-mono font-medium text-neutral-900">
+                    {formatCurrency(complexityAdjustment)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+                  <span className="text-sm text-neutral-600">Adjusted Base Cost</span>
+                  <span className="text-sm font-mono font-medium text-neutral-900">
+                    {formatCurrency(baseCost + complexityAdjustment)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+                  <span className="text-sm text-neutral-600">Standard Markup (2×)</span>
+                  <span className="text-sm font-mono font-medium text-neutral-900">
+                    {formatCurrency(markupAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-base font-medium text-neutral-800">Total Quote</span>
+                  <span className="text-base font-mono font-medium text-primary">
+                    {formatCurrency(adjustedAmount || totalAmount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="lg:col-span-2">
+              <h5 className="text-base font-medium text-neutral-800 mb-3">Quote Adjustments</h5>
+              <div className="mb-3">
+                <Label className="block text-sm font-medium text-neutral-700 mb-1">Adjust Final Quote</Label>
+                <div className="flex items-center">
+                  <Input
+                    type="number"
+                    className="w-full"
+                    value={adjustedAmount?.toString() || ""}
+                    onChange={handleAdjustedAmountChange}
+                  />
+                  <span className="ml-2 text-sm font-mono text-neutral-600">USD</span>
+                </div>
+              </div>
+              <div className="mb-3">
+                <Label className="block text-sm font-medium text-neutral-700 mb-1">Adjustment Reason</Label>
+                <Textarea
+                  className="w-full"
+                  rows={2}
+                  placeholder="Enter reason for adjustment (if any)..."
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-4 bg-neutral-100 rounded-lg mb-6">
+          <Label className="block text-sm font-medium text-neutral-700 mb-1">Additional Notes</Label>
+          <Textarea
+            className="w-full"
+            rows={3}
+            placeholder="Additional project notes or special considerations..."
+            value={additionalNotes}
+            onChange={(e) => setAdditionalNotes(e.target.value)}
+          />
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
+        <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center">
+          <span className="material-icons mr-1">arrow_back</span>
+          Back
+        </Button>
+        
+        <div className="flex space-x-4">
+          <Button
+            variant="outline"
+            disabled={isSaving}
+            onClick={() => navigate("/")}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={isSaving}
+            onClick={generateQuote}
+            className="flex items-center"
+          >
+            {isSaving ? "Generating..." : "Generate Quote"}
+            <span className="material-icons ml-1">check_circle</span>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
