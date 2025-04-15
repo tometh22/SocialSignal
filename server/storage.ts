@@ -23,6 +23,7 @@ export interface IStorage {
   getRole(id: number): Promise<Role | undefined>;
   createRole(role: InsertRole): Promise<Role>;
   updateRole(id: number, role: Partial<InsertRole>): Promise<Role | undefined>;
+  deleteRole(id: number): Promise<boolean>;
 
   // Personnel operations
   getPersonnel(): Promise<Personnel[]>;
@@ -196,6 +197,18 @@ export class MemStorage implements IStorage {
     const updatedRole = { ...existingRole, ...role };
     this.roles.set(id, updatedRole);
     return updatedRole;
+  }
+  
+  async deleteRole(id: number): Promise<boolean> {
+    // Primero verificar si hay personal asociado a este rol
+    const personnelWithRole = await this.getPersonnelByRole(id);
+    if (personnelWithRole.length > 0) {
+      // No podemos eliminar un rol que tenga personal asociado
+      return false;
+    }
+    
+    const result = this.roles.delete(id);
+    return result;
   }
 
   // Personnel operations
@@ -398,6 +411,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(roles.id, id))
       .returning();
     return updatedRole;
+  }
+  
+  async deleteRole(id: number): Promise<boolean> {
+    // Verificar primero si hay personal asociado a este rol
+    const personnelWithRole = await this.getPersonnelByRole(id);
+    if (personnelWithRole.length > 0) {
+      // No podemos eliminar un rol que tenga personal asociado
+      return false;
+    }
+    
+    // Si no hay personal asociado, eliminar el rol
+    await db.delete(roles).where(eq(roles.id, id));
+    // Verificar si el rol todavía existe
+    const roleExists = await this.getRole(id);
+    return !roleExists;
   }
 
   // Personnel operations

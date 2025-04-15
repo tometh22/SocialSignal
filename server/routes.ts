@@ -113,6 +113,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update role" });
     }
   });
+  
+  app.delete("/api/roles/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
+    
+    try {
+      const success = await storage.deleteRole(id);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete this role because it has personnel assigned to it. Reassign personnel before deleting." 
+        });
+      }
+      
+      res.json({ success: true, message: "Role deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting role:", error);
+      res.status(500).json({ message: "Failed to delete role" });
+    }
+  });
 
   // Personnel routes
   app.get("/api/personnel", async (_, res) => {
