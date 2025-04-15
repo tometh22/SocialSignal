@@ -108,7 +108,6 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
     if (
       !projectDetails.clientId ||
       !projectDetails.projectName ||
-      !projectDetails.analysisType ||
       !projectDetails.projectType ||
       !projectDetails.mentionsVolume ||
       !projectDetails.countriesCovered ||
@@ -127,19 +126,23 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
   // Update calculations when inputs change
   useEffect(() => {
     if (
-      projectDetails.analysisType &&
       projectDetails.mentionsVolume &&
       projectDetails.countriesCovered &&
       projectDetails.clientEngagement
     ) {
+      // Default analysisType to 'basic' if it's not set
+      if (!projectDetails.analysisType) {
+        updateProjectDetails({ analysisType: "basic" });
+      }
       analyzeInputs();
     }
   }, [
-    projectDetails.analysisType,
     projectDetails.mentionsVolume,
     projectDetails.countriesCovered,
     projectDetails.clientEngagement,
-    analyzeInputs
+    projectDetails.analysisType,
+    analyzeInputs,
+    updateProjectDetails
   ]);
 
   // Handle continue button click
@@ -202,26 +205,6 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
               value={projectDetails.projectName || ""}
               onChange={(e) => updateProjectDetails({ projectName: e.target.value })}
             />
-          </div>
-
-          <div>
-            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Metodología Aplicada</Label>
-            <p className="text-xs text-neutral-500 mb-2">Las técnicas y métodos aplicados en el análisis (afecta recursos técnicos y horas de trabajo)</p>
-            <Select 
-              value={projectDetails.analysisType || ""}
-              onValueChange={(value) => updateProjectDetails({ analysisType: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona la metodología" />
-              </SelectTrigger>
-              <SelectContent>
-                {analysisTypes?.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           
           <div>
