@@ -226,7 +226,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           
           <div>
             <Label htmlFor="project-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Proyecto</Label>
-            <p className="text-xs text-neutral-500 mb-2">El objetivo principal del proyecto (ejecutivo, competitivo, temático)</p>
+            <p className="text-xs text-neutral-500 mb-2">Define el propósito y formato del entregable final</p>
             <Select 
               value={projectDetails.projectType || ""}
               onValueChange={(value) => updateProjectDetails({ projectType: value })}
@@ -236,8 +236,19 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
               </SelectTrigger>
               <SelectContent>
                 {projectTypes?.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
+                  <SelectItem key={type.value} value={type.value} className="relative group">
+                    <div>
+                      {type.label}
+                      <div className="absolute left-full ml-2 top-0 hidden group-hover:block bg-white shadow-lg rounded-md p-2 z-50 w-64">
+                        <p className="text-xs text-neutral-700 font-medium">
+                          {type.value === "demo" && "Informe de demostración para ganar un cliente potencial. Formato conciso y visual."}
+                          {type.value === "executive" && "Informe estándar, más conciso, diseñado para toma de decisiones rápidas a nivel ejecutivo."}
+                          {type.value === "comprehensive" && "Informe integral con análisis de alta profundidad y recomendaciones detalladas."}
+                          {type.value === "always-on" && "Servicio recurrente facturado mensualmente. Incluye dashboard y reportes periódicos."}
+                          {type.value === "monitoring" && "Servicio de inteligencia en tiempo real con alertas y monitoreo continuo."}
+                        </p>
+                      </div>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>

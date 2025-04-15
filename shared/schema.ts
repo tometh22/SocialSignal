@@ -88,7 +88,7 @@ export const quotations = pgTable("quotations", {
   clientId: integer("client_id").notNull(),
   projectName: text("project_name").notNull(),
   analysisType: text("analysis_type").notNull(), // 'basic', 'standard', 'deep'
-  projectType: text("project_type").notNull(), // 'executive', 'comprehensive', 'campaign', 'always-on'
+  projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring'
   mentionsVolume: text("mentions_volume").notNull(), // 'small', 'medium', 'large', 'xlarge'
   countriesCovered: text("countries_covered").notNull(), // '1', '2-5', '6-10', '10+'
   clientEngagement: text("client_engagement").notNull(), // 'low', 'medium', 'high'
@@ -164,10 +164,11 @@ export const analysisTypes = [
 
 // Opciones de tipo de proyecto
 export const projectTypes = [
+  { value: "demo", label: "Informe Demo" },
   { value: "executive", label: "Informe Ejecutivo" },
-  { value: "comprehensive", label: "Informe Integral" },
-  { value: "campaign", label: "Informes de Ciclo de Campaña" },
-  { value: "always-on", label: "Servicio Continuo Basado en Tarifas" },
+  { value: "comprehensive", label: "Informe Exhaustivo" },
+  { value: "always-on", label: "Always On" },
+  { value: "monitoring", label: "Servicio de Monitoreo" },
 ];
 
 // Opciones de volumen de menciones
