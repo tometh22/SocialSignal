@@ -117,35 +117,83 @@ export class MemStorage implements IStorage {
 
     // Add sample report templates
     this.createReportTemplate({
-      name: "Executive Dashboard",
-      description: "Concise, high-level metrics with key insights and strategic recommendations. Ideal for executive stakeholders.",
+      name: "Panel Ejecutivo",
+      description: "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
       complexity: "low",
-      pageRange: "5-10 pages",
-      features: "Core metrics only"
+      pageRange: "5-10 páginas",
+      features: "Métricas principales"
     });
     
     this.createReportTemplate({
-      name: "Comprehensive Analysis",
-      description: "Detailed evaluation with extensive metrics, audience segmentation, and demographic breakdown.",
+      name: "Análisis Completo",
+      description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
       complexity: "medium",
-      pageRange: "15-25 pages",
-      features: "Advanced metrics"
+      pageRange: "15-25 páginas",
+      features: "Métricas avanzadas"
     });
     
     this.createReportTemplate({
-      name: "Campaign Performance",
-      description: "Pre, during, and post campaign analysis with KPI tracking and comparative benchmark data.",
+      name: "Rendimiento de Campaña",
+      description: "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
       complexity: "high",
-      pageRange: "20-30 pages",
-      features: "Trend analysis"
+      pageRange: "20-30 páginas",
+      features: "Análisis de tendencias"
     });
     
     this.createReportTemplate({
-      name: "Custom Template",
-      description: "Build a custom report structure based on specific client requirements and project goals.",
+      name: "Plantilla Personalizada",
+      description: "Estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
       complexity: "variable",
-      pageRange: "Variable length",
-      features: "Custom metrics"
+      pageRange: "Longitud variable",
+      features: "Métricas personalizadas"
+    });
+    
+    this.createReportTemplate({
+      name: "Informe de Crisis",
+      description: "Monitoreo intensivo y análisis de situaciones críticas que requieren respuesta inmediata.",
+      complexity: "high",
+      pageRange: "10-20 páginas",
+      features: "Alertas y recomendaciones"
+    });
+    
+    this.createReportTemplate({
+      name: "Informe de Precios",
+      description: "Análisis comparativo de precios del mercado con identificación de oportunidades y riesgos.",
+      complexity: "medium",
+      pageRange: "15-25 páginas",
+      features: "Análisis competitivo"
+    });
+    
+    this.createReportTemplate({
+      name: "Análisis de Conversación Digital",
+      description: "Estudio profundo de conversaciones en redes sociales con análisis de sentimiento y temas emergentes.",
+      complexity: "high",
+      pageRange: "20-30 páginas",
+      features: "Análisis semántico"
+    });
+    
+    this.createReportTemplate({
+      name: "Informe Mensual",
+      description: "Resumen periódico de KPIs principales, tendencias del mes y recomendaciones tácticas.",
+      complexity: "medium",
+      pageRange: "15-25 páginas",
+      features: "Comparativa mensual"
+    });
+    
+    this.createReportTemplate({
+      name: "Informe Semanal",
+      description: "Actualización rápida con datos clave de la semana y alertas de cambios significativos.",
+      complexity: "low",
+      pageRange: "5-10 páginas",
+      features: "Métricas ágiles"
+    });
+    
+    this.createReportTemplate({
+      name: "Informe SOV (Share of Voice)",
+      description: "Análisis de la cuota de conversación de la marca respecto a competidores en canales digitales.",
+      complexity: "medium",
+      pageRange: "10-20 páginas",
+      features: "Visualización comparativa"
     });
   }
 
