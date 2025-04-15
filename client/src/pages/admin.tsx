@@ -181,12 +181,18 @@ export default function Admin() {
   });
   
   const deleteRoleMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/roles/${id}`),
-    onSuccess: (_, variables) => {
+    mutationFn: async (id: number) => {
+      // Realizar la solicitud y devolver el resultado
+      const response = await apiRequest("DELETE", `/api/roles/${id}`);
+      return id;
+    },
+    onSuccess: (deletedId) => {
       // Optimistic update - remove role instantly from UI
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
         if (!oldData) return [];
-        return oldData.filter(item => item.id !== variables);
+        const filtered = oldData.filter(item => item.id !== deletedId);
+        console.log("Filtered roles:", filtered);
+        return filtered;
       });
       
       toast({

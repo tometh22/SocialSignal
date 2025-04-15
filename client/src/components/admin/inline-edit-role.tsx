@@ -128,6 +128,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
   // Delete role mutation
   const deleteRoleMutation = useMutation({
     mutationFn: async () => {
+      // Realizar la eliminación y devolver el ID
       await apiRequest("DELETE", `/api/roles/${role.id}`);
       return role.id;
     },
@@ -136,15 +137,8 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
         onDelete(deletedId);
       }
       
-      // Actualizar la caché de React Query eliminando el rol
-      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.filter(item => item.id !== deletedId);
-      });
-      
-      // Invalidar la consulta para asegurar que la caché esté sincronizada con el servidor
-      // Esto es crucial para evitar que los roles eliminados reaparezcan después de editar
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      // Ya no manejamos la caché aquí, lo dejamos al componente padre
+      // ya que podríamos estar causando una actualización doble
       
       toast({
         title: "Éxito",
