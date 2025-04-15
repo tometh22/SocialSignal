@@ -205,14 +205,14 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           </div>
 
           <div>
-            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Análisis</Label>
-            <p className="text-xs text-neutral-500 mb-2">El enfoque analítico aplicado a los datos (básico, avanzado, predictivo)</p>
+            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Nivel de Análisis</Label>
+            <p className="text-xs text-neutral-500 mb-2">La profundidad metodológica del análisis de datos (modifica el esfuerzo analítico)</p>
             <Select 
               value={projectDetails.analysisType || ""}
               onValueChange={(value) => updateProjectDetails({ analysisType: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona tipo de análisis" />
+                <SelectValue placeholder="Selecciona el nivel de análisis" />
               </SelectTrigger>
               <SelectContent>
                 {analysisTypes?.map((type) => (
@@ -226,7 +226,7 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           
           <div>
             <Label htmlFor="project-type" className="block text-sm font-medium text-neutral-700 mb-1">Tipo de Proyecto</Label>
-            <p className="text-xs text-neutral-500 mb-2">Define el propósito y formato del entregable final</p>
+            <p className="text-xs text-neutral-500 mb-2">Define el formato, enfoque y alcance del entregable final (determina estructura y tipo de informe)</p>
             <Select 
               value={projectDetails.projectType || ""}
               onValueChange={(value) => updateProjectDetails({ projectType: value })}
