@@ -169,13 +169,15 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         let recommendedIds: number[] = [];
         
         // Buscar roles por nombre en lugar de usar IDs fijos
-        const analistaId = roles.find(r => r.name.includes("Analista Senior"))?.id;
-        const especialistaId = roles.find(r => r.name.includes("Data Specialist"))?.id;
-        const analistaSemiId = roles.find(r => r.name.includes("Semi"))?.id;
-        const gerenteId = roles.find(r => r.name.includes("Manager"))?.id;
+        console.log("Roles disponibles para recomendación:", roles.map(r => ({ id: r.id, name: r.name })));
+        
+        const analistaId = roles.find(r => r.name.toLowerCase().includes("analista") && r.name.toLowerCase().includes("senior"))?.id;
+        const cientificoId = roles.find(r => r.name.toLowerCase().includes("data") || r.name.toLowerCase().includes("científico"))?.id;
+        const especialistaId = roles.find(r => r.name.toLowerCase().includes("contenido") || r.name.toLowerCase().includes("content"))?.id;
+        const gerenteId = roles.find(r => r.name.toLowerCase().includes("gerente") || r.name.toLowerCase().includes("manager"))?.id;
         
         // Crear array con los IDs encontrados (excluyendo undefined)
-        const roleIds = [analistaId, especialistaId, analistaSemiId, gerenteId].filter(id => id !== undefined) as number[];
+        const roleIds = [analistaId, cientificoId, especialistaId, gerenteId].filter(id => id !== undefined) as number[];
         
         if (template.complexity === "high") {
           // Para informes complejos, recomendamos todos los roles disponibles

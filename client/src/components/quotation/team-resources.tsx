@@ -248,6 +248,9 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
               // Check if this role is recommended
               const isRecommended = recommendedRoleIds.includes(role.id);
               
+              // Debugging: log recomendaciones para este rol
+              console.log(`Rol: ${role.name} (ID: ${role.id}), Recomendado: ${isRecommended}, recommendedRoleIds: ${JSON.stringify(recommendedRoleIds)}`);
+              
               // Find the team member for this role if it exists
               const teamMember = teamMembers.find(member => member.roleId === role.id);
               
