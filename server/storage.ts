@@ -39,6 +39,14 @@ export interface IStorage {
   createReportTemplate(template: InsertReportTemplate): Promise<ReportTemplate>;
   updateReportTemplate(id: number, template: Partial<InsertReportTemplate>): Promise<ReportTemplate | undefined>;
 
+  // Template role assignments operations
+  getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]>;
+  getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]>;
+  createTemplateRoleAssignment(assignment: InsertTemplateRoleAssignment): Promise<TemplateRoleAssignment>;
+  updateTemplateRoleAssignment(id: number, assignment: Partial<InsertTemplateRoleAssignment>): Promise<TemplateRoleAssignment | undefined>;
+  deleteTemplateRoleAssignment(id: number): Promise<boolean>;
+  deleteTemplateRoleAssignments(templateId: number): Promise<void>;
+
   // Quotation operations
   getQuotations(): Promise<Quotation[]>;
   getQuotationsByClient(clientId: number): Promise<Quotation[]>;
@@ -67,6 +75,7 @@ export class MemStorage implements IStorage {
   private reportTemplates: Map<number, ReportTemplate>;
   private quotations: Map<number, Quotation>;
   private quotationTeamMembers: Map<number, QuotationTeamMember>;
+  private templateRoleAssignments: Map<number, TemplateRoleAssignment>;
   
   private clientId: number;
   private roleId: number;
@@ -74,6 +83,7 @@ export class MemStorage implements IStorage {
   private templateId: number;
   private quotationId: number;
   private quotationTeamMemberId: number;
+  private templateRoleAssignmentId: number;
 
   constructor() {
     this.clients = new Map();
@@ -82,6 +92,7 @@ export class MemStorage implements IStorage {
     this.reportTemplates = new Map();
     this.quotations = new Map();
     this.quotationTeamMembers = new Map();
+    this.templateRoleAssignments = new Map();
     
     this.clientId = 1;
     this.roleId = 1;
@@ -89,6 +100,7 @@ export class MemStorage implements IStorage {
     this.templateId = 1;
     this.quotationId = 1;
     this.quotationTeamMemberId = 1;
+    this.templateRoleAssignmentId = 1;
     
     // Initialize with sample data
     this.initializeSampleData();
@@ -390,6 +402,54 @@ export class MemStorage implements IStorage {
     }
   }
 
+  // Template role assignments operations
+  async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
+    return Array.from(this.templateRoleAssignments.values()).filter(
+      (a) => a.templateId === templateId
+    );
+  }
+
+  async getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]> {
+    const assignments = await this.getTemplateRoleAssignments(templateId);
+    return Promise.all(
+      assignments.map(async (assignment) => {
+        const role = await this.getRole(assignment.roleId);
+        return {
+          ...assignment,
+          role: role!
+        };
+      })
+    );
+  }
+
+  async createTemplateRoleAssignment(assignment: InsertTemplateRoleAssignment): Promise<TemplateRoleAssignment> {
+    const id = this.templateRoleAssignmentId++;
+    const newAssignment: TemplateRoleAssignment = { ...assignment, id };
+    this.templateRoleAssignments.set(id, newAssignment);
+    return newAssignment;
+  }
+
+  async updateTemplateRoleAssignment(id: number, assignment: Partial<InsertTemplateRoleAssignment>): Promise<TemplateRoleAssignment | undefined> {
+    const existingAssignment = this.templateRoleAssignments.get(id);
+    if (!existingAssignment) return undefined;
+    
+    const updatedAssignment = { ...existingAssignment, ...assignment };
+    this.templateRoleAssignments.set(id, updatedAssignment);
+    return updatedAssignment;
+  }
+
+  async deleteTemplateRoleAssignment(id: number): Promise<boolean> {
+    return this.templateRoleAssignments.delete(id);
+  }
+
+  async deleteTemplateRoleAssignments(templateId: number): Promise<void> {
+    for (const [id, assignment] of this.templateRoleAssignments.entries()) {
+      if (assignment.templateId === templateId) {
+        this.templateRoleAssignments.delete(id);
+      }
+    }
+  }
+
   // Get option lists
   async getAnalysisTypes() {
     return analysisTypes;
@@ -578,6 +638,51 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
     await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+  }
+
+  // Template role assignments operations
+  async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
+    return await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
+  }
+
+  async getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]> {
+    const result = await db
+      .select({
+        assignment: templateRoleAssignments,
+        role: roles
+      })
+      .from(templateRoleAssignments)
+      .innerJoin(roles, eq(templateRoleAssignments.roleId, roles.id))
+      .where(eq(templateRoleAssignments.templateId, templateId));
+
+    return result.map(item => ({
+      ...item.assignment,
+      role: item.role
+    }));
+  }
+
+  async createTemplateRoleAssignment(assignment: InsertTemplateRoleAssignment): Promise<TemplateRoleAssignment> {
+    const [newAssignment] = await db.insert(templateRoleAssignments).values(assignment).returning();
+    return newAssignment;
+  }
+
+  async updateTemplateRoleAssignment(id: number, assignment: Partial<InsertTemplateRoleAssignment>): Promise<TemplateRoleAssignment | undefined> {
+    const [updatedAssignment] = await db
+      .update(templateRoleAssignments)
+      .set(assignment)
+      .where(eq(templateRoleAssignments.id, id))
+      .returning();
+    return updatedAssignment;
+  }
+
+  async deleteTemplateRoleAssignment(id: number): Promise<boolean> {
+    await db.delete(templateRoleAssignments).where(eq(templateRoleAssignments.id, id));
+    const assignment = await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.id, id));
+    return assignment.length === 0;
+  }
+
+  async deleteTemplateRoleAssignments(templateId: number): Promise<void> {
+    await db.delete(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
   }
 
   // Get option lists
