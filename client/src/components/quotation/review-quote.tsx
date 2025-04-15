@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 
 export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) {
+  console.log("Componente ReviewQuote renderizado");
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isSaving, setIsSaving] = useState(false);

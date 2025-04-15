@@ -156,9 +156,14 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
 
   // Handle continue button click
   const handleContinue = () => {
+    console.log("Botón Continuar presionado");
     if (validateForm()) {
+      console.log("Formulario validado correctamente");
       calculateTotalCost();
+      console.log("Costos calculados, avanzando al siguiente paso");
       onNext();
+    } else {
+      console.log("La validación del formulario falló");
     }
   };
 
