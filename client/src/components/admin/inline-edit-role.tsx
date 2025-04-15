@@ -29,7 +29,8 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(role.name);
   const [editDescription, setEditDescription] = useState(role.description || "");
-  const [editDefaultRate, setEditDefaultRate] = useState(role.defaultRate);
+  // Asegurarse de que editDefaultRate sea un número válido inicialmente
+  const [editDefaultRate, setEditDefaultRate] = useState(typeof role.defaultRate === 'number' ? role.defaultRate : 0);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   // Estado local para mostrar los cambios inmediatamente
   const [localRole, setLocalRole] = useState<Role>(role);
@@ -42,7 +43,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
     if (!isEditing) {
       setEditName(role.name);
       setEditDescription(role.description || "");
-      setEditDefaultRate(role.defaultRate);
+      setEditDefaultRate(typeof role.defaultRate === 'number' ? role.defaultRate : 0);
     }
   }, [role, isEditing]);
 
@@ -120,7 +121,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
   const handleCancel = () => {
     setEditName(localRole.name);
     setEditDescription(localRole.description || "");
-    setEditDefaultRate(localRole.defaultRate);
+    setEditDefaultRate(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0);
     setIsEditing(false);
   };
 
@@ -177,7 +178,8 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
             <Textarea 
               value={editDescription} 
               onChange={(e) => setEditDescription(e.target.value)}
-              className="w-full h-20 resize-none"
+              className="w-full h-10 resize-none min-h-0 py-2"
+              style={{ overflow: 'auto', lineHeight: '1.2' }}
             />
           ) : localRole.description || "-"}
         </TableCell>
@@ -191,7 +193,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
               onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
               className="w-full h-9" // Altura fija
             />
-          ) : `$${localRole.defaultRate.toFixed(2)}/hr`}
+          ) : `$${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2)}/hr`}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (
