@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -201,3 +201,34 @@ export const quotationStatusOptions = [
   { value: "rejected", label: "Rechazado" },
   { value: "in-negotiation", label: "En Negociación" },
 ];
+
+// Template Role Assignments table
+export const templateRoleAssignments = pgTable("template_role_assignments", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull().references(() => reportTemplates.id),
+  roleId: integer("role_id").notNull().references(() => roles.id),
+  hours: numeric("hours", { precision: 8, scale: 2 }).notNull().default("0"),
+});
+
+export const insertTemplateRoleAssignmentSchema = createInsertSchema(templateRoleAssignments).omit({
+  id: true,
+});
+
+export const templateRoleAssignmentsRelations = relations(templateRoleAssignments, ({ one }) => ({
+  template: one(reportTemplates, { fields: [templateRoleAssignments.templateId], references: [reportTemplates.id] }),
+  role: one(roles, { fields: [templateRoleAssignments.roleId], references: [roles.id] }),
+}));
+
+// Update existing relations
+export const rolesRelationsWithTemplates = relations(roles, ({ many }) => ({
+  personnel: many(personnel),
+  templateAssignments: many(templateRoleAssignments),
+}));
+
+export const reportTemplatesRelationsWithRoles = relations(reportTemplates, ({ many }) => ({
+  quotations: many(quotations),
+  roleAssignments: many(templateRoleAssignments),
+}));
+
+export type TemplateRoleAssignment = typeof templateRoleAssignments.$inferSelect;
+export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssignmentSchema>;

@@ -5,7 +5,8 @@ import {
   type ReportTemplate, type InsertReportTemplate,
   type Quotation, type InsertQuotation,
   type QuotationTeamMember, type InsertQuotationTeamMember,
-  clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers,
+  type TemplateRoleAssignment, type InsertTemplateRoleAssignment,
+  clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions
 } from "@shared/schema";
 import { db } from "./db";
