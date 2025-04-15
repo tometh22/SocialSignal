@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Role } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -11,19 +11,22 @@ import { Edit, Loader2 } from "lucide-react";
 
 interface InlineEditRoleProps {
   role: Role;
+  onUpdate?: (updatedRole: Role) => void;
 }
 
-export function InlineEditRole({ role }: InlineEditRoleProps) {
+export function InlineEditRole({ role, onUpdate }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(role.name);
   const [editDescription, setEditDescription] = useState(role.description || "");
   const [editDefaultRate, setEditDefaultRate] = useState(role.defaultRate);
-  const [updatedRole, setUpdatedRole] = useState<Role>(role);
+  // Estado local para mostrar los cambios inmediatamente
+  const [localRole, setLocalRole] = useState<Role>(role);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Update when the role prop changes
   useEffect(() => {
-    setUpdatedRole(role);
+    setLocalRole(role);
     if (!isEditing) {
       setEditName(role.name);
       setEditDescription(role.description || "");
@@ -35,17 +38,27 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   const updateRoleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string; defaultRate: number } }) => {
       const response = await apiRequest("PATCH", `/api/roles/${id}`, data);
-      return await response.json();
+      const updatedRole = await response.json();
+      return updatedRole as Role;
     },
     onSuccess: (updatedData: Role) => {
-      setUpdatedRole(updatedData);
-      // Actualizar de inmediato la caché local
+      // Actualizar estado local inmediatamente
+      setLocalRole(updatedData);
+      
+      // Notificar al componente padre si existe onUpdate
+      if (onUpdate) {
+        onUpdate(updatedData);
+      }
+      
+      // Actualizar la caché de React Query
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
         if (!oldData) return [updatedData];
         return oldData.map(item => item.id === updatedData.id ? updatedData : item);
       });
-      // Invalidar la consulta para refrescar los datos
+      
+      // También invalidar la consulta para asegurar que los datos se actualicen
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      
       toast({
         title: "Success",
         description: "Role has been updated successfully.",
@@ -93,9 +106,9 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   };
 
   const handleCancel = () => {
-    setEditName(updatedRole.name);
-    setEditDescription(updatedRole.description || "");
-    setEditDefaultRate(updatedRole.defaultRate);
+    setEditName(localRole.name);
+    setEditDescription(localRole.description || "");
+    setEditDefaultRate(localRole.defaultRate);
     setIsEditing(false);
   };
 
@@ -108,7 +121,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditName(e.target.value)}
             className="w-full"
           />
-        ) : updatedRole.name}
+        ) : localRole.name}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -117,7 +130,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditDescription(e.target.value)}
             className="w-full h-20 resize-none"
           />
-        ) : updatedRole.description || "-"}
+        ) : localRole.description || "-"}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -129,7 +142,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
             className="w-full"
           />
-        ) : `$${updatedRole.defaultRate.toFixed(2)}/hr`}
+        ) : `$${localRole.defaultRate.toFixed(2)}/hr`}
       </TableCell>
       <TableCell className="text-right">
         {isEditing ? (

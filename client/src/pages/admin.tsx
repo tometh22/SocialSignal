@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -404,7 +404,14 @@ export default function Admin() {
                         {roles.map(role => (
                           <InlineEditRole 
                             key={role.id} 
-                            role={role} 
+                            role={role}
+                            onUpdate={(updatedRole) => {
+                              // Actualizar roles en tiempo real
+                              const updatedRoles = roles.map(r => 
+                                r.id === updatedRole.id ? updatedRole : r
+                              );
+                              queryClient.setQueryData(["/api/roles"], updatedRoles);
+                            }}
                           />
                         ))}
                       </TableBody>
@@ -453,6 +460,13 @@ export default function Admin() {
                             key={person.id}
                             person={person}
                             roles={roles}
+                            onUpdate={(updatedPerson) => {
+                              // Actualizar personal en tiempo real
+                              const updatedPersonnel = personnel.map(p => 
+                                p.id === updatedPerson.id ? updatedPerson : p
+                              );
+                              queryClient.setQueryData(["/api/personnel"], updatedPersonnel);
+                            }}
                           />
                         ))}
                       </TableBody>
