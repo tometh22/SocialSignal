@@ -330,9 +330,20 @@ export default function QuoteDetails() {
                           <div>
                             <span className="text-sm font-medium text-neutral-700">Margen</span>
                             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                              {((quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)) > 1.9 ? 'x2.0' : 
-                                (quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)) > 1.4 ? 'x1.5' : 
-                                'x' + (quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)).toFixed(1))}
+                              {(() => {
+                                // Calculate the actual markup ratio
+                                const baseCostWithAdjustment = quotation.baseCost + quotation.complexityAdjustment;
+                                const markupRatio = quotation.markupAmount / baseCostWithAdjustment;
+                                
+                                // Check for common markup ratios
+                                if (Math.abs(markupRatio - 2.0) < 0.05) return 'x2.0';
+                                if (Math.abs(markupRatio - 1.5) < 0.05) return 'x1.5';
+                                if (Math.abs(markupRatio - 1.0) < 0.05) return 'x1.0';
+                                if (Math.abs(markupRatio - 0.5) < 0.05) return 'x0.5';
+                                
+                                // Use actual percentage if not close to common ratios
+                                return `${(markupRatio * 100).toFixed(0)}%`;
+                              })()}
                             </span>
                           </div>
                           <span className="text-sm font-mono font-medium">${quotation.markupAmount.toFixed(2)}</span>
