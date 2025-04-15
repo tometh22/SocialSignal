@@ -11,9 +11,9 @@ export const getAnalysisTypeFactor = (analysisType: string): number => {
     case "basic":
       return 0;
     case "standard":
-      return 0.1; // +10% - Análisis estándar requiere más esfuerzo metodológico
+      return 0.1; // +10% - Metodología estándar requiere más recursos técnicos
     case "deep":
-      return 0.15; // +15% - Análisis profundo requiere técnicas avanzadas
+      return 0.15; // +15% - Metodología avanzada requiere herramientas y técnicas especializadas
     default:
       return 0;
   }

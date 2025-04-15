@@ -205,14 +205,14 @@ export default function ProjectDetails({ onNext }: { onNext: () => void }) {
           </div>
 
           <div>
-            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Nivel de Análisis</Label>
-            <p className="text-xs text-neutral-500 mb-2">La profundidad metodológica del análisis de datos (modifica el esfuerzo analítico)</p>
+            <Label htmlFor="analysis-type" className="block text-sm font-medium text-neutral-700 mb-1">Metodología Aplicada</Label>
+            <p className="text-xs text-neutral-500 mb-2">Las técnicas y métodos aplicados en el análisis (afecta recursos técnicos y horas de trabajo)</p>
             <Select 
               value={projectDetails.analysisType || ""}
               onValueChange={(value) => updateProjectDetails({ analysisType: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecciona el nivel de análisis" />
+                <SelectValue placeholder="Selecciona la metodología" />
               </SelectTrigger>
               <SelectContent>
                 {analysisTypes?.map((type) => (
