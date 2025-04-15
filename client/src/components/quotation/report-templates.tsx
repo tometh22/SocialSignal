@@ -145,11 +145,18 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
       <h3 className="text-xl font-semibold text-neutral-900 mb-6">Plantillas de Informe</h3>
       
       <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <h4 className="text-base font-medium text-blue-700">¿Cuál es la diferencia?</h4>
+        <h4 className="text-base font-medium text-blue-700">¿Cuál es la diferencia entre tipo de proyecto y plantilla?</h4>
         <p className="text-sm text-blue-600 mt-1">
-          En el paso 1 seleccionaste el <strong>Tipo de Análisis</strong> (metodología y enfoque analítico).
-          Ahora debes elegir una <strong>Plantilla de Informe</strong> específica que define la estructura,
+          <strong>Tipo de Proyecto</strong> (seleccionado anteriormente): Define el propósito general del entregable 
+          (ej. Informe Demo, Informe Ejecutivo, Always On, etc.).
+        </p>
+        <p className="text-sm text-blue-600 mt-2">
+          <strong>Plantilla de Informe</strong> (a seleccionar ahora): Define la estructura específica, 
           formato y presentación del entregable final al cliente.
+        </p>
+        <p className="text-sm text-blue-600 mt-2 italic">
+          Por ejemplo, podrías necesitar un "Informe Exhaustivo" (tipo de proyecto) presentado como 
+          "Panel Ejecutivo" (plantilla) para un cliente que requiere información detallada pero en formato visual.
         </p>
       </div>
       
