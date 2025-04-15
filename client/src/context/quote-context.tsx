@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useQuery } from "@tanstack/react-query";
-import { ReportTemplate } from "@shared/schema";
+import { ReportTemplate, Role } from "@shared/schema";
 import {
   getAnalysisTypeFactor,
   getMentionsVolumeFactor,
@@ -13,6 +13,7 @@ import {
   calculateTotalAmount,
   ComplexityFactors
 } from "@/lib/calculation";
+import { apiRequest } from "@/lib/queryClient";
 
 export interface TeamMember {
   id: string;
@@ -165,33 +166,54 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           templateComplexity: template.complexity
         }));
         
-        // Establecer roles recomendados basados en la plantilla
-        let recommendedIds: number[] = [];
-        
-        // Buscar roles por nombre en lugar de usar IDs fijos
-        console.log("Roles disponibles para recomendación:", roles.map(r => ({ id: r.id, name: r.name })));
-        
-        const analistaId = roles.find(r => r.name.toLowerCase().includes("analista") && r.name.toLowerCase().includes("senior"))?.id;
-        const cientificoId = roles.find(r => r.name.toLowerCase().includes("data") || r.name.toLowerCase().includes("científico"))?.id;
-        const especialistaId = roles.find(r => r.name.toLowerCase().includes("contenido") || r.name.toLowerCase().includes("content"))?.id;
-        const gerenteId = roles.find(r => r.name.toLowerCase().includes("gerente") || r.name.toLowerCase().includes("manager"))?.id;
-        
-        // Crear array con los IDs encontrados (excluyendo undefined)
-        const roleIds = [analistaId, cientificoId, especialistaId, gerenteId].filter(id => id !== undefined) as number[];
-        
-        if (template.complexity === "high") {
-          // Para informes complejos, recomendamos todos los roles disponibles
-          recommendedIds = roleIds;
-        } else if (template.complexity === "medium") {
-          // Para informes medianos, excluimos algunos roles
-          recommendedIds = roleIds.slice(0, 3);  // Usar los primeros 3 roles
-        } else {
-          // Para informes básicos, solo los roles principales
-          recommendedIds = roleIds.slice(0, 2);  // Usar los primeros 2 roles
-        }
-        
-        console.log("Configurando roles recomendados:", recommendedIds);
-        setRecommendedRoleIds(recommendedIds);
+        // Cargar las asignaciones de roles para esta plantilla desde la API
+        // Esta llamada obtiene qué roles están asignados a la plantilla seleccionada
+        apiRequest(`/api/templates/${templateId}/role-assignments`)
+          .then(response => {
+            console.log("Asignaciones de roles cargadas:", response);
+            
+            if (response && Array.isArray(response)) {
+              // Extraer los IDs de roles de las asignaciones
+              const recommendedIds = response.map(assignment => assignment.roleId);
+              console.log("Roles recomendados basados en asignaciones:", recommendedIds);
+              
+              // Guardar los roles recomendados en el estado
+              setRecommendedRoleIds(recommendedIds);
+            } else {
+              console.log("No se encontraron asignaciones de roles para esta plantilla");
+              
+              // Si no hay asignaciones configuradas, usamos la lógica anterior basada en complejidad
+              // Buscar roles por nombre en lugar de usar IDs fijos
+              console.log("Roles disponibles para recomendación:", roles.map(r => ({ id: r.id, name: r.name })));
+              
+              const analistaId = roles.find(r => r.name.toLowerCase().includes("analista") && r.name.toLowerCase().includes("senior"))?.id;
+              const cientificoId = roles.find(r => r.name.toLowerCase().includes("data") || r.name.toLowerCase().includes("científico"))?.id;
+              const especialistaId = roles.find(r => r.name.toLowerCase().includes("contenido") || r.name.toLowerCase().includes("content"))?.id;
+              const gerenteId = roles.find(r => r.name.toLowerCase().includes("gerente") || r.name.toLowerCase().includes("manager"))?.id;
+              
+              // Crear array con los IDs encontrados (excluyendo undefined)
+              const roleIds = [analistaId, cientificoId, especialistaId, gerenteId].filter(id => id !== undefined) as number[];
+              
+              // Asignar según la complejidad
+              let recommendedIds: number[] = [];
+              if (template.complexity === "high") {
+                // Para informes complejos, recomendamos todos los roles disponibles
+                recommendedIds = roleIds;
+              } else if (template.complexity === "medium") {
+                // Para informes medianos, excluimos algunos roles
+                recommendedIds = roleIds.slice(0, 3);  // Usar los primeros 3 roles
+              } else {
+                // Para informes básicos, solo los roles principales
+                recommendedIds = roleIds.slice(0, 2);  // Usar los primeros 2 roles
+              }
+              
+              console.log("Configurando roles recomendados por complejidad:", recommendedIds);
+              setRecommendedRoleIds(recommendedIds);
+            }
+          })
+          .catch(error => {
+            console.error("Error al cargar asignaciones de roles:", error);
+          });
       }
     }
   }, [templates, roles]);
@@ -288,39 +310,94 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Siempre limpiamos roles existentes al añadir los recomendados
     setTeamMembers([]);
     
-    if (roles) {
-      // Volvemos a obtener los roles más actuales para asegurarnos de tener la información más reciente
-      // Para cada rol recomendado, añadirlo al equipo si existe
-      recommendedRoleIds.forEach(roleId => {
-        const role = roles.find(r => r.id === roleId);
-        console.log("Procesando rol recomendado:", roleId, role);
-        
-        if (role) {
-          // Añadir el rol con configuración predeterminada
-          const newMember = {
-            roleId: role.id,
-            personnelId: null,
-            hours: 10, // Horas predeterminadas
-            rate: role.defaultRate,
-            cost: 10 * role.defaultRate
-          };
+    if (roles && selectedTemplateId) {
+      // Cargar las asignaciones de roles desde la API para obtener las horas asignadas
+      apiRequest(`/api/templates/${selectedTemplateId}/role-assignments`)
+        .then(response => {
+          console.log("Asignaciones de roles para configuración de horas:", response);
           
-          console.log("Añadiendo miembro:", newMember);
+          if (response && Array.isArray(response)) {
+            // Para cada rol recomendado, añadirlo al equipo si existe
+            recommendedRoleIds.forEach(roleId => {
+              const role = roles.find(r => r.id === roleId);
+              console.log("Procesando rol recomendado:", roleId, role);
+              
+              if (role) {
+                // Buscar si hay una asignación específica para este rol en esta plantilla
+                const roleAssignment = response.find(assignment => assignment.roleId === roleId);
+                // Determinar horas asignadas (usar las horas de la asignación si existe, o un valor predeterminado)
+                const assignedHours = roleAssignment ? parseInt(roleAssignment.hours) : 10;
+                
+                // Añadir el rol con las horas asignadas según la asignación de la plantilla
+                const newMember = {
+                  roleId: role.id,
+                  personnelId: null,
+                  hours: assignedHours,
+                  rate: role.defaultRate,
+                  cost: assignedHours * role.defaultRate
+                };
+                
+                console.log("Añadiendo miembro con horas asignadas:", newMember);
+                
+                // Usamos directamente la función en lugar de la versión memorizada
+                // para evitar problemas de dependencias en useCallback
+                setTeamMembers(prev => [...prev, {
+                  ...newMember,
+                  id: uuidv4()
+                }]);
+              }
+            });
+            
+            console.log("Roles recomendados añadidos con horas asignadas");
+          } else {
+            // Usar lógica predeterminada si no hay asignaciones disponibles
+            recommendedRoleIds.forEach(roleId => {
+              const role = roles.find(r => r.id === roleId);
+              if (role) {
+                const newMember = {
+                  roleId: role.id,
+                  personnelId: null,
+                  hours: 10, // Horas predeterminadas
+                  rate: role.defaultRate,
+                  cost: 10 * role.defaultRate
+                };
+                
+                setTeamMembers(prev => [...prev, {
+                  ...newMember,
+                  id: uuidv4()
+                }]);
+              }
+            });
+            
+            console.log("Roles recomendados añadidos con horas predeterminadas");
+          }
+        })
+        .catch(error => {
+          console.error("Error al cargar asignaciones para horas:", error);
           
-          // Usamos directamente la función en lugar de la versión memorizada
-          // para evitar problemas de dependencias en useCallback
-          setTeamMembers(prev => [...prev, {
-            ...newMember,
-            id: uuidv4()
-          }]);
-        }
-      });
-      
-      console.log("Roles recomendados añadidos");
+          // En caso de error, usar lógica predeterminada
+          recommendedRoleIds.forEach(roleId => {
+            const role = roles.find(r => r.id === roleId);
+            if (role) {
+              const newMember = {
+                roleId: role.id,
+                personnelId: null,
+                hours: 10, // Horas predeterminadas
+                rate: role.defaultRate,
+                cost: 10 * role.defaultRate
+              };
+              
+              setTeamMembers(prev => [...prev, {
+                ...newMember,
+                id: uuidv4()
+              }]);
+            }
+          });
+        });
     } else {
-      console.log("No hay roles disponibles para añadir");
+      console.log("No hay roles disponibles o no se ha seleccionado plantilla");
     }
-  }, [recommendedRoleIds, roles]);
+  }, [recommendedRoleIds, roles, selectedTemplateId]);
 
   const value = {
     projectDetails,
