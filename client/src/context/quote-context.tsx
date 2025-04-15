@@ -150,7 +150,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSelectedTemplateId(templateId);
     
     // Update template complexity factor
-    if (templates) {
+    if (templates && roles) {
       const template = templates.find(t => t.id === templateId);
       console.log("Plantilla encontrada:", template);
       
@@ -166,27 +166,33 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }));
         
         // Establecer roles recomendados basados en la plantilla
-        // Estos IDs deberían venir de la base de datos en una implementación real
-        // Por ahora, usamos una lógica simple basada en la complejidad
         let recommendedIds: number[] = [];
         
-        // IDs de roles estándar: 9=Analista Senior, 10=Científico de Datos, 11=Especialista de Contenido, 12=Gerente de Proyecto
+        // Buscar roles por nombre en lugar de usar IDs fijos
+        const analistaId = roles.find(r => r.name.includes("Analista Senior"))?.id;
+        const especialistaId = roles.find(r => r.name.includes("Data Specialist"))?.id;
+        const analistaSemiId = roles.find(r => r.name.includes("Semi"))?.id;
+        const gerenteId = roles.find(r => r.name.includes("Manager"))?.id;
+        
+        // Crear array con los IDs encontrados (excluyendo undefined)
+        const roleIds = [analistaId, especialistaId, analistaSemiId, gerenteId].filter(id => id !== undefined) as number[];
+        
         if (template.complexity === "high") {
-          // Para informes complejos, recomendamos todos los roles
-          recommendedIds = [9, 10, 11, 12];
+          // Para informes complejos, recomendamos todos los roles disponibles
+          recommendedIds = roleIds;
         } else if (template.complexity === "medium") {
-          // Para informes medianos, excluimos al científico de datos
-          recommendedIds = [9, 11, 12];
+          // Para informes medianos, excluimos algunos roles
+          recommendedIds = roleIds.slice(0, 3);  // Usar los primeros 3 roles
         } else {
-          // Para informes básicos, solo analista y especialista de contenido
-          recommendedIds = [9, 11];
+          // Para informes básicos, solo los roles principales
+          recommendedIds = roleIds.slice(0, 2);  // Usar los primeros 2 roles
         }
         
         console.log("Configurando roles recomendados:", recommendedIds);
         setRecommendedRoleIds(recommendedIds);
       }
     }
-  }, [templates]);
+  }, [templates, roles]);
 
   const updateTemplateCustomization = useCallback((customization: string) => {
     setTemplateCustomization(customization);
@@ -281,6 +287,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTeamMembers([]);
     
     if (roles) {
+      // Volvemos a obtener los roles más actuales para asegurarnos de tener la información más reciente
       // Para cada rol recomendado, añadirlo al equipo si existe
       recommendedRoleIds.forEach(roleId => {
         const role = roles.find(r => r.id === roleId);
