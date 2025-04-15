@@ -621,20 +621,45 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
         </div>
 
         {/* Resumen de costos */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-neutral-50 p-4 rounded-lg">
-            <h5 className="text-sm font-medium text-neutral-700 mb-1">Costo Base</h5>
-            <p className="text-2xl font-mono font-semibold">${baseCost.toFixed(2)}</p>
-          </div>
-          <div className="bg-neutral-50 p-4 rounded-lg">
-            <h5 className="text-sm font-medium text-neutral-700 mb-1">
-              Ajuste por Complejidad {complexityAdjustment > 0 && `(+${(complexityAdjustment/baseCost*100).toFixed(0)}%)`}
-            </h5>
-            <p className="text-2xl font-mono font-semibold">${complexityAdjustment.toFixed(2)}</p>
-          </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h5 className="text-sm font-medium text-blue-700 mb-1">Margen Estándar (2×)</h5>
-            <p className="text-2xl font-mono font-semibold text-blue-700">${totalAmount.toFixed(2)}</p>
+        <div className="mb-6">
+          <h4 className="text-base font-medium text-neutral-700 mb-3">Desglose de Cotización</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-neutral-700">Costo Base (Horas de Equipo)</h5>
+                <p className="text-lg font-mono font-semibold">${baseCost.toFixed(2)}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-neutral-700">
+                  Ajustes por Complejidad {complexityAdjustment > 0 && `(+${(complexityAdjustment/baseCost*100).toFixed(0)}%)`}
+                </h5>
+                <p className="text-lg font-mono font-semibold">${complexityAdjustment.toFixed(2)}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-neutral-700">Costo Base Ajustado</h5>
+                <p className="text-lg font-mono font-semibold">${(baseCost + complexityAdjustment).toFixed(2)}</p>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-neutral-700">Margen Estándar (2×)</h5>
+                <p className="text-lg font-mono font-semibold">${markupAmount.toFixed(2)}</p>
+              </div>
+            </div>
+            
+            <div className="col-span-2 bg-primary bg-opacity-10 p-4 rounded-lg border border-primary shadow-sm">
+              <div className="flex justify-between items-center">
+                <h5 className="text-base font-medium text-primary">Cotización Total</h5>
+                <p className="text-xl font-mono font-semibold text-primary">${totalAmount.toFixed(2)}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

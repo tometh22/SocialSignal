@@ -323,38 +323,52 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-3">
               <h5 className="text-base font-medium text-neutral-800 mb-3">Desglose de Cotización</h5>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Costo Base (Horas de Equipo)</span>
-                  <span className="text-sm font-mono font-medium text-neutral-900">
-                    {formatCurrency(baseCost)}
-                  </span>
+              <div className="space-y-4">
+                <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-neutral-700">Costo Base (Horas de Equipo)</span>
+                    <span className="text-sm font-mono font-medium text-neutral-900">
+                      {formatCurrency(baseCost)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">
-                    Ajustes por Complejidad ({(complexityAdjustment / baseCost * 100).toFixed(0)}%)
-                  </span>
-                  <span className="text-sm font-mono font-medium text-neutral-900">
-                    {formatCurrency(complexityAdjustment)}
-                  </span>
+                
+                <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-neutral-700">
+                      Ajustes por Complejidad ({(complexityAdjustment / baseCost * 100).toFixed(0)}%)
+                    </span>
+                    <span className="text-sm font-mono font-medium text-neutral-900">
+                      {formatCurrency(complexityAdjustment)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Costo Base Ajustado</span>
-                  <span className="text-sm font-mono font-medium text-neutral-900">
-                    {formatCurrency(baseCost + complexityAdjustment)}
-                  </span>
+                
+                <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-neutral-700">Costo Base Ajustado</span>
+                    <span className="text-sm font-mono font-medium text-neutral-900">
+                      {formatCurrency(baseCost + complexityAdjustment)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
-                  <span className="text-sm text-neutral-600">Margen Estándar (2×)</span>
-                  <span className="text-sm font-mono font-medium text-neutral-900">
-                    {formatCurrency(markupAmount)}
-                  </span>
+                
+                <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-neutral-700">Margen Estándar (2×)</span>
+                    <span className="text-sm font-mono font-medium text-neutral-900">
+                      {formatCurrency(markupAmount)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-base font-medium text-neutral-800">Cotización Total</span>
-                  <span className="text-base font-mono font-medium text-primary">
-                    {formatCurrency(adjustedAmount || totalAmount)}
-                  </span>
+                
+                <div className="bg-primary bg-opacity-10 p-3 rounded-lg border border-primary">
+                  <div className="flex justify-between items-center">
+                    <span className="text-base font-medium text-primary">Cotización Total</span>
+                    <span className="text-base font-mono font-medium text-primary">
+                      {formatCurrency(adjustedAmount || totalAmount)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
