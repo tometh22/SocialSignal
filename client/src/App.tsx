@@ -4,6 +4,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import NewQuote from "@/pages/new-quote";
 import ManageQuotes from "@/pages/manage-quotes";
+import QuoteDetails from "@/pages/quote-details";
 import Clients from "@/pages/clients";
 import History from "@/pages/history";
 import Admin from "@/pages/admin";
@@ -24,6 +25,7 @@ function App() {
           <Route path="/" component={Dashboard} />
           <Route path="/new-quote" component={NewQuote} />
           <Route path="/manage-quotes" component={ManageQuotes} />
+          <Route path="/quote/:id" component={QuoteDetails} />
           <Route path="/clients" component={Clients} />
           <Route path="/history" component={History} />
           <Route path="/admin" component={Admin} />

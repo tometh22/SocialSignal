@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Quotation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function ManageQuotes() {
+  const [, navigate] = useLocation();
   const { data: quotations, isLoading, refetch } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
   });
@@ -189,7 +191,11 @@ export default function ManageQuotes() {
                                 <Edit className="h-4 w-4 mr-1" />
                                 Estado
                               </Button>
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => navigate(`/quote/${quote.id}`)}
+                              >
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver
                               </Button>
