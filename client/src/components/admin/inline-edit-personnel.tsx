@@ -47,6 +47,12 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
     },
     onSuccess: (updatedData: Personnel) => {
       setUpdatedPerson(updatedData);
+      // Actualizar de inmediato la caché local
+      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      // Invalidar la consulta para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       toast({
         title: "Success",

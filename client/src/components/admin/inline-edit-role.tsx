@@ -39,6 +39,12 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
     },
     onSuccess: (updatedData: Role) => {
       setUpdatedRole(updatedData);
+      // Actualizar de inmediato la caché local
+      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      // Invalidar la consulta para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       toast({
         title: "Success",

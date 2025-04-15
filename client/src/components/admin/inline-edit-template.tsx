@@ -53,6 +53,12 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
     },
     onSuccess: (updatedData: ReportTemplate) => {
       setUpdatedTemplate(updatedData);
+      // Actualizar de inmediato la caché local
+      queryClient.setQueryData(["/api/templates"], (oldData: ReportTemplate[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      // Invalidar la consulta para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
       toast({
         title: "Success",
