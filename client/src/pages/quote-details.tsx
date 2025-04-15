@@ -331,18 +331,17 @@ export default function QuoteDetails() {
                             <span className="text-sm font-medium text-neutral-700">Margen</span>
                             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
                               {(() => {
-                                // Calculate the actual markup ratio
+                                // Calculate the total/base ratio to determine markup multiplier
                                 const baseCostWithAdjustment = quotation.baseCost + quotation.complexityAdjustment;
-                                const markupRatio = quotation.markupAmount / baseCostWithAdjustment;
+                                const totalRatio = quotation.totalAmount / baseCostWithAdjustment;
                                 
-                                // Check for common markup ratios
-                                if (Math.abs(markupRatio - 2.0) < 0.05) return 'x2.0';
-                                if (Math.abs(markupRatio - 1.5) < 0.05) return 'x1.5';
-                                if (Math.abs(markupRatio - 1.0) < 0.05) return 'x1.0';
-                                if (Math.abs(markupRatio - 0.5) < 0.05) return 'x0.5';
+                                // Check for common total ratios (relative to base cost)
+                                if (Math.abs(totalRatio - 2.0) < 0.05) return 'x2.0';
+                                if (Math.abs(totalRatio - 1.5) < 0.05) return 'x1.5';
+                                if (Math.abs(totalRatio - 1.0) < 0.05) return 'x1.0';
                                 
-                                // Use actual percentage if not close to common ratios
-                                return `${(markupRatio * 100).toFixed(0)}%`;
+                                // If not a common ratio, show the actual multiplier
+                                return `x${totalRatio.toFixed(1)}`;
                               })()}
                             </span>
                           </div>
