@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit } from "lucide-react";
+import { Edit, Loader2 } from "lucide-react";
 
 interface InlineEditRoleProps {
   role: Role;
@@ -18,13 +18,27 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   const [editName, setEditName] = useState(role.name);
   const [editDescription, setEditDescription] = useState(role.description || "");
   const [editDefaultRate, setEditDefaultRate] = useState(role.defaultRate);
+  const [updatedRole, setUpdatedRole] = useState<Role>(role);
   const { toast } = useToast();
+
+  // Update when the role prop changes
+  useEffect(() => {
+    setUpdatedRole(role);
+    if (!isEditing) {
+      setEditName(role.name);
+      setEditDescription(role.description || "");
+      setEditDefaultRate(role.defaultRate);
+    }
+  }, [role, isEditing]);
 
   // Update role mutation
   const updateRoleMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; description: string; defaultRate: number } }) => 
-      apiRequest("PATCH", `/api/roles/${id}`, data),
-    onSuccess: () => {
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string; defaultRate: number } }) => {
+      const response = await apiRequest("PATCH", `/api/roles/${id}`, data);
+      return response as Role;
+    },
+    onSuccess: (updatedData: Role) => {
+      setUpdatedRole(updatedData);
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       toast({
         title: "Success",
@@ -42,6 +56,26 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   });
 
   const handleSave = () => {
+    // Validate inputs
+    if (!editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Role name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (editDefaultRate <= 0) {
+      toast({
+        title: "Error",
+        description: "Default rate must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Execute mutation
     updateRoleMutation.mutate({ 
       id: role.id, 
       data: {
@@ -53,9 +87,9 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   };
 
   const handleCancel = () => {
-    setEditName(role.name);
-    setEditDescription(role.description || "");
-    setEditDefaultRate(role.defaultRate);
+    setEditName(updatedRole.name);
+    setEditDescription(updatedRole.description || "");
+    setEditDefaultRate(updatedRole.defaultRate);
     setIsEditing(false);
   };
 
@@ -68,7 +102,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditName(e.target.value)}
             className="w-full"
           />
-        ) : role.name}
+        ) : updatedRole.name}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -77,7 +111,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditDescription(e.target.value)}
             className="w-full h-20 resize-none"
           />
-        ) : role.description || "-"}
+        ) : updatedRole.description || "-"}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -89,7 +123,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
             className="w-full"
           />
-        ) : `$${role.defaultRate.toFixed(2)}/hr`}
+        ) : `$${updatedRole.defaultRate.toFixed(2)}/hr`}
       </TableCell>
       <TableCell className="text-right">
         {isEditing ? (
@@ -97,8 +131,18 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
             <Button variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button variant="default" size="sm" onClick={handleSave}>
-              Save
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleSave}
+              disabled={updateRoleMutation.isPending}
+            >
+              {updateRoleMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save"}
             </Button>
           </div>
         ) : (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit } from "lucide-react";
+import { Edit, Loader2 } from "lucide-react";
 
 interface InlineEditPersonnelProps {
   person: Personnel;
@@ -19,7 +19,18 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
   const [editName, setEditName] = useState(person.name);
   const [editRoleId, setEditRoleId] = useState(person.roleId);
   const [editRate, setEditRate] = useState(person.hourlyRate);
+  const [updatedPerson, setUpdatedPerson] = useState<Personnel>(person);
   const { toast } = useToast();
+
+  // Update when the person prop changes
+  useEffect(() => {
+    setUpdatedPerson(person);
+    if (!isEditing) {
+      setEditName(person.name);
+      setEditRoleId(person.roleId);
+      setEditRate(person.hourlyRate);
+    }
+  }, [person, isEditing]);
 
   // Get role name by ID
   const getRoleName = (roleId: number) => {
@@ -30,9 +41,12 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
 
   // Update personnel mutation
   const updatePersonnelMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; roleId: number; hourlyRate: number } }) => 
-      apiRequest("PATCH", `/api/personnel/${id}`, data),
-    onSuccess: () => {
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; roleId: number; hourlyRate: number } }) => {
+      const response = await apiRequest("PATCH", `/api/personnel/${id}`, data);
+      return response as Personnel;
+    },
+    onSuccess: (updatedData: Personnel) => {
+      setUpdatedPerson(updatedData);
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       toast({
         title: "Success",
@@ -50,6 +64,25 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
   });
 
   const handleSave = () => {
+    // Validate inputs
+    if (!editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (editRate <= 0) {
+      toast({
+        title: "Error",
+        description: "Hourly rate must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updatePersonnelMutation.mutate({ 
       id: person.id, 
       data: {
@@ -61,9 +94,9 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
   };
 
   const handleCancel = () => {
-    setEditName(person.name);
-    setEditRoleId(person.roleId);
-    setEditRate(person.hourlyRate);
+    setEditName(updatedPerson.name);
+    setEditRoleId(updatedPerson.roleId);
+    setEditRate(updatedPerson.hourlyRate);
     setIsEditing(false);
   };
 
@@ -76,7 +109,7 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
             onChange={(e) => setEditName(e.target.value)}
             className="w-full"
           />
-        ) : person.name}
+        ) : updatedPerson.name}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -92,7 +125,7 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
               ))}
             </SelectContent>
           </Select>
-        ) : getRoleName(person.roleId)}
+        ) : getRoleName(updatedPerson.roleId)}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -104,7 +137,7 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
             onChange={(e) => setEditRate(parseFloat(e.target.value))} 
             className="w-full"
           />
-        ) : `$${person.hourlyRate.toFixed(2)}/hr`}
+        ) : `$${updatedPerson.hourlyRate.toFixed(2)}/hr`}
       </TableCell>
       <TableCell className="text-right">
         {isEditing ? (
@@ -112,8 +145,18 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
             <Button variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button variant="default" size="sm" onClick={handleSave}>
-              Save
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleSave}
+              disabled={updatePersonnelMutation.isPending}
+            >
+              {updatePersonnelMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save"}
             </Button>
           </div>
         ) : (
