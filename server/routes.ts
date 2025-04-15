@@ -242,6 +242,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update template" });
     }
   });
+  
+  // Ruta para obtener asignaciones de roles para una plantilla específica
+  app.get("/api/templates/:id/role-assignments", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+
+    try {
+      const assignments = await storage.getTemplateRoleAssignments(id);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch template role assignments" });
+    }
+  });
 
   // Quotations routes
   app.get("/api/quotations", async (_, res) => {
