@@ -127,19 +127,26 @@ export default function Admin() {
   // Mutations
   const createRoleMutation = useMutation({
     mutationFn: (role: InsertRole) => apiRequest("POST", "/api/roles", role),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      toast({
-        title: "Success",
-        description: "Role has been created successfully.",
+    onSuccess: (response) => {
+      // Optimistic update for instant UI feedback
+      response.json().then(newRole => {
+        queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+          if (!oldData) return [newRole];
+          return [...oldData, newRole];
+        });
+        
+        toast({
+          title: "Éxito",
+          description: "Rol creado correctamente.",
+        });
+        setRoleDialogOpen(false);
+        roleForm.reset();
       });
-      setRoleDialogOpen(false);
-      roleForm.reset();
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create role.",
+        description: "No se pudo crear el rol.",
         variant: "destructive",
       });
     },
@@ -148,19 +155,53 @@ export default function Admin() {
   const updateRoleMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertRole> }) => 
       apiRequest("PATCH", `/api/roles/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      toast({
-        title: "Success",
-        description: "Role has been updated successfully.",
+    onSuccess: (response, variables) => {
+      // Optimistic update for instant UI feedback
+      response.json().then(updatedRole => {
+        queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+          if (!oldData) return [updatedRole];
+          return oldData.map(item => item.id === variables.id ? updatedRole : item);
+        });
+        
+        toast({
+          title: "Éxito",
+          description: "Rol actualizado correctamente.",
+        });
+        setRoleDialogOpen(false);
+        roleForm.reset();
       });
-      setRoleDialogOpen(false);
-      roleForm.reset();
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update role.",
+        description: "No se pudo actualizar el rol.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const deleteRoleMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/roles/${id}`),
+    onSuccess: (_, variables) => {
+      // Optimistic update - remove role instantly from UI
+      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.filter(item => item.id !== variables);
+      });
+      
+      toast({
+        title: "Éxito",
+        description: "Rol eliminado correctamente.",
+      });
+      
+      // Invalidate queries to ensure data is up to date
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",
         variant: "destructive",
       });
     },
@@ -168,19 +209,26 @@ export default function Admin() {
 
   const createPersonnelMutation = useMutation({
     mutationFn: (personnel: InsertPersonnel) => apiRequest("POST", "/api/personnel", personnel),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      toast({
-        title: "Success",
-        description: "Team member has been added successfully.",
+    onSuccess: (response) => {
+      // Optimistic update for instant UI feedback
+      response.json().then(newPersonnel => {
+        queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+          if (!oldData) return [newPersonnel];
+          return [...oldData, newPersonnel];
+        });
+        
+        toast({
+          title: "Éxito",
+          description: "Miembro del equipo añadido correctamente.",
+        });
+        setPersonnelDialogOpen(false);
+        personnelForm.reset();
       });
-      setPersonnelDialogOpen(false);
-      personnelForm.reset();
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to add team member.",
+        description: "No se pudo añadir el miembro del equipo.",
         variant: "destructive",
       });
     },
@@ -189,19 +237,49 @@ export default function Admin() {
   const updatePersonnelMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertPersonnel> }) => 
       apiRequest("PATCH", `/api/personnel/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      toast({
-        title: "Success",
-        description: "Team member has been updated successfully.",
+    onSuccess: (response, variables) => {
+      // Optimistic update for instant UI feedback
+      response.json().then(updatedPersonnel => {
+        queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+          if (!oldData) return [updatedPersonnel];
+          return oldData.map(item => item.id === variables.id ? updatedPersonnel : item);
+        });
+        
+        toast({
+          title: "Éxito",
+          description: "Miembro del equipo actualizado correctamente.",
+        });
+        setPersonnelDialogOpen(false);
+        personnelForm.reset();
       });
-      setPersonnelDialogOpen(false);
-      personnelForm.reset();
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update team member.",
+        description: "No se pudo actualizar el miembro del equipo.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const deletePersonnelMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/personnel/${id}`),
+    onSuccess: (_, variables) => {
+      // Optimistic update - remove personnel instantly from UI
+      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.filter(item => item.id !== variables);
+      });
+      
+      toast({
+        title: "Éxito",
+        description: "Miembro del equipo eliminado correctamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el miembro del equipo.",
         variant: "destructive",
       });
     },
@@ -411,6 +489,10 @@ export default function Admin() {
                                 r.id === updatedRole.id ? updatedRole : r
                               );
                               queryClient.setQueryData(["/api/roles"], updatedRoles);
+                            }}
+                            onDelete={(roleId) => {
+                              // Eliminar rol en tiempo real
+                              deleteRoleMutation.mutate(roleId);
                             }}
                           />
                         ))}

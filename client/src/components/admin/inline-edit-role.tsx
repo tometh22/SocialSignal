@@ -7,18 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit, Loader2 } from "lucide-react";
+import { Edit, Loader2, Trash2, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface InlineEditRoleProps {
   role: Role;
   onUpdate?: (updatedRole: Role) => void;
+  onDelete?: (roleId: number) => void;
 }
 
-export function InlineEditRole({ role, onUpdate }: InlineEditRoleProps) {
+export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(role.name);
   const [editDescription, setEditDescription] = useState(role.description || "");
   const [editDefaultRate, setEditDefaultRate] = useState(role.defaultRate);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   // Estado local para mostrar los cambios inmediatamente
   const [localRole, setLocalRole] = useState<Role>(role);
   const { toast } = useToast();
@@ -112,65 +124,143 @@ export function InlineEditRole({ role, onUpdate }: InlineEditRoleProps) {
     setIsEditing(false);
   };
 
+  // Delete role mutation
+  const deleteRoleMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/roles/${role.id}`);
+      return role.id;
+    },
+    onSuccess: (deletedId) => {
+      if (onDelete) {
+        onDelete(deletedId);
+      }
+      
+      // Actualizar la caché de React Query eliminando el rol
+      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.filter(item => item.id !== deletedId);
+      });
+      
+      toast({
+        title: "Éxito",
+        description: "Rol eliminado correctamente",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    deleteRoleMutation.mutate();
+    setIsDeleteDialogOpen(false);
+  };
+
   return (
-    <TableRow>
-      <TableCell className="font-medium">
-        {isEditing ? (
-          <Input 
-            value={editName} 
-            onChange={(e) => setEditName(e.target.value)}
-            className="w-full"
-          />
-        ) : localRole.name}
-      </TableCell>
-      <TableCell>
-        {isEditing ? (
-          <Textarea 
-            value={editDescription} 
-            onChange={(e) => setEditDescription(e.target.value)}
-            className="w-full h-20 resize-none"
-          />
-        ) : localRole.description || "-"}
-      </TableCell>
-      <TableCell>
-        {isEditing ? (
-          <Input 
-            type="number" 
-            min="0" 
-            step="0.01" 
-            value={editDefaultRate} 
-            onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
-            className="w-full"
-          />
-        ) : `$${localRole.defaultRate.toFixed(2)}/hr`}
-      </TableCell>
-      <TableCell className="text-right">
-        {isEditing ? (
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" size="sm" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={handleSave}
-              disabled={updateRoleMutation.isPending}
+    <>
+      <TableRow>
+        <TableCell className="font-medium">
+          {isEditing ? (
+            <Input 
+              value={editName} 
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full"
+            />
+          ) : localRole.name}
+        </TableCell>
+        <TableCell>
+          {isEditing ? (
+            <Textarea 
+              value={editDescription} 
+              onChange={(e) => setEditDescription(e.target.value)}
+              className="w-full h-20 resize-none"
+            />
+          ) : localRole.description || "-"}
+        </TableCell>
+        <TableCell>
+          {isEditing ? (
+            <Input 
+              type="number" 
+              min="0" 
+              step="0.01" 
+              value={editDefaultRate} 
+              onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
+              className="w-full"
+            />
+          ) : `$${localRole.defaultRate.toFixed(2)}/hr`}
+        </TableCell>
+        <TableCell className="text-right">
+          {isEditing ? (
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleSave}
+                disabled={updateRoleMutation.isPending}
+              >
+                {updateRoleMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Guardando...
+                  </>
+                ) : "Guardar"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit className="h-4 w-4 mr-1" />
+                Editar
+              </Button>
+            </div>
+          )}
+        </TableCell>
+      </TableRow>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center text-red-600">
+              <AlertTriangle className="h-5 w-5 mr-2" /> Eliminar Rol
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro que deseas eliminar el rol <strong>{localRole.name}</strong>?
+              <br /><br />
+              Esta acción no se puede deshacer. Si hay personal asignado a este rol, la eliminación fallará.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {updateRoleMutation.isPending ? (
+              {deleteRoleMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Saving...
+                  Eliminando...
                 </>
-              ) : "Save"}
-            </Button>
-          </div>
-        ) : (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-            <Edit className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
-        )}
-      </TableCell>
-    </TableRow>
+              ) : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
