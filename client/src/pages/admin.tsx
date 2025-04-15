@@ -493,10 +493,10 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Role Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Default Rate</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead>Nombre del Rol</TableHead>
+                          <TableHead>Descripción</TableHead>
+                          <TableHead>Tarifa Predeterminada</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -551,10 +551,10 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Hourly Rate</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Rol</TableHead>
+                          <TableHead>Tarifa por Hora</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -580,7 +580,7 @@ export default function Admin() {
                     </Table>
                   ) : (
                     <div className="text-center py-4 text-neutral-500">
-                      No personnel found. Add your first team member.
+                      No se encontró personal. Añade tu primer miembro de equipo.
                     </div>
                   )}
                 </CardContent>
@@ -606,11 +606,11 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Template Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Complexity</TableHead>
-                          <TableHead>Page Range</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead>Nombre de Plantilla</TableHead>
+                          <TableHead>Descripción</TableHead>
+                          <TableHead>Complejidad</TableHead>
+                          <TableHead>Rango de Páginas</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -631,7 +631,7 @@ export default function Admin() {
                     </Table>
                   ) : (
                     <div className="text-center py-4 text-neutral-500">
-                      No templates found. Add your first report template.
+                      No se encontraron plantillas. Añade tu primera plantilla de reporte.
                     </div>
                   )}
                 </CardContent>
@@ -645,11 +645,11 @@ export default function Admin() {
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Role" : "Add New Role"}</DialogTitle>
+            <DialogTitle>{isEditing ? "Editar Rol" : "Añadir Nuevo Rol"}</DialogTitle>
             <DialogDescription>
               {isEditing 
-                ? "Update the role details below."
-                : "Add a new role with default hourly rate."}
+                ? "Actualiza los detalles del rol a continuación."
+                : "Añade un nuevo rol con tarifa por hora predeterminada."}
             </DialogDescription>
           </DialogHeader>
           
@@ -660,9 +660,9 @@ export default function Admin() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Role Name</FormLabel>
+                    <FormLabel>Nombre del Rol</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter role name" {...field} />
+                      <Input placeholder="Ingresa el nombre del rol" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -674,10 +674,10 @@ export default function Admin() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Descripción</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Enter role description" 
+                        placeholder="Ingresa la descripción del rol" 
                         className="resize-none" 
                         {...field} 
                       />
@@ -731,11 +731,11 @@ export default function Admin() {
       <Dialog open={personnelDialogOpen} onOpenChange={setPersonnelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Team Member" : "Add Team Member"}</DialogTitle>
+            <DialogTitle>{isEditing ? "Editar Miembro del Equipo" : "Añadir Miembro del Equipo"}</DialogTitle>
             <DialogDescription>
               {isEditing 
-                ? "Update the team member details below."
-                : "Add a new team member with their role and hourly rate."}
+                ? "Actualiza los detalles del miembro del equipo a continuación."
+                : "Añade un nuevo miembro del equipo con su rol y tarifa por hora."}
             </DialogDescription>
           </DialogHeader>
           
@@ -836,11 +836,11 @@ export default function Admin() {
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Template" : "Add Report Template"}</DialogTitle>
+            <DialogTitle>{isEditing ? "Editar Plantilla" : "Añadir Plantilla de Reporte"}</DialogTitle>
             <DialogDescription>
               {isEditing 
-                ? "Update the report template details below."
-                : "Create a new report template for quotations."}
+                ? "Actualiza los detalles de la plantilla de reporte a continuación."
+                : "Crea una nueva plantilla de reporte para cotizaciones."}
             </DialogDescription>
           </DialogHeader>
           
