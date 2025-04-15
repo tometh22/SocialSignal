@@ -549,6 +549,10 @@ export default function Admin() {
                               );
                               queryClient.setQueryData(["/api/personnel"], updatedPersonnel);
                             }}
+                            onDelete={(personnelId) => {
+                              // Eliminar personal en tiempo real
+                              deletePersonnelMutation.mutate(personnelId);
+                            }}
                           />
                         ))}
                       </TableBody>
