@@ -453,7 +453,7 @@ export default function Admin() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Administration Panel</h2>
+        <h2 className="text-lg font-semibold text-neutral-900">Panel de Administración</h2>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
@@ -462,15 +462,15 @@ export default function Admin() {
             <TabsList className="mb-6">
               <TabsTrigger value="roles" className="flex items-center">
                 <UserCog className="mr-2 h-4 w-4" />
-                Team Roles
+                Roles de Equipo
               </TabsTrigger>
               <TabsTrigger value="personnel" className="flex items-center">
                 <Settings className="mr-2 h-4 w-4" />
-                Personnel
+                Personal
               </TabsTrigger>
               <TabsTrigger value="templates" className="flex items-center">
                 <FileText className="mr-2 h-4 w-4" />
-                Report Templates
+                Plantillas de Reportes
               </TabsTrigger>
             </TabsList>
             
@@ -478,8 +478,8 @@ export default function Admin() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Team Roles</CardTitle>
-                    <CardDescription>Manage roles and default hourly rates</CardDescription>
+                    <CardTitle>Roles de Equipo</CardTitle>
+                    <CardDescription>Administrar roles y tarifas por hora predeterminadas</CardDescription>
                   </div>
                   <Button onClick={openNewRoleDialog}>
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -532,8 +532,8 @@ export default function Admin() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Personnel Management</CardTitle>
-                    <CardDescription>Add and update team members and their rates</CardDescription>
+                    <CardTitle>Gestión de Personal</CardTitle>
+                    <CardDescription>Añadir y actualizar miembros del equipo y sus tarifas</CardDescription>
                   </div>
                   <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                     <PlusCircle className="mr-2 h-4 w-4" />

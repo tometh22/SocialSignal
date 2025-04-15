@@ -74,15 +74,15 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       // Invalidar la consulta para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       toast({
-        title: "Success",
-        description: "Team member has been updated successfully.",
+        title: "Éxito",
+        description: "Miembro del equipo actualizado correctamente.",
       });
       setIsEditing(false);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update team member.",
+        description: "No se pudo actualizar el miembro del equipo.",
         variant: "destructive",
       });
     },
@@ -93,7 +93,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
     if (!editName.trim()) {
       toast({
         title: "Error",
-        description: "Name cannot be empty",
+        description: "El nombre no puede estar vacío",
         variant: "destructive",
       });
       return;
@@ -102,7 +102,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
     if (editRate <= 0) {
       toast({
         title: "Error",
-        description: "Hourly rate must be greater than 0",
+        description: "La tarifa por hora debe ser mayor que 0",
         variant: "destructive",
       });
       return;
