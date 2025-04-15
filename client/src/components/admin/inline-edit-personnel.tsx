@@ -12,9 +12,10 @@ import { Edit, Loader2 } from "lucide-react";
 interface InlineEditPersonnelProps {
   person: Personnel;
   roles: Role[] | undefined;
+  onUpdate?: (updatedPerson: Personnel) => void;
 }
 
-export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
+export function InlineEditPersonnel({ person, roles, onUpdate }: InlineEditPersonnelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(person.name);
   const [editRoleId, setEditRoleId] = useState(person.roleId);
@@ -47,6 +48,12 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
     },
     onSuccess: (updatedData: Personnel) => {
       setUpdatedPerson(updatedData);
+      
+      // Notificar al componente padre si existe onUpdate
+      if (onUpdate) {
+        onUpdate(updatedData);
+      }
+      
       // Actualizar de inmediato la caché local
       queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
         if (!oldData) return [updatedData];

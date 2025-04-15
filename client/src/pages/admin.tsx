@@ -510,7 +510,14 @@ export default function Admin() {
                         {templates.map(template => (
                           <InlineEditTemplate 
                             key={template.id} 
-                            template={template} 
+                            template={template}
+                            onUpdate={(updatedTemplate) => {
+                              // Actualizar plantillas en tiempo real
+                              const updatedTemplates = templates.map(t => 
+                                t.id === updatedTemplate.id ? updatedTemplate : t
+                              );
+                              queryClient.setQueryData(["/api/templates"], updatedTemplates);
+                            }}
                           />
                         ))}
                       </TableBody>

@@ -12,9 +12,10 @@ import { Edit, Loader2 } from "lucide-react";
 
 interface InlineEditTemplateProps {
   template: ReportTemplate;
+  onUpdate?: (updatedTemplate: ReportTemplate) => void;
 }
 
-export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
+export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplateProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(template.name);
   const [editDescription, setEditDescription] = useState(template.description || "");
@@ -53,6 +54,12 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
     },
     onSuccess: (updatedData: ReportTemplate) => {
       setUpdatedTemplate(updatedData);
+      
+      // Notificar al componente padre si existe onUpdate
+      if (onUpdate) {
+        onUpdate(updatedData);
+      }
+      
       // Actualizar de inmediato la caché local
       queryClient.setQueryData(["/api/templates"], (oldData: ReportTemplate[] | undefined) => {
         if (!oldData) return [updatedData];
