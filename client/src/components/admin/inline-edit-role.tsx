@@ -168,7 +168,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
             <Input 
               value={editName} 
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full"
+              className="w-full h-9" // Altura fija
             />
           ) : localRole.name}
         </TableCell>
@@ -189,7 +189,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
               step="0.01" 
               value={editDefaultRate} 
               onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
-              className="w-full"
+              className="w-full h-9" // Altura fija
             />
           ) : `$${localRole.defaultRate.toFixed(2)}/hr`}
         </TableCell>

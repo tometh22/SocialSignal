@@ -169,15 +169,15 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
             <Input 
               value={editName} 
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full"
+              className="w-full h-9" // Altura fija
             />
           ) : updatedPerson.name}
         </TableCell>
         <TableCell>
           {isEditing ? (
             <Select value={editRoleId.toString()} onValueChange={(value) => setEditRoleId(parseInt(value))}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select role" />
+              <SelectTrigger className="w-full h-9"> {/* Altura fija */}
+                <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
                 {roles?.map(role => (
@@ -197,7 +197,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
               step="0.01" 
               value={editRate} 
               onChange={(e) => setEditRate(parseFloat(e.target.value))} 
-              className="w-full"
+              className="w-full h-9" // Altura fija
             />
           ) : `$${updatedPerson.hourlyRate.toFixed(2)}/hr`}
         </TableCell>
