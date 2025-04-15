@@ -121,7 +121,7 @@ export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplatePro
           <Input 
             value={editName} 
             onChange={(e) => setEditName(e.target.value)}
-            className="w-full"
+            className="w-full h-9" // Altura fija
           />
         ) : updatedTemplate.name}
       </TableCell>
@@ -130,14 +130,15 @@ export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplatePro
           <Textarea 
             value={editDescription} 
             onChange={(e) => setEditDescription(e.target.value)}
-            className="w-full h-20 resize-none"
+            className="w-full h-10 resize-none min-h-0 py-2"
+            style={{ overflow: 'auto', lineHeight: '1.2' }}
           />
         ) : updatedTemplate.description || "-"}
       </TableCell>
       <TableCell>
         {isEditing ? (
           <Select value={editComplexity} onValueChange={setEditComplexity}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full h-9"> {/* Altura fija */}
               <SelectValue placeholder="Select complexity" />
             </SelectTrigger>
             <SelectContent>
@@ -163,7 +164,7 @@ export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplatePro
           <Input 
             value={editPageRange} 
             onChange={(e) => setEditPageRange(e.target.value)}
-            className="w-full"
+            className="w-full h-9" // Altura fija
           />
         ) : updatedTemplate.pageRange || "-"}
       </TableCell>
