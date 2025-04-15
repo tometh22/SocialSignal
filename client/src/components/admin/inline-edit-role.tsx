@@ -129,23 +129,43 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
   const deleteRoleMutation = useMutation({
     mutationFn: async () => {
       // Realizar la eliminación y devolver el ID
-      await apiRequest("DELETE", `/api/roles/${role.id}`);
+      const response = await apiRequest("DELETE", `/api/roles/${role.id}`);
+      
+      // Validar la respuesta del servidor
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al eliminar el rol");
+      }
+      
+      console.log(`Rol ${role.id} eliminado correctamente`);
       return role.id;
     },
     onSuccess: (deletedId) => {
+      // Actualizar la caché directamente aquí para eliminar el rol
+      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        if (!oldData) return [];
+        console.log("Eliminando rol ID:", deletedId);
+        console.log("Roles antes:", oldData.map(r => r.id));
+        const filtered = oldData.filter(item => item.id !== deletedId);
+        console.log("Roles después:", filtered.map(r => r.id));
+        return filtered;
+      });
+      
+      // Invalidar las consultas para forzar refrescar los datos
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      
+      // Notificar al componente padre si existe onDelete
       if (onDelete) {
         onDelete(deletedId);
       }
-      
-      // Ya no manejamos la caché aquí, lo dejamos al componente padre
-      // ya que podríamos estar causando una actualización doble
       
       toast({
         title: "Éxito",
         description: "Rol eliminado correctamente",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error al eliminar rol:", error);
       toast({
         title: "Error",
         description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",

@@ -184,14 +184,25 @@ export default function Admin() {
     mutationFn: async (id: number) => {
       // Realizar la solicitud y devolver el resultado
       const response = await apiRequest("DELETE", `/api/roles/${id}`);
+      
+      // Verificar si la operación fue exitosa
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al eliminar el rol");
+      }
+      
+      console.log(`Rol ${id} eliminado correctamente desde Admin`);
       return id;
     },
     onSuccess: (deletedId) => {
-      // Optimistic update - remove role instantly from UI
+      console.log("Operación exitosa. ID del rol eliminado:", deletedId);
+      
+      // Actualizar la caché de forma inmediata
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
         if (!oldData) return [];
+        console.log("Roles antes de filtrado:", oldData.map(r => `${r.id}:${r.name}`));
         const filtered = oldData.filter(item => item.id !== deletedId);
-        console.log("Filtered roles:", filtered);
+        console.log("Roles después de filtrado:", filtered.map(r => `${r.id}:${r.name}`));
         return filtered;
       });
       
@@ -200,11 +211,15 @@ export default function Admin() {
         description: "Rol eliminado correctamente.",
       });
       
-      // Importante: invalidar la consulta para actualizar los datos
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      // Forzar la recarga de datos del servidor
+      setTimeout(() => {
+        console.log("Invalidando consultas después de eliminar rol");
+        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      }, 300);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error eliminando rol:", error);
       toast({
         title: "Error",
         description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",
