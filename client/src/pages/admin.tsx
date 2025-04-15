@@ -194,7 +194,7 @@ export default function Admin() {
         description: "Rol eliminado correctamente.",
       });
       
-      // Invalidate queries to ensure data is up to date
+      // Importante: invalidar la consulta para actualizar los datos
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
     },

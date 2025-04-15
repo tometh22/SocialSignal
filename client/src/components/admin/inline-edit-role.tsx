@@ -142,6 +142,10 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
         return oldData.filter(item => item.id !== deletedId);
       });
       
+      // Invalidar la consulta para asegurar que la caché esté sincronizada con el servidor
+      // Esto es crucial para evitar que los roles eliminados reaparezcan después de editar
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      
       toast({
         title: "Éxito",
         description: "Rol eliminado correctamente",
