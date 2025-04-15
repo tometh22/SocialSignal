@@ -924,9 +924,9 @@ export default function Admin() {
                 name="features"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Features</FormLabel>
+                    <FormLabel>Características</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Core metrics only" {...field} />
+                      <Input placeholder="ej., Solo métricas básicas" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -939,13 +939,13 @@ export default function Admin() {
                   type="button" 
                   onClick={() => setTemplateDialogOpen(false)}
                 >
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
                 >
-                  {isEditing ? "Update Template" : "Add Template"}
+                  {isEditing ? "Actualizar Plantilla" : "Añadir Plantilla"}
                 </Button>
               </DialogFooter>
             </form>
