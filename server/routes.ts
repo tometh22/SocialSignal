@@ -8,7 +8,8 @@ import {
   insertPersonnelSchema, 
   insertReportTemplateSchema, 
   insertQuotationSchema,
-  insertQuotationTeamMemberSchema
+  insertQuotationTeamMemberSchema,
+  insertTemplateRoleAssignmentSchema
 } from "@shared/schema";
 import { reinitializeDatabase } from "./reinit-data";
 
@@ -374,6 +375,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/options/client-engagement", async (_, res) => {
     const options = await storage.getClientEngagementOptions();
     res.json(options);
+  });
+
+  // Template role assignments routes
+  app.get("/api/template-roles/:templateId", async (req, res) => {
+    const templateId = parseInt(req.params.templateId);
+    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+
+    const assignments = await storage.getTemplateRoleAssignments(templateId);
+    res.json(assignments);
+  });
+
+  app.get("/api/template-roles/:templateId/with-roles", async (req, res) => {
+    const templateId = parseInt(req.params.templateId);
+    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+
+    const assignmentsWithRoles = await storage.getTemplateRoleAssignmentsWithRoles(templateId);
+    res.json(assignmentsWithRoles);
+  });
+
+  app.post("/api/template-roles", async (req, res) => {
+    try {
+      const validatedData = insertTemplateRoleAssignmentSchema.parse(req.body);
+      const assignment = await storage.createTemplateRoleAssignment(validatedData);
+      res.status(201).json(assignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create template role assignment" });
+    }
+  });
+
+  app.patch("/api/template-roles/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
+
+    try {
+      const validatedData = insertTemplateRoleAssignmentSchema.partial().parse(req.body);
+      const updatedAssignment = await storage.updateTemplateRoleAssignment(id, validatedData);
+      
+      if (!updatedAssignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      res.json(updatedAssignment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid assignment data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update template role assignment" });
+    }
+  });
+
+  app.delete("/api/template-roles/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid assignment ID" });
+
+    try {
+      const success = await storage.deleteTemplateRoleAssignment(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      res.json({ success: true, message: "Template role assignment deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete template role assignment" });
+    }
+  });
+
+  app.delete("/api/template-roles/template/:templateId", async (req, res) => {
+    const templateId = parseInt(req.params.templateId);
+    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+
+    try {
+      await storage.deleteTemplateRoleAssignments(templateId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete template role assignments" });
+    }
   });
 
   // Admin route para reinicializar la base de datos con los nuevos datos

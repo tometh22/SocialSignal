@@ -129,7 +129,7 @@ export class MemStorage implements IStorage {
     this.createClient({ name: "Global Media Group", contactName: "Emily Wilson", contactEmail: "emily@globalmedia.com", contactPhone: "+1-555-456-7890" });
 
     // Add sample report templates
-    this.createReportTemplate({
+    const panelEjecutivo = this.createReportTemplate({
       name: "Panel Ejecutivo",
       description: "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
       complexity: "low",
@@ -137,7 +137,7 @@ export class MemStorage implements IStorage {
       features: "Métricas principales"
     });
     
-    this.createReportTemplate({
+    const analisisCompleto = this.createReportTemplate({
       name: "Análisis Completo",
       description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
       complexity: "medium",
@@ -145,7 +145,7 @@ export class MemStorage implements IStorage {
       features: "Métricas avanzadas"
     });
     
-    this.createReportTemplate({
+    const rendimientoCampana = this.createReportTemplate({
       name: "Rendimiento de Campaña",
       description: "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
       complexity: "high",
@@ -153,7 +153,7 @@ export class MemStorage implements IStorage {
       features: "Análisis de tendencias"
     });
     
-    this.createReportTemplate({
+    const plantillaPersonalizada = this.createReportTemplate({
       name: "Plantilla Personalizada",
       description: "Estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
       complexity: "variable",
@@ -161,7 +161,7 @@ export class MemStorage implements IStorage {
       features: "Métricas personalizadas"
     });
     
-    this.createReportTemplate({
+    const informeCrisis = this.createReportTemplate({
       name: "Informe de Crisis",
       description: "Monitoreo intensivo y análisis de situaciones críticas que requieren respuesta inmediata.",
       complexity: "high",
@@ -169,7 +169,7 @@ export class MemStorage implements IStorage {
       features: "Alertas y recomendaciones"
     });
     
-    this.createReportTemplate({
+    const informePrecios = this.createReportTemplate({
       name: "Informe de Precios",
       description: "Análisis comparativo de precios del mercado con identificación de oportunidades y riesgos.",
       complexity: "medium",
@@ -177,7 +177,7 @@ export class MemStorage implements IStorage {
       features: "Análisis competitivo"
     });
     
-    this.createReportTemplate({
+    const analisisConversacion = this.createReportTemplate({
       name: "Análisis de Conversación Digital",
       description: "Estudio profundo de conversaciones en redes sociales con análisis de sentimiento y temas emergentes.",
       complexity: "high",
@@ -185,7 +185,7 @@ export class MemStorage implements IStorage {
       features: "Análisis semántico"
     });
     
-    this.createReportTemplate({
+    const informeMensual = this.createReportTemplate({
       name: "Informe Mensual",
       description: "Resumen periódico de KPIs principales, tendencias del mes y recomendaciones tácticas.",
       complexity: "medium",
@@ -193,7 +193,7 @@ export class MemStorage implements IStorage {
       features: "Comparativa mensual"
     });
     
-    this.createReportTemplate({
+    const informeSemanal = this.createReportTemplate({
       name: "Informe Semanal",
       description: "Actualización rápida con datos clave de la semana y alertas de cambios significativos.",
       complexity: "low",
@@ -201,12 +201,175 @@ export class MemStorage implements IStorage {
       features: "Métricas ágiles"
     });
     
-    this.createReportTemplate({
+    const informeSOV = this.createReportTemplate({
       name: "Informe SOV (Share of Voice)",
       description: "Análisis de la cuota de conversación de la marca respecto a competidores en canales digitales.",
       complexity: "medium",
       pageRange: "10-20 páginas",
       features: "Visualización comparativa"
+    });
+
+    // Add sample template role assignments
+    
+    // Panel Ejecutivo - Informe básico y corto
+    this.createTemplateRoleAssignment({
+      templateId: panelEjecutivo.id,
+      roleId: seniorAnalyst.id,
+      hours: "6"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: panelEjecutivo.id,
+      roleId: contentSpecialist.id,
+      hours: "4"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: panelEjecutivo.id,
+      roleId: projectManager.id,
+      hours: "2"
+    });
+    
+    // Análisis Completo - Informe detallado con análisis profundo
+    this.createTemplateRoleAssignment({
+      templateId: analisisCompleto.id,
+      roleId: seniorAnalyst.id,
+      hours: "12"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisCompleto.id,
+      roleId: dataScientist.id,
+      hours: "8"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisCompleto.id,
+      roleId: contentSpecialist.id,
+      hours: "10"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisCompleto.id,
+      roleId: projectManager.id,
+      hours: "6"
+    });
+    
+    // Rendimiento de Campaña - Análisis extenso antes, durante y después de campaña
+    this.createTemplateRoleAssignment({
+      templateId: rendimientoCampana.id,
+      roleId: seniorAnalyst.id,
+      hours: "15"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: rendimientoCampana.id,
+      roleId: dataScientist.id,
+      hours: "10"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: rendimientoCampana.id,
+      roleId: contentSpecialist.id,
+      hours: "12"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: rendimientoCampana.id,
+      roleId: projectManager.id,
+      hours: "8"
+    });
+    
+    // Informe de Crisis - Monitoreo intensivo y alerta temprana
+    this.createTemplateRoleAssignment({
+      templateId: informeCrisis.id,
+      roleId: seniorAnalyst.id,
+      hours: "20"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeCrisis.id,
+      roleId: dataScientist.id,
+      hours: "10"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeCrisis.id,
+      roleId: contentSpecialist.id,
+      hours: "8"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeCrisis.id,
+      roleId: projectManager.id,
+      hours: "12"
+    });
+    
+    // Análisis de Conversación Digital - Análisis semántico complejo
+    this.createTemplateRoleAssignment({
+      templateId: analisisConversacion.id,
+      roleId: seniorAnalyst.id,
+      hours: "18"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisConversacion.id,
+      roleId: dataScientist.id,
+      hours: "15"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisConversacion.id,
+      roleId: contentSpecialist.id,
+      hours: "10"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: analisisConversacion.id,
+      roleId: projectManager.id,
+      hours: "8"
+    });
+    
+    // Informe Mensual - Actualización periódica con tendencias
+    this.createTemplateRoleAssignment({
+      templateId: informeMensual.id,
+      roleId: seniorAnalyst.id,
+      hours: "8"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeMensual.id,
+      roleId: contentSpecialist.id,
+      hours: "6"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeMensual.id,
+      roleId: projectManager.id,
+      hours: "4"
+    });
+    
+    // Informe Semanal - Actualizaciones rápidas
+    this.createTemplateRoleAssignment({
+      templateId: informeSemanal.id,
+      roleId: seniorAnalyst.id,
+      hours: "3"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeSemanal.id,
+      roleId: contentSpecialist.id,
+      hours: "2"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeSemanal.id,
+      roleId: projectManager.id,
+      hours: "1"
+    });
+    
+    // Informe SOV - Análisis de cuota de voz
+    this.createTemplateRoleAssignment({
+      templateId: informeSOV.id,
+      roleId: seniorAnalyst.id,
+      hours: "10"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeSOV.id,
+      roleId: dataScientist.id,
+      hours: "6"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeSOV.id,
+      roleId: contentSpecialist.id,
+      hours: "8"
+    });
+    this.createTemplateRoleAssignment({
+      templateId: informeSOV.id,
+      roleId: projectManager.id,
+      hours: "5"
     });
   }
 

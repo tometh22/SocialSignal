@@ -1,11 +1,12 @@
 import { db } from "./db";
-import { roles, personnel, clients, reportTemplates } from "@shared/schema";
+import { roles, personnel, clients, reportTemplates, templateRoleAssignments } from "@shared/schema";
 
 export async function reinitializeDatabase() {
   try {
     console.log("Reinicializando la base de datos...");
 
     // Eliminar todos los datos existentes (en orden para respetar las restricciones de clave externa)
+    await db.delete(templateRoleAssignments);
     await db.delete(personnel);
     await db.delete(reportTemplates);
     await db.delete(clients);
@@ -85,34 +86,163 @@ export async function reinitializeDatabase() {
     ]);
 
     // Insertar plantillas de informes
-    await db.insert(reportTemplates).values([
+    const [dashboardEjecutivo] = await db.insert(reportTemplates).values({
+      name: "Dashboard Ejecutivo",
+      description: "Métricas concisas de alto nivel con insights clave y recomendaciones estratégicas. Ideal para stakeholders ejecutivos.",
+      complexity: "low",
+      pageRange: "5-10 páginas",
+      features: "Solo métricas básicas"
+    }).returning();
+    
+    const [analisisIntegral] = await db.insert(reportTemplates).values({
+      name: "Análisis Integral",
+      description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
+      complexity: "medium",
+      pageRange: "15-25 páginas",
+      features: "Métricas avanzadas"
+    }).returning();
+    
+    const [rendimientoCampana] = await db.insert(reportTemplates).values({
+      name: "Rendimiento de Campaña",
+      description: "Análisis pre, durante y post campaña con seguimiento de KPIs y datos comparativos de referencia.",
+      complexity: "high",
+      pageRange: "20-30 páginas",
+      features: "Análisis de tendencias"
+    }).returning();
+    
+    const [plantillaPersonalizada] = await db.insert(reportTemplates).values({
+      name: "Plantilla Personalizada",
+      description: "Construye una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
+      complexity: "variable",
+      pageRange: "Longitud variable",
+      features: "Métricas personalizadas"
+    }).returning();
+    
+    const [informeCrisis] = await db.insert(reportTemplates).values({
+      name: "Informe de Crisis",
+      description: "Monitoreo intensivo y análisis de situaciones críticas que requieren respuesta inmediata.",
+      complexity: "high",
+      pageRange: "10-20 páginas",
+      features: "Alertas y recomendaciones"
+    }).returning();
+    
+    const [informeMensual] = await db.insert(reportTemplates).values({
+      name: "Informe Mensual",
+      description: "Resumen periódico de KPIs principales, tendencias del mes y recomendaciones tácticas.",
+      complexity: "medium",
+      pageRange: "15-25 páginas",
+      features: "Comparativa mensual"
+    }).returning();
+    
+    // Insertar asignaciones de roles por plantilla
+    
+    // Dashboard Ejecutivo - Informe básico y conciso
+    await db.insert(templateRoleAssignments).values([
       {
-        name: "Dashboard Ejecutivo",
-        description: "Métricas concisas de alto nivel con insights clave y recomendaciones estratégicas. Ideal para stakeholders ejecutivos.",
-        complexity: "low",
-        pageRange: "5-10 páginas",
-        features: "Solo métricas básicas"
+        templateId: dashboardEjecutivo.id,
+        roleId: seniorAnalyst.id,
+        hours: "6"
       },
       {
-        name: "Análisis Integral",
-        description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
-        complexity: "medium",
-        pageRange: "15-25 páginas",
-        features: "Métricas avanzadas"
+        templateId: dashboardEjecutivo.id,
+        roleId: contentSpecialist.id,
+        hours: "4"
       },
       {
-        name: "Rendimiento de Campaña",
-        description: "Análisis pre, durante y post campaña con seguimiento de KPIs y datos comparativos de referencia.",
-        complexity: "high",
-        pageRange: "20-30 páginas",
-        features: "Análisis de tendencias"
+        templateId: dashboardEjecutivo.id,
+        roleId: projectManager.id,
+        hours: "2"
+      }
+    ]);
+    
+    // Análisis Integral - Informe detallado con análisis profundo
+    await db.insert(templateRoleAssignments).values([
+      {
+        templateId: analisisIntegral.id,
+        roleId: seniorAnalyst.id,
+        hours: "12"
       },
       {
-        name: "Plantilla Personalizada",
-        description: "Construye una estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
-        complexity: "variable",
-        pageRange: "Longitud variable",
-        features: "Métricas personalizadas"
+        templateId: analisisIntegral.id,
+        roleId: dataScientist.id,
+        hours: "8"
+      },
+      {
+        templateId: analisisIntegral.id,
+        roleId: contentSpecialist.id,
+        hours: "10"
+      },
+      {
+        templateId: analisisIntegral.id,
+        roleId: projectManager.id,
+        hours: "6"
+      }
+    ]);
+    
+    // Rendimiento de Campaña - Análisis extenso antes, durante y después de campaña
+    await db.insert(templateRoleAssignments).values([
+      {
+        templateId: rendimientoCampana.id,
+        roleId: seniorAnalyst.id,
+        hours: "15"
+      },
+      {
+        templateId: rendimientoCampana.id,
+        roleId: dataScientist.id,
+        hours: "10"
+      },
+      {
+        templateId: rendimientoCampana.id,
+        roleId: contentSpecialist.id,
+        hours: "12"
+      },
+      {
+        templateId: rendimientoCampana.id,
+        roleId: projectManager.id,
+        hours: "8"
+      }
+    ]);
+    
+    // Informe de Crisis - Monitoreo intensivo y alerta temprana
+    await db.insert(templateRoleAssignments).values([
+      {
+        templateId: informeCrisis.id,
+        roleId: seniorAnalyst.id,
+        hours: "20"
+      },
+      {
+        templateId: informeCrisis.id,
+        roleId: dataScientist.id,
+        hours: "10"
+      },
+      {
+        templateId: informeCrisis.id,
+        roleId: contentSpecialist.id,
+        hours: "8"
+      },
+      {
+        templateId: informeCrisis.id,
+        roleId: projectManager.id,
+        hours: "12"
+      }
+    ]);
+    
+    // Informe Mensual - Actualización periódica con tendencias
+    await db.insert(templateRoleAssignments).values([
+      {
+        templateId: informeMensual.id,
+        roleId: seniorAnalyst.id,
+        hours: "8"
+      },
+      {
+        templateId: informeMensual.id,
+        roleId: contentSpecialist.id,
+        hours: "6"
+      },
+      {
+        templateId: informeMensual.id,
+        roleId: projectManager.id,
+        hours: "4"
       }
     ]);
 
