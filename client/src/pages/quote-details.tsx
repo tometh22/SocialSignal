@@ -124,29 +124,37 @@ export default function QuoteDetails() {
           ) : quotation ? (
             <>
               {/* Header */}
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold text-neutral-900 mb-2">
-                  {quotation.projectName}
-                </h1>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(quotation.status)}`}>
-                    {translateStatus(quotation.status)}
-                  </span>
-                  <div className="flex items-center text-sm text-neutral-500">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    {new Date(quotation.createdAt).toLocaleDateString()}
+              <div className="mb-6 bg-white rounded-lg shadow p-6 border-l-4 border-primary">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="text-2xl font-bold text-neutral-900 mb-2">
+                      {quotation.projectName}
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-3 mt-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(quotation.status)}`}>
+                        {translateStatus(quotation.status)}
+                      </span>
+                      <div className="flex items-center text-sm text-neutral-500">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {new Date(quotation.createdAt).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center text-sm text-neutral-500">
+                        <User className="h-4 w-4 mr-1" />
+                        {getClientName(quotation.clientId)}
+                      </div>
+                      <div className="flex items-center text-sm text-neutral-500">
+                        <Tag className="h-4 w-4 mr-1" />
+                        {quotation.analysisType}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm text-neutral-500">
-                    <User className="h-4 w-4 mr-1" />
-                    {getClientName(quotation.clientId)}
-                  </div>
-                  <div className="flex items-center text-sm text-neutral-500">
-                    <Tag className="h-4 w-4 mr-1" />
-                    {quotation.analysisType}
-                  </div>
-                  <div className="flex items-center text-sm font-medium text-primary">
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    {formatCurrency(quotation.totalAmount)}
+                  <div className="flex flex-col items-end">
+                    <div className="text-2xl font-bold text-primary mb-1">
+                      {formatCurrency(quotation.totalAmount)}
+                    </div>
+                    <div className="text-sm text-neutral-500">
+                      Cotización #{quotation.id}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -159,51 +167,82 @@ export default function QuoteDetails() {
                     <CardHeader>
                       <CardTitle>Detalles del Proyecto</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Tipo de Análisis</h4>
-                          <p className="text-sm text-neutral-900">{quotation.analysisType}</p>
+                    <CardContent className="space-y-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Tipo de Análisis</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">{quotation.analysisType}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Tipo de Proyecto</h4>
-                          <p className="text-sm text-neutral-900">{quotation.projectType}</p>
+                        
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Tipo de Proyecto</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">{quotation.projectType}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Volumen de Menciones</h4>
-                          <p className="text-sm text-neutral-900">{quotation.mentionsVolume}</p>
+                        
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Volumen de Menciones</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">{quotation.mentionsVolume}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Países Cubiertos</h4>
-                          <p className="text-sm text-neutral-900">{quotation.countriesCovered}</p>
+                        
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Países Cubiertos</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">{quotation.countriesCovered}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Participación del Cliente</h4>
-                          <p className="text-sm text-neutral-900">{quotation.clientEngagement}</p>
+                        
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Participación del Cliente</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">{quotation.clientEngagement}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Plantilla de Reporte</h4>
-                          <p className="text-sm text-neutral-900">
-                            {quotation.templateId ? getTemplateName(quotation.templateId) : "No especificada"}
-                          </p>
+                        
+                        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                          <h4 className="text-xs uppercase tracking-wider font-semibold text-neutral-500 mb-2">Plantilla de Reporte</h4>
+                          <div className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-primary mr-2"></span>
+                            <p className="text-sm font-medium text-neutral-800">
+                              {quotation.templateId ? getTemplateName(quotation.templateId) : "No especificada"}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
                       {quotation.templateCustomization && (
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Personalización de Plantilla</h4>
-                          <p className="text-sm text-neutral-900 p-3 bg-neutral-50 rounded border border-neutral-200">
-                            {quotation.templateCustomization}
-                          </p>
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 overflow-hidden">
+                          <div className="bg-blue-100 px-4 py-2">
+                            <h4 className="text-xs uppercase tracking-wider font-semibold text-blue-800">Personalización de Plantilla</h4>
+                          </div>
+                          <div className="p-4">
+                            <p className="text-sm text-neutral-800 whitespace-pre-wrap">
+                              {quotation.templateCustomization}
+                            </p>
+                          </div>
                         </div>
                       )}
 
                       {quotation.additionalNotes && (
-                        <div>
-                          <h4 className="text-sm font-medium text-neutral-500 mb-1">Notas Adicionales</h4>
-                          <p className="text-sm text-neutral-900 p-3 bg-neutral-50 rounded border border-neutral-200">
-                            {quotation.additionalNotes}
-                          </p>
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">
+                          <div className="bg-amber-100 px-4 py-2">
+                            <h4 className="text-xs uppercase tracking-wider font-semibold text-amber-800">Notas Adicionales</h4>
+                          </div>
+                          <div className="p-4">
+                            <p className="text-sm text-neutral-800 whitespace-pre-wrap">
+                              {quotation.additionalNotes}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -215,39 +254,49 @@ export default function QuoteDetails() {
                     </CardHeader>
                     <CardContent>
                       {teamMembers && teamMembers.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-neutral-200">
-                                <th className="text-left py-2 px-3 font-medium text-neutral-500">Rol</th>
-                                <th className="text-left py-2 px-3 font-medium text-neutral-500">Miembro</th>
-                                <th className="text-left py-2 px-3 font-medium text-neutral-500">Tarifa</th>
-                                <th className="text-left py-2 px-3 font-medium text-neutral-500">Horas</th>
-                                <th className="text-right py-2 px-3 font-medium text-neutral-500">Costo</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {teamMembers.map((member) => (
-                                <tr key={member.id} className="border-b border-neutral-100">
-                                  <td className="py-2 px-3">{getRoleName(member.personnelId ? personnel?.find(p => p.id === member.personnelId)?.roleId : undefined)}</td>
-                                  <td className="py-2 px-3">{getPersonnelName(member.personnelId)}</td>
-                                  <td className="py-2 px-3 font-mono">${member.rate.toFixed(2)}</td>
-                                  <td className="py-2 px-3">{member.hours}</td>
-                                  <td className="py-2 px-3 text-right font-mono">${member.cost.toFixed(2)}</td>
-                                </tr>
-                              ))}
-                              <tr className="bg-neutral-50">
-                                <td colSpan={4} className="py-2 px-3 font-medium">Total Horas</td>
-                                <td className="py-2 px-3 text-right font-medium font-mono">
-                                  {teamMembers.reduce((sum, member) => sum + member.hours, 0)}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                        <div>
+                          <div className="grid grid-cols-5 gap-2 px-3 py-2 bg-neutral-100 rounded-t-lg mb-2">
+                            <div className="text-xs font-semibold text-neutral-600">Rol</div>
+                            <div className="text-xs font-semibold text-neutral-600">Miembro</div>
+                            <div className="text-xs font-semibold text-neutral-600">Tarifa</div>
+                            <div className="text-xs font-semibold text-neutral-600">Horas</div>
+                            <div className="text-xs font-semibold text-neutral-600 text-right">Costo</div>
+                          </div>
+                          
+                          <div className="space-y-2 mb-4">
+                            {teamMembers.map((member) => (
+                              <div key={member.id} className="grid grid-cols-5 gap-2 px-3 py-2 bg-white border border-neutral-200 rounded-md items-center">
+                                <div className="text-sm font-medium text-neutral-800">
+                                  {getRoleName(member.personnelId ? personnel?.find(p => p.id === member.personnelId)?.roleId : undefined)}
+                                </div>
+                                <div className="text-sm text-neutral-700">
+                                  {getPersonnelName(member.personnelId)}
+                                </div>
+                                <div className="text-sm font-mono text-neutral-700">
+                                  ${member.rate.toFixed(2)}
+                                </div>
+                                <div className="text-sm text-neutral-700">
+                                  {member.hours}
+                                </div>
+                                <div className="text-sm font-mono text-neutral-800 font-medium text-right">
+                                  ${member.cost.toFixed(2)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div className="flex justify-between items-center py-2 px-3 bg-neutral-100 rounded-md">
+                            <span className="text-sm font-medium text-neutral-700">Total Horas</span>
+                            <span className="text-sm font-medium">
+                              {teamMembers.reduce((sum, member) => sum + member.hours, 0)}
+                            </span>
+                          </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-neutral-500 text-center py-4">
-                          No hay miembros del equipo asignados a esta cotización
+                        <div className="bg-neutral-50 rounded-lg p-6 text-center">
+                          <div className="text-sm text-neutral-500">
+                            No hay miembros del equipo asignados a esta cotización
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -262,21 +311,31 @@ export default function QuoteDetails() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center py-1">
-                          <span className="text-sm text-neutral-600">Costo Base</span>
-                          <span className="text-sm font-mono">${quotation.baseCost.toFixed(2)}</span>
+                        <div className="flex justify-between items-center py-2 bg-neutral-50 rounded-md px-3">
+                          <span className="text-sm font-medium text-neutral-700">Costo Base</span>
+                          <span className="text-sm font-mono font-medium">${quotation.baseCost.toFixed(2)}</span>
                         </div>
-                        <Separator />
                         
-                        <div className="flex justify-between items-center py-1">
-                          <span className="text-sm text-neutral-600">Ajuste por Complejidad</span>
-                          <span className="text-sm font-mono">${quotation.complexityAdjustment.toFixed(2)}</span>
+                        <div className="flex justify-between items-center py-2 bg-neutral-50 rounded-md px-3">
+                          <div>
+                            <span className="text-sm font-medium text-neutral-700">Ajuste por Complejidad</span>
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              +{((quotation.complexityAdjustment / quotation.baseCost) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <span className="text-sm font-mono font-medium">${quotation.complexityAdjustment.toFixed(2)}</span>
                         </div>
-                        <Separator />
                         
-                        <div className="flex justify-between items-center py-1">
-                          <span className="text-sm text-neutral-600">Margen</span>
-                          <span className="text-sm font-mono">${quotation.markupAmount.toFixed(2)}</span>
+                        <div className="flex justify-between items-center py-2 bg-neutral-50 rounded-md px-3">
+                          <div>
+                            <span className="text-sm font-medium text-neutral-700">Margen</span>
+                            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                              {((quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)) > 1.9 ? 'x2.0' : 
+                                (quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)) > 1.4 ? 'x1.5' : 
+                                'x' + (quotation.markupAmount / (quotation.baseCost + quotation.complexityAdjustment)).toFixed(1))}
+                            </span>
+                          </div>
+                          <span className="text-sm font-mono font-medium">${quotation.markupAmount.toFixed(2)}</span>
                         </div>
                         
                         {quotation.adjustmentReason && (
