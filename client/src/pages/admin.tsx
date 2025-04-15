@@ -692,7 +692,7 @@ export default function Admin() {
                 name="defaultRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Default Hourly Rate ($)</FormLabel>
+                    <FormLabel>Tarifa Predeterminada por Hora ($)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -713,13 +713,13 @@ export default function Admin() {
                   type="button" 
                   onClick={() => setRoleDialogOpen(false)}
                 >
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createRoleMutation.isPending || updateRoleMutation.isPending}
                 >
-                  {isEditing ? "Update Role" : "Add Role"}
+                  {isEditing ? "Actualizar Rol" : "Añadir Rol"}
                 </Button>
               </DialogFooter>
             </form>
@@ -746,9 +746,9 @@ export default function Admin() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Nombre</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter name" {...field} />
+                      <Input placeholder="Ingresa el nombre" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -760,7 +760,7 @@ export default function Admin() {
                 name="roleId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Role</FormLabel>
+                    <FormLabel>Rol</FormLabel>
                     <Select 
                       value={field.value.toString()} 
                       onValueChange={(value) => {
@@ -776,7 +776,7 @@ export default function Admin() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
+                          <SelectValue placeholder="Selecciona un rol" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -797,7 +797,7 @@ export default function Admin() {
                 name="hourlyRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Hourly Rate ($)</FormLabel>
+                    <FormLabel>Tarifa por Hora ($)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -818,13 +818,13 @@ export default function Admin() {
                   type="button" 
                   onClick={() => setPersonnelDialogOpen(false)}
                 >
-                  Cancel
+                  Cancelar
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={createPersonnelMutation.isPending || updatePersonnelMutation.isPending}
                 >
-                  {isEditing ? "Update Team Member" : "Add Team Member"}
+                  {isEditing ? "Actualizar Miembro" : "Añadir Miembro"}
                 </Button>
               </DialogFooter>
             </form>
@@ -851,9 +851,9 @@ export default function Admin() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Template Name</FormLabel>
+                    <FormLabel>Nombre de Plantilla</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter template name" {...field} />
+                      <Input placeholder="Ingresa el nombre de la plantilla" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -865,10 +865,10 @@ export default function Admin() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Descripción</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Enter template description" 
+                        placeholder="Ingresa la descripción de la plantilla" 
                         className="resize-none" 
                         {...field} 
                       />
@@ -883,20 +883,20 @@ export default function Admin() {
                 name="complexity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Complexity</FormLabel>
+                    <FormLabel>Complejidad</FormLabel>
                     <Select 
                       value={field.value} 
                       onValueChange={field.onChange}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select complexity" />
+                          <SelectValue placeholder="Selecciona la complejidad" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="low">Baja</SelectItem>
+                        <SelectItem value="medium">Media</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
                         <SelectItem value="variable">Variable</SelectItem>
                       </SelectContent>
                     </Select>
@@ -910,9 +910,9 @@ export default function Admin() {
                 name="pageRange"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Page Range</FormLabel>
+                    <FormLabel>Rango de Páginas</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 5-10 pages" {...field} />
+                      <Input placeholder="ej., 5-10 páginas" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
