@@ -483,12 +483,12 @@ export default function Admin() {
                   </div>
                   <Button onClick={openNewRoleDialog}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Add New Role
+                    Añadir Nuevo Rol
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {rolesLoading ? (
-                    <div className="text-center py-4">Loading roles...</div>
+                    <div className="text-center py-4">Cargando roles...</div>
                   ) : roles && roles.length > 0 ? (
                     <Table>
                       <TableHeader>
@@ -521,7 +521,7 @@ export default function Admin() {
                     </Table>
                   ) : (
                     <div className="text-center py-4 text-neutral-500">
-                      No roles found. Add your first role.
+                      No se encontraron roles. Añade tu primer rol.
                     </div>
                   )}
                 </CardContent>
@@ -537,15 +537,15 @@ export default function Admin() {
                   </div>
                   <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Team Member
+                    Añadir Miembro
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {personnelLoading || rolesLoading ? (
-                    <div className="text-center py-4">Loading personnel...</div>
+                    <div className="text-center py-4">Cargando personal...</div>
                   ) : !roles || roles.length === 0 ? (
                     <div className="text-center py-4 text-neutral-500">
-                      Please add roles before adding personnel.
+                      Por favor, añade roles antes de añadir personal.
                     </div>
                   ) : personnel && personnel.length > 0 ? (
                     <Table>
@@ -591,17 +591,17 @@ export default function Admin() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Report Templates</CardTitle>
-                    <CardDescription>Configure standard report templates</CardDescription>
+                    <CardTitle>Plantillas de Reportes</CardTitle>
+                    <CardDescription>Configurar plantillas estándar de reportes</CardDescription>
                   </div>
                   <Button onClick={openNewTemplateDialog}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Template
+                    Añadir Plantilla
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {templatesLoading ? (
-                    <div className="text-center py-4">Loading templates...</div>
+                    <div className="text-center py-4">Cargando plantillas...</div>
                   ) : templates && templates.length > 0 ? (
                     <Table>
                       <TableHeader>
