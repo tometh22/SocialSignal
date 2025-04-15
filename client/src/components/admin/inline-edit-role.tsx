@@ -35,7 +35,7 @@ export function InlineEditRole({ role }: InlineEditRoleProps) {
   const updateRoleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string; defaultRate: number } }) => {
       const response = await apiRequest("PATCH", `/api/roles/${id}`, data);
-      return response as Role;
+      return await response.json();
     },
     onSuccess: (updatedData: Role) => {
       setUpdatedRole(updatedData);

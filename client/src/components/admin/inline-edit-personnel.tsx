@@ -43,7 +43,7 @@ export function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps)
   const updatePersonnelMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; roleId: number; hourlyRate: number } }) => {
       const response = await apiRequest("PATCH", `/api/personnel/${id}`, data);
-      return response as Personnel;
+      return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
       setUpdatedPerson(updatedData);

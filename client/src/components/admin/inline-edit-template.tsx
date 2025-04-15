@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit } from "lucide-react";
+import { Edit, Loader2 } from "lucide-react";
 
 interface InlineEditTemplateProps {
   template: ReportTemplate;
@@ -21,11 +21,24 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
   const [editComplexity, setEditComplexity] = useState(template.complexity);
   const [editPageRange, setEditPageRange] = useState(template.pageRange || "");
   const [editFeatures, setEditFeatures] = useState(template.features || "");
+  const [updatedTemplate, setUpdatedTemplate] = useState<ReportTemplate>(template);
   const { toast } = useToast();
+
+  // Update when the template prop changes
+  useEffect(() => {
+    setUpdatedTemplate(template);
+    if (!isEditing) {
+      setEditName(template.name);
+      setEditDescription(template.description || "");
+      setEditComplexity(template.complexity);
+      setEditPageRange(template.pageRange || "");
+      setEditFeatures(template.features || "");
+    }
+  }, [template, isEditing]);
 
   // Update template mutation
   const updateTemplateMutation = useMutation({
-    mutationFn: ({ id, data }: { 
+    mutationFn: async ({ id, data }: { 
       id: number; 
       data: { 
         name: string; 
@@ -34,8 +47,12 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
         pageRange: string;
         features: string;
       } 
-    }) => apiRequest("PATCH", `/api/templates/${id}`, data),
-    onSuccess: () => {
+    }) => {
+      const response = await apiRequest("PATCH", `/api/templates/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: (updatedData: ReportTemplate) => {
+      setUpdatedTemplate(updatedData);
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
       toast({
         title: "Success",
@@ -53,6 +70,16 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
   });
 
   const handleSave = () => {
+    // Validate inputs
+    if (!editName.trim()) {
+      toast({
+        title: "Error",
+        description: "Template name cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
     updateTemplateMutation.mutate({ 
       id: template.id, 
       data: {
@@ -66,11 +93,11 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
   };
 
   const handleCancel = () => {
-    setEditName(template.name);
-    setEditDescription(template.description || "");
-    setEditComplexity(template.complexity);
-    setEditPageRange(template.pageRange || "");
-    setEditFeatures(template.features || "");
+    setEditName(updatedTemplate.name);
+    setEditDescription(updatedTemplate.description || "");
+    setEditComplexity(updatedTemplate.complexity);
+    setEditPageRange(updatedTemplate.pageRange || "");
+    setEditFeatures(updatedTemplate.features || "");
     setIsEditing(false);
   };
 
@@ -83,7 +110,7 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
             onChange={(e) => setEditName(e.target.value)}
             className="w-full"
           />
-        ) : template.name}
+        ) : updatedTemplate.name}
       </TableCell>
       <TableCell className="max-w-xs">
         {isEditing ? (
@@ -92,7 +119,7 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
             onChange={(e) => setEditDescription(e.target.value)}
             className="w-full h-20 resize-none"
           />
-        ) : template.description || "-"}
+        ) : updatedTemplate.description || "-"}
       </TableCell>
       <TableCell>
         {isEditing ? (
@@ -109,12 +136,12 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
           </Select>
         ) : (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-            ${template.complexity === 'low' ? 'bg-green-100 text-green-800' : ''}
-            ${template.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' : ''}
-            ${template.complexity === 'high' ? 'bg-red-100 text-red-800' : ''}
-            ${template.complexity === 'variable' ? 'bg-blue-100 text-blue-800' : ''}
+            ${updatedTemplate.complexity === 'low' ? 'bg-green-100 text-green-800' : ''}
+            ${updatedTemplate.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' : ''}
+            ${updatedTemplate.complexity === 'high' ? 'bg-red-100 text-red-800' : ''}
+            ${updatedTemplate.complexity === 'variable' ? 'bg-blue-100 text-blue-800' : ''}
           `}>
-            {template.complexity.charAt(0).toUpperCase() + template.complexity.slice(1)}
+            {updatedTemplate.complexity.charAt(0).toUpperCase() + updatedTemplate.complexity.slice(1)}
           </span>
         )}
       </TableCell>
@@ -125,7 +152,7 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
             onChange={(e) => setEditPageRange(e.target.value)}
             className="w-full"
           />
-        ) : template.pageRange || "-"}
+        ) : updatedTemplate.pageRange || "-"}
       </TableCell>
       <TableCell className="text-right">
         {isEditing ? (
@@ -133,8 +160,18 @@ export function InlineEditTemplate({ template }: InlineEditTemplateProps) {
             <Button variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button variant="default" size="sm" onClick={handleSave}>
-              Save
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleSave}
+              disabled={updateTemplateMutation.isPending}
+            >
+              {updateTemplateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : "Save"}
             </Button>
           </div>
         ) : (
