@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
   DialogContent,
@@ -152,7 +153,9 @@ export default function ManageQuotes() {
               </div>
 
               {isLoading ? (
-                <div className="text-center py-8">Cargando cotizaciones...</div>
+                <div className="flex justify-center py-8">
+                  <Loader variant="gradient" size="md" text="Cargando cotizaciones" />
+                </div>
               ) : filteredQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">

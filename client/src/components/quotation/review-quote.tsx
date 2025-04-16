@@ -434,8 +434,17 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
             onClick={generateQuote}
             className="flex items-center"
           >
-            {isSaving ? "Generando..." : "Generar Cotización"}
-            <span className="ml-1">✓</span>
+            {isSaving ? (
+              <span className="flex items-center">
+                <Loader variant="dots" size="sm" />
+                <span className="ml-2">Generando</span>
+              </span>
+            ) : (
+              <>
+                Generar Cotización
+                <span className="ml-1">✓</span>
+              </>
+            )}
           </Button>
         </div>
       </div>

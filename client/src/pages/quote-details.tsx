@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Quotation, QuotationTeamMember, Personnel, Role, ReportTemplate, Client } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader } from "@/components/ui/loader";
 
 export default function QuoteDetails() {
   const [, navigate] = useLocation();
@@ -116,10 +117,8 @@ export default function QuoteDetails() {
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           {isLoading ? (
-            <div className="space-y-6">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-64 w-full" />
+            <div className="flex justify-center py-12">
+              <Loader variant="default" size="lg" text="Cargando detalles de cotización" />
             </div>
           ) : quotation ? (
             <>
