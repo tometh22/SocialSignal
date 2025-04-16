@@ -488,7 +488,9 @@ export default function Admin() {
                 </CardHeader>
                 <CardContent>
                   {rolesLoading ? (
-                    <div className="text-center py-4">Cargando roles...</div>
+                    <div className="flex justify-center py-8">
+                      <Loader variant="gradient" size="md" text="Cargando roles" />
+                    </div>
                   ) : roles && roles.length > 0 ? (
                     <Table>
                       <TableHeader>
