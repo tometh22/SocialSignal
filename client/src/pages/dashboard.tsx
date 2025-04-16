@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, FileText, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { Quotation } from "@shared/schema";
+import { Loader } from "@/components/ui/loader";
 
 export default function Dashboard() {
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
@@ -73,7 +74,13 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center">
                   <Clock className="h-8 w-8 text-yellow-500 mr-3" />
-                  <span className="text-3xl font-bold">{isLoading ? "..." : statusCounts.pending}</span>
+                  <span className="text-3xl font-bold">
+                    {isLoading ? (
+                      <span className="inline-flex items-center">
+                        <Loader variant="dots" size="sm" />
+                      </span>
+                    ) : statusCounts.pending}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -86,7 +93,13 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center">
                   <CheckCircle className="h-8 w-8 text-green-500 mr-3" />
-                  <span className="text-3xl font-bold">{isLoading ? "..." : statusCounts.approved}</span>
+                  <span className="text-3xl font-bold">
+                    {isLoading ? (
+                      <span className="inline-flex items-center">
+                        <Loader variant="dots" size="sm" />
+                      </span>
+                    ) : statusCounts.approved}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -99,7 +112,13 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center">
                   <AlertCircle className="h-8 w-8 text-red-500 mr-3" />
-                  <span className="text-3xl font-bold">{isLoading ? "..." : statusCounts.rejected}</span>
+                  <span className="text-3xl font-bold">
+                    {isLoading ? (
+                      <span className="inline-flex items-center">
+                        <Loader variant="dots" size="sm" />
+                      </span>
+                    ) : statusCounts.rejected}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -112,7 +131,13 @@ export default function Dashboard() {
               <CardContent>
                 <div className="flex items-center">
                   <FileText className="h-8 w-8 text-blue-500 mr-3" />
-                  <span className="text-3xl font-bold">{isLoading ? "..." : statusCounts.inNegotiation}</span>
+                  <span className="text-3xl font-bold">
+                    {isLoading ? (
+                      <span className="inline-flex items-center">
+                        <Loader variant="dots" size="sm" />
+                      </span>
+                    ) : statusCounts.inNegotiation}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -125,7 +150,9 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="text-center py-4">Cargando cotizaciones recientes...</div>
+                <div className="flex justify-center py-8">
+                  <Loader variant="dots" size="md" text="Cargando cotizaciones recientes" />
+                </div>
               ) : recentQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">

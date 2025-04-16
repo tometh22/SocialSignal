@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PlusCircle, Edit, UserCog, FileText, Settings } from "lucide-react";
+import { Loader } from "@/components/ui/loader";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -544,7 +545,9 @@ export default function Admin() {
                 </CardHeader>
                 <CardContent>
                   {personnelLoading || rolesLoading ? (
-                    <div className="text-center py-4">Cargando personal...</div>
+                    <div className="flex justify-center py-8">
+                      <Loader variant="gradient" size="md" text="Cargando personal" />
+                    </div>
                   ) : !roles || roles.length === 0 ? (
                     <div className="text-center py-4 text-neutral-500">
                       Por favor, añade roles antes de añadir personal.
@@ -603,7 +606,9 @@ export default function Admin() {
                 </CardHeader>
                 <CardContent>
                   {templatesLoading ? (
-                    <div className="text-center py-4">Cargando plantillas...</div>
+                    <div className="flex justify-center py-8">
+                      <Loader variant="gradient" size="md" text="Cargando plantillas" />
+                    </div>
                   ) : templates && templates.length > 0 ? (
                     <Table>
                       <TableHeader>

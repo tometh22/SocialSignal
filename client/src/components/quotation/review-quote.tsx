@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { formatCurrency } from "@/lib/utils";
+import { Loader } from "@/components/ui/loader";
 
 export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) {
   console.log("Componente ReviewQuote renderizado");
