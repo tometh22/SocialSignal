@@ -345,7 +345,11 @@ export default function Admin() {
       const tempId = Date.now();
       const optimisticTemplate: ReportTemplate = {
         id: tempId,
-        ...newTemplateData,
+        name: newTemplateData.name,
+        description: newTemplateData.description || null,
+        complexity: newTemplateData.complexity,
+        pageRange: newTemplateData.pageRange || null,
+        features: newTemplateData.features || null,
       };
       
       // Actualizar la caché con el nuevo template optimista
