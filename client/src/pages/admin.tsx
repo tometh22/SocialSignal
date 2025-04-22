@@ -530,60 +530,162 @@ export default function Admin() {
   
   // Añadir asignación de rol a plantilla
   const createTemplateRoleAssignmentMutation = useMutation({
-    mutationFn: (data: InsertTemplateRoleAssignment) => 
-      apiRequest("POST", "/api/template-roles", data),
-    onSuccess: (response) => {
-      response.json().then(newAssignment => {
-        // Actualizar la caché local
-        if (currentTemplate) {
-          queryClient.invalidateQueries({ 
-            queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
-          });
+    mutationFn: async (data: InsertTemplateRoleAssignment) => {
+      const response = await apiRequest("POST", "/api/template-roles", data);
+      if (!response.ok) {
+        throw new Error("Failed to assign role");
+      }
+      return response.json();
+    },
+    onMutate: async (newRoleAssignment) => {
+      if (!currentTemplate || !roles) return {};
+      
+      // Conseguir el rol seleccionado para usarlo en la actualización optimista
+      const selectedRole = roles.find(r => r.id === newRoleAssignment.roleId);
+      if (!selectedRole) return {};
+      
+      // Cancelar consultas en curso
+      await queryClient.cancelQueries({ 
+        queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+      });
+      
+      // Guardar el estado anterior
+      const previousAssignments = queryClient.getQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`]
+      );
+      
+      // Crear una asignación optimista temporal
+      const tempId = -Date.now(); // ID temporal negativo para distinguirlo
+      const optimisticAssignment: TemplateRoleAssignment & { role: Role } = {
+        id: tempId,
+        templateId: newRoleAssignment.templateId,
+        roleId: newRoleAssignment.roleId,
+        hours: newRoleAssignment.hours || "0", // Asegurarnos de que hours sea un string válido
+        role: selectedRole,
+      };
+      
+      // Actualizar la caché con la asignación optimista
+      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`],
+        (old) => old ? [...old, optimisticAssignment] : [optimisticAssignment]
+      );
+      
+      return { previousAssignments, tempId };
+    },
+    onSuccess: (newAssignment, variables, context) => {
+      if (!currentTemplate || !roles) return;
+      
+      // Encontrar el rol para crear la asignación completa
+      const role = roles.find(r => r.id === variables.roleId);
+      if (!role) return;
+      
+      // Actualizar la caché con la asignación real (reemplazando la temporal)
+      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`],
+        (old) => {
+          if (!old) return [{ ...newAssignment, role }];
+          
+          // Filtrar la asignación temporal y añadir la real
+          return old
+            .filter(item => item.id !== context?.tempId)
+            .concat({ ...newAssignment, role });
         }
-        
-        toast({
-          title: "Éxito",
-          description: "Rol asignado correctamente a la plantilla.",
-        });
-        
-        // Resetear el formulario
-        templateRoleForm.reset({
-          roleId: roles && roles.length > 0 ? roles[0].id : 0,
-          hours: 0
-        });
+      );
+      
+      toast({
+        title: "Éxito",
+        description: "Rol asignado correctamente a la plantilla.",
+      });
+      
+      // Resetear el formulario para añadir otro rol
+      templateRoleForm.reset({
+        roleId: roles && roles.length > 0 ? roles[0].id : 0,
+        hours: 0
       });
     },
-    onError: () => {
+    onError: (err, _, context) => {
+      // Revertir al estado anterior en caso de error
+      if (context?.previousAssignments && currentTemplate) {
+        queryClient.setQueryData(
+          [`/api/template-roles/${currentTemplate.id}/with-roles`], 
+          context.previousAssignments
+        );
+      }
+      
       toast({
         title: "Error",
         description: "No se pudo asignar el rol a la plantilla.",
         variant: "destructive",
       });
     },
-  });
-  
-  // Eliminar asignación de rol a plantilla
-  const deleteTemplateRoleAssignmentMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/template-roles/${id}`),
-    onSuccess: (_, id) => {
-      // Actualizar la caché local
+    onSettled: () => {
+      // Refrescar datos del servidor por si acaso
       if (currentTemplate) {
         queryClient.invalidateQueries({ 
           queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
         });
       }
+    }
+  });
+  
+  // Eliminar asignación de rol a plantilla
+  const deleteTemplateRoleAssignmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/template-roles/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete role assignment");
+      }
+      return id;
+    },
+    onMutate: async (id) => {
+      if (!currentTemplate) return {};
       
+      // Cancelar consultas en curso
+      await queryClient.cancelQueries({ 
+        queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+      });
+      
+      // Guardar el estado anterior
+      const previousAssignments = queryClient.getQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`]
+      );
+      
+      // Actualizar la caché removiendo la asignación
+      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`],
+        (old) => old ? old.filter(assignment => assignment.id !== id) : []
+      );
+      
+      return { previousAssignments };
+    },
+    onSuccess: (id) => {
       toast({
         title: "Éxito",
         description: "Rol eliminado correctamente de la plantilla.",
       });
     },
-    onError: () => {
+    onError: (err, id, context) => {
+      // Revertir al estado anterior en caso de error
+      if (context?.previousAssignments && currentTemplate) {
+        queryClient.setQueryData(
+          [`/api/template-roles/${currentTemplate.id}/with-roles`], 
+          context.previousAssignments
+        );
+      }
+      
       toast({
         title: "Error",
         description: "No se pudo eliminar el rol de la plantilla.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Refrescar datos del servidor por si acaso
+      if (currentTemplate) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+        });
+      }
     },
   });
 
