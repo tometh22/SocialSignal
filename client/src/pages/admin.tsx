@@ -629,10 +629,16 @@ export default function Admin() {
       });
     },
     onSettled: () => {
-      // Refrescar datos del servidor por si acaso
+      // Refrescar datos del servidor
       if (currentTemplate) {
+        // Invalidar la consulta de roles de la plantilla
         queryClient.invalidateQueries({ 
           queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+        });
+        
+        // Invalidar también la lista completa de plantillas para actualizar costos
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/templates"] 
         });
       }
     }
@@ -690,10 +696,16 @@ export default function Admin() {
       });
     },
     onSettled: () => {
-      // Refrescar datos del servidor por si acaso
+      // Refrescar datos del servidor
       if (currentTemplate) {
+        // Invalidar la consulta de roles de la plantilla
         queryClient.invalidateQueries({ 
           queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+        });
+        
+        // Invalidar también la lista completa de plantillas para actualizar costos
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/templates"] 
         });
       }
     },
