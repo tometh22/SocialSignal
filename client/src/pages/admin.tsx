@@ -1332,111 +1332,185 @@ export default function Admin() {
                 <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
                   {/* Mostrar resumen de costos cuando se está editando */}
                   {isEditing && currentTemplate && (
-                    <div className="mb-6">
-                      <Card className="bg-gradient-to-br from-slate-50 to-blue-50 border-blue-100">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg flex items-center text-blue-700">
-                            <BadgeDollarSign className="h-5 w-5 mr-2" /> 
-                            Resumen Financiero
-                          </CardTitle>
-                          <CardDescription>
-                            Información de costos para la plantilla "{currentTemplate.name}"
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium text-slate-700 flex items-center">
-                                <Users className="h-4 w-4 mr-2 text-blue-600" />
-                                Composición del Equipo
-                              </h4>
-                              <div className="bg-white rounded-md p-3 border border-blue-100 shadow-sm">
-                                <RoleSummary templateId={currentTemplate.id} showCosts={true} />
+                    <>
+                      {/* Tarjetas de resumen financiero */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+                          <CardContent className="p-6">
+                            <div className="space-y-2">
+                              <div className="flex items-center text-blue-600">
+                                <Users className="h-5 w-5 mr-2" />
+                                <h3 className="text-sm font-medium">Costo de Personal</h3>
+                              </div>
+                              <div className="text-2xl font-bold text-blue-700">
+                                ${templateRoleAssignmentsLoading ? (
+                                  <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                                ) : templateRoleAssignments?.reduce(
+                                  (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                                  0
+                                ).toFixed(2)} USD
                               </div>
                             </div>
-                            
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-medium text-slate-700 flex items-center">
-                                <Calculator className="h-4 w-4 mr-2 text-blue-600" />
-                                Desglose de Costos
-                              </h4>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-100">
+                          <CardContent className="p-6">
+                            <div className="space-y-2">
+                              <div className="flex items-center text-emerald-600">
+                                <LayoutGrid className="h-5 w-5 mr-2" />
+                                <h3 className="text-sm font-medium">Subtotal (con plataformas)</h3>
+                              </div>
+                              <div className="text-2xl font-bold text-emerald-700">
+                                ${templateRoleAssignmentsLoading ? (
+                                  <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                                ) : (templateRoleAssignments?.reduce(
+                                  (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                                  0
+                                ) + (currentTemplate.platformCost || 0)).toFixed(2)} USD
+                              </div>
+                              {(currentTemplate.platformCost || 0) > 0 && (
+                                <div className="text-xs text-emerald-600">
+                                  <span className="font-medium">Incluye:</span> ${(currentTemplate.platformCost || 0).toFixed(2)} USD de plataformas
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-100">
+                          <CardContent className="p-6">
+                            <div className="space-y-2">
+                              <div className="flex items-center text-purple-600">
+                                <BadgeDollarSign className="h-5 w-5 mr-2" />
+                                <h3 className="text-sm font-medium">Costo Total Final</h3>
+                              </div>
+                              <div className="text-2xl font-bold text-purple-700">
+                                ${templateRoleAssignmentsLoading ? (
+                                  <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                                ) : ((templateRoleAssignments?.reduce(
+                                  (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                                  0
+                                ) + (currentTemplate.platformCost || 0)) * 
+                                  (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)} USD
+                              </div>
+                              {(currentTemplate.deviationPercentage || 0) > 0 && (
+                                <div className="text-xs text-fuchsia-600">
+                                  Incluye {currentTemplate.deviationPercentage}% de desvío
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      {/* Resumen detallado */}
+                      <div className="mb-6">
+                        <Card className="bg-gradient-to-br from-slate-50 to-blue-50 border-blue-100">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-lg flex items-center text-blue-700">
+                              <BadgeDollarSign className="h-5 w-5 mr-2" /> 
+                              Resumen Detallado
+                            </CardTitle>
+                            <CardDescription>
+                              Información detallada de costos para la plantilla "{currentTemplate.name}"
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-slate-700 flex items-center">
+                                  <Users className="h-4 w-4 mr-2 text-blue-600" />
+                                  Composición del Equipo
+                                </h4>
+                                <div className="bg-white rounded-md p-3 border border-blue-100 shadow-sm">
+                                  <RoleSummary templateId={currentTemplate.id} showCosts={true} />
+                                </div>
+                              </div>
                               
-                              <div className="bg-white rounded-md p-4 border border-blue-100 shadow-sm">
-                                {/* Cargando si no tenemos los datos aún */}
-                                {templateRoleAssignmentsLoading ? (
-                                  <div className="text-center py-6">
-                                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
-                                    <p className="text-sm text-slate-600">Calculando costos...</p>
-                                  </div>
-                                ) : templateRoleAssignments && (
-                                  <div className="space-y-3">
-                                    {/* Costo de personal */}
-                                    <div className="flex justify-between items-center pb-2 border-b border-dashed">
-                                      <div className="flex items-center text-slate-700">
-                                        <Users className="h-4 w-4 mr-2 text-slate-500" />
-                                        <span>Personal</span>
-                                      </div>
-                                      <span className="font-medium">
-                                        ${templateRoleAssignments.reduce((acc, assignment) => 
-                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)}
-                                      </span>
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-medium text-slate-700 flex items-center">
+                                  <Calculator className="h-4 w-4 mr-2 text-blue-600" />
+                                  Desglose de Costos
+                                </h4>
+                                
+                                <div className="bg-white rounded-md p-4 border border-blue-100 shadow-sm">
+                                  {/* Cargando si no tenemos los datos aún */}
+                                  {templateRoleAssignmentsLoading ? (
+                                    <div className="text-center py-6">
+                                      <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                                      <p className="text-sm text-slate-600">Calculando costos...</p>
                                     </div>
-                                    
-                                    {/* Costo de plataformas */}
-                                    <div className="flex justify-between items-center pb-2 border-b border-dashed">
-                                      <div className="flex items-center text-slate-700">
-                                        <LayoutGrid className="h-4 w-4 mr-2 text-slate-500" />
-                                        <span>Plataformas</span>
-                                      </div>
-                                      <span className="font-medium">
-                                        ${(currentTemplate.platformCost || 0).toFixed(2)}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Subtotal */}
-                                    <div className="flex justify-between items-center pt-1 pb-2 font-medium">
-                                      <span>Subtotal</span>
-                                      <span>
-                                        ${(templateRoleAssignments.reduce((acc, assignment) => 
-                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                          (currentTemplate.platformCost || 0)).toFixed(2)}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Desvío */}
-                                    {(currentTemplate.deviationPercentage || 0) > 0 && (
-                                      <div className="flex justify-between items-center text-purple-700 pb-2 border-b border-dashed">
-                                        <div className="flex items-center">
-                                          <BadgeDollarSign className="h-4 w-4 mr-2" />
-                                          <span>Desvío ({currentTemplate.deviationPercentage || 0}%)</span>
+                                  ) : templateRoleAssignments && (
+                                    <div className="space-y-3">
+                                      {/* Costo de personal */}
+                                      <div className="flex justify-between items-center pb-2 border-b border-dashed">
+                                        <div className="flex items-center text-slate-700">
+                                          <Users className="h-4 w-4 mr-2 text-slate-500" />
+                                          <span>Personal</span>
                                         </div>
                                         <span className="font-medium">
+                                          ${templateRoleAssignments.reduce((acc, assignment) => 
+                                            acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Costo de plataformas */}
+                                      <div className="flex justify-between items-center pb-2 border-b border-dashed">
+                                        <div className="flex items-center text-slate-700">
+                                          <LayoutGrid className="h-4 w-4 mr-2 text-slate-500" />
+                                          <span>Plataformas</span>
+                                        </div>
+                                        <span className="font-medium">
+                                          ${(currentTemplate.platformCost || 0).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Subtotal */}
+                                      <div className="flex justify-between items-center pt-1 pb-2 font-medium">
+                                        <span>Subtotal</span>
+                                        <span>
+                                          ${(templateRoleAssignments.reduce((acc, assignment) => 
+                                            acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                            (currentTemplate.platformCost || 0)).toFixed(2)}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Desvío */}
+                                      {(currentTemplate.deviationPercentage || 0) > 0 && (
+                                        <div className="flex justify-between items-center text-purple-700 pb-2 border-b border-dashed">
+                                          <div className="flex items-center">
+                                            <BadgeDollarSign className="h-4 w-4 mr-2" />
+                                            <span>Desvío ({currentTemplate.deviationPercentage || 0}%)</span>
+                                          </div>
+                                          <span className="font-medium">
+                                            ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                              (currentTemplate.platformCost || 0)) * 
+                                              ((currentTemplate.deviationPercentage || 0) / 100)).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Total */}
+                                      <div className="flex justify-between items-center pt-2 pb-1 border-t">
+                                        <span className="font-semibold text-blue-800">Total Final</span>
+                                        <span className="font-bold text-lg text-blue-800">
                                           ${((templateRoleAssignments.reduce((acc, assignment) => 
                                             acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
                                             (currentTemplate.platformCost || 0)) * 
-                                            ((currentTemplate.deviationPercentage || 0) / 100)).toFixed(2)}
+                                            (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)}
                                         </span>
                                       </div>
-                                    )}
-                                    
-                                    {/* Total */}
-                                    <div className="flex justify-between items-center pt-2 pb-1 border-t">
-                                      <span className="font-semibold text-blue-800">Total Final</span>
-                                      <span className="font-bold text-lg text-blue-800">
-                                        ${((templateRoleAssignments.reduce((acc, assignment) => 
-                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                          (currentTemplate.platformCost || 0)) * 
-                                          (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)}
-                                      </span>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </>
                   )}
                   <Card className="mb-6">
                     <CardHeader className="pb-2">
@@ -1667,76 +1741,7 @@ export default function Admin() {
             {isEditing && currentTemplate && (
               <TabsContent value="roles" className="py-4">
                 <div className="space-y-6">
-                  {/* Tarjetas de resumen financiero */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
-                      <CardContent className="p-6">
-                        <div className="space-y-2">
-                          <div className="flex items-center text-blue-600">
-                            <Users className="h-5 w-5 mr-2" />
-                            <h3 className="text-sm font-medium">Costo de Personal</h3>
-                          </div>
-                          <div className="text-2xl font-bold text-blue-700">
-                            ${templateRoleAssignmentsLoading ? (
-                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
-                            ) : templateRoleAssignments?.reduce(
-                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
-                              0
-                            ).toFixed(2)} USD
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-100">
-                      <CardContent className="p-6">
-                        <div className="space-y-2">
-                          <div className="flex items-center text-emerald-600">
-                            <LayoutGrid className="h-5 w-5 mr-2" />
-                            <h3 className="text-sm font-medium">Subtotal (con plataformas)</h3>
-                          </div>
-                          <div className="text-2xl font-bold text-emerald-700">
-                            ${templateRoleAssignmentsLoading ? (
-                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
-                            ) : (templateRoleAssignments?.reduce(
-                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
-                              0
-                            ) + (currentTemplate.platformCost || 0)).toFixed(2)} USD
-                          </div>
-                          {(currentTemplate.platformCost || 0) > 0 && (
-                            <div className="text-xs text-emerald-600">
-                              <span className="font-medium">Incluye:</span> ${(currentTemplate.platformCost || 0).toFixed(2)} USD de plataformas
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-100">
-                      <CardContent className="p-6">
-                        <div className="space-y-2">
-                          <div className="flex items-center text-purple-600">
-                            <BadgeDollarSign className="h-5 w-5 mr-2" />
-                            <h3 className="text-sm font-medium">Costo Total Final</h3>
-                          </div>
-                          <div className="text-2xl font-bold text-purple-700">
-                            ${templateRoleAssignmentsLoading ? (
-                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
-                            ) : ((templateRoleAssignments?.reduce(
-                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
-                              0
-                            ) + (currentTemplate.platformCost || 0)) * 
-                              (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)} USD
-                          </div>
-                          {(currentTemplate.deviationPercentage || 0) > 0 && (
-                            <div className="text-xs text-fuchsia-600">
-                              Incluye {currentTemplate.deviationPercentage}% de desvío
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+
                   
                   {/* Header con título y ordenamiento */}
                   <div className="flex items-center justify-between">
