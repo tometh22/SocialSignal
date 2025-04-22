@@ -14,7 +14,9 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
     baseCost,
     complexityAdjustment,
     markupAmount,
-    totalAmount
+    totalAmount,
+    platformCost,
+    deviationPercentage
   } = useQuoteContext();
 
   // Get personnel and roles info
@@ -116,12 +118,31 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
           </div>
         )}
         
+        {showComplexity && platformCost > 0 && (
+          <div className="p-4 bg-neutral-100 rounded-lg">
+            <div className="text-sm text-neutral-600 mb-1">Costo de Plataformas</div>
+            <div className="text-2xl font-mono font-medium">{formatCurrency(platformCost)}</div>
+          </div>
+        )}
+        
         <div className="p-4 bg-neutral-100 rounded-lg">
           <div className="text-sm text-neutral-600 mb-1">Margen Estándar (2×)</div>
           <div className="text-2xl font-mono font-medium">{formatCurrency(markupAmount)}</div>
         </div>
         
-        <div className="p-4 bg-primary bg-opacity-10 rounded-lg border border-primary">
+        {showComplexity && deviationPercentage > 0 && (
+          <div className="p-4 bg-neutral-100 rounded-lg">
+            <div className="text-sm text-neutral-600 mb-1">Ajuste por Desvío</div>
+            <div className="text-2xl font-mono font-medium">
+              {formatCurrency((baseCost + complexityAdjustment + markupAmount + platformCost) * (deviationPercentage / 100))}
+            </div>
+            <div className="text-xs text-neutral-500 mt-1">
+              +{deviationPercentage}% desvío aplicado
+            </div>
+          </div>
+        )}
+        
+        <div className="p-4 bg-primary bg-opacity-10 rounded-lg border border-primary md:col-span-1">
           <div className="text-sm text-primary mb-1">
             {showComplexity ? "Cotización Total" : "Cotización Preliminar Total"}
           </div>

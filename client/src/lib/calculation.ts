@@ -99,7 +99,15 @@ export const calculateMarkup = (adjustedBaseCost: number): number => {
 export const calculateTotalAmount = (
   baseCost: number,
   complexityAdjustment: number,
-  markupAmount: number
+  markupAmount: number,
+  platformCost: number = 0,
+  deviationPercentage: number = 0
 ): number => {
-  return baseCost + complexityAdjustment + markupAmount;
+  // Calcular el subtotal antes de aplicar el desvío
+  const subtotal = baseCost + complexityAdjustment + markupAmount + platformCost;
+  
+  // Aplicar el porcentaje de desvío (si existe)
+  const deviationAmount = subtotal * (deviationPercentage / 100);
+  
+  return subtotal + deviationAmount;
 };

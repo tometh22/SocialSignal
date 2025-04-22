@@ -53,6 +53,8 @@ interface QuoteContextType {
   complexityAdjustment: number;
   markupAmount: number;
   totalAmount: number;
+  platformCost: number;
+  deviationPercentage: number;
   complexityFactors: ComplexityFactors;
   quotationData: QuotationData;
   quoteOption: "roles" | "team";
@@ -93,6 +95,8 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [platformCost, setPlatformCost] = useState(0);
+  const [deviationPercentage, setDeviationPercentage] = useState(0);
   
   // Complexity factors
   const [complexityFactors, setComplexityFactors] = useState<ComplexityFactors>({
@@ -298,10 +302,33 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const markup = calculateMarkup(adjusted);
     setMarkupAmount(markup);
     
-    // Calculate total
-    const total = calculateTotalAmount(baseTeamCost, complexityAdj, markup);
+    // Obtener los costos adicionales de la plantilla seleccionada
+    let currentPlatformCost = 0;
+    let currentDeviationPercentage = 0;
+    
+    if (selectedTemplateId && templates) {
+      const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+      if (selectedTemplate) {
+        currentPlatformCost = selectedTemplate.platformCost || 0;
+        currentDeviationPercentage = selectedTemplate.deviationPercentage || 0;
+        
+        // Actualizar los estados
+        setPlatformCost(currentPlatformCost);
+        setDeviationPercentage(currentDeviationPercentage);
+      }
+    }
+    
+    // Calculate total with platform costs and deviation percentage
+    const total = calculateTotalAmount(
+      baseTeamCost, 
+      complexityAdj, 
+      markup, 
+      currentPlatformCost, 
+      currentDeviationPercentage
+    );
+    
     setTotalAmount(total);
-  }, [calculateBaseCost, complexityFactors]);
+  }, [calculateBaseCost, complexityFactors, selectedTemplateId, templates]);
   
   // Función para añadir roles recomendados al equipo basado en la plantilla seleccionada
   const addRecommendedRoles = useCallback(() => {
@@ -409,6 +436,8 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     complexityAdjustment,
     markupAmount,
     totalAmount,
+    platformCost,
+    deviationPercentage,
     complexityFactors,
     quotationData,
     quoteOption,
