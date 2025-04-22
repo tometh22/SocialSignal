@@ -1012,7 +1012,7 @@ export default function Admin() {
                           <TableHead>Descripción</TableHead>
                           <TableHead>Complejidad</TableHead>
                           <TableHead>Rango de Páginas</TableHead>
-                          <TableHead>Costos Adicionales</TableHead>
+                          <TableHead>Costo Estimado</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
