@@ -1031,16 +1031,16 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="py-3">{template.pageRange}</TableCell>
                             <TableCell className="py-3">
-                              {(template.platformCost > 0 || template.deviationPercentage > 0) ? (
+                              {((template.platformCost || 0) > 0 || (template.deviationPercentage || 0) > 0) ? (
                                 <div className="text-sm">
-                                  {template.platformCost > 0 && (
+                                  {(template.platformCost || 0) > 0 && (
                                     <div className="text-slate-600">
-                                      Plataformas: <span className="font-medium">${template.platformCost.toFixed(2)}</span>
+                                      Plataformas: <span className="font-medium">${(template.platformCost || 0).toFixed(2)}</span>
                                     </div>
                                   )}
-                                  {template.deviationPercentage > 0 && (
+                                  {(template.deviationPercentage || 0) > 0 && (
                                     <div className="text-slate-600">
-                                      Desvío: <span className="font-medium">{template.deviationPercentage}%</span>
+                                      Desvío: <span className="font-medium">{template.deviationPercentage || 0}%</span>
                                     </div>
                                   )}
                                 </div>
