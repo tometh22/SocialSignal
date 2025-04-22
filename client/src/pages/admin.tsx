@@ -1516,27 +1516,25 @@ export default function Admin() {
                   <Select
                     defaultValue="horas"
                     onValueChange={(value) => {
+                      const sortedData = [...(templateRoleAssignments || [])];
+                      
                       if (value === "horas") {
-                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
-                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
-                          (old) => old ? [...old].sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours)) : []
-                        );
+                        sortedData.sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours));
                       } else if (value === "costo") {
-                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
-                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
-                          (old) => old ? [...old].sort((a, b) => 
-                            (parseFloat(b.hours) * b.role.defaultRate) - 
-                            (parseFloat(a.hours) * a.role.defaultRate)
-                          ) : []
+                        sortedData.sort((a, b) => 
+                          (parseFloat(b.hours) * b.role.defaultRate) - 
+                          (parseFloat(a.hours) * a.role.defaultRate)
                         );
                       } else if (value === "rol") {
-                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
-                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
-                          (old) => old ? [...old].sort((a, b) => 
-                            a.role.name.localeCompare(b.role.name)
-                          ) : []
+                        sortedData.sort((a, b) => 
+                          a.role.name.localeCompare(b.role.name)
                         );
                       }
+                      
+                      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+                        [`/api/template-roles/${currentTemplate?.id}/with-roles`],
+                        sortedData
+                      );
                     }}
                   >
                     <SelectTrigger className="h-8 w-28">
@@ -1562,9 +1560,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...templateRoleAssignments]
-                        .sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours))
-                        .map(assignment => (
+                      {templateRoleAssignments.map(assignment => (
                           <TableRow key={assignment.id}>
                             <TableCell className="py-2">{assignment.role.name}</TableCell>
                             <TableCell className="py-2">{assignment.hours} hrs</TableCell>
