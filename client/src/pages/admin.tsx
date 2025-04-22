@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { InlineEditRole } from "@/components/admin/inline-edit-role";
 import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
+import { RoleSummary } from "@/components/admin/role-summary";
 
 import { 
   InsertPersonnel, 
@@ -516,7 +517,8 @@ export default function Admin() {
       if (!response.ok) {
         throw new Error("Failed to assign role");
       }
-      return response.json();
+      const result = await response.json();
+      return result;
     },
     onMutate: async (newRoleAssignment) => {
       if (!currentTemplate || !roles) return {};
@@ -1032,22 +1034,26 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="py-3">{template.pageRange}</TableCell>
                             <TableCell className="py-3">
-                              {((template.platformCost || 0) > 0 || (template.deviationPercentage || 0) > 0) ? (
-                                <div className="text-sm">
-                                  {(template.platformCost || 0) > 0 && (
-                                    <div className="text-slate-600">
-                                      Plataformas: <span className="font-medium">${(template.platformCost || 0).toFixed(2)}</span>
-                                    </div>
-                                  )}
-                                  {(template.deviationPercentage || 0) > 0 && (
-                                    <div className="text-slate-600">
-                                      Desvío: <span className="font-medium">{template.deviationPercentage || 0}%</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-500">-</span>
-                              )}
+                              <div className="flex flex-col gap-1">
+                                {/* Resumen de equipo */}
+                                <RoleSummary templateId={template.id} />
+                                
+                                {/* Costos adicionales */}
+                                {((template.platformCost || 0) > 0 || (template.deviationPercentage || 0) > 0) && (
+                                  <div className="border-t pt-1 mt-1">
+                                    {(template.platformCost || 0) > 0 && (
+                                      <div className="text-slate-600 text-sm">
+                                        Plataformas: <span className="font-medium">${(template.platformCost || 0).toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {(template.deviationPercentage || 0) > 0 && (
+                                      <div className="text-slate-600 text-sm">
+                                        Desvío: <span className="font-medium">{template.deviationPercentage || 0}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="py-3 text-right">
                               <div className="flex justify-end space-x-2">
@@ -1526,38 +1532,73 @@ export default function Admin() {
                   ) : (
                     <div className="space-y-4">
                       <div className="max-h-[250px] overflow-y-auto border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Rol</TableHead>
-                              <TableHead>Horas Estándar</TableHead>
-                              <TableHead>Tarifa por Hora</TableHead>
-                              <TableHead>Costo Estándar</TableHead>
-                              <TableHead className="text-right">Acciones</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {templateRoleAssignments.map(assignment => (
-                              <TableRow key={assignment.id}>
-                                <TableCell className="py-2">{assignment.role.name}</TableCell>
-                                <TableCell className="py-2">{assignment.hours} hrs</TableCell>
-                                <TableCell className="py-2">${assignment.role.defaultRate.toFixed(2)}</TableCell>
-                                <TableCell className="py-2 font-medium">
-                                  ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
-                                </TableCell>
-                                <TableCell className="py-2 text-right">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
-                                  >
-                                    <Trash className="h-3.5 w-3.5 text-red-500" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        {/* Agrupar roles por tipo */}
+                        {(() => {
+                          // Crear grupos de roles
+                          const roleGroups: Record<string, (TemplateRoleAssignment & { role: Role })[]> = {};
+                          
+                          templateRoleAssignments.forEach(assignment => {
+                            const roleName = assignment.role.name;
+                            if (!roleGroups[roleName]) {
+                              roleGroups[roleName] = [];
+                            }
+                            roleGroups[roleName].push(assignment);
+                          });
+                          
+                          return (
+                            <div className="p-2 space-y-4">
+                              {Object.entries(roleGroups).map(([roleName, assignments]) => (
+                                <div key={roleName} className="space-y-2">
+                                  <div className="font-medium border-b pb-1">
+                                    {roleName} {assignments.length > 1 && `(${assignments.length})`}
+                                  </div>
+                                  
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="py-1">Horas</TableHead>
+                                        <TableHead className="py-1">Tarifa</TableHead>
+                                        <TableHead className="py-1">Costo</TableHead>
+                                        <TableHead className="py-1 text-right">Acciones</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {assignments.map(assignment => (
+                                        <TableRow key={assignment.id}>
+                                          <TableCell className="py-1">{assignment.hours} hrs</TableCell>
+                                          <TableCell className="py-1">${assignment.role.defaultRate.toFixed(2)}</TableCell>
+                                          <TableCell className="py-1 font-medium">
+                                            ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
+                                          </TableCell>
+                                          <TableCell className="py-1 text-right">
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm"
+                                              onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
+                                            >
+                                              <Trash className="h-3.5 w-3.5 text-red-500" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                      
+                                      {/* Subtotal por grupo */}
+                                      <TableRow>
+                                        <TableCell colSpan={2} className="text-right font-medium py-1">
+                                          Subtotal:
+                                        </TableCell>
+                                        <TableCell colSpan={2} className="font-medium py-1">
+                                          ${assignments.reduce((total, a) => 
+                                            total + (parseFloat(a.hours) * a.role.defaultRate), 0).toFixed(2)}
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       
                       <div className="p-3 border rounded-md bg-slate-50 space-y-2">
