@@ -23,6 +23,8 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
   const [editComplexity, setEditComplexity] = useState(template.complexity);
   const [editPageRange, setEditPageRange] = useState(template.pageRange || "");
   const [editFeatures, setEditFeatures] = useState(template.features || "");
+  const [editPlatformCost, setEditPlatformCost] = useState(template.platformCost || 0);
+  const [editDeviationPercentage, setEditDeviationPercentage] = useState(template.deviationPercentage || 0);
   const [updatedTemplate, setUpdatedTemplate] = useState<ReportTemplate>(template);
   const { toast } = useToast();
 
@@ -35,6 +37,8 @@ export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditT
       setEditComplexity(template.complexity);
       setEditPageRange(template.pageRange || "");
       setEditFeatures(template.features || "");
+      setEditPlatformCost(template.platformCost || 0);
+      setEditDeviationPercentage(template.deviationPercentage || 0);
     }
   }, [template, isEditing]);
 
