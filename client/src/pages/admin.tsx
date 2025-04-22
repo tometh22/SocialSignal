@@ -828,28 +828,7 @@ export default function Admin() {
   const onTemplateRoleSubmit = (values: TemplateRoleFormValues) => {
     if (!currentTemplate) return;
     
-    // Encontrar el rol seleccionado para actualizaciones optimistas
-    const selectedRole = roles?.find(r => r.id === values.roleId);
-    
-    // Crear una asignación temporal optimista
-    if (selectedRole && currentTemplate) {
-      // Crear una asignación optimista 
-      const tempId = -Date.now(); // ID temporal negativo para distinguirlo
-      const optimisticAssignment = {
-        id: tempId,
-        templateId: currentTemplate.id,
-        roleId: values.roleId,
-        hours: values.hours.toString(),
-        role: selectedRole
-      };
-      
-      // Actualizar la caché con la asignación optimista
-      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
-        [`/api/template-roles/${currentTemplate.id}/with-roles`],
-        (old) => old ? [...old, optimisticAssignment] : [optimisticAssignment]
-      );
-    }
-    
+    // Solo enviamos la mutación y dejamos que onMutate maneje la parte optimista
     createTemplateRoleAssignmentMutation.mutate({
       templateId: currentTemplate.id,
       roleId: values.roleId,
