@@ -3,9 +3,10 @@ import { TemplateRoleAssignment, Role } from "@shared/schema";
 
 interface RoleSummaryProps {
   templateId: number;
+  showCosts?: boolean;
 }
 
-export function RoleSummary({ templateId }: RoleSummaryProps) {
+export function RoleSummary({ templateId, showCosts = false }: RoleSummaryProps) {
   const { data: templateRoleAssignments, isLoading } = useQuery<(TemplateRoleAssignment & { role: Role })[]>({
     queryKey: [`/api/template-roles/${templateId}/with-roles`],
     enabled: !!templateId,
@@ -46,10 +47,10 @@ export function RoleSummary({ templateId }: RoleSummaryProps) {
           <span>
             {roleName} {info.count > 1 ? `(x${info.count})` : ""}: {info.totalHours} hrs
           </span>
-          <span className="font-medium">${info.totalCost.toFixed(2)}</span>
+          {showCosts && <span className="font-medium">${info.totalCost.toFixed(2)}</span>}
         </div>
       ))}
-      {Object.keys(roleGroups).length > 0 && (
+      {Object.keys(roleGroups).length > 0 && showCosts && (
         <div className="text-sm font-medium border-t pt-1 flex justify-between">
           <span>Total equipo:</span>
           <span>${totalCost.toFixed(2)}</span>

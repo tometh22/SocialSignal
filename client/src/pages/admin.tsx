@@ -1035,22 +1035,14 @@ export default function Admin() {
                             <TableCell className="py-3">{template.pageRange}</TableCell>
                             <TableCell className="py-3">
                               <div className="flex flex-col gap-1">
-                                {/* Resumen de equipo */}
-                                <RoleSummary templateId={template.id} />
+                                {/* Resumen de equipo sin mostrar costos */}
+                                <RoleSummary templateId={template.id} showCosts={false} />
                                 
-                                {/* Costos adicionales */}
+                                {/* Información adicional sin mostrar costos */}
                                 {((template.platformCost || 0) > 0 || (template.deviationPercentage || 0) > 0) && (
-                                  <div className="border-t pt-1 mt-1">
-                                    {(template.platformCost || 0) > 0 && (
-                                      <div className="text-slate-600 text-sm">
-                                        Plataformas: <span className="font-medium">${(template.platformCost || 0).toFixed(2)}</span>
-                                      </div>
-                                    )}
-                                    {(template.deviationPercentage || 0) > 0 && (
-                                      <div className="text-slate-600 text-sm">
-                                        Desvío: <span className="font-medium">{template.deviationPercentage || 0}%</span>
-                                      </div>
-                                    )}
+                                  <div className="border-t pt-1 mt-1 text-slate-600 text-sm">
+                                    {(template.platformCost || 0) > 0 && <div>Incluye costos de plataformas</div>}
+                                    {(template.deviationPercentage || 0) > 0 && <div>Incluye {template.deviationPercentage}% de desvío</div>}
                                   </div>
                                 )}
                               </div>
