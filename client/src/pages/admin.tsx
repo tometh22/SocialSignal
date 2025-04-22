@@ -427,13 +427,16 @@ export default function Admin() {
         );
       });
       
+      // Reset de estados
+      setIsEditing(false);
+      setCurrentTemplate(null);
+      setTemplateDialogOpen(false);
+      templateForm.reset();
+      
       toast({
         title: "Éxito",
         description: "Plantilla de reporte actualizada correctamente.",
       });
-      
-      setTemplateDialogOpen(false);
-      templateForm.reset();
     },
     onError: (err, variables, context) => {
       console.error("Error al actualizar plantilla:", err);
@@ -1292,7 +1295,20 @@ export default function Admin() {
       </Dialog>
 
       {/* Template Dialog */}
-      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+      <Dialog 
+        open={templateDialogOpen} 
+        onOpenChange={(open) => {
+          setTemplateDialogOpen(open);
+          // Cuando se cierra el diálogo, resetear los estados
+          if (!open) {
+            setIsEditing(false);
+            setCurrentTemplate(null);
+            setTimeout(() => {
+              // Forzar la actualización de la lista después de un pequeño retraso
+              queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+            }, 100);
+          }
+        }}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Editar Plantilla" : "Añadir Plantilla de Reporte"}</DialogTitle>
