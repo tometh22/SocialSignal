@@ -598,7 +598,7 @@ export default function Admin() {
       
       toast({
         title: "Éxito",
-        description: "Rol asignado correctamente a la plantilla.",
+        description: "Rol agregado correctamente a la plantilla.",
       });
       
       // Resetear el formulario para añadir otro rol
@@ -618,7 +618,7 @@ export default function Admin() {
       
       toast({
         title: "Error",
-        description: "No se pudo asignar el rol a la plantilla.",
+        description: "No se pudo agregar el rol a la plantilla.",
         variant: "destructive",
       });
     },
@@ -1382,7 +1382,7 @@ export default function Admin() {
       <Dialog open={assignRolesDialogOpen} onOpenChange={setAssignRolesDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Asignar Roles y Horas para {currentTemplate?.name}</DialogTitle>
+            <DialogTitle>Agregar Roles y Horas para {currentTemplate?.name}</DialogTitle>
             <DialogDescription>
               Configura los roles estándar y cantidad de horas para esta plantilla de reporte.
               Estos roles serán recomendados automáticamente al crear una nueva cotización 
@@ -1391,15 +1391,15 @@ export default function Admin() {
           </DialogHeader>
           
           <div className="py-4">
-            <h3 className="text-sm font-medium mb-2">Roles Asignados Actualmente</h3>
+            <h3 className="text-sm font-medium mb-2">Roles Agregados Actualmente</h3>
             
             {templateRoleAssignmentsLoading ? (
               <div className="flex justify-center py-4">
-                <Loader variant="gradient" size="sm" text="Cargando roles asignados" />
+                <Loader variant="gradient" size="sm" text="Cargando roles agregados" />
               </div>
             ) : !templateRoleAssignments || templateRoleAssignments.length === 0 ? (
               <div className="text-center py-3 text-sm text-neutral-500 border rounded-md">
-                No hay roles asignados a esta plantilla.
+                No hay roles agregados a esta plantilla.
               </div>
             ) : (
               <div className="space-y-2 mb-4">
