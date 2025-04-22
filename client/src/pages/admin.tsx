@@ -48,7 +48,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BadgeDollarSign,
+  Briefcase,
   Calculator,
+  ChevronRight,
   Clock,
   DollarSign,
   FileText, 
@@ -57,9 +59,11 @@ import {
   Loader2, 
   Pencil, 
   Plus,
-  PlusCircle, 
+  PlusCircle,
+  RefreshCw,
   Settings, 
-  Trash, 
+  Trash,
+  User2, 
   UserCog, 
   UserPlus,
   Users,
