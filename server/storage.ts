@@ -38,6 +38,7 @@ export interface IStorage {
   getReportTemplate(id: number): Promise<ReportTemplate | undefined>;
   createReportTemplate(template: InsertReportTemplate): Promise<ReportTemplate>;
   updateReportTemplate(id: number, template: Partial<InsertReportTemplate>): Promise<ReportTemplate | undefined>;
+  deleteReportTemplate(id: number): Promise<boolean>;
 
   // Template role assignments operations
   getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]>;
@@ -488,6 +489,19 @@ export class MemStorage implements IStorage {
     this.reportTemplates.set(id, updatedTemplate);
     return updatedTemplate;
   }
+  
+  async deleteReportTemplate(id: number): Promise<boolean> {
+    // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
+    await this.deleteTemplateRoleAssignments(id);
+    
+    // Verificar si la plantilla existe
+    if (!this.reportTemplates.has(id)) {
+      return false;
+    }
+    
+    // Eliminar la plantilla
+    return this.reportTemplates.delete(id);
+  }
 
   // Quotation operations
   async getQuotations(): Promise<Quotation[]> {
@@ -750,6 +764,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(reportTemplates.id, id))
       .returning();
     return updatedTemplate;
+  }
+  
+  async deleteReportTemplate(id: number): Promise<boolean> {
+    // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
+    await this.deleteTemplateRoleAssignments(id);
+    
+    // Verificar si hay cotizaciones que usan esta plantilla
+    const quotationsWithTemplate = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(quotations)
+      .where(sql`${quotations.templates}::jsonb @> jsonb_build_array(${id})`);
+    
+    if (quotationsWithTemplate[0].count > 0) {
+      // No eliminar si hay cotizaciones que usan esta plantilla
+      return false;
+    }
+    
+    // Eliminar la plantilla
+    await db.delete(reportTemplates).where(eq(reportTemplates.id, id));
+    
+    // Verificar si la plantilla fue eliminada
+    const [template] = await db
+      .select()
+      .from(reportTemplates)
+      .where(eq(reportTemplates.id, id));
+      
+    return !template;
   }
 
   // Quotation operations

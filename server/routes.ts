@@ -243,6 +243,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Eliminar plantilla de reporte
+  app.delete("/api/templates/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+
+    try {
+      // Verificar si la plantilla existe
+      const template = await storage.getReportTemplate(id);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      // Intentar eliminar la plantilla
+      const deleted = await storage.deleteReportTemplate(id);
+      
+      if (!deleted) {
+        return res.status(409).json({ 
+          message: "Cannot delete template. It may be in use by existing quotations." 
+        });
+      }
+      
+      res.status(200).json({ 
+        message: "Template deleted successfully", 
+        id
+      });
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+  
   // Ruta para obtener asignaciones de roles para una plantilla específica
   app.get("/api/templates/:id/role-assignments", async (req, res) => {
     const id = parseInt(req.params.id);
