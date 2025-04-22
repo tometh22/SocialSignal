@@ -1008,6 +1008,7 @@ export default function Admin() {
                           <TableHead>Descripción</TableHead>
                           <TableHead>Complejidad</TableHead>
                           <TableHead>Rango de Páginas</TableHead>
+                          <TableHead>Costos Adicionales</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1029,6 +1030,24 @@ export default function Admin() {
                               </Badge>
                             </TableCell>
                             <TableCell className="py-3">{template.pageRange}</TableCell>
+                            <TableCell className="py-3">
+                              {(template.platformCost > 0 || template.deviationPercentage > 0) ? (
+                                <div className="text-sm">
+                                  {template.platformCost > 0 && (
+                                    <div className="text-slate-600">
+                                      Plataformas: <span className="font-medium">${template.platformCost.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {template.deviationPercentage > 0 && (
+                                    <div className="text-slate-600">
+                                      Desvío: <span className="font-medium">{template.deviationPercentage}%</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-500">-</span>
+                              )}
+                            </TableCell>
                             <TableCell className="py-3 text-right">
                               <div className="flex justify-end space-x-2">
                                 <Button 
