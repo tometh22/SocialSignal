@@ -1305,6 +1305,84 @@ export default function Admin() {
             <TabsContent value="details">
               <Form {...templateForm}>
                 <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
+                  {/* Mostrar resumen de costos cuando se está editando */}
+                  {isEditing && currentTemplate && (
+                    <div className="p-3 bg-slate-50 rounded-md border mb-4">
+                      <h3 className="text-sm font-medium mb-2">Resumen de Costos</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 mb-1">Composición del Equipo</h4>
+                          <RoleSummary templateId={currentTemplate.id} showCosts={true} />
+                        </div>
+                        
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 mb-1">Desglose de Costos</h4>
+                          <div className="space-y-1 text-sm">
+                            {/* Cargando si no tenemos los datos aún */}
+                            {templateRoleAssignmentsLoading ? (
+                              <div className="text-center py-2">
+                                <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
+                                Calculando...
+                              </div>
+                            ) : templateRoleAssignments && (
+                              <>
+                                {/* Costo de personal */}
+                                <div className="flex justify-between">
+                                  <span className="text-slate-600">Personal:</span>
+                                  <span className="font-medium">
+                                    ${templateRoleAssignments.reduce((acc, assignment) => 
+                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                
+                                {/* Costo de plataformas */}
+                                <div className="flex justify-between">
+                                  <span className="text-slate-600">Plataformas:</span>
+                                  <span className="font-medium">
+                                    ${(currentTemplate.platformCost || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                
+                                {/* Subtotal */}
+                                <div className="flex justify-between pt-1 border-t">
+                                  <span className="font-medium">Subtotal:</span>
+                                  <span className="font-medium">
+                                    ${(templateRoleAssignments.reduce((acc, assignment) => 
+                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                      (currentTemplate.platformCost || 0)).toFixed(2)}
+                                  </span>
+                                </div>
+                                
+                                {/* Desvío */}
+                                {(currentTemplate.deviationPercentage || 0) > 0 && (
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-600">Desvío ({currentTemplate.deviationPercentage}%):</span>
+                                    <span className="font-medium">
+                                      ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                        acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                        (currentTemplate.platformCost || 0)) * 
+                                        (currentTemplate.deviationPercentage / 100)).toFixed(2)}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {/* Total */}
+                                <div className="flex justify-between pt-1 border-t">
+                                  <span className="font-medium">Total:</span>
+                                  <span className="font-medium text-lg">
+                                    ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                      (currentTemplate.platformCost || 0)) * 
+                                      (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <FormField
                     control={templateForm.control}
                     name="name"
