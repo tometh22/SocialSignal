@@ -66,7 +66,9 @@ const templateSchema = z.object({
   description: z.string().optional(),
   complexity: z.string().min(1, "Complexity is required"),
   pageRange: z.string().optional(),
-  features: z.string().optional()
+  features: z.string().optional(),
+  platformCost: z.coerce.number().min(0, "El costo no puede ser negativo").default(0),
+  deviationPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo").max(100, "El porcentaje no puede ser mayor a 100").default(0)
 });
 
 type TemplateFormValues = z.infer<typeof templateSchema>;
@@ -140,7 +142,9 @@ export default function Admin() {
       description: "",
       complexity: "",
       pageRange: "",
-      features: ""
+      features: "",
+      platformCost: 0,
+      deviationPercentage: 0
     }
   });
 
@@ -350,6 +354,8 @@ export default function Admin() {
         complexity: newTemplateData.complexity,
         pageRange: newTemplateData.pageRange || null,
         features: newTemplateData.features || null,
+        platformCost: newTemplateData.platformCost || 0,
+        deviationPercentage: newTemplateData.deviationPercentage || 0,
       };
       
       // Actualizar la caché con el nuevo template optimista
@@ -744,7 +750,9 @@ export default function Admin() {
       description: "",
       complexity: "low",
       pageRange: "",
-      features: ""
+      features: "",
+      platformCost: 0,
+      deviationPercentage: 0
     });
     setCurrentTemplate(null);
     setIsEditing(false);
@@ -757,7 +765,9 @@ export default function Admin() {
       description: template.description || "",
       complexity: template.complexity,
       pageRange: template.pageRange || "",
-      features: template.features || ""
+      features: template.features || "",
+      platformCost: template.platformCost || 0,
+      deviationPercentage: template.deviationPercentage || 0
     });
     setCurrentTemplate(template);
     setIsEditing(true);
