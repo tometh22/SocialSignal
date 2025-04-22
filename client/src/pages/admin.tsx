@@ -1368,6 +1368,55 @@ export default function Admin() {
                 )}
               />
               
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={templateForm.control}
+                  name="platformCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Costo de Plataformas ($)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(parseFloat(e.target.value) || 0);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={templateForm.control}
+                  name="deviationPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Porcentaje de Desvío (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          placeholder="0"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(parseFloat(e.target.value) || 0);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <DialogFooter>
                 <Button 
                   variant="outline" 
@@ -1447,11 +1496,56 @@ export default function Admin() {
                 </Table>
                 
                 {/* Cálculo del costo total */}
-                <div className="mt-3 border-t pt-3 flex justify-between items-center">
-                  <div className="font-medium">Costo Total Estándar:</div>
-                  <div className="text-lg font-bold">
-                    ${templateRoleAssignments.reduce((acc, assignment) => 
-                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)} USD
+                <div className="mt-3 border-t pt-3 space-y-2">
+                  {/* Mostrar costos de personal */}
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm">Costo de Personal:</div>
+                    <div className="text-base">
+                      ${templateRoleAssignments.reduce((acc, assignment) => 
+                        acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)} USD
+                    </div>
+                  </div>
+                  
+                  {/* Mostrar costo de plataformas */}
+                  {currentTemplate && currentTemplate.platformCost && currentTemplate.platformCost > 0 && (
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm">Costo de Plataformas:</div>
+                      <div className="text-base">${currentTemplate.platformCost.toFixed(2)} USD</div>
+                    </div>
+                  )}
+                  
+                  {/* Subtotal antes de desvío */}
+                  <div className="flex justify-between items-center text-slate-700">
+                    <div className="text-sm font-medium">Subtotal:</div>
+                    <div className="text-base font-medium">
+                      ${(templateRoleAssignments.reduce((acc, assignment) => 
+                        acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                        (currentTemplate?.platformCost || 0)).toFixed(2)} USD
+                    </div>
+                  </div>
+                  
+                  {/* Mostrar desvío si es mayor que cero */}
+                  {currentTemplate && currentTemplate.deviationPercentage && currentTemplate.deviationPercentage > 0 && (
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm">Desvío ({currentTemplate.deviationPercentage}%):</div>
+                      <div className="text-base">
+                        ${((templateRoleAssignments.reduce((acc, assignment) => 
+                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                          (currentTemplate?.platformCost || 0)) * 
+                          (currentTemplate.deviationPercentage / 100)).toFixed(2)} USD
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Total final */}
+                  <div className="flex justify-between items-center pt-1 border-t font-medium">
+                    <div className="font-medium">Costo Total Estándar:</div>
+                    <div className="text-lg font-bold">
+                      ${((templateRoleAssignments.reduce((acc, assignment) => 
+                        acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                        (currentTemplate?.platformCost || 0)) * 
+                        (1 + ((currentTemplate?.deviationPercentage || 0) / 100))).toFixed(2)} USD
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1512,9 +1606,11 @@ export default function Admin() {
                     />
                   </div>
                   
-                  {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && (
+                  {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && currentTemplate && (
                     <div className="p-3 border rounded-md bg-slate-50">
-                      <div className="text-sm font-medium">Vista previa de costo:</div>
+                      <div className="text-sm font-medium mb-2">Vista previa de costos:</div>
+                      
+                      {/* Costo del rol a agregar */}
                       <div className="flex justify-between items-center mt-1">
                         <div className="text-sm text-slate-600">
                           {roles.find(r => r.id === templateRoleForm.watch("roleId"))?.name || "Rol seleccionado"} 
@@ -1524,6 +1620,31 @@ export default function Admin() {
                           <span className="font-medium text-base">
                             ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
                               templateRoleForm.watch("hours")).toFixed(2)}
+                          </span>
+                          <span className="text-sm text-slate-600 ml-1">USD</span>
+                        </div>
+                      </div>
+                      
+                      {/* Separación */}
+                      <div className="border-t my-2"></div>
+                      
+                      {/* Cálculo del nuevo total de la plantilla */}
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm font-medium text-slate-800">Nuevo Costo Total:</div>
+                        <div className="text-right">
+                          <span className="font-bold text-base">
+                            ${(
+                              // Costo base actual
+                              (templateRoleAssignments?.reduce((acc, assignment) => 
+                                acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) || 0) 
+                              // Costo del nuevo rol
+                              + ((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
+                                templateRoleForm.watch("hours"))
+                              // Costo de plataformas
+                              + (currentTemplate.platformCost || 0)
+                              // Multiplicador de desvío
+                              * (1 + ((currentTemplate.deviationPercentage || 0) / 100))
+                            ).toFixed(2)}
                           </span>
                           <span className="text-sm text-slate-600 ml-1">USD</span>
                         </div>
