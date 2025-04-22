@@ -1,20 +1,21 @@
+// Archivo original con correcciones
+
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Role, InsertRole, 
-  Personnel, InsertPersonnel, 
-  ReportTemplate, InsertReportTemplate,
-  TemplateRoleAssignment, InsertTemplateRoleAssignment
-} from "@shared/schema";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Table, 
   TableBody, 
@@ -23,98 +24,128 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PlusCircle, Edit, UserCog, FileText, Settings, Users2, Pencil, Trash } from "lucide-react";
+import { 
+  Form, 
+  FormControl, 
+  FormDescription, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ui/loader";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { z } from "zod";
-import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  FileText, 
+  Loader2, 
+  Pencil, 
+  PlusCircle, 
+  Settings, 
+  Trash, 
+  UserCog, 
+  Users2 
+} from "lucide-react";
 import { InlineEditRole } from "@/components/admin/inline-edit-role";
-import { InlineEditTemplate } from "@/components/admin/inline-edit-template";
+import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 
-// Role form schema
+import { 
+  InsertPersonnel, 
+  InsertReportTemplate, 
+  InsertRole, 
+  InsertTemplateRoleAssignment, 
+  Personnel, 
+  ReportTemplate, 
+  Role, 
+  TemplateRoleAssignment
+} from "@shared/schema";
+
+// Schema para el formulario de roles
 const roleSchema = z.object({
-  name: z.string().min(1, "Role name is required"),
+  name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  defaultRate: z.coerce.number().min(1, "Default rate must be at least 1")
+  defaultRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0")
 });
 
-type RoleFormValues = z.infer<typeof roleSchema>;
-
-// Personnel form schema
+// Schema para el formulario de personal
 const personnelSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  roleId: z.coerce.number().min(1, "Role is required"),
-  hourlyRate: z.coerce.number().min(1, "Hourly rate must be at least 1")
+  name: z.string().min(1, "El nombre es requerido"),
+  roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
+  hourlyRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0")
 });
 
-type PersonnelFormValues = z.infer<typeof personnelSchema>;
-
-// Template form schema
+// Schema para el formulario de plantillas
 const templateSchema = z.object({
-  name: z.string().min(1, "Template name is required"),
+  name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  complexity: z.string().min(1, "Complexity is required"),
+  complexity: z.string().min(1, "Debe seleccionar una complejidad"),
   pageRange: z.string().optional(),
   features: z.string().optional(),
-  platformCost: z.coerce.number().min(0, "El costo no puede ser negativo").default(0),
-  deviationPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo").max(100, "El porcentaje no puede ser mayor a 100").default(0)
+  platformCost: z.coerce.number().min(0, "El costo debe ser mayor o igual a 0"),
+  deviationPercentage: z.coerce.number().min(0, "El porcentaje debe ser mayor o igual a 0").max(100, "El porcentaje no puede ser mayor a 100")
 });
 
-type TemplateFormValues = z.infer<typeof templateSchema>;
-
-// Template role assignment schema
+// Schema para el formulario de asignación de roles a plantillas
 const templateRoleSchema = z.object({
-  roleId: z.coerce.number().min(1, "Rol es requerido"),
-  hours: z.coerce.number().min(0, "Horas deben ser 0 o más")
+  roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
+  hours: z.coerce.number().min(0.5, "Las horas deben ser al menos 0.5")
 });
 
+// Tipos derivados para nuestros formularios
+type RoleFormValues = z.infer<typeof roleSchema>;
+type PersonnelFormValues = z.infer<typeof personnelSchema>;
+type TemplateFormValues = z.infer<typeof templateSchema>;
 type TemplateRoleFormValues = z.infer<typeof templateRoleSchema>;
 
 export default function Admin() {
+  // Estado para manejar tabs 
   const [activeTab, setActiveTab] = useState("roles");
+  
+  // Estados para manejar diálogos
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
+  
+  // Estados para formularios
   const [isEditing, setIsEditing] = useState(false);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
   const [currentTemplate, setCurrentTemplate] = useState<ReportTemplate | null>(null);
+  const [newRoleId, setNewRoleId] = useState("");
+  const [newRoleHours, setNewRoleHours] = useState(0);
+  
   const { toast } = useToast();
-
-  // Queries
+  
+  // Obtener datos necesarios
   const { data: roles, isLoading: rolesLoading } = useQuery<Role[]>({
     queryKey: ["/api/roles"],
   });
-
+  
   const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
   });
-
+  
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
   });
   
-  // Solo se usa cuando se abre el diálogo de asignación de roles
   const { data: templateRoleAssignments, isLoading: templateRoleAssignmentsLoading } = useQuery<(TemplateRoleAssignment & { role: Role })[]>({
-    queryKey: [
-      currentTemplate ? `/api/template-roles/${currentTemplate.id}/with-roles` : null,
-    ],
-    enabled: !!currentTemplate && assignRolesDialogOpen,
+    queryKey: [`/api/template-roles/${currentTemplate?.id}/with-roles`],
+    enabled: !!currentTemplate,
   });
-
-  // Role form
+  
+  // Configuración de formularios
   const roleForm = useForm<RoleFormValues>({
     resolver: zodResolver(roleSchema),
     defaultValues: {
@@ -123,8 +154,7 @@ export default function Admin() {
       defaultRate: 0
     }
   });
-
-  // Personnel form
+  
   const personnelForm = useForm<PersonnelFormValues>({
     resolver: zodResolver(personnelSchema),
     defaultValues: {
@@ -133,38 +163,38 @@ export default function Admin() {
       hourlyRate: 0
     }
   });
-
-  // Template form
+  
   const templateForm = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
     defaultValues: {
       name: "",
       description: "",
-      complexity: "",
+      complexity: "medium",
       pageRange: "",
       features: "",
       platformCost: 0,
       deviationPercentage: 0
     }
   });
-
-  // Mutations
+  
+  const templateRoleForm = useForm<TemplateRoleFormValues>({
+    resolver: zodResolver(templateRoleSchema),
+    defaultValues: {
+      roleId: 0,
+      hours: 0
+    }
+  });
+  
+  // Mutations para crear y editar roles
   const createRoleMutation = useMutation({
     mutationFn: (role: InsertRole) => apiRequest("POST", "/api/roles", role),
-    onSuccess: (response) => {
-      // Optimistic update for instant UI feedback
-      response.json().then(newRole => {
-        queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-          if (!oldData) return [newRole];
-          return [...oldData, newRole];
-        });
-        
-        toast({
-          title: "Éxito",
-          description: "Rol creado correctamente.",
-        });
-        setRoleDialogOpen(false);
-        roleForm.reset();
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      setRoleDialogOpen(false);
+      roleForm.reset();
+      toast({
+        title: "Éxito",
+        description: "Rol creado correctamente.",
       });
     },
     onError: () => {
@@ -175,24 +205,26 @@ export default function Admin() {
       });
     },
   });
-
+  
   const updateRoleMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertRole> }) => 
-      apiRequest("PATCH", `/api/roles/${id}`, data),
-    onSuccess: (response, variables) => {
-      // Optimistic update for instant UI feedback
-      response.json().then(updatedRole => {
-        queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-          if (!oldData) return [updatedRole];
-          return oldData.map(item => item.id === variables.id ? updatedRole : item);
-        });
-        
-        toast({
-          title: "Éxito",
-          description: "Rol actualizado correctamente.",
-        });
-        setRoleDialogOpen(false);
-        roleForm.reset();
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertRole> }) => {
+      const response = await apiRequest("PATCH", `/api/roles/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: (updatedRole: Role) => {
+      // Actualizar la caché para actualización inmediata en UI
+      queryClient.setQueryData<Role[]>(["/api/roles"], (oldRoles) => {
+        if (!oldRoles) return [updatedRole];
+        return oldRoles.map(role => 
+          role.id === updatedRole.id ? updatedRole : role
+        );
+      });
+      
+      setRoleDialogOpen(false);
+      roleForm.reset();
+      toast({
+        title: "Éxito",
+        description: "Rol actualizado correctamente.",
       });
     },
     onError: () => {
@@ -206,96 +238,73 @@ export default function Admin() {
   
   const deleteRoleMutation = useMutation({
     mutationFn: async (id: number) => {
-      // Realizar la solicitud y devolver el resultado
       const response = await apiRequest("DELETE", `/api/roles/${id}`);
-      
-      // Verificar si la operación fue exitosa
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al eliminar el rol");
+        throw new Error("Failed to delete role");
       }
-      
-      console.log(`Rol ${id} eliminado correctamente desde Admin`);
       return id;
     },
     onSuccess: (deletedId) => {
-      console.log("Operación exitosa. ID del rol eliminado:", deletedId);
-      
-      // Actualizar la caché de forma inmediata
-      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-        if (!oldData) return [];
-        console.log("Roles antes de filtrado:", oldData.map(r => `${r.id}:${r.name}`));
-        const filtered = oldData.filter(item => item.id !== deletedId);
-        console.log("Roles después de filtrado:", filtered.map(r => `${r.id}:${r.name}`));
-        return filtered;
+      // Actualizar la caché para actualización inmediata en UI
+      queryClient.setQueryData<Role[]>(["/api/roles"], (oldRoles) => {
+        if (!oldRoles) return [];
+        return oldRoles.filter(role => role.id !== deletedId);
       });
       
       toast({
         title: "Éxito",
         description: "Rol eliminado correctamente.",
       });
-      
-      // Forzar la recarga de datos del servidor
-      setTimeout(() => {
-        console.log("Invalidando consultas después de eliminar rol");
-        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      }, 300);
     },
-    onError: (error) => {
-      console.error("Error eliminando rol:", error);
+    onError: () => {
       toast({
         title: "Error",
-        description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",
+        description: "No se pudo eliminar el rol. Puede que esté en uso.",
         variant: "destructive",
       });
     },
   });
-
+  
+  // Mutations para crear y editar personal
   const createPersonnelMutation = useMutation({
     mutationFn: (personnel: InsertPersonnel) => apiRequest("POST", "/api/personnel", personnel),
-    onSuccess: (response) => {
-      // Optimistic update for instant UI feedback
-      response.json().then(newPersonnel => {
-        queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-          if (!oldData) return [newPersonnel];
-          return [...oldData, newPersonnel];
-        });
-        
-        toast({
-          title: "Éxito",
-          description: "Miembro del equipo añadido correctamente.",
-        });
-        setPersonnelDialogOpen(false);
-        personnelForm.reset();
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      setPersonnelDialogOpen(false);
+      personnelForm.reset();
+      toast({
+        title: "Éxito",
+        description: "Miembro del equipo creado correctamente.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "No se pudo añadir el miembro del equipo.",
+        description: "No se pudo crear el miembro del equipo.",
         variant: "destructive",
       });
     },
   });
-
+  
   const updatePersonnelMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertPersonnel> }) => 
-      apiRequest("PATCH", `/api/personnel/${id}`, data),
-    onSuccess: (response, variables) => {
-      // Optimistic update for instant UI feedback
-      response.json().then(updatedPersonnel => {
-        queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-          if (!oldData) return [updatedPersonnel];
-          return oldData.map(item => item.id === variables.id ? updatedPersonnel : item);
-        });
-        
-        toast({
-          title: "Éxito",
-          description: "Miembro del equipo actualizado correctamente.",
-        });
-        setPersonnelDialogOpen(false);
-        personnelForm.reset();
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertPersonnel> }) => {
+      const response = await apiRequest("PATCH", `/api/personnel/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: (updatedPersonnel: Personnel) => {
+      // Actualizar la caché para actualización inmediata en UI
+      queryClient.setQueryData<Personnel[]>(["/api/personnel"], (oldPersonnel) => {
+        if (!oldPersonnel) return [updatedPersonnel];
+        return oldPersonnel.map(person => 
+          person.id === updatedPersonnel.id ? updatedPersonnel : person
+        );
+      });
+      
+      setPersonnelDialogOpen(false);
+      personnelForm.reset();
+      toast({
+        title: "Éxito",
+        description: "Miembro del equipo actualizado correctamente.",
       });
     },
     onError: () => {
@@ -308,12 +317,18 @@ export default function Admin() {
   });
   
   const deletePersonnelMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/personnel/${id}`),
-    onSuccess: (_, variables) => {
-      // Optimistic update - remove personnel instantly from UI
-      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.filter(item => item.id !== variables);
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/personnel/${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete personnel");
+      }
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      // Actualizar la caché para actualización inmediata en UI
+      queryClient.setQueryData<Personnel[]>(["/api/personnel"], (oldPersonnel) => {
+        if (!oldPersonnel) return [];
+        return oldPersonnel.filter(person => person.id !== deletedId);
       });
       
       toast({
@@ -324,118 +339,74 @@ export default function Admin() {
     onError: () => {
       toast({
         title: "Error",
-        description: "No se pudo eliminar el miembro del equipo.",
+        description: "No se pudo eliminar el miembro del equipo. Puede que esté en uso.",
         variant: "destructive",
       });
     },
   });
-
+  
+  // Mutations para crear y editar plantillas
   const createTemplateMutation = useMutation({
     mutationFn: async (template: InsertReportTemplate) => {
       const response = await apiRequest("POST", "/api/templates", template);
-      if (!response.ok) {
-        throw new Error("Failed to create template");
-      }
-      return response.json();
+      return await response.json();
     },
-    onMutate: async (newTemplateData) => {
-      // Cancelar consultas en curso
-      await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
-      
-      // Guardar el estado anterior
-      const previousTemplates = queryClient.getQueryData<ReportTemplate[]>(["/api/templates"]);
-      
-      // Crear un ID temporal para la optimización de UI (será reemplazado al recibir la respuesta real)
-      const tempId = Date.now();
+    onSuccess: (newTemplate: ReportTemplate) => {
+      // Crear objeto optimista para actualización inmediata
       const optimisticTemplate: ReportTemplate = {
-        id: tempId,
-        name: newTemplateData.name,
-        description: newTemplateData.description || null,
-        complexity: newTemplateData.complexity,
-        pageRange: newTemplateData.pageRange || null,
-        features: newTemplateData.features || null,
-        platformCost: newTemplateData.platformCost || 0,
-        deviationPercentage: newTemplateData.deviationPercentage || 0,
+        ...newTemplate
       };
       
-      // Actualizar la caché con el nuevo template optimista
-      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => 
-        old ? [...old, optimisticTemplate] : [optimisticTemplate]
-      );
-      
-      return { previousTemplates, tempId };
-    },
-    onSuccess: (data, variables, context) => {
-      // Actualizar la caché con el template real (reemplazando el temporal)
-      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
-        if (!old) return [data];
-        
-        // Filtrar el template temporal y añadir el real
-        return old
-          .filter(template => template.id !== context?.tempId)
-          .concat(data);
-      });
-      
-      toast({
-        title: "Éxito",
-        description: "Plantilla de reporte creada correctamente.",
+      // Actualizar la caché para actualización inmediata en UI
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (oldTemplates) => {
+        if (!oldTemplates) return [optimisticTemplate];
+        return [...oldTemplates, optimisticTemplate];
       });
       
       setTemplateDialogOpen(false);
       templateForm.reset();
+      toast({
+        title: "Éxito",
+        description: "Plantilla de reporte creada correctamente.",
+      });
     },
-    onError: (err, newTemplate, context) => {
-      console.error("Error al crear plantilla:", err);
-      
-      // Revertir al estado anterior en caso de error
-      if (context?.previousTemplates) {
-        queryClient.setQueryData(["/api/templates"], context.previousTemplates);
-      }
-      
+    onError: () => {
       toast({
         title: "Error",
         description: "No se pudo crear la plantilla de reporte.",
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      // Refrescar datos del servidor independientemente del resultado
-      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-    },
   });
-
+  
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertReportTemplate> }) => {
       const response = await apiRequest("PATCH", `/api/templates/${id}`, data);
-      if (!response.ok) {
-        throw new Error("Failed to update template");
-      }
-      return response.json();
+      return await response.json();
     },
     onMutate: async ({ id, data }) => {
       // Cancelar consultas en curso
       await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
       
-      // Guardar el estado anterior
+      // Guardar estado anterior
       const previousTemplates = queryClient.getQueryData<ReportTemplate[]>(["/api/templates"]);
       
-      // Actualizar la caché con el template actualizado optimistamente
-      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
+      // Actualización optimista
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], old => {
         if (!old) return [];
         
         return old.map(template => 
           template.id === id 
-            ? { ...template, ...data } 
+            ? { ...template, ...data }
             : template
         );
       });
       
       return { previousTemplates };
     },
-    onSuccess: (updatedTemplate) => {
-      // La caché ya está actualizada optimistamente, pero podemos asegurarnos
-      // de que los datos son correctos al actualizar con el resultado de la API
-      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
+    onSuccess: (updatedTemplate: ReportTemplate) => {
+      // Asegurar que la caché tenga los datos actualizados
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], old => {
         if (!old) return [updatedTemplate];
         
         return old.map(template => 
@@ -718,59 +689,68 @@ export default function Admin() {
       description: "",
       defaultRate: 0
     });
-    setCurrentRole(null);
     setIsEditing(false);
+    setCurrentRole(null);
     setRoleDialogOpen(true);
   };
-
+  
+  const openNewPersonnelDialog = () => {
+    if (!roles || roles.length === 0) {
+      toast({
+        title: "Error",
+        description: "Primero debe crear roles antes de añadir personal.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    personnelForm.reset({
+      name: "",
+      roleId: roles[0].id,
+      hourlyRate: 0
+    });
+    setIsEditing(false);
+    setCurrentPersonnel(null);
+    setPersonnelDialogOpen(true);
+  };
+  
+  const openNewTemplateDialog = () => {
+    templateForm.reset({
+      name: "",
+      description: "",
+      complexity: "medium",
+      pageRange: "",
+      features: "",
+      platformCost: 0,
+      deviationPercentage: 0
+    });
+    setIsEditing(false);
+    setCurrentTemplate(null);
+    setTemplateDialogOpen(true);
+  };
+  
   const openEditRoleDialog = (role: Role) => {
     roleForm.reset({
       name: role.name,
       description: role.description || "",
       defaultRate: role.defaultRate
     });
-    setCurrentRole(role);
     setIsEditing(true);
+    setCurrentRole(role);
     setRoleDialogOpen(true);
   };
-
-  const openNewPersonnelDialog = () => {
-    personnelForm.reset({
-      name: "",
-      roleId: roles && roles.length > 0 ? roles[0].id : 0,
-      hourlyRate: roles && roles.length > 0 ? roles[0].defaultRate : 0
-    });
-    setCurrentPersonnel(null);
-    setIsEditing(false);
-    setPersonnelDialogOpen(true);
-  };
-
+  
   const openEditPersonnelDialog = (person: Personnel) => {
     personnelForm.reset({
       name: person.name,
       roleId: person.roleId,
       hourlyRate: person.hourlyRate
     });
-    setCurrentPersonnel(person);
     setIsEditing(true);
+    setCurrentPersonnel(person);
     setPersonnelDialogOpen(true);
   };
-
-  const openNewTemplateDialog = () => {
-    templateForm.reset({
-      name: "",
-      description: "",
-      complexity: "low",
-      pageRange: "",
-      features: "",
-      platformCost: 0,
-      deviationPercentage: 0
-    });
-    setCurrentTemplate(null);
-    setIsEditing(false);
-    setTemplateDialogOpen(true);
-  };
-
+  
   const openEditTemplateDialog = (template: ReportTemplate) => {
     templateForm.reset({
       name: template.name,
@@ -781,56 +761,58 @@ export default function Admin() {
       platformCost: template.platformCost || 0,
       deviationPercentage: template.deviationPercentage || 0
     });
-    setCurrentTemplate(template);
     setIsEditing(true);
+    setCurrentTemplate(template);
     setTemplateDialogOpen(true);
   };
   
-  // Template role assignment form
-  const templateRoleForm = useForm<TemplateRoleFormValues>({
-    resolver: zodResolver(templateRoleSchema),
-    defaultValues: {
-      roleId: 0,
-      hours: 0
-    }
-  });
-  
   const openAssignRolesDialog = (template: ReportTemplate) => {
+    if (!roles || roles.length === 0) {
+      toast({
+        title: "Error",
+        description: "Primero debe crear roles antes de asignarlos a plantillas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCurrentTemplate(template);
     templateRoleForm.reset({
-      roleId: roles && roles.length > 0 ? roles[0].id : 0,
+      roleId: roles[0].id,
       hours: 0
     });
-    setCurrentTemplate(template);
     setAssignRolesDialogOpen(true);
-    
-    // Obtener las asignaciones de roles existentes para esta plantilla
-    if (template) {
-      queryClient.prefetchQuery({
-        queryKey: [`/api/template-roles/${template.id}/with-roles`],
-      });
-    }
   };
-
-  // Handle form submissions
+  
+  // Form submissions
   const onRoleSubmit = (values: RoleFormValues) => {
     if (isEditing && currentRole) {
-      updateRoleMutation.mutate({ id: currentRole.id, data: values });
+      updateRoleMutation.mutate({
+        id: currentRole.id,
+        data: values
+      });
     } else {
       createRoleMutation.mutate(values);
     }
   };
-
+  
   const onPersonnelSubmit = (values: PersonnelFormValues) => {
     if (isEditing && currentPersonnel) {
-      updatePersonnelMutation.mutate({ id: currentPersonnel.id, data: values });
+      updatePersonnelMutation.mutate({
+        id: currentPersonnel.id,
+        data: values
+      });
     } else {
       createPersonnelMutation.mutate(values);
     }
   };
-
+  
   const onTemplateSubmit = (values: TemplateFormValues) => {
     if (isEditing && currentTemplate) {
-      updateTemplateMutation.mutate({ id: currentTemplate.id, data: values });
+      updateTemplateMutation.mutate({
+        id: currentTemplate.id,
+        data: values
+      });
     } else {
       createTemplateMutation.mutate(values);
     }
@@ -839,6 +821,28 @@ export default function Admin() {
   // Manejar añadir asignación de rol a plantilla
   const onTemplateRoleSubmit = (values: TemplateRoleFormValues) => {
     if (!currentTemplate) return;
+    
+    // Encontrar el rol seleccionado para actualizaciones optimistas
+    const selectedRole = roles?.find(r => r.id === values.roleId);
+    
+    // Crear una asignación temporal optimista
+    if (selectedRole && currentTemplate) {
+      // Crear una asignación optimista 
+      const tempId = -Date.now(); // ID temporal negativo para distinguirlo
+      const optimisticAssignment = {
+        id: tempId,
+        templateId: currentTemplate.id,
+        roleId: values.roleId,
+        hours: values.hours.toString(),
+        role: selectedRole
+      };
+      
+      // Actualizar la caché con la asignación optimista
+      queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+        [`/api/template-roles/${currentTemplate.id}/with-roles`],
+        (old) => old ? [...old, optimisticAssignment] : [optimisticAssignment]
+      );
+    }
     
     createTemplateRoleAssignmentMutation.mutate({
       templateId: currentTemplate.id,
@@ -1106,7 +1110,7 @@ export default function Admin() {
           </Tabs>
         </div>
       </div>
-
+      
       {/* Role Dialog */}
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <DialogContent>
@@ -1115,12 +1119,12 @@ export default function Admin() {
             <DialogDescription>
               {isEditing 
                 ? "Actualiza los detalles del rol a continuación."
-                : "Añade un nuevo rol con tarifa por hora predeterminada."}
+                : "Añade un nuevo rol con su descripción y tarifa por hora predeterminada."}
             </DialogDescription>
           </DialogHeader>
           
           <Form {...roleForm}>
-            <form onSubmit={roleForm.handleSubmit(onRoleSubmit)} className="space-y-4 py-2">
+            <form onSubmit={roleForm.handleSubmit(onRoleSubmit)} className="space-y-4">
               <FormField
                 control={roleForm.control}
                 name="name"
@@ -1128,7 +1132,7 @@ export default function Admin() {
                   <FormItem>
                     <FormLabel>Nombre del Rol</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ingresa el nombre del rol" {...field} />
+                      <Input placeholder="Ej: Project Manager" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1143,7 +1147,7 @@ export default function Admin() {
                     <FormLabel>Descripción</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Ingresa la descripción del rol" 
+                        placeholder="Breve descripción de las responsabilidades" 
                         className="resize-none" 
                         {...field} 
                       />
@@ -1158,16 +1162,13 @@ export default function Admin() {
                 name="defaultRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tarifa Predeterminada por Hora ($)</FormLabel>
+                    <FormLabel>Tarifa por Hora (USD)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                      />
+                      <Input type="number" step="0.01" min="0" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Esta es la tarifa predeterminada por hora para este rol.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1175,17 +1176,17 @@ export default function Admin() {
               
               <DialogFooter>
                 <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => setRoleDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button 
                   type="submit" 
                   disabled={createRoleMutation.isPending || updateRoleMutation.isPending}
                 >
-                  {isEditing ? "Actualizar Rol" : "Añadir Rol"}
+                  {createRoleMutation.isPending || updateRoleMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "Actualizando..." : "Creando..."}
+                    </>
+                  ) : (
+                    isEditing ? "Actualizar Rol" : "Añadir Rol"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -1206,7 +1207,7 @@ export default function Admin() {
           </DialogHeader>
           
           <Form {...personnelForm}>
-            <form onSubmit={personnelForm.handleSubmit(onPersonnelSubmit)} className="space-y-4 py-2">
+            <form onSubmit={personnelForm.handleSubmit(onPersonnelSubmit)} className="space-y-4">
               <FormField
                 control={personnelForm.control}
                 name="name"
@@ -1214,7 +1215,7 @@ export default function Admin() {
                   <FormItem>
                     <FormLabel>Nombre</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ingresa el nombre" {...field} />
+                      <Input placeholder="Nombre del miembro del equipo" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1229,16 +1230,7 @@ export default function Admin() {
                     <FormLabel>Rol</FormLabel>
                     <Select 
                       value={field.value.toString()} 
-                      onValueChange={(value) => {
-                        field.onChange(parseInt(value));
-                        // Set default hourly rate based on role if creating new personnel
-                        if (!isEditing && roles) {
-                          const selectedRole = roles.find(r => r.id === parseInt(value));
-                          if (selectedRole) {
-                            personnelForm.setValue("hourlyRate", selectedRole.defaultRate);
-                          }
-                        }
-                      }}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -1261,36 +1253,53 @@ export default function Admin() {
               <FormField
                 control={personnelForm.control}
                 name="hourlyRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tarifa por Hora ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  // Obtener la tarifa predeterminada del rol seleccionado
+                  const selectedRoleId = personnelForm.watch("roleId");
+                  const selectedRole = roles?.find(r => r.id === selectedRoleId);
+                  const defaultRate = selectedRole?.defaultRate || 0;
+                  
+                  return (
+                    <FormItem>
+                      <FormLabel>Tarifa por Hora (USD)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          {...field} 
+                          // Al cambiar de rol, sugerir la tarifa predeterminada
+                          onChange={(e) => {
+                            if (e.target.value === "" && selectedRole) {
+                              field.onChange(defaultRate);
+                            } else {
+                              field.onChange(e.target.value);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Tarifa sugerida: ${defaultRate.toFixed(2)}/hora (basada en el rol seleccionado)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <DialogFooter>
                 <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => setPersonnelDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button 
                   type="submit" 
                   disabled={createPersonnelMutation.isPending || updatePersonnelMutation.isPending}
                 >
-                  {isEditing ? "Actualizar Miembro" : "Añadir Miembro"}
+                  {createPersonnelMutation.isPending || updatePersonnelMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "Actualizando..." : "Creando..."}
+                    </>
+                  ) : (
+                    isEditing ? "Actualizar Miembro" : "Añadir Miembro"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -1311,15 +1320,15 @@ export default function Admin() {
           </DialogHeader>
           
           <Form {...templateForm}>
-            <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4 py-2">
+            <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
               <FormField
                 control={templateForm.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre de Plantilla</FormLabel>
+                    <FormLabel>Nombre de la Plantilla</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ingresa el nombre de la plantilla" {...field} />
+                      <Input placeholder="Ej: Análisis de Sentimiento Mensual" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1334,7 +1343,7 @@ export default function Admin() {
                     <FormLabel>Descripción</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Ingresa la descripción de la plantilla" 
+                        placeholder="Breve descripción de la plantilla" 
                         className="resize-none" 
                         {...field} 
                       />
@@ -1344,46 +1353,48 @@ export default function Admin() {
                 )}
               />
               
-              <FormField
-                control={templateForm.control}
-                name="complexity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Complejidad</FormLabel>
-                    <Select 
-                      value={field.value} 
-                      onValueChange={field.onChange}
-                    >
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={templateForm.control}
+                  name="complexity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Complejidad</FormLabel>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona la complejidad" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Baja</SelectItem>
+                          <SelectItem value="medium">Media</SelectItem>
+                          <SelectItem value="high">Alta</SelectItem>
+                          <SelectItem value="variable">Variable</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={templateForm.control}
+                  name="pageRange"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rango de Páginas</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona la complejidad" />
-                        </SelectTrigger>
+                        <Input placeholder="Ej: 10-15" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="low">Baja</SelectItem>
-                        <SelectItem value="medium">Media</SelectItem>
-                        <SelectItem value="high">Alta</SelectItem>
-                        <SelectItem value="variable">Variable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={templateForm.control}
-                name="pageRange"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rango de Páginas</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ej., 5-10 páginas" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={templateForm.control}
@@ -1392,8 +1403,15 @@ export default function Admin() {
                   <FormItem>
                     <FormLabel>Características</FormLabel>
                     <FormControl>
-                      <Input placeholder="ej., Solo métricas básicas" {...field} />
+                      <Textarea 
+                        placeholder="Lista de características o elementos principales" 
+                        className="resize-none" 
+                        {...field} 
+                      />
                     </FormControl>
+                    <FormDescription>
+                      Enumera las características principales separadas por comas o líneas nuevas.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1405,19 +1423,19 @@ export default function Admin() {
                   name="platformCost"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Costo de Plataformas ($)</FormLabel>
+                      <FormLabel>Costo de Plataformas (USD)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          placeholder="0.00" 
                           {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                          }}
                         />
                       </FormControl>
+                      <FormDescription>
+                        Costo adicional por uso de plataformas
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1430,18 +1448,18 @@ export default function Admin() {
                     <FormItem>
                       <FormLabel>Porcentaje de Desvío (%)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
+                        <Input 
+                          type="number" 
+                          step="1" 
+                          min="0" 
                           max="100"
-                          step="1"
-                          placeholder="0"
+                          placeholder="0" 
                           {...field}
-                          onChange={(e) => {
-                            field.onChange(parseFloat(e.target.value) || 0);
-                          }}
                         />
                       </FormControl>
+                      <FormDescription>
+                        Porcentaje adicional para contingencias
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1450,17 +1468,17 @@ export default function Admin() {
               
               <DialogFooter>
                 <Button 
-                  variant="outline" 
-                  type="button" 
-                  onClick={() => setTemplateDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button 
                   type="submit" 
                   disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
                 >
-                  {isEditing ? "Actualizar Plantilla" : "Añadir Plantilla"}
+                  {createTemplateMutation.isPending || updateTemplateMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "Actualizando..." : "Creando..."}
+                    </>
+                  ) : (
+                    isEditing ? "Actualizar Plantilla" : "Añadir Plantilla"
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -1470,7 +1488,7 @@ export default function Admin() {
 
       {/* Template Role Assignment Dialog */}
       <Dialog open={assignRolesDialogOpen} onOpenChange={setAssignRolesDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Agregar Roles y Horas para {currentTemplate?.name}</DialogTitle>
             <DialogDescription>
@@ -1493,38 +1511,81 @@ export default function Admin() {
               </div>
             ) : (
               <div className="space-y-2 mb-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rol</TableHead>
-                      <TableHead>Horas Estándar</TableHead>
-                      <TableHead>Tarifa por Hora</TableHead>
-                      <TableHead>Costo Estándar</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {templateRoleAssignments.map(assignment => (
-                      <TableRow key={assignment.id}>
-                        <TableCell className="py-2">{assignment.role.name}</TableCell>
-                        <TableCell className="py-2">{assignment.hours} hrs</TableCell>
-                        <TableCell className="py-2">${assignment.role.defaultRate.toFixed(2)}</TableCell>
-                        <TableCell className="py-2 font-medium">
-                          ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="py-2 text-right">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
-                          >
-                            <Trash className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
-                        </TableCell>
+                <div className="flex items-center justify-end mb-2 space-x-2">
+                  <span className="text-xs text-slate-500">Ordenar por:</span>
+                  <Select
+                    defaultValue="horas"
+                    onValueChange={(value) => {
+                      if (value === "horas") {
+                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
+                          (old) => old ? [...old].sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours)) : []
+                        );
+                      } else if (value === "costo") {
+                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
+                          (old) => old ? [...old].sort((a, b) => 
+                            (parseFloat(b.hours) * b.role.defaultRate) - 
+                            (parseFloat(a.hours) * a.role.defaultRate)
+                          ) : []
+                        );
+                      } else if (value === "rol") {
+                        queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+                          [`/api/template-roles/${currentTemplate?.id}/with-roles`],
+                          (old) => old ? [...old].sort((a, b) => 
+                            a.role.name.localeCompare(b.role.name)
+                          ) : []
+                        );
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-28">
+                      <SelectValue placeholder="Ordenar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="horas">Horas</SelectItem>
+                      <SelectItem value="costo">Costo</SelectItem>
+                      <SelectItem value="rol">Rol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="max-h-80 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Horas Estándar</TableHead>
+                        <TableHead>Tarifa por Hora</TableHead>
+                        <TableHead>Costo Estándar</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {[...templateRoleAssignments]
+                        .sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours))
+                        .map(assignment => (
+                          <TableRow key={assignment.id}>
+                            <TableCell className="py-2">{assignment.role.name}</TableCell>
+                            <TableCell className="py-2">{assignment.hours} hrs</TableCell>
+                            <TableCell className="py-2">${assignment.role.defaultRate.toFixed(2)}</TableCell>
+                            <TableCell className="py-2 font-medium">
+                              ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
+                              >
+                                <Trash className="h-3.5 w-3.5 text-red-500" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
                 
                 {/* Cálculo del costo total */}
                 <div className="mt-3 border-t pt-3 space-y-2">
@@ -1651,31 +1712,6 @@ export default function Admin() {
                           <span className="font-medium text-base">
                             ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
                               templateRoleForm.watch("hours")).toFixed(2)}
-                          </span>
-                          <span className="text-sm text-slate-600 ml-1">USD</span>
-                        </div>
-                      </div>
-                      
-                      {/* Separación */}
-                      <div className="border-t my-2"></div>
-                      
-                      {/* Cálculo del nuevo total de la plantilla */}
-                      <div className="flex justify-between items-center">
-                        <div className="text-sm font-medium text-slate-800">Nuevo Costo Total:</div>
-                        <div className="text-right">
-                          <span className="font-bold text-base">
-                            ${(
-                              // Costo base actual
-                              (templateRoleAssignments?.reduce((acc, assignment) => 
-                                acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) || 0) 
-                              // Costo del nuevo rol
-                              + ((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
-                                templateRoleForm.watch("hours"))
-                              // Costo de plataformas
-                              + (currentTemplate.platformCost || 0)
-                              // Multiplicador de desvío
-                              * (1 + ((currentTemplate.deviationPercentage || 0) / 100))
-                            ).toFixed(2)}
                           </span>
                           <span className="text-sm text-slate-600 ml-1">USD</span>
                         </div>
