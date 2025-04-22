@@ -369,12 +369,22 @@ export default function Admin() {
   
   // Mutación para eliminar plantilla de reporte
   const deleteTemplateMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/templates/${id}`),
-    onSuccess: (_, variables) => {
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/templates/${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Crear un objeto de error con información adicional
+        const error: any = new Error(errorData.message || "Error al eliminar la plantilla");
+        error.status = response.status;
+        throw error;
+      }
+      return id;
+    },
+    onSuccess: (deletedId) => {
       // Actualización optimista - eliminar plantilla inmediatamente de la UI
       queryClient.setQueryData(["/api/templates"], (oldData: ReportTemplate[] | undefined) => {
         if (!oldData) return [];
-        return oldData.filter(item => item.id !== variables);
+        return oldData.filter(item => item.id !== deletedId);
       });
       
       toast({
@@ -385,12 +395,22 @@ export default function Admin() {
       // Forzar la recarga de datos del servidor para asegurar consistencia
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la plantilla de reporte. Puede que tenga cotizaciones asociadas.",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      console.error("Error eliminando plantilla:", error);
+      // Verificar si es un error de conflicto (plantilla en uso)
+      if (error.status === 409) {
+        toast({
+          title: "No se puede eliminar",
+          description: "Esta plantilla está siendo utilizada en cotizaciones existentes.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar la plantilla de reporte.",
+          variant: "destructive",
+        });
+      }
     },
   });
   
