@@ -380,25 +380,39 @@ export default function Admin() {
       }
       return id;
     },
+    onMutate: async (deletedId) => {
+      // Cancelar todas las consultas en curso
+      await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
+      
+      // Guardar el estado anterior por si necesitamos revertir
+      const previousTemplates = queryClient.getQueryData<ReportTemplate[]>(["/api/templates"]);
+      
+      // Actualizar inmediatamente la UI con el cambio optimista
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => 
+        old ? old.filter(item => item.id !== deletedId) : []
+      );
+      
+      // Devolver el estado anterior para poder revertir si ocurre un error
+      return { previousTemplates };
+    },
     onSuccess: (deletedId) => {
-      // Actualización optimista - eliminar plantilla inmediatamente de la UI
-      queryClient.setQueryData(["/api/templates"], (oldData: ReportTemplate[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.filter(item => item.id !== deletedId);
-      });
+      console.log(`Plantilla ${deletedId} eliminada exitosamente`);
       
       toast({
         title: "Éxito",
         description: "Plantilla de reporte eliminada correctamente.",
       });
-      
-      // Forzar la recarga de datos del servidor para asegurar consistencia
-      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
-    onError: (error: any) => {
-      console.error("Error eliminando plantilla:", error);
-      // Verificar si es un error de conflicto (plantilla en uso)
-      if (error.status === 409) {
+    onError: (err, deletedId, context) => {
+      console.error("Error al eliminar plantilla:", err);
+      
+      // Revertir al estado anterior en caso de error
+      if (context?.previousTemplates) {
+        queryClient.setQueryData(["/api/templates"], context.previousTemplates);
+      }
+      
+      // Mostrar mensaje de error según el tipo
+      if ((err as any).status === 409) {
         toast({
           title: "No se puede eliminar",
           description: "Esta plantilla está siendo utilizada en cotizaciones existentes.",
@@ -411,6 +425,10 @@ export default function Admin() {
           variant: "destructive",
         });
       }
+    },
+    onSettled: () => {
+      // Refrescar datos del servidor después de la operación, sin importar si hubo éxito o error
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
   });
   
