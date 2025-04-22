@@ -30,7 +30,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, UserCog, FileText, Settings } from "lucide-react";
+import { PlusCircle, Edit, UserCog, FileText, Settings, Users2, Pencil } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ui/loader";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -69,11 +70,20 @@ const templateSchema = z.object({
 
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
+// Template role assignment schema
+const templateRoleSchema = z.object({
+  roleId: z.coerce.number().min(1, "Rol es requerido"),
+  hours: z.coerce.number().min(0, "Horas deben ser 0 o más")
+});
+
+type TemplateRoleFormValues = z.infer<typeof templateRoleSchema>;
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("roles");
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
@@ -622,17 +632,43 @@ export default function Admin() {
                       </TableHeader>
                       <TableBody>
                         {templates.map(template => (
-                          <InlineEditTemplate 
-                            key={template.id} 
-                            template={template}
-                            onUpdate={(updatedTemplate) => {
-                              // Actualizar plantillas en tiempo real
-                              const updatedTemplates = templates.map(t => 
-                                t.id === updatedTemplate.id ? updatedTemplate : t
-                              );
-                              queryClient.setQueryData(["/api/templates"], updatedTemplates);
-                            }}
-                          />
+                          <TableRow key={template.id}>
+                            <TableCell className="py-3 font-medium">{template.name}</TableCell>
+                            <TableCell className="py-3">{template.description}</TableCell>
+                            <TableCell className="py-3">
+                              <Badge className={
+                                template.complexity === "high" ? "bg-red-100 text-red-800 hover:bg-red-100" :
+                                template.complexity === "medium" ? "bg-amber-100 text-amber-800 hover:bg-amber-100" :
+                                template.complexity === "variable" ? "bg-purple-100 text-purple-800 hover:bg-purple-100" :
+                                "bg-green-100 text-green-800 hover:bg-green-100"
+                              }>
+                                {template.complexity === "high" ? "Alta" :
+                                 template.complexity === "medium" ? "Media" :
+                                 template.complexity === "variable" ? "Variable" : "Baja"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3">{template.pageRange}</TableCell>
+                            <TableCell className="py-3 text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openAssignRolesDialog(template)}
+                                >
+                                  <Users2 className="h-4 w-4 mr-1" />
+                                  Roles
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openEditTemplateDialog(template)}
+                                >
+                                  <Pencil className="h-4 w-4 mr-1" />
+                                  Editar
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         ))}
                       </TableBody>
                     </Table>
