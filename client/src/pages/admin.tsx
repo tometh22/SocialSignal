@@ -1130,6 +1130,8 @@ export default function Admin() {
                     <TableRow>
                       <TableHead>Rol</TableHead>
                       <TableHead>Horas Estándar</TableHead>
+                      <TableHead>Tarifa por Hora</TableHead>
+                      <TableHead>Costo Estándar</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1138,6 +1140,10 @@ export default function Admin() {
                       <TableRow key={assignment.id}>
                         <TableCell className="py-2">{assignment.role.name}</TableCell>
                         <TableCell className="py-2">{assignment.hours} hrs</TableCell>
+                        <TableCell className="py-2">${assignment.role.defaultRate.toFixed(2)}</TableCell>
+                        <TableCell className="py-2 font-medium">
+                          ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
+                        </TableCell>
                         <TableCell className="py-2 text-right">
                           <Button 
                             variant="outline" 
@@ -1151,6 +1157,15 @@ export default function Admin() {
                     ))}
                   </TableBody>
                 </Table>
+                
+                {/* Cálculo del costo total */}
+                <div className="mt-3 border-t pt-3 flex justify-between items-center">
+                  <div className="font-medium">Costo Total Estándar:</div>
+                  <div className="text-lg font-bold">
+                    ${templateRoleAssignments.reduce((acc, assignment) => 
+                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)} USD
+                  </div>
+                </div>
               </div>
             )}
             
@@ -1178,7 +1193,7 @@ export default function Admin() {
                             <SelectContent>
                               {roles?.map(role => (
                                 <SelectItem key={role.id} value={role.id.toString()}>
-                                  {role.name}
+                                  {role.name} (${role.defaultRate.toFixed(2)}/hr)
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1208,6 +1223,25 @@ export default function Admin() {
                       )}
                     />
                   </div>
+                  
+                  {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && (
+                    <div className="p-3 border rounded-md bg-slate-50">
+                      <div className="text-sm font-medium">Vista previa de costo:</div>
+                      <div className="flex justify-between items-center mt-1">
+                        <div className="text-sm text-slate-600">
+                          {roles.find(r => r.id === templateRoleForm.watch("roleId"))?.name || "Rol seleccionado"} 
+                          &times; {templateRoleForm.watch("hours")} horas
+                        </div>
+                        <div className="text-right">
+                          <span className="font-medium text-base">
+                            ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
+                              templateRoleForm.watch("hours")).toFixed(2)}
+                          </span>
+                          <span className="text-sm text-slate-600 ml-1">USD</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <DialogFooter>
                     <Button 
