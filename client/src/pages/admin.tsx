@@ -1448,7 +1448,7 @@ export default function Admin() {
             )}
             
             <div className="border-t pt-4 mt-4">
-              <h3 className="text-sm font-medium mb-3">Asignar Nuevo Rol</h3>
+              <h3 className="text-sm font-medium mb-3">Agregar Nuevo Rol</h3>
               
               <Form {...templateRoleForm}>
                 <form onSubmit={templateRoleForm.handleSubmit(onTemplateRoleSubmit)} className="space-y-4">
@@ -1536,10 +1536,10 @@ export default function Admin() {
                       {createTemplateRoleAssignmentMutation.isPending ? (
                         <>
                           <Loader size="sm" variant="dots" className="mr-2" />
-                          Asignando...
+                          Agregando...
                         </>
                       ) : (
-                        <>Asignar Rol</>
+                        <>Agregar Rol</>
                       )}
                     </Button>
                   </DialogFooter>
