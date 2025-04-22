@@ -352,8 +352,8 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
       toast({
-        title: "Success",
-        description: "Report template has been updated successfully.",
+        title: "Éxito",
+        description: "Plantilla de reporte actualizada correctamente.",
       });
       setTemplateDialogOpen(false);
       templateForm.reset();
@@ -361,7 +361,34 @@ export default function Admin() {
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update report template.",
+        description: "No se pudo actualizar la plantilla de reporte.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutación para eliminar plantilla de reporte
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/templates/${id}`),
+    onSuccess: (_, variables) => {
+      // Actualización optimista - eliminar plantilla inmediatamente de la UI
+      queryClient.setQueryData(["/api/templates"], (oldData: ReportTemplate[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.filter(item => item.id !== variables);
+      });
+      
+      toast({
+        title: "Éxito",
+        description: "Plantilla de reporte eliminada correctamente.",
+      });
+      
+      // Forzar la recarga de datos del servidor para asegurar consistencia
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la plantilla de reporte. Puede que tenga cotizaciones asociadas.",
         variant: "destructive",
       });
     },
@@ -769,6 +796,17 @@ export default function Admin() {
                                 >
                                   <Pencil className="h-4 w-4 mr-1" />
                                   Editar
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    if (window.confirm(`¿Estás seguro de que deseas eliminar la plantilla "${template.name}"? Esta acción no se puede deshacer.`)) {
+                                      deleteTemplateMutation.mutate(template.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash className="h-4 w-4 text-red-500" />
                                 </Button>
                               </div>
                             </TableCell>

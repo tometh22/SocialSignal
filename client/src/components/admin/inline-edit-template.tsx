@@ -8,14 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit, Loader2 } from "lucide-react";
+import { Edit, Loader2, Trash } from "lucide-react";
 
 interface InlineEditTemplateProps {
   template: ReportTemplate;
   onUpdate?: (updatedTemplate: ReportTemplate) => void;
+  onDelete?: (templateId: number) => void;
 }
 
-export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplateProps) {
+export function InlineEditTemplate({ template, onUpdate, onDelete }: InlineEditTemplateProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(template.name);
   const [editDescription, setEditDescription] = useState(template.description || "");
@@ -189,10 +190,25 @@ export function InlineEditTemplate({ template, onUpdate }: InlineEditTemplatePro
             </Button>
           </div>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-            <Edit className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
+          <div className="flex justify-end space-x-1">
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Edit className="h-4 w-4 mr-1" />
+              Editar
+            </Button>
+            {onDelete && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  if (window.confirm(`¿Estás seguro de que deseas eliminar la plantilla "${updatedTemplate.name}"? Esta acción no se puede deshacer.`)) {
+                    onDelete(updatedTemplate.id);
+                  }
+                }}
+              >
+                <Trash className="h-4 w-4 text-red-500" />
+              </Button>
+            )}
+          </div>
         )}
       </TableCell>
     </TableRow>
