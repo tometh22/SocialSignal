@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Role, InsertRole, 
   Personnel, InsertPersonnel, 
-  ReportTemplate, InsertReportTemplate 
+  ReportTemplate, InsertReportTemplate,
+  TemplateRoleAssignment, InsertTemplateRoleAssignment
 } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, UserCog, FileText, Settings, Users2, Pencil } from "lucide-react";
+import { PlusCircle, Edit, UserCog, FileText, Settings, Users2, Pencil, Trash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ui/loader";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -101,6 +102,14 @@ export default function Admin() {
 
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
+  });
+  
+  // Solo se usa cuando se abre el diálogo de asignación de roles
+  const { data: templateRoleAssignments, isLoading: templateRoleAssignmentsLoading } = useQuery<(TemplateRoleAssignment & { role: Role })[]>({
+    queryKey: [
+      currentTemplate ? `/api/template-roles/${currentTemplate.id}/with-roles` : null,
+    ],
+    enabled: !!currentTemplate && assignRolesDialogOpen,
   });
 
   // Role form
@@ -357,6 +366,65 @@ export default function Admin() {
       });
     },
   });
+  
+  // Añadir asignación de rol a plantilla
+  const createTemplateRoleAssignmentMutation = useMutation({
+    mutationFn: (data: InsertTemplateRoleAssignment) => 
+      apiRequest("POST", "/api/template-roles", data),
+    onSuccess: (response) => {
+      response.json().then(newAssignment => {
+        // Actualizar la caché local
+        if (currentTemplate) {
+          queryClient.invalidateQueries({ 
+            queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+          });
+        }
+        
+        toast({
+          title: "Éxito",
+          description: "Rol asignado correctamente a la plantilla.",
+        });
+        
+        // Resetear el formulario
+        templateRoleForm.reset({
+          roleId: roles && roles.length > 0 ? roles[0].id : 0,
+          hours: 0
+        });
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo asignar el rol a la plantilla.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Eliminar asignación de rol a plantilla
+  const deleteTemplateRoleAssignmentMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/template-roles/${id}`),
+    onSuccess: (_, id) => {
+      // Actualizar la caché local
+      if (currentTemplate) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/template-roles/${currentTemplate.id}/with-roles`] 
+        });
+      }
+      
+      toast({
+        title: "Éxito",
+        description: "Rol eliminado correctamente de la plantilla.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el rol de la plantilla.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Open dialogs
   const openNewRoleDialog = () => {
@@ -428,6 +496,31 @@ export default function Admin() {
     setIsEditing(true);
     setTemplateDialogOpen(true);
   };
+  
+  // Template role assignment form
+  const templateRoleForm = useForm<TemplateRoleFormValues>({
+    resolver: zodResolver(templateRoleSchema),
+    defaultValues: {
+      roleId: 0,
+      hours: 0
+    }
+  });
+  
+  const openAssignRolesDialog = (template: ReportTemplate) => {
+    templateRoleForm.reset({
+      roleId: roles && roles.length > 0 ? roles[0].id : 0,
+      hours: 0
+    });
+    setCurrentTemplate(template);
+    setAssignRolesDialogOpen(true);
+    
+    // Obtener las asignaciones de roles existentes para esta plantilla
+    if (template) {
+      queryClient.prefetchQuery({
+        queryKey: [`/api/template-roles/${template.id}/with-roles`],
+      });
+    }
+  };
 
   // Handle form submissions
   const onRoleSubmit = (values: RoleFormValues) => {
@@ -452,6 +545,17 @@ export default function Admin() {
     } else {
       createTemplateMutation.mutate(values);
     }
+  };
+  
+  // Manejar añadir asignación de rol a plantilla
+  const onTemplateRoleSubmit = (values: TemplateRoleFormValues) => {
+    if (!currentTemplate) return;
+    
+    createTemplateRoleAssignmentMutation.mutate({
+      templateId: currentTemplate.id,
+      roleId: values.roleId,
+      hours: values.hours.toString() // La API espera un string para las horas
+    });
   };
 
   // Find role name by ID
@@ -993,6 +1097,144 @@ export default function Admin() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Role Assignment Dialog */}
+      <Dialog open={assignRolesDialogOpen} onOpenChange={setAssignRolesDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Asignar Roles y Horas para {currentTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              Configura los roles estándar y cantidad de horas para esta plantilla de reporte.
+              Estos roles serán recomendados automáticamente al crear una nueva cotización 
+              con esta plantilla.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <h3 className="text-sm font-medium mb-2">Roles Asignados Actualmente</h3>
+            
+            {templateRoleAssignmentsLoading ? (
+              <div className="flex justify-center py-4">
+                <Loader variant="gradient" size="sm" text="Cargando roles asignados" />
+              </div>
+            ) : !templateRoleAssignments || templateRoleAssignments.length === 0 ? (
+              <div className="text-center py-3 text-sm text-neutral-500 border rounded-md">
+                No hay roles asignados a esta plantilla.
+              </div>
+            ) : (
+              <div className="space-y-2 mb-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Horas Estándar</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {templateRoleAssignments.map(assignment => (
+                      <TableRow key={assignment.id}>
+                        <TableCell className="py-2">{assignment.role.name}</TableCell>
+                        <TableCell className="py-2">{assignment.hours} hrs</TableCell>
+                        <TableCell className="py-2 text-right">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
+                          >
+                            <Trash className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-medium mb-3">Asignar Nuevo Rol</h3>
+              
+              <Form {...templateRoleForm}>
+                <form onSubmit={templateRoleForm.handleSubmit(onTemplateRoleSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={templateRoleForm.control}
+                      name="roleId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rol</FormLabel>
+                          <Select 
+                            value={field.value.toString()} 
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un rol" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {roles?.map(role => (
+                                <SelectItem key={role.id} value={role.id.toString()}>
+                                  {role.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={templateRoleForm.control}
+                      name="hours"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Horas Estándar</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="1" 
+                              placeholder="0" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      type="button" 
+                      onClick={() => setAssignRolesDialogOpen(false)}
+                    >
+                      Cerrar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={createTemplateRoleAssignmentMutation.isPending}
+                    >
+                      {createTemplateRoleAssignmentMutation.isPending ? (
+                        <>
+                          <Loader size="sm" variant="dots" className="mr-2" />
+                          Asignando...
+                        </>
+                      ) : (
+                        <>Asignar Rol</>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
