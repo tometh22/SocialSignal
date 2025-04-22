@@ -763,6 +763,12 @@ export default function Admin() {
     });
     setIsEditing(true);
     setCurrentTemplate(template);
+    
+    // Pre-cargar los roles asignados a esta plantilla
+    queryClient.prefetchQuery({
+      queryKey: [`/api/template-roles/${template.id}/with-roles`],
+    });
+    
     setTemplateDialogOpen(true);
   };
   
@@ -1069,14 +1075,6 @@ export default function Admin() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  onClick={() => openAssignRolesDialog(template)}
-                                >
-                                  <Users2 className="h-4 w-4 mr-1" />
-                                  Roles
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
                                   onClick={() => openEditTemplateDialog(template)}
                                 >
                                   <Pencil className="h-4 w-4 mr-1" />
@@ -1309,180 +1307,433 @@ export default function Admin() {
 
       {/* Template Dialog */}
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Editar Plantilla" : "Añadir Plantilla de Reporte"}</DialogTitle>
             <DialogDescription>
               {isEditing 
-                ? "Actualiza los detalles de la plantilla de reporte a continuación."
+                ? "Actualiza los detalles de la plantilla de reporte y gestiona sus roles."
                 : "Crea una nueva plantilla de reporte para cotizaciones."}
             </DialogDescription>
           </DialogHeader>
           
-          <Form {...templateForm}>
-            <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
-              <FormField
-                control={templateForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre de la Plantilla</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Análisis de Sentimiento Mensual" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={templateForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descripción</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Breve descripción de la plantilla" 
-                        className="resize-none" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={templateForm.control}
-                  name="complexity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Complejidad</FormLabel>
-                      <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                      >
+          <Tabs defaultValue="details" className="mt-4">
+            <TabsList>
+              <TabsTrigger value="details">Detalles Generales</TabsTrigger>
+              {isEditing && currentTemplate && (
+                <TabsTrigger value="roles">Roles y Costos</TabsTrigger>
+              )}
+            </TabsList>
+            
+            <TabsContent value="details">
+              <Form {...templateForm}>
+                <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
+                  <FormField
+                    control={templateForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre de la Plantilla</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona la complejidad" />
-                          </SelectTrigger>
+                          <Input placeholder="Ej: Análisis de Sentimiento Mensual" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={templateForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descripción</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Breve descripción de la plantilla" 
+                            className="resize-none" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={templateForm.control}
+                      name="complexity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Complejidad</FormLabel>
+                          <Select 
+                            value={field.value} 
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona la complejidad" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="low">Baja</SelectItem>
+                              <SelectItem value="medium">Media</SelectItem>
+                              <SelectItem value="high">Alta</SelectItem>
+                              <SelectItem value="variable">Variable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={templateForm.control}
+                      name="pageRange"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rango de Páginas</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ej: 10-15" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={templateForm.control}
+                    name="features"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Características</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Lista de características o elementos principales" 
+                            className="resize-none" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Enumera las características principales separadas por comas o líneas nuevas.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={templateForm.control}
+                      name="platformCost"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Costo de Plataformas (USD)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01" 
+                              min="0" 
+                              placeholder="0.00" 
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Costo adicional por uso de plataformas
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={templateForm.control}
+                      name="deviationPercentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Porcentaje de Desvío (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="1" 
+                              min="0" 
+                              max="100"
+                              placeholder="0" 
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Porcentaje adicional para contingencias
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="submit" 
+                      disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                    >
+                      {createTemplateMutation.isPending || updateTemplateMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isEditing ? "Actualizar..." : "Crear..."}
+                        </>
+                      ) : (
+                        isEditing ? "Actualizar Detalles" : "Crear Plantilla"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </TabsContent>
+            
+            {isEditing && currentTemplate && (
+              <TabsContent value="roles" className="py-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Roles Asignados a la Plantilla</h3>
+                    
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-slate-500">Ordenar por:</span>
+                      <Select
+                        defaultValue="horas"
+                        onValueChange={(value) => {
+                          const sortedData = [...(templateRoleAssignments || [])];
+                          
+                          if (value === "horas") {
+                            sortedData.sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours));
+                          } else if (value === "costo") {
+                            sortedData.sort((a, b) => 
+                              (parseFloat(b.hours) * b.role.defaultRate) - 
+                              (parseFloat(a.hours) * a.role.defaultRate)
+                            );
+                          } else if (value === "rol") {
+                            sortedData.sort((a, b) => 
+                              a.role.name.localeCompare(b.role.name)
+                            );
+                          }
+                          
+                          queryClient.setQueryData<(TemplateRoleAssignment & { role: Role })[]>(
+                            [`/api/template-roles/${currentTemplate.id}/with-roles`],
+                            sortedData
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-24">
+                          <SelectValue placeholder="Ordenar" />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">Baja</SelectItem>
-                          <SelectItem value="medium">Media</SelectItem>
-                          <SelectItem value="high">Alta</SelectItem>
-                          <SelectItem value="variable">Variable</SelectItem>
+                          <SelectItem value="horas">Horas</SelectItem>
+                          <SelectItem value="costo">Costo</SelectItem>
+                          <SelectItem value="rol">Rol</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={templateForm.control}
-                  name="pageRange"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rango de Páginas</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ej: 10-15" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={templateForm.control}
-                name="features"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Características</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Lista de características o elementos principales" 
-                        className="resize-none" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Enumera las características principales separadas por comas o líneas nuevas.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={templateForm.control}
-                  name="platformCost"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Costo de Plataformas (USD)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          min="0" 
-                          placeholder="0.00" 
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Costo adicional por uso de plataformas
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={templateForm.control}
-                  name="deviationPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Porcentaje de Desvío (%)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="1" 
-                          min="0" 
-                          max="100"
-                          placeholder="0" 
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Porcentaje adicional para contingencias
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <DialogFooter>
-                <Button 
-                  type="submit" 
-                  disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
-                >
-                  {createTemplateMutation.isPending || updateTemplateMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isEditing ? "Actualizando..." : "Creando..."}
-                    </>
+                    </div>
+                  </div>
+                  
+                  {templateRoleAssignmentsLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader variant="gradient" size="sm" text="Cargando roles..." />
+                    </div>
+                  ) : !templateRoleAssignments || templateRoleAssignments.length === 0 ? (
+                    <div className="text-center py-3 text-sm text-neutral-500 border rounded-md">
+                      No hay roles asignados a esta plantilla.
+                    </div>
                   ) : (
-                    isEditing ? "Actualizar Plantilla" : "Añadir Plantilla"
+                    <div className="space-y-4">
+                      <div className="max-h-[250px] overflow-y-auto border rounded-md">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Rol</TableHead>
+                              <TableHead>Horas Estándar</TableHead>
+                              <TableHead>Tarifa por Hora</TableHead>
+                              <TableHead>Costo Estándar</TableHead>
+                              <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {templateRoleAssignments.map(assignment => (
+                              <TableRow key={assignment.id}>
+                                <TableCell className="py-2">{assignment.role.name}</TableCell>
+                                <TableCell className="py-2">{assignment.hours} hrs</TableCell>
+                                <TableCell className="py-2">${assignment.role.defaultRate.toFixed(2)}</TableCell>
+                                <TableCell className="py-2 font-medium">
+                                  ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
+                                </TableCell>
+                                <TableCell className="py-2 text-right">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
+                                  >
+                                    <Trash className="h-3.5 w-3.5 text-red-500" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      
+                      <div className="p-3 border rounded-md bg-slate-50 space-y-2">
+                        {/* Mostrar costos de personal */}
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm">Costo de Personal:</div>
+                          <div className="text-base">
+                            ${templateRoleAssignments.reduce((acc, assignment) => 
+                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)} USD
+                          </div>
+                        </div>
+                        
+                        {/* Mostrar costo de plataformas */}
+                        {currentTemplate && currentTemplate.platformCost && currentTemplate.platformCost > 0 && (
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm">Costo de Plataformas:</div>
+                            <div className="text-base">${currentTemplate.platformCost.toFixed(2)} USD</div>
+                          </div>
+                        )}
+                        
+                        {/* Subtotal antes de desvío */}
+                        <div className="flex justify-between items-center text-slate-700 pt-1 border-t mt-1">
+                          <div className="text-sm font-medium">Subtotal:</div>
+                          <div className="text-base font-medium">
+                            ${(templateRoleAssignments.reduce((acc, assignment) => 
+                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                              (currentTemplate?.platformCost || 0)).toFixed(2)} USD
+                          </div>
+                        </div>
+                        
+                        {/* Mostrar desvío si es mayor que cero */}
+                        {currentTemplate && currentTemplate.deviationPercentage && currentTemplate.deviationPercentage > 0 && (
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm">Desvío ({currentTemplate.deviationPercentage}%):</div>
+                            <div className="text-base">
+                              ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                (currentTemplate?.platformCost || 0)) * 
+                                (currentTemplate.deviationPercentage / 100)).toFixed(2)} USD
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Total final */}
+                        <div className="flex justify-between items-center pt-1 border-t mt-1">
+                          <div className="font-medium">Costo Total Estándar:</div>
+                          <div className="text-lg font-bold">
+                            ${((templateRoleAssignments.reduce((acc, assignment) => 
+                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                              (currentTemplate?.platformCost || 0)) * 
+                              (1 + ((currentTemplate?.deviationPercentage || 0) / 100))).toFixed(2)} USD
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                  
+                  <div className="border-t pt-4 mt-4">
+                    <h3 className="text-sm font-medium mb-3">Agregar Nuevo Rol</h3>
+                    
+                    <Form {...templateRoleForm}>
+                      <form onSubmit={templateRoleForm.handleSubmit(onTemplateRoleSubmit)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={templateRoleForm.control}
+                            name="roleId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Rol</FormLabel>
+                                <Select 
+                                  value={field.value.toString()} 
+                                  onValueChange={(value) => field.onChange(parseInt(value))}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecciona un rol" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {roles?.map(role => (
+                                      <SelectItem key={role.id} value={role.id.toString()}>
+                                        {role.name} (${role.defaultRate.toFixed(2)}/hr)
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={templateRoleForm.control}
+                            name="hours"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Horas Estándar</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    min="0" 
+                                    step="1" 
+                                    placeholder="0" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && currentTemplate && (
+                          <div className="p-3 border rounded-md bg-slate-50">
+                            <div className="text-sm font-medium mb-2">Vista previa de costos:</div>
+                            
+                            {/* Costo del rol a agregar */}
+                            <div className="flex justify-between items-center mt-1">
+                              <div className="text-sm text-slate-600">
+                                {roles.find(r => r.id === templateRoleForm.watch("roleId"))?.name || "Rol seleccionado"} 
+                                &times; {templateRoleForm.watch("hours")} horas
+                              </div>
+                              <div className="text-right">
+                                <span className="font-medium text-base">
+                                  ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
+                                    templateRoleForm.watch("hours")).toFixed(2)}
+                                </span>
+                                <span className="text-sm text-slate-600 ml-1">USD</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-end mt-4">
+                          <Button 
+                            type="submit" 
+                            disabled={createTemplateRoleAssignmentMutation.isPending}
+                          >
+                            {createTemplateRoleAssignmentMutation.isPending ? (
+                              <>
+                                <Loader size="sm" variant="dots" className="mr-2" />
+                                Agregando...
+                              </>
+                            ) : (
+                              <>Agregar Rol</>
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
         </DialogContent>
       </Dialog>
 
