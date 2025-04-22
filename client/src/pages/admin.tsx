@@ -47,13 +47,22 @@ import { Loader } from "@/components/ui/loader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
+  BadgeDollarSign,
+  Calculator,
+  Clock,
+  DollarSign,
   FileText, 
+  Info,
+  LayoutGrid,
   Loader2, 
   Pencil, 
+  Plus,
   PlusCircle, 
   Settings, 
   Trash, 
   UserCog, 
+  UserPlus,
+  Users,
   Users2 
 } from "lucide-react";
 import { InlineEditRole } from "@/components/admin/inline-edit-role";
@@ -1307,254 +1316,423 @@ export default function Admin() {
                 <form onSubmit={templateForm.handleSubmit(onTemplateSubmit)} className="space-y-4">
                   {/* Mostrar resumen de costos cuando se está editando */}
                   {isEditing && currentTemplate && (
-                    <div className="p-3 bg-slate-50 rounded-md border mb-4">
-                      <h3 className="text-sm font-medium mb-2">Resumen de Costos</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-xs font-medium text-slate-500 mb-1">Composición del Equipo</h4>
-                          <RoleSummary templateId={currentTemplate.id} showCosts={true} />
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-xs font-medium text-slate-500 mb-1">Desglose de Costos</h4>
-                          <div className="space-y-1 text-sm">
-                            {/* Cargando si no tenemos los datos aún */}
-                            {templateRoleAssignmentsLoading ? (
-                              <div className="text-center py-2">
-                                <Loader2 className="h-4 w-4 animate-spin inline mr-1" />
-                                Calculando...
+                    <div className="mb-6">
+                      <Card className="bg-gradient-to-br from-slate-50 to-blue-50 border-blue-100">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center text-blue-700">
+                            <BadgeDollarSign className="h-5 w-5 mr-2" /> 
+                            Resumen Financiero
+                          </CardTitle>
+                          <CardDescription>
+                            Información de costos para la plantilla "{currentTemplate.name}"
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-medium text-slate-700 flex items-center">
+                                <Users className="h-4 w-4 mr-2 text-blue-600" />
+                                Composición del Equipo
+                              </h4>
+                              <div className="bg-white rounded-md p-3 border border-blue-100 shadow-sm">
+                                <RoleSummary templateId={currentTemplate.id} showCosts={true} />
                               </div>
-                            ) : templateRoleAssignments && (
-                              <>
-                                {/* Costo de personal */}
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Personal:</span>
-                                  <span className="font-medium">
-                                    ${templateRoleAssignments.reduce((acc, assignment) => 
-                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)}
-                                  </span>
-                                </div>
-                                
-                                {/* Costo de plataformas */}
-                                <div className="flex justify-between">
-                                  <span className="text-slate-600">Plataformas:</span>
-                                  <span className="font-medium">
-                                    ${(currentTemplate.platformCost || 0).toFixed(2)}
-                                  </span>
-                                </div>
-                                
-                                {/* Subtotal */}
-                                <div className="flex justify-between pt-1 border-t">
-                                  <span className="font-medium">Subtotal:</span>
-                                  <span className="font-medium">
-                                    ${(templateRoleAssignments.reduce((acc, assignment) => 
-                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                      (currentTemplate.platformCost || 0)).toFixed(2)}
-                                  </span>
-                                </div>
-                                
-                                {/* Desvío */}
-                                {(currentTemplate.deviationPercentage || 0) > 0 && (
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-600">Desvío ({currentTemplate.deviationPercentage || 0}%):</span>
-                                    <span className="font-medium">
-                                      ${((templateRoleAssignments.reduce((acc, assignment) => 
-                                        acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                        (currentTemplate.platformCost || 0)) * 
-                                        ((currentTemplate.deviationPercentage || 0) / 100)).toFixed(2)}
-                                    </span>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-medium text-slate-700 flex items-center">
+                                <Calculator className="h-4 w-4 mr-2 text-blue-600" />
+                                Desglose de Costos
+                              </h4>
+                              
+                              <div className="bg-white rounded-md p-4 border border-blue-100 shadow-sm">
+                                {/* Cargando si no tenemos los datos aún */}
+                                {templateRoleAssignmentsLoading ? (
+                                  <div className="text-center py-6">
+                                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                                    <p className="text-sm text-slate-600">Calculando costos...</p>
+                                  </div>
+                                ) : templateRoleAssignments && (
+                                  <div className="space-y-3">
+                                    {/* Costo de personal */}
+                                    <div className="flex justify-between items-center pb-2 border-b border-dashed">
+                                      <div className="flex items-center text-slate-700">
+                                        <Users className="h-4 w-4 mr-2 text-slate-500" />
+                                        <span>Personal</span>
+                                      </div>
+                                      <span className="font-medium">
+                                        ${templateRoleAssignments.reduce((acc, assignment) => 
+                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Costo de plataformas */}
+                                    <div className="flex justify-between items-center pb-2 border-b border-dashed">
+                                      <div className="flex items-center text-slate-700">
+                                        <LayoutGrid className="h-4 w-4 mr-2 text-slate-500" />
+                                        <span>Plataformas</span>
+                                      </div>
+                                      <span className="font-medium">
+                                        ${(currentTemplate.platformCost || 0).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Subtotal */}
+                                    <div className="flex justify-between items-center pt-1 pb-2 font-medium">
+                                      <span>Subtotal</span>
+                                      <span>
+                                        ${(templateRoleAssignments.reduce((acc, assignment) => 
+                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                          (currentTemplate.platformCost || 0)).toFixed(2)}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Desvío */}
+                                    {(currentTemplate.deviationPercentage || 0) > 0 && (
+                                      <div className="flex justify-between items-center text-purple-700 pb-2 border-b border-dashed">
+                                        <div className="flex items-center">
+                                          <BadgeDollarSign className="h-4 w-4 mr-2" />
+                                          <span>Desvío ({currentTemplate.deviationPercentage || 0}%)</span>
+                                        </div>
+                                        <span className="font-medium">
+                                          ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                            acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                            (currentTemplate.platformCost || 0)) * 
+                                            ((currentTemplate.deviationPercentage || 0) / 100)).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Total */}
+                                    <div className="flex justify-between items-center pt-2 pb-1 border-t">
+                                      <span className="font-semibold text-blue-800">Total Final</span>
+                                      <span className="font-bold text-lg text-blue-800">
+                                        ${((templateRoleAssignments.reduce((acc, assignment) => 
+                                          acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
+                                          (currentTemplate.platformCost || 0)) * 
+                                          (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)}
+                                      </span>
+                                    </div>
                                   </div>
                                 )}
-                                
-                                {/* Total */}
-                                <div className="flex justify-between pt-1 border-t">
-                                  <span className="font-medium">Total:</span>
-                                  <span className="font-medium text-lg">
-                                    ${((templateRoleAssignments.reduce((acc, assignment) => 
-                                      acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                      (currentTemplate.platformCost || 0)) * 
-                                      (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)}
-                                  </span>
-                                </div>
-                              </>
-                            )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </CardContent>
+                      </Card>
                     </div>
                   )}
-                  <FormField
-                    control={templateForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre de la Plantilla</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ej: Análisis de Sentimiento Mensual" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={templateForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descripción</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Breve descripción de la plantilla" 
-                            className="resize-none" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={templateForm.control}
-                      name="complexity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Complejidad</FormLabel>
-                          <Select 
-                            value={field.value} 
-                            onValueChange={field.onChange}
-                          >
+                  <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center">
+                        <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                        Información General
+                      </CardTitle>
+                      <CardDescription>
+                        Datos básicos de la plantilla de reporte
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <FormField
+                        control={templateForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-medium text-slate-700">Nombre de la Plantilla</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecciona la complejidad" />
-                              </SelectTrigger>
+                              <div className="relative">
+                                <Input 
+                                  placeholder="Ej: Análisis de Sentimiento Mensual" 
+                                  className="bg-white pl-10"
+                                  {...field} 
+                                />
+                                <FileText className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                              </div>
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="low">Baja</SelectItem>
-                              <SelectItem value="medium">Media</SelectItem>
-                              <SelectItem value="high">Alta</SelectItem>
-                              <SelectItem value="variable">Variable</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={templateForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-medium text-slate-700">Descripción</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Breve descripción de la plantilla" 
+                                className="resize-none bg-white min-h-24" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={templateForm.control}
+                          name="complexity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="font-medium text-slate-700">Complejidad</FormLabel>
+                              <Select 
+                                value={field.value} 
+                                onValueChange={field.onChange}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="bg-white">
+                                    <SelectValue placeholder="Selecciona la complejidad" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="low">Baja</SelectItem>
+                                  <SelectItem value="medium">Media</SelectItem>
+                                  <SelectItem value="high">Alta</SelectItem>
+                                  <SelectItem value="variable">Variable</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={templateForm.control}
+                          name="pageRange"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="font-medium text-slate-700">Rango de Páginas</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    placeholder="Ej: 10-15" 
+                                    className="bg-white pl-10"
+                                    {...field} 
+                                  />
+                                  <FileText className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <FormField
+                        control={templateForm.control}
+                        name="features"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="font-medium text-slate-700">Características</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Lista de características o elementos principales" 
+                                className="resize-none bg-white min-h-24"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Enumera las características principales separadas por comas o líneas nuevas.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
                     
-                    <FormField
-                      control={templateForm.control}
-                      name="pageRange"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Rango de Páginas</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ej: 10-15" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center">
+                        <BadgeDollarSign className="h-4 w-4 mr-2 text-blue-600" />
+                        Configuración de Costos
+                      </CardTitle>
+                      <CardDescription>
+                        Ajustes de costos adicionales para esta plantilla
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                          control={templateForm.control}
+                          name="platformCost"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="font-medium text-slate-700">Costo de Plataformas (USD)</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0" 
+                                    placeholder="0.00" 
+                                    className="bg-white pl-10"
+                                    {...field}
+                                  />
+                                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                </div>
+                              </FormControl>
+                              <FormDescription>
+                                Costo adicional por uso de plataformas de análisis
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={templateForm.control}
+                          name="deviationPercentage"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="font-medium text-slate-700">Porcentaje de Desvío (%)</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input 
+                                    type="number" 
+                                    step="1" 
+                                    min="0" 
+                                    max="100"
+                                    placeholder="0" 
+                                    className="bg-white pl-10"
+                                    {...field}
+                                  />
+                                  <BadgeDollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                </div>
+                              </FormControl>
+                              <FormDescription>
+                                Porcentaje adicional para contingencias
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
                   
-                  <FormField
-                    control={templateForm.control}
-                    name="features"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Características</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Lista de características o elementos principales" 
-                            className="resize-none" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Enumera las características principales separadas por comas o líneas nuevas.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={templateForm.control}
-                      name="platformCost"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Costo de Plataformas (USD)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              min="0" 
-                              placeholder="0.00" 
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Costo adicional por uso de plataformas
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={templateForm.control}
-                      name="deviationPercentage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Porcentaje de Desvío (%)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="1" 
-                              min="0" 
-                              max="100"
-                              placeholder="0" 
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Porcentaje adicional para contingencias
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <DialogFooter>
+                  <div className="flex justify-end">
                     <Button 
                       type="submit" 
                       disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                      className="px-6 py-5 rounded-lg shadow-md transition-all hover:shadow-lg"
+                      size="lg"
                     >
                       {createTemplateMutation.isPending || updateTemplateMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {isEditing ? "Actualizar..." : "Crear..."}
-                        </>
+                        <div className="flex items-center">
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          <span>{isEditing ? "Actualizando..." : "Creando..."}</span>
+                        </div>
                       ) : (
-                        isEditing ? "Actualizar Detalles" : "Crear Plantilla"
+                        <div className="flex items-center">
+                          {isEditing ? (
+                            <>
+                              <Pencil className="mr-2 h-5 w-5" />
+                              <span>Guardar Cambios</span>
+                            </>
+                          ) : (
+                            <>
+                              <PlusCircle className="mr-2 h-5 w-5" />
+                              <span>Crear Plantilla</span>
+                            </>
+                          )}
+                        </div>
                       )}
                     </Button>
-                  </DialogFooter>
+                  </div>
                 </form>
               </Form>
             </TabsContent>
             
             {isEditing && currentTemplate && (
               <TabsContent value="roles" className="py-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium">Roles Asignados a la Plantilla</h3>
+                <div className="space-y-6">
+                  {/* Tarjetas de resumen financiero */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100">
+                      <CardContent className="p-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-blue-600">
+                            <Users className="h-5 w-5 mr-2" />
+                            <h3 className="text-sm font-medium">Costo de Personal</h3>
+                          </div>
+                          <div className="text-2xl font-bold text-blue-700">
+                            ${templateRoleAssignmentsLoading ? (
+                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                            ) : templateRoleAssignments?.reduce(
+                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                              0
+                            ).toFixed(2)} USD
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                     
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-slate-500">Ordenar por:</span>
+                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-100">
+                      <CardContent className="p-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-emerald-600">
+                            <LayoutGrid className="h-5 w-5 mr-2" />
+                            <h3 className="text-sm font-medium">Subtotal (con plataformas)</h3>
+                          </div>
+                          <div className="text-2xl font-bold text-emerald-700">
+                            ${templateRoleAssignmentsLoading ? (
+                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                            ) : (templateRoleAssignments?.reduce(
+                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                              0
+                            ) + (currentTemplate.platformCost || 0)).toFixed(2)} USD
+                          </div>
+                          {(currentTemplate.platformCost || 0) > 0 && (
+                            <div className="text-xs text-emerald-600">
+                              <span className="font-medium">Incluye:</span> ${(currentTemplate.platformCost || 0).toFixed(2)} USD de plataformas
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 border-purple-100">
+                      <CardContent className="p-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center text-purple-600">
+                            <BadgeDollarSign className="h-5 w-5 mr-2" />
+                            <h3 className="text-sm font-medium">Costo Total Final</h3>
+                          </div>
+                          <div className="text-2xl font-bold text-purple-700">
+                            ${templateRoleAssignmentsLoading ? (
+                              <Loader2 className="h-4 w-4 inline animate-spin mr-1" />
+                            ) : ((templateRoleAssignments?.reduce(
+                              (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
+                              0
+                            ) + (currentTemplate.platformCost || 0)) * 
+                              (1 + ((currentTemplate.deviationPercentage || 0) / 100))).toFixed(2)} USD
+                          </div>
+                          {(currentTemplate.deviationPercentage || 0) > 0 && (
+                            <div className="text-xs text-fuchsia-600">
+                              Incluye {currentTemplate.deviationPercentage}% de desvío
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {/* Header con título y ordenamiento */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-800">Roles Asignados</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Configura el equipo de trabajo para esta plantilla
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-md">
+                      <span className="text-xs font-medium text-slate-600 px-2">Ordenar por:</span>
                       <Select
                         defaultValue="horas"
                         onValueChange={(value) => {
@@ -1579,7 +1757,7 @@ export default function Admin() {
                           );
                         }}
                       >
-                        <SelectTrigger className="h-8 w-24">
+                        <SelectTrigger className="h-8 w-28 bg-white">
                           <SelectValue placeholder="Ordenar" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1591,235 +1769,234 @@ export default function Admin() {
                     </div>
                   </div>
                   
+                  {/* Lista de roles agrupados */}
                   {templateRoleAssignmentsLoading ? (
-                    <div className="flex justify-center py-4">
-                      <Loader variant="gradient" size="sm" text="Cargando roles..." />
-                    </div>
+                    <Card>
+                      <CardContent className="flex justify-center py-8">
+                        <Loader variant="gradient" size="sm" text="Cargando roles..." />
+                      </CardContent>
+                    </Card>
                   ) : !templateRoleAssignments || templateRoleAssignments.length === 0 ? (
-                    <div className="text-center py-3 text-sm text-neutral-500 border rounded-md">
-                      No hay roles asignados a esta plantilla.
-                    </div>
+                    <Card className="border-dashed bg-slate-50">
+                      <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                        <Users2 className="h-12 w-12 text-slate-300 mb-4" />
+                        <h3 className="text-lg font-medium mb-1">Sin roles asignados</h3>
+                        <p className="text-sm text-slate-500 max-w-sm mb-4">
+                          Esta plantilla no tiene roles asignados. Añade roles para estimar el costo del proyecto.
+                        </p>
+                      </CardContent>
+                    </Card>
                   ) : (
-                    <div className="space-y-4">
-                      <div className="max-h-[250px] overflow-y-auto border rounded-md">
-                        {/* Agrupar roles por tipo */}
-                        {(() => {
-                          // Crear grupos de roles
-                          const roleGroups: Record<string, (TemplateRoleAssignment & { role: Role })[]> = {};
-                          
-                          templateRoleAssignments.forEach(assignment => {
-                            const roleName = assignment.role.name;
-                            if (!roleGroups[roleName]) {
-                              roleGroups[roleName] = [];
-                            }
-                            roleGroups[roleName].push(assignment);
-                          });
-                          
-                          return (
-                            <div className="p-2 space-y-4">
-                              {Object.entries(roleGroups).map(([roleName, assignments]) => (
-                                <div key={roleName} className="space-y-2">
-                                  <div className="font-medium border-b pb-1">
-                                    {roleName} {assignments.length > 1 && `(${assignments.length})`}
-                                  </div>
-                                  
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="py-1">Horas</TableHead>
-                                        <TableHead className="py-1">Tarifa</TableHead>
-                                        <TableHead className="py-1">Costo</TableHead>
-                                        <TableHead className="py-1 text-right">Acciones</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {assignments.map(assignment => (
-                                        <TableRow key={assignment.id}>
-                                          <TableCell className="py-1">{assignment.hours} hrs</TableCell>
-                                          <TableCell className="py-1">${assignment.role.defaultRate.toFixed(2)}</TableCell>
-                                          <TableCell className="py-1 font-medium">
-                                            ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
-                                          </TableCell>
-                                          <TableCell className="py-1 text-right">
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm"
-                                              onClick={() => deleteTemplateRoleAssignmentMutation.mutate(assignment.id)}
-                                            >
-                                              <Trash className="h-3.5 w-3.5 text-red-500" />
-                                            </Button>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                      
-                                      {/* Subtotal por grupo */}
-                                      <TableRow>
-                                        <TableCell colSpan={2} className="text-right font-medium py-1">
-                                          Subtotal:
-                                        </TableCell>
-                                        <TableCell colSpan={2} className="font-medium py-1">
-                                          ${assignments.reduce((total, a) => 
-                                            total + (parseFloat(a.hours) * a.role.defaultRate), 0).toFixed(2)}
-                                        </TableCell>
-                                      </TableRow>
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      
-                      <div className="p-3 border rounded-md bg-slate-50 space-y-2">
-                        {/* Mostrar costos de personal */}
-                        <div className="flex justify-between items-center">
-                          <div className="text-sm">Costo de Personal:</div>
-                          <div className="text-base">
-                            ${templateRoleAssignments.reduce((acc, assignment) => 
-                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0).toFixed(2)} USD
-                          </div>
-                        </div>
+                    <div className="grid gap-4">
+                      {(() => {
+                        // Crear grupos de roles
+                        const roleGroups: Record<string, (TemplateRoleAssignment & { role: Role })[]> = {};
                         
-                        {/* Mostrar costo de plataformas */}
-                        {currentTemplate && currentTemplate.platformCost && currentTemplate.platformCost > 0 && (
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm">Costo de Plataformas:</div>
-                            <div className="text-base">${currentTemplate.platformCost.toFixed(2)} USD</div>
-                          </div>
-                        )}
+                        templateRoleAssignments.forEach(assignment => {
+                          const roleName = assignment.role.name;
+                          if (!roleGroups[roleName]) {
+                            roleGroups[roleName] = [];
+                          }
+                          roleGroups[roleName].push(assignment);
+                        });
                         
-                        {/* Subtotal antes de desvío */}
-                        <div className="flex justify-between items-center text-slate-700 pt-1 border-t mt-1">
-                          <div className="text-sm font-medium">Subtotal:</div>
-                          <div className="text-base font-medium">
-                            ${(templateRoleAssignments.reduce((acc, assignment) => 
-                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                              (currentTemplate?.platformCost || 0)).toFixed(2)} USD
-                          </div>
-                        </div>
-                        
-                        {/* Mostrar desvío si es mayor que cero */}
-                        {currentTemplate && currentTemplate.deviationPercentage && currentTemplate.deviationPercentage > 0 && (
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm">Desvío ({currentTemplate.deviationPercentage}%):</div>
-                            <div className="text-base">
-                              ${((templateRoleAssignments.reduce((acc, assignment) => 
-                                acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                                (currentTemplate?.platformCost || 0)) * 
-                                (currentTemplate.deviationPercentage / 100)).toFixed(2)} USD
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Total final */}
-                        <div className="flex justify-between items-center pt-1 border-t mt-1">
-                          <div className="font-medium">Costo Total Estándar:</div>
-                          <div className="text-lg font-bold">
-                            ${((templateRoleAssignments.reduce((acc, assignment) => 
-                              acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
-                              (currentTemplate?.platformCost || 0)) * 
-                              (1 + ((currentTemplate?.deviationPercentage || 0) / 100))).toFixed(2)} USD
-                          </div>
-                        </div>
-                      </div>
+                        return Object.entries(roleGroups).map(([roleName, assignments]) => (
+                          <Card key={roleName} className="overflow-hidden">
+                            <CardHeader className="bg-slate-50 py-3 px-4 border-b">
+                              <CardTitle className="text-base font-medium flex items-center">
+                                <span>{roleName}</span>
+                                {assignments.length > 1 && (
+                                  <Badge variant="outline" className="ml-2">
+                                    {assignments.length}
+                                  </Badge>
+                                )}
+                              </CardTitle>
+                            </CardHeader>
+                            
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-1/3">Horas</TableHead>
+                                  <TableHead className="w-1/3">Tarifa</TableHead>
+                                  <TableHead className="w-1/3">Costo</TableHead>
+                                  <TableHead className="w-0 text-right">Acciones</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {assignments.map(assignment => (
+                                  <TableRow key={assignment.id}>
+                                    <TableCell className="font-medium">
+                                      <div className="flex items-center">
+                                        <Clock className="h-3.5 w-3.5 mr-2 text-slate-400" />
+                                        {assignment.hours} hrs
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center">
+                                        <DollarSign className="h-3.5 w-3.5 mr-2 text-slate-400" />
+                                        ${assignment.role.defaultRate.toFixed(2)}/hr
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      <div className="flex items-center">
+                                        <Calculator className="h-3.5 w-3.5 mr-2 text-slate-400" />
+                                        ${(parseFloat(assignment.hours) * assignment.role.defaultRate).toFixed(2)}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                        onClick={() => {
+                                          if (window.confirm(`¿Estás seguro de que deseas eliminar el rol ${assignment.role.name} de esta plantilla?`)) {
+                                            deleteTemplateRoleAssignmentMutation.mutate(assignment.id);
+                                          }
+                                        }}
+                                      >
+                                        <Trash className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                
+                                {assignments.length > 1 && (
+                                  <TableRow className="bg-slate-50/50">
+                                    <TableCell colSpan={2} className="text-right font-medium">
+                                      Subtotal:
+                                    </TableCell>
+                                    <TableCell colSpan={2} className="font-semibold">
+                                      ${assignments.reduce((total, a) => 
+                                        total + (parseFloat(a.hours) * a.role.defaultRate), 0).toFixed(2)} USD
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </Card>
+                        ));
+                      })()}
                     </div>
                   )}
                   
-                  <div className="border-t pt-4 mt-4">
-                    <h3 className="text-sm font-medium mb-3">Agregar Nuevo Rol</h3>
-                    
-                    <Form {...templateRoleForm}>
-                      <form onSubmit={templateRoleForm.handleSubmit(onTemplateRoleSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={templateRoleForm.control}
-                            name="roleId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Rol</FormLabel>
-                                <Select 
-                                  value={field.value.toString()} 
-                                  onValueChange={(value) => field.onChange(parseInt(value))}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Selecciona un rol" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {roles?.map(role => (
-                                      <SelectItem key={role.id} value={role.id.toString()}>
-                                        {role.name} (${role.defaultRate.toFixed(2)}/hr)
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={templateRoleForm.control}
-                            name="hours"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Horas Estándar</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    min="0" 
-                                    step="1" 
-                                    placeholder="0" 
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && currentTemplate && (
-                          <div className="p-3 border rounded-md bg-slate-50">
-                            <div className="text-sm font-medium mb-2">Vista previa de costos:</div>
+                  {/* Agregar Rol - UI mejorada */}
+                  <Card className="mt-6">
+                    <CardHeader className="py-3 px-4 border-b">
+                      <CardTitle className="text-base font-medium flex items-center">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Agregar Nuevo Rol
+                      </CardTitle>
+                      <CardDescription>
+                        Configura un nuevo rol para esta plantilla de reporte
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="py-4">
+                      <Form {...templateRoleForm}>
+                        <form onSubmit={templateRoleForm.handleSubmit(onTemplateRoleSubmit)} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={templateRoleForm.control}
+                              name="roleId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">Rol</FormLabel>
+                                  <Select 
+                                    value={field.value.toString()} 
+                                    onValueChange={(value) => field.onChange(parseInt(value))}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger className="h-10">
+                                        <SelectValue placeholder="Selecciona un rol" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {roles?.map(role => (
+                                        <SelectItem key={role.id} value={role.id.toString()}>
+                                          {role.name} (${role.defaultRate.toFixed(2)}/hr)
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                             
-                            {/* Costo del rol a agregar */}
-                            <div className="flex justify-between items-center mt-1">
-                              <div className="text-sm text-slate-600">
-                                {roles.find(r => r.id === templateRoleForm.watch("roleId"))?.name || "Rol seleccionado"} 
-                                &times; {templateRoleForm.watch("hours")} horas
-                              </div>
-                              <div className="text-right">
-                                <span className="font-medium text-base">
-                                  ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
-                                    templateRoleForm.watch("hours")).toFixed(2)}
-                                </span>
-                                <span className="text-sm text-slate-600 ml-1">USD</span>
-                              </div>
-                            </div>
+                            <FormField
+                              control={templateRoleForm.control}
+                              name="hours"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">Horas Estándar</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Input 
+                                        type="number" 
+                                        min="0" 
+                                        step="1" 
+                                        placeholder="0" 
+                                        className="pl-8 h-10"
+                                        {...field} 
+                                      />
+                                      <Clock className="absolute left-2.5 top-3 h-4 w-4 text-slate-400" />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
-                        )}
-                        
-                        <div className="flex justify-end mt-4">
-                          <Button 
-                            type="submit" 
-                            disabled={createTemplateRoleAssignmentMutation.isPending}
-                          >
-                            {createTemplateRoleAssignmentMutation.isPending ? (
-                              <>
-                                <Loader size="sm" variant="dots" className="mr-2" />
-                                Agregando...
-                              </>
-                            ) : (
-                              <>Agregar Rol</>
-                            )}
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </div>
+                          
+                          {templateRoleForm.watch("roleId") > 0 && templateRoleForm.watch("hours") > 0 && roles && currentTemplate && (
+                            <Card className="border-dotted border-blue-200 bg-blue-50">
+                              <CardContent className="py-3 px-4">
+                                <div className="flex items-center text-sm mb-2">
+                                  <Info className="h-4 w-4 mr-2 text-blue-500" />
+                                  <span className="font-medium text-blue-700">Vista previa de costos</span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center mt-2">
+                                  <div className="text-sm text-slate-600 flex items-center">
+                                    <Users className="h-3.5 w-3.5 mr-2" />
+                                    {roles.find(r => r.id === templateRoleForm.watch("roleId"))?.name || "Rol seleccionado"} 
+                                    <span className="mx-1">×</span> 
+                                    {templateRoleForm.watch("hours")} horas
+                                  </div>
+                                  <div className="font-medium">
+                                    <span className="text-lg">
+                                      ${((roles.find(r => r.id === templateRoleForm.watch("roleId"))?.defaultRate || 0) * 
+                                        templateRoleForm.watch("hours")).toFixed(2)}
+                                    </span>
+                                    <span className="text-sm text-slate-500 ml-1">USD</span>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )}
+                          
+                          <div className="flex justify-end pt-2">
+                            <Button 
+                              type="submit" 
+                              className="gap-2"
+                              disabled={createTemplateRoleAssignmentMutation.isPending}
+                            >
+                              {createTemplateRoleAssignmentMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Agregando...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4" />
+                                  <span>Agregar Rol</span>
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </CardContent>
+                  </Card>
                 </div>
               </TabsContent>
             )}
