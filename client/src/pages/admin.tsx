@@ -59,6 +59,7 @@ import {
 import { InlineEditRole } from "@/components/admin/inline-edit-role";
 import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 import { RoleSummary } from "@/components/admin/role-summary";
+import { TemplateCost } from "@/components/admin/template-cost";
 
 import { 
   InsertPersonnel, 
@@ -1034,17 +1035,16 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="py-3">{template.pageRange}</TableCell>
                             <TableCell className="py-3">
-                              <div className="flex flex-col gap-1">
-                                {/* Resumen de equipo sin mostrar costos */}
-                                <RoleSummary templateId={template.id} showCosts={false} />
+                              <div className="space-y-1">
+                                {/* Mostramos "Cargando..." mientras esperamos los datos */}
+                                <TemplateCost templateId={template.id} platformCost={template.platformCost || 0} deviationPercentage={template.deviationPercentage || 0} />
                                 
-                                {/* Información adicional sin mostrar costos */}
-                                {((template.platformCost || 0) > 0 || (template.deviationPercentage || 0) > 0) && (
-                                  <div className="border-t pt-1 mt-1 text-slate-600 text-sm">
-                                    {(template.platformCost || 0) > 0 && <div>Incluye costos de plataformas</div>}
-                                    {(template.deviationPercentage || 0) > 0 && <div>Incluye {template.deviationPercentage}% de desvío</div>}
-                                  </div>
-                                )}
+                                
+                                {/* Información adicional más compacta */}
+                                <div className="text-xs text-slate-500">
+                                  {(template.platformCost || 0) > 0 && <span className="inline-block mr-2">Plataformas</span>}
+                                  {(template.deviationPercentage || 0) > 0 && <span>Desvío {template.deviationPercentage}%</span>}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="py-3 text-right">
@@ -1356,12 +1356,12 @@ export default function Admin() {
                                 {/* Desvío */}
                                 {(currentTemplate.deviationPercentage || 0) > 0 && (
                                   <div className="flex justify-between">
-                                    <span className="text-slate-600">Desvío ({currentTemplate.deviationPercentage}%):</span>
+                                    <span className="text-slate-600">Desvío ({currentTemplate.deviationPercentage || 0}%):</span>
                                     <span className="font-medium">
                                       ${((templateRoleAssignments.reduce((acc, assignment) => 
                                         acc + (parseFloat(assignment.hours) * assignment.role.defaultRate), 0) + 
                                         (currentTemplate.platformCost || 0)) * 
-                                        (currentTemplate.deviationPercentage / 100)).toFixed(2)}
+                                        ((currentTemplate.deviationPercentage || 0) / 100)).toFixed(2)}
                                     </span>
                                   </div>
                                 )}
