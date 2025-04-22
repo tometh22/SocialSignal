@@ -327,43 +327,139 @@ export default function Admin() {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: (template: InsertReportTemplate) => apiRequest("POST", "/api/templates", template),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      toast({
-        title: "Success",
-        description: "Report template has been created successfully.",
+    mutationFn: async (template: InsertReportTemplate) => {
+      const response = await apiRequest("POST", "/api/templates", template);
+      if (!response.ok) {
+        throw new Error("Failed to create template");
+      }
+      return response.json();
+    },
+    onMutate: async (newTemplateData) => {
+      // Cancelar consultas en curso
+      await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
+      
+      // Guardar el estado anterior
+      const previousTemplates = queryClient.getQueryData<ReportTemplate[]>(["/api/templates"]);
+      
+      // Crear un ID temporal para la optimización de UI (será reemplazado al recibir la respuesta real)
+      const tempId = Date.now();
+      const optimisticTemplate: ReportTemplate = {
+        id: tempId,
+        ...newTemplateData,
+      };
+      
+      // Actualizar la caché con el nuevo template optimista
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => 
+        old ? [...old, optimisticTemplate] : [optimisticTemplate]
+      );
+      
+      return { previousTemplates, tempId };
+    },
+    onSuccess: (data, variables, context) => {
+      // Actualizar la caché con el template real (reemplazando el temporal)
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
+        if (!old) return [data];
+        
+        // Filtrar el template temporal y añadir el real
+        return old
+          .filter(template => template.id !== context?.tempId)
+          .concat(data);
       });
+      
+      toast({
+        title: "Éxito",
+        description: "Plantilla de reporte creada correctamente.",
+      });
+      
       setTemplateDialogOpen(false);
       templateForm.reset();
     },
-    onError: () => {
+    onError: (err, newTemplate, context) => {
+      console.error("Error al crear plantilla:", err);
+      
+      // Revertir al estado anterior en caso de error
+      if (context?.previousTemplates) {
+        queryClient.setQueryData(["/api/templates"], context.previousTemplates);
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create report template.",
+        description: "No se pudo crear la plantilla de reporte.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Refrescar datos del servidor independientemente del resultado
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
   });
 
   const updateTemplateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertReportTemplate> }) => 
-      apiRequest("PATCH", `/api/templates/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertReportTemplate> }) => {
+      const response = await apiRequest("PATCH", `/api/templates/${id}`, data);
+      if (!response.ok) {
+        throw new Error("Failed to update template");
+      }
+      return response.json();
+    },
+    onMutate: async ({ id, data }) => {
+      // Cancelar consultas en curso
+      await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
+      
+      // Guardar el estado anterior
+      const previousTemplates = queryClient.getQueryData<ReportTemplate[]>(["/api/templates"]);
+      
+      // Actualizar la caché con el template actualizado optimistamente
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
+        if (!old) return [];
+        
+        return old.map(template => 
+          template.id === id 
+            ? { ...template, ...data } 
+            : template
+        );
+      });
+      
+      return { previousTemplates };
+    },
+    onSuccess: (updatedTemplate) => {
+      // La caché ya está actualizada optimistamente, pero podemos asegurarnos
+      // de que los datos son correctos al actualizar con el resultado de la API
+      queryClient.setQueryData<ReportTemplate[]>(["/api/templates"], (old) => {
+        if (!old) return [updatedTemplate];
+        
+        return old.map(template => 
+          template.id === updatedTemplate.id 
+            ? updatedTemplate
+            : template
+        );
+      });
+      
       toast({
         title: "Éxito",
         description: "Plantilla de reporte actualizada correctamente.",
       });
+      
       setTemplateDialogOpen(false);
       templateForm.reset();
     },
-    onError: () => {
+    onError: (err, variables, context) => {
+      console.error("Error al actualizar plantilla:", err);
+      
+      // Revertir al estado anterior en caso de error
+      if (context?.previousTemplates) {
+        queryClient.setQueryData(["/api/templates"], context.previousTemplates);
+      }
+      
       toast({
         title: "Error",
         description: "No se pudo actualizar la plantilla de reporte.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Refrescar datos del servidor independientemente del resultado
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
   });
   
