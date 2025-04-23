@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { useQuoteContext } from "@/context/quote-context";
 import { TeamMember } from "@/context/quote-context";
 import { useQuery } from "@tanstack/react-query";
@@ -16,8 +17,17 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
     markupAmount,
     totalAmount,
     platformCost,
-    deviationPercentage
+    deviationPercentage,
+    calculateBaseCost,
+    calculateTotalCost
   } = useQuoteContext();
+  
+  // Asegurarnos de que los costos estén actualizados
+  useEffect(() => {
+    console.log("[BREAKDOWN] Ejecutando cálculo de costos en CostBreakdown");
+    calculateBaseCost();
+    calculateTotalCost();
+  }, [calculateBaseCost, calculateTotalCost, teamMembers]);
 
   // Get personnel and roles info
   const { data: allPersonnel } = useQuery<Personnel[]>({

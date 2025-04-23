@@ -266,12 +266,21 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                     setTeamMembers([]);
                     
                     // Agregar los nuevos roles 
+                    console.log("[DEBUGGING] Actualizando team members con:", newTeamMembers.length, "roles");
                     setTeamMembers(newTeamMembers);
+                    
+                    // Verificamos que el estado se ha actualizado correctamente
+                    setTimeout(() => {
+                      console.log("[DEBUGGING] Estado de teamMembers después de actualizar:", teamMembers.length);
+                    }, 100);
                     
                     console.log("Roles añadidos:", newTeamMembers);
                     
-                    // Recalcular costos
-                    calculateTotalCost();
+                    // Recalcular costos - ejecutar después que team members se haya actualizado
+                    setTimeout(() => {
+                      console.log("[DEBUGGING] Ejecutando cálculo de costos después de actualizar team members");
+                      calculateTotalCost();
+                    }, 200);
                     
                     toast({
                       title: "Roles Recomendados Aplicados",
