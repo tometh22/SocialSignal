@@ -52,6 +52,11 @@ export interface QuotationData {
   template: ReportTemplate | null;
   complexity: 'low' | 'medium' | 'high' | '';
   customization: string;
+  // Parámetros adicionales de configuración
+  analysisType: string;
+  mentionsVolume: string;
+  countriesCovered: string;
+  clientEngagement: string;
   // Paso 3: Equipo
   teamOption: 'auto' | 'manual';
   teamMembers: TeamMember[];
@@ -77,6 +82,11 @@ interface OptimizedQuoteContextType {
   updateTemplate: (template: ReportTemplate | null) => void;
   updateComplexity: (complexity: 'low' | 'medium' | 'high') => void;
   updateCustomization: (customization: string) => void;
+  // Métodos para configuración adicional
+  updateAnalysisType: (type: string) => void;
+  updateMentionsVolume: (volume: string) => void;
+  updateCountriesCovered: (countries: string) => void;
+  updateClientEngagement: (engagement: string) => void;
   // Métodos paso 3
   setTeamOption: (option: 'auto' | 'manual') => void;
   addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
@@ -110,6 +120,11 @@ const initialQuotationData: QuotationData = {
   template: null,
   complexity: '',
   customization: '',
+  // Valores por defecto para parámetros adicionales
+  analysisType: 'standard',
+  mentionsVolume: 'medium',
+  countriesCovered: '1',
+  clientEngagement: 'medium',
   teamOption: 'auto',
   teamMembers: [],
   financials: {
@@ -240,6 +255,23 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   const updateCustomization = useCallback((customization: string) => {
     setQuotationData(prev => ({...prev, customization}));
+  }, []);
+  
+  // Métodos para los parámetros adicionales de configuración
+  const updateAnalysisType = useCallback((type: string) => {
+    setQuotationData(prev => ({...prev, analysisType: type}));
+  }, []);
+  
+  const updateMentionsVolume = useCallback((volume: string) => {
+    setQuotationData(prev => ({...prev, mentionsVolume: volume}));
+  }, []);
+  
+  const updateCountriesCovered = useCallback((countries: string) => {
+    setQuotationData(prev => ({...prev, countriesCovered: countries}));
+  }, []);
+  
+  const updateClientEngagement = useCallback((engagement: string) => {
+    setQuotationData(prev => ({...prev, clientEngagement: engagement}));
   }, []);
 
   // Métodos para el Paso 3: Configuración del Equipo
