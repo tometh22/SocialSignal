@@ -213,7 +213,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               variant="outline" 
               className={cn(
                 "w-full py-6 border-dashed border-2",
-                selectedTemplateId === -1 && "bg-blue-50 border-blue-500 text-blue-700"
+                !selectedTemplateId && "bg-blue-50 border-blue-500 text-blue-700"
               )}
               onClick={() => {
                 // Usamos un ID especial como -1 para representar "Sin plantilla"
@@ -239,47 +239,46 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
             {templates?.map(template => (
-              <div
-                key={template.id}
-                className={cn(
-                  "card-select p-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 cursor-pointer",
-                  selectedTemplateId === template.id && "selected"
-                )}
-                onClick={() => updateReportTemplate(template.id)}
-              >
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <RadioGroupItem value={template.id.toString()} id={`template-${template.id}`} className="h-5 w-5" />
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <Label
-                      htmlFor={`template-${template.id}`}
-                      className="text-base font-medium text-neutral-800 cursor-pointer"
-                    >
-                      {template.name}
-                    </Label>
-                    <p className="text-sm text-neutral-600 mt-1">{template.description}</p>
-                    
-                    <div className="mt-3 flex items-center text-sm">
-                      {template.pageRange && (
-                        <span className="inline-flex items-center mr-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-                          {template.pageRange}
-                        </span>
-                      )}
-                      {template.features && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
-                          {template.features}
-                        </span>
-                      )}
-                    </div>
+            <div
+              key={template.id}
+              className={cn(
+                "card-select p-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 cursor-pointer",
+                selectedTemplateId === template.id && "selected"
+              )}
+              onClick={() => updateReportTemplate(template.id)}
+            >
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <RadioGroupItem value={template.id.toString()} id={`template-${template.id}`} className="h-5 w-5" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <Label
+                    htmlFor={`template-${template.id}`}
+                    className="text-base font-medium text-neutral-800 cursor-pointer"
+                  >
+                    {template.name}
+                  </Label>
+                  <p className="text-sm text-neutral-600 mt-1">{template.description}</p>
+                  
+                  <div className="mt-3 flex items-center text-sm">
+                    {template.pageRange && (
+                      <span className="inline-flex items-center mr-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
+                        {template.pageRange}
+                      </span>
+                    )}
+                    {template.features && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800">
+                        {template.features}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
-          </RadioGroup>
-        </div>
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
       )}
-      
       <div className="p-4 bg-neutral-100 rounded-lg mb-6">
         <h4 className="text-base font-medium text-neutral-800 mb-3">Personalización de Plantilla</h4>
         <p className="text-sm text-neutral-600 mb-3">Especifica cualquier requisito personalizado o modificación necesaria para la plantilla seleccionada.</p>
@@ -502,11 +501,11 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                       </td>
                     </tr>
                   )}
-                  {selectedTemplateId && selectedTemplateId > 0 && templates && (
+                  {selectedTemplateId && templates && (
                     <tr>
                       <td className="px-4 py-2 text-sm text-neutral-900">Plantilla</td>
                       <td className="px-4 py-2 text-sm text-neutral-900">
-                        {templates.find(t => t.id === selectedTemplateId)?.name || "Personalizado / Sin Plantilla"}
+                        {templates.find(t => t.id === selectedTemplateId)?.name}
                       </td>
                       <td className="px-4 py-2">
                         {complexityFactors.templateFactor > 0 && (
@@ -517,37 +516,27 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                       </td>
                     </tr>
                   )}
-                  {selectedTemplateId === -1 && (
-                    <tr>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Plantilla</td>
-                      <td className="px-4 py-2 text-sm text-neutral-900">Personalizado / Sin Plantilla</td>
-                      <td className="px-4 py-2">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Personalizado
-                        </span>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
           </div>
           
           <div className="lg:col-span-1">
-            <h4 className="text-base font-medium text-neutral-700 mb-3">Factores de Complejidad</h4>
-            <div className="h-64 bg-neutral-50 rounded-lg border border-neutral-200 p-2">
+            <h4 className="text-base font-medium text-neutral-700 mb-3">Distribución de Costos</h4>
+            <div className="bg-neutral-100 p-4 rounded-lg h-60">
               {getCostFactorsData().length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart width={400} height={300}>
+                  <PieChart>
                     <Pie
                       data={getCostFactorsData()}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
+                      outerRadius={50}
                       fill="#8884d8"
                       dataKey="value"
                       nameKey="name"
+                      labelLine={true}
+                      label
                     >
                       {getCostFactorsData().map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
