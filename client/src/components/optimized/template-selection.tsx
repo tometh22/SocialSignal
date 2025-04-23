@@ -248,7 +248,38 @@ const OptimizedTemplateSelection: React.FC = () => {
                       size="sm" 
                       variant="outline" 
                       className="mt-2 bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
-                      onClick={() => setSelectedTab('details')}
+                      onClick={() => {
+                        // Asegurarse de que el usuario configure estas variables
+                        setSelectedTab('details');
+                        
+                        // Mensaje temporal para informar al usuario sobre la importancia de estos parámetros
+                        setTimeout(() => {
+                          const messageContainer = document.createElement('div');
+                          messageContainer.className = 'fixed top-4 right-4 max-w-md p-4 bg-amber-50 border border-amber-200 rounded-lg shadow-md z-50';
+                          messageContainer.innerHTML = `
+                            <div class="flex items-start">
+                              <div class="text-amber-600 flex-shrink-0 mt-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M12 8v4m0 4h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z"></path>
+                                </svg>
+                              </div>
+                              <div class="ml-3">
+                                <h4 class="font-medium text-amber-800">Importante</h4>
+                                <p class="text-sm text-amber-700 mt-1">
+                                  Por favor, configura los parámetros de análisis, volumen, países e interacción. Estos afectan directamente al precio final.
+                                </p>
+                              </div>
+                            </div>
+                          `;
+                          document.body.appendChild(messageContainer);
+                          
+                          // Eliminar el mensaje después de 5 segundos
+                          setTimeout(() => {
+                            messageContainer.className += ' opacity-0 transition-opacity duration-500';
+                            setTimeout(() => document.body.removeChild(messageContainer), 500);
+                          }, 5000);
+                        }, 300);
+                      }}
                     >
                       Ir a Detalles y Ajustes
                     </Button>
@@ -441,8 +472,16 @@ const OptimizedTemplateSelection: React.FC = () => {
               </div>
               
               {/* Tipo de análisis */}
-              <div className="space-y-3">
-                <Label>Tipo de Análisis</Label>
+              <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <div className="flex items-center mb-2">
+                  <div className="bg-blue-100 p-1 rounded-full mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700">
+                      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                  </div>
+                  <Label className="font-medium text-blue-800">Tipo de Análisis *</Label>
+                </div>
                 <RadioGroup 
                   value={quotationData.analysisType} 
                   onValueChange={(value) => updateAnalysisType(value)}
@@ -452,29 +491,45 @@ const OptimizedTemplateSelection: React.FC = () => {
                     <RadioGroupItem value="basic" id="analysis-basic" />
                     <Label htmlFor="analysis-basic" className="cursor-pointer">
                       <span className="font-medium">Básico</span> - Análisis general sin profundidad
+                      <span className="ml-2 text-xs text-blue-600">(+0%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="standard" id="analysis-standard" />
                     <Label htmlFor="analysis-standard" className="cursor-pointer">
-                      <span className="font-medium">Estándar</span> - Análisis detallado con métricas completas
+                      <span className="font-medium">Estándar</span> - Análisis detallado con métricas completas 
+                      <span className="ml-2 text-xs text-blue-600">(+10%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="deep" id="analysis-deep" />
                     <Label htmlFor="analysis-deep" className="cursor-pointer">
                       <span className="font-medium">Avanzado</span> - Análisis profundo con metodologías especializadas
+                      <span className="ml-2 text-xs text-blue-600">(+15%)</span>
                     </Label>
                   </div>
                 </RadioGroup>
-                <div className="text-xs text-muted-foreground mt-1">
-                  El tipo de análisis afecta la complejidad y el costo del proyecto.
+                <div className="text-xs text-blue-600 mt-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                  </svg>
+                  El tipo de análisis determina la profundidad metodológica y afecta directamente al costo.
                 </div>
               </div>
               
               {/* Volumen de menciones */}
-              <div className="space-y-3">
-                <Label>Volumen de Menciones</Label>
+              <div className="space-y-3 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                <div className="flex items-center mb-2">
+                  <div className="bg-indigo-100 p-1 rounded-full mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-700">
+                      <path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"></path>
+                      <path d="m13 12-3 5h4l-3 5"></path>
+                    </svg>
+                  </div>
+                  <Label className="font-medium text-indigo-800">Volumen de Menciones *</Label>
+                </div>
                 <RadioGroup 
                   value={quotationData.mentionsVolume} 
                   onValueChange={(value) => updateMentionsVolume(value)}
@@ -484,32 +539,53 @@ const OptimizedTemplateSelection: React.FC = () => {
                     <RadioGroupItem value="small" id="volume-small" />
                     <Label htmlFor="volume-small" className="cursor-pointer">
                       <span className="font-medium">Pequeño</span> - Menos de 1,000 menciones
+                      <span className="ml-2 text-xs text-indigo-600">(+0%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="medium" id="volume-medium" />
                     <Label htmlFor="volume-medium" className="cursor-pointer">
                       <span className="font-medium">Medio</span> - Entre 1,000 y 10,000 menciones
+                      <span className="ml-2 text-xs text-indigo-600">(+10%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="large" id="volume-large" />
                     <Label htmlFor="volume-large" className="cursor-pointer">
                       <span className="font-medium">Grande</span> - Entre 10,000 y 50,000 menciones
+                      <span className="ml-2 text-xs text-indigo-600">(+20%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="xlarge" id="volume-xlarge" />
                     <Label htmlFor="volume-xlarge" className="cursor-pointer">
                       <span className="font-medium">Extra grande</span> - Más de 50,000 menciones
+                      <span className="ml-2 text-xs text-indigo-600">(+30%)</span>
                     </Label>
                   </div>
                 </RadioGroup>
+                <div className="text-xs text-indigo-600 mt-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                  </svg>
+                  Mayor volumen implica más tiempo de procesamiento y análisis, afectando al precio.
+                </div>
               </div>
               
               {/* Países cubiertos */}
-              <div className="space-y-3">
-                <Label>Países Cubiertos</Label>
+              <div className="space-y-3 bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                <div className="flex items-center mb-2">
+                  <div className="bg-emerald-100 p-1 rounded-full mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-700">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                      <path d="M2 12h20"></path>
+                    </svg>
+                  </div>
+                  <Label className="font-medium text-emerald-800">Países Cubiertos *</Label>
+                </div>
                 <RadioGroup 
                   value={quotationData.countriesCovered} 
                   onValueChange={(value) => updateCountriesCovered(value)}
@@ -519,32 +595,52 @@ const OptimizedTemplateSelection: React.FC = () => {
                     <RadioGroupItem value="1" id="countries-1" />
                     <Label htmlFor="countries-1" className="cursor-pointer">
                       <span className="font-medium">Un país</span> - Análisis local
+                      <span className="ml-2 text-xs text-emerald-600">(+0%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="2-5" id="countries-2-5" />
                     <Label htmlFor="countries-2-5" className="cursor-pointer">
                       <span className="font-medium">2-5 países</span> - Análisis regional
+                      <span className="ml-2 text-xs text-emerald-600">(+5%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="6-10" id="countries-6-10" />
                     <Label htmlFor="countries-6-10" className="cursor-pointer">
                       <span className="font-medium">6-10 países</span> - Análisis multirregional
+                      <span className="ml-2 text-xs text-emerald-600">(+15%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="10+" id="countries-10+" />
                     <Label htmlFor="countries-10+" className="cursor-pointer">
                       <span className="font-medium">Más de 10 países</span> - Análisis global
+                      <span className="ml-2 text-xs text-emerald-600">(+25%)</span>
                     </Label>
                   </div>
                 </RadioGroup>
+                <div className="text-xs text-emerald-600 mt-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                  </svg>
+                  Más países requieren análisis multilingüe y herramientas adicionales, incrementando el costo.
+                </div>
               </div>
               
               {/* Interacción con cliente */}
-              <div className="space-y-3">
-                <Label>Nivel de Interacción con Cliente</Label>
+              <div className="space-y-3 bg-purple-50 p-4 rounded-lg border border-purple-100">
+                <div className="flex items-center mb-2">
+                  <div className="bg-purple-100 p-1 rounded-full mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-700">
+                      <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"></path>
+                      <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path>
+                    </svg>
+                  </div>
+                  <Label className="font-medium text-purple-800">Nivel de Interacción con Cliente *</Label>
+                </div>
                 <RadioGroup 
                   value={quotationData.clientEngagement} 
                   onValueChange={(value) => updateClientEngagement(value)}
@@ -554,21 +650,32 @@ const OptimizedTemplateSelection: React.FC = () => {
                     <RadioGroupItem value="low" id="engagement-low" />
                     <Label htmlFor="engagement-low" className="cursor-pointer">
                       <span className="font-medium">Bajo</span> - Interacción mínima, entrega de informe final
+                      <span className="ml-2 text-xs text-purple-600">(+0%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="medium" id="engagement-medium" />
                     <Label htmlFor="engagement-medium" className="cursor-pointer">
                       <span className="font-medium">Medio</span> - Reuniones periódicas y ajustes
+                      <span className="ml-2 text-xs text-purple-600">(+5%)</span>
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="high" id="engagement-high" />
                     <Label htmlFor="engagement-high" className="cursor-pointer">
                       <span className="font-medium">Alto</span> - Interacción constante, ajustes frecuentes, sesiones de trabajo
+                      <span className="ml-2 text-xs text-purple-600">(+15%)</span>
                     </Label>
                   </div>
                 </RadioGroup>
+                <div className="text-xs text-purple-600 mt-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 16v-4"></path>
+                    <path d="M12 8h.01"></path>
+                  </svg>
+                  Mayor nivel de interacción significa más tiempo de consultoría y revisiones, aumentando el costo.
+                </div>
               </div>
 
               {/* Customización */}
