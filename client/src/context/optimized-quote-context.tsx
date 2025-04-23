@@ -567,8 +567,14 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       return;
     }
     
-    // Si estamos en el paso 2 (detalles y ajustes), validar que todos los parámetros estén configurados
+    // Si estamos en el paso 2 (selección de plantilla y configuración), validar que se seleccionó una plantilla y se configuraron parámetros
     if (currentStep === 2) {
+      // Verificar que se seleccionó una plantilla
+      if (!quotationData.template) {
+        alert("Debe seleccionar una plantilla antes de continuar.");
+        return;
+      }
+      
       // Verificar que todos los parámetros obligatorios estén configurados
       if (!quotationData.analysisType) {
         alert("Debe seleccionar un tipo de análisis antes de continuar.");
