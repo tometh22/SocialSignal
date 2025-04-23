@@ -22,7 +22,7 @@ const OptimizedBasicInfo: React.FC = () => {
   });
 
   // Consultar tipos de proyecto
-  const { data: projectTypes, isLoading: isLoadingProjectTypes } = useQuery<string[]>({
+  const { data: projectTypes, isLoading: isLoadingProjectTypes } = useQuery<{value: string, label: string}[]>({
     queryKey: ['/api/options/project-types'],
   });
 
@@ -83,8 +83,8 @@ const OptimizedBasicInfo: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {projectTypes?.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
+              <SelectItem key={type.value} value={type.value}>
+                {type.label}
               </SelectItem>
             ))}
           </SelectContent>
