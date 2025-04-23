@@ -31,10 +31,20 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
     updateReportTemplate,
     updateTemplateCustomization,
     addRecommendedRoles,
+    calculateBaseCost,
     calculateTotalCost,
     complexityFactors,
     quotationData
   } = useQuoteContext();
+  
+  // Calcular costos cuando cambian los miembros del equipo
+  useEffect(() => {
+    console.log("[TEMPLATES] Recalculando costos en ReportTemplates");
+    if (teamMembers.length > 0) {
+      calculateBaseCost();
+      calculateTotalCost();
+    }
+  }, [teamMembers, calculateBaseCost, calculateTotalCost]);
 
   // Get templates from API
   const { data: originalTemplates } = useQuery<ReportTemplate[]>({
@@ -249,8 +259,8 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                         return;
                       }
                       
-                      // Usar 40 horas por defecto
-                      const hours = 40;
+                      // Usar 40 horas por defecto - un valor más alto para asegurar que el costo sea visible
+                      const hours = 80;
                       
                       newTeamMembers.push({
                         id: uuidv4(),

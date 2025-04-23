@@ -304,7 +304,9 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Calculate base cost from team members
   const calculateBaseCost = useCallback(() => {
+    console.log("[COST-DEBUG] Calculando costo base desde:", teamMembers.length, "miembros del equipo");
     const total = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+    console.log("[COST-DEBUG] Costo base calculado:", total);
     setBaseCost(total);
     return total;
   }, [teamMembers]);
