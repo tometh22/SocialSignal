@@ -377,7 +377,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   }
                 }
               }}
-              className="flex items-center bg-blue-500 border-blue-200 text-white hover:bg-blue-600"
+              className="flex items-center bg-blue-600 border-blue-300 text-white hover:bg-blue-700 shadow-sm font-medium"
             >
               <span className="mr-1">✓</span>
               Usar {recommendedRoleIds && recommendedRoleIds.length > 0 
@@ -385,7 +385,11 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                 : 0} Roles Recomendados
             </Button>
             
-            <Button type="button" onClick={handleContinue} className="flex items-center">
+            <Button 
+              type="button" 
+              onClick={handleContinue} 
+              className="flex items-center bg-primary text-white hover:bg-primary/90 font-medium"
+            >
               Continuar
               <span className="ml-1">→</span>
             </Button>

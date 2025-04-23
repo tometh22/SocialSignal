@@ -504,7 +504,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
               <Button
                 type="button"
                 variant="outline"
-                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                className="bg-blue-600 border-blue-300 text-white hover:bg-blue-700 shadow-sm font-medium"
                 onClick={() => {
                   console.log("[TEST] Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
                   
@@ -593,7 +593,11 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                 Aplicar {recommendedRoleIds.length} Roles Recomendados
               </Button>
             )}
-            <Button type="button" onClick={handleContinue} className="flex items-center">
+            <Button 
+              type="button" 
+              onClick={handleContinue} 
+              className="flex items-center bg-primary text-white hover:bg-primary/90 font-medium"
+            >
               Continuar
               <span className="ml-1">→</span>
             </Button>
