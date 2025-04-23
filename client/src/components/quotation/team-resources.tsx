@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import CostBreakdown from "./cost-breakdown";
 import { cn } from "@/lib/utils";
+import { v4 as uuidv4 } from "uuid";
 
 export default function TeamResources({ onPrevious, onNext }: { onPrevious: () => void; onNext: () => void }) {
   const { toast } = useToast();
@@ -504,12 +505,64 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                 variant="outline"
                 className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                 onClick={() => {
-                  addRecommendedRoles();
-                  toast({
-                    title: "Roles Recomendados Añadidos",
-                    description: `Se han añadido ${recommendedRoleIds.length} roles recomendados a tu equipo.`,
-                  });
-                  calculateTotalCost();
+                  console.log("Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
+                  
+                  try {
+                    // Creamos aplicación directa de roles para evitar problemas
+                    // de asincronía en la función original
+                    if (roles && selectedTemplateId) {
+                      // Primero, limpiar roles existentes
+                      setTeamMembers([]);
+                      
+                      // Obtener roles únicos (sin duplicados)
+                      const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
+                      console.log("Roles únicos a añadir:", uniqueRoleIds);
+                      
+                      // Para cada rol, añadirlo directamente
+                      let newTeamMembers = [];
+                      
+                      uniqueRoleIds.forEach(roleId => {
+                        const role = roles.find(r => r.id === roleId);
+                        if (role) {
+                          // Horas predeterminadas para cada rol
+                          const hours = 40;
+                          
+                          newTeamMembers.push({
+                            id: uuidv4(),
+                            roleId: role.id,
+                            personnelId: null,
+                            hours: hours,
+                            rate: role.defaultRate,
+                            cost: hours * role.defaultRate
+                          });
+                        }
+                      });
+                      
+                      console.log("Nuevos miembros del equipo:", newTeamMembers);
+                      
+                      // Establecer los miembros del equipo
+                      setTeamMembers(newTeamMembers);
+                      
+                      // Recalcular costos
+                      setTimeout(() => {
+                        calculateTotalCost();
+                      }, 100);
+                    } else {
+                      console.error("Faltan roles o plantilla seleccionada");
+                    }
+                    
+                    toast({
+                      title: "Roles Recomendados Añadidos",
+                      description: `Se han añadido ${recommendedRoleIds.length} roles recomendados a tu equipo.`,
+                    });
+                  } catch (error) {
+                    console.error("Error al aplicar roles recomendados:", error);
+                    toast({
+                      title: "Error al aplicar roles",
+                      description: "Ocurrió un error al aplicar los roles recomendados",
+                      variant: "destructive"
+                    });
+                  }
                 }}
               >
                 <span className="mr-1">✓</span>
