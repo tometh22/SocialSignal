@@ -458,6 +458,9 @@ const OptimizedTemplateSelection: React.FC = () => {
                     </Label>
                   </div>
                 </RadioGroup>
+                <div className="text-xs text-muted-foreground mt-1">
+                  El tipo de análisis afecta la complejidad y el costo del proyecto.
+                </div>
               </div>
               
               {/* Volumen de menciones */}

@@ -156,16 +156,31 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   const complexityFactors = useMemo((): ComplexityFactors => {
     // Derivar factores de complejidad en base a los datos actuales
     return {
-      analysisTypeFactor: quotationData.complexity === 'high' ? 0.2 : 
-                         quotationData.complexity === 'medium' ? 0.1 : 0,
-      mentionsVolumeFactor: quotationData.project.duration === 'long' ? 0.15 :
-                           quotationData.project.duration === 'medium' ? 0.1 : 0.05,
-      countriesFactor: 0,
-      clientEngagementFactor: 0,
+      // Factor de complejidad general del proyecto
+      analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
+      
+      // Factor de volumen de menciones
+      mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
+      
+      // Factor de países cubiertos
+      countriesFactor: getCountriesFactor(quotationData.countriesCovered),
+      
+      // Factor de interacción con el cliente
+      clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
+      
+      // Factor de complejidad de la plantilla
       templateFactor: quotationData.template?.complexity === 'high' ? 0.25 :
                      quotationData.template?.complexity === 'medium' ? 0.15 : 0.05,
     };
-  }, [quotationData.complexity, quotationData.project.duration, quotationData.template]);
+  }, [
+    quotationData.complexity, 
+    quotationData.project.duration, 
+    quotationData.template,
+    quotationData.analysisType,
+    quotationData.mentionsVolume,
+    quotationData.countriesCovered,
+    quotationData.clientEngagement
+  ]);
 
   // Métodos para el Paso 1: Información Básica
   const updateClient = useCallback((client: Client | null) => {
@@ -208,6 +223,23 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       template,
       teamMembers: [] // Limpiar equipos anteriores
     }));
+    
+    // Establecer la complejidad por separado, si hay una plantilla
+    if (template) {
+      // Determinar el valor de complejidad basado en la plantilla
+      let newComplexity: 'low' | 'medium' | 'high' = 'medium';
+      if (template.complexity === 'high') {
+        newComplexity = 'high';
+      } else if (template.complexity === 'low') {
+        newComplexity = 'low';
+      }
+      
+      // Actualizar la complejidad
+      setQuotationData(prev => ({
+        ...prev,
+        complexity: newComplexity
+      }));
+    }
 
     // Reiniciar los roleIds recomendados
     setRecommendedRoleIds([]);
