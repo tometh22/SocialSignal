@@ -166,6 +166,9 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Actualizamos la plantilla seleccionada
     setSelectedTemplateId(templateId);
     
+    // Reiniciamos el costo base ya que el equipo está vacío ahora
+    setBaseCost(0);
+    
     // Update template complexity factor
     if (templates && roles) {
       const template = templates.find(t => t.id === templateId);
@@ -261,6 +264,9 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     // Al cambiar la opción, reseteamos el equipo para empezar de nuevo
     setTeamMembers([]);
+    
+    // Reiniciamos el costo base ya que el equipo está vacío ahora
+    setBaseCost(0);
     
     // Cuando cambiamos a opción por equipo, debemos reflejar correctamente
     // que se usarán tarifas personalizadas por miembro en lugar de tarifas estándar
@@ -476,6 +482,12 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             console.log(`Se añadieron ${addedRoleCount} roles al equipo (${addedMembers.length} entradas)`);
             
             // Recalcular los costos después de añadir los roles
+            // Primero calculamos costo base para asegurar que tenga valor correcto
+            const newBaseCost = addedMembers.reduce((sum, member) => sum + member.cost, 0);
+            setBaseCost(newBaseCost);
+            console.log("[COST] Costo base actualizado:", newBaseCost);
+            
+            // Luego calculamos costo total
             setTimeout(() => {
               calculateTotalCost();
             }, 100);
@@ -515,6 +527,14 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (addedMembers.length > 0) {
               setTeamMembers(addedMembers);
               console.log(`Se añadieron ${addedMembers.length} roles al equipo (modo recuperación)`);
+              
+              // Recalcular costos después de añadir los roles en modo recuperación
+              const newBaseCost = addedMembers.reduce((sum, member) => sum + member.cost, 0);
+              setBaseCost(newBaseCost);
+              
+              setTimeout(() => {
+                calculateTotalCost();
+              }, 100);
             } else if (templates) {
               const template = templates.find(t => t.id === selectedTemplateId);
               if (template) {
@@ -613,6 +633,12 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       
       console.log(`Se añadieron ${roleIdsToUse.length} roles predeterminados al equipo`);
+      
+      // Recalcular costos después de añadir roles predeterminados
+      setTimeout(() => {
+        calculateBaseCost();
+        calculateTotalCost();
+      }, 100);
     } catch (error) {
       console.error("Error al generar roles predeterminados:", error);
       
@@ -631,6 +657,12 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }]);
         
         console.log("Se añadió un rol de emergencia al equipo:", role.name);
+        
+        // Recalcular costos después de añadir el rol de emergencia
+        setTimeout(() => {
+          calculateBaseCost();
+          calculateTotalCost();
+        }, 100);
       }
     }
   };
