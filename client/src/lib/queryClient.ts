@@ -8,14 +8,34 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
-  url: string,
+  methodOrUrl: string,
+  urlOrData?: string | unknown,
   data?: unknown | undefined,
-): Promise<Response> {
+): Promise<Response | any> {
+  // Detectar tipo de uso
+  const isOldStyleUsage = urlOrData !== undefined && typeof urlOrData === 'string';
+  
+  // Manejar caso cuando se llama con un solo argumento (la URL)
+  if (!isOldStyleUsage && arguments.length === 1) {
+    const url = methodOrUrl;
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    
+    await throwIfResNotOk(res);
+    return res.json();
+  }
+  
+  // Manejar caso de uso tradicional con 2-3 argumentos
+  const method = methodOrUrl;
+  const url = urlOrData as string;
+  const bodyData = data;
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    headers: bodyData ? { "Content-Type": "application/json" } : {},
+    body: bodyData ? JSON.stringify(bodyData) : undefined,
     credentials: "include",
   });
 

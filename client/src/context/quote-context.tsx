@@ -172,12 +172,11 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }));
         
         // Actualizar costos y desviación de la plantilla
-        if (template.platformCost !== undefined) {
-          setPlatformCost(template.platformCost);
-        }
-        if (template.deviationPercentage !== undefined) {
-          setDeviationPercentage(template.deviationPercentage);
-        }
+        const platformCost = typeof template.platformCost === 'number' ? template.platformCost : 0;
+        const deviationPercentage = typeof template.deviationPercentage === 'number' ? template.deviationPercentage : 0;
+        
+        setPlatformCost(platformCost);
+        setDeviationPercentage(deviationPercentage);
         
         try {
           // Cargar las asignaciones de roles para esta plantilla desde la API
@@ -350,147 +349,45 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Función para añadir roles recomendados al equipo basado en la plantilla seleccionada
   const addRecommendedRoles = useCallback(() => {
-    console.log("Añadiendo roles recomendados:", recommendedRoleIds);
-    
-    // Siempre limpiamos roles existentes al añadir los recomendados
-    setTeamMembers([]);
-    
-    if (!roles || !selectedTemplateId) {
-      console.log("No hay roles disponibles o no se ha seleccionado plantilla");
-      return;
-    }
-    
-    // Si no hay roles recomendados, verificamos la plantilla y configuramos recomendaciones basadas en complejidad
-    if (recommendedRoleIds.length === 0 && templates) {
-      const template = templates.find(t => t.id === selectedTemplateId);
-      if (template) {
-        console.log("No hay roles recomendados, generando basados en complejidad:", template.complexity);
-        
-        // Buscar roles por nombre en lugar de usar IDs fijos
-        const analistaId = roles.find(r => r.name.toLowerCase().includes("analista") && r.name.toLowerCase().includes("senior"))?.id;
-        const cientificoId = roles.find(r => r.name.toLowerCase().includes("data") || r.name.toLowerCase().includes("científico"))?.id;
-        const especialistaId = roles.find(r => r.name.toLowerCase().includes("contenido") || r.name.toLowerCase().includes("content"))?.id;
-        const gerenteId = roles.find(r => r.name.toLowerCase().includes("gerente") || r.name.toLowerCase().includes("manager"))?.id;
-        
-        // Crear array con los IDs encontrados (excluyendo undefined)
-        const roleIds = [analistaId, cientificoId, especialistaId, gerenteId].filter(id => id !== undefined) as number[];
-        
-        // Asignar según la complejidad
-        let generatedRoleIds: number[] = [];
-        if (template.complexity === "high") {
-          // Para informes complejos, recomendamos todos los roles disponibles
-          generatedRoleIds = roleIds;
-        } else if (template.complexity === "medium") {
-          // Para informes medianos, excluimos algunos roles
-          generatedRoleIds = roleIds.slice(0, 3);  // Usar los primeros 3 roles
-        } else {
-          // Para informes básicos, solo los roles principales
-          generatedRoleIds = roleIds.slice(0, 2);  // Usar los primeros 2 roles
-        }
-        
-        // Usar estos roles generados si no hay roles recomendados
-        if (generatedRoleIds.length > 0) {
-          console.log("Usando roles generados basados en complejidad:", generatedRoleIds);
-          
-          // Añadir estos roles al equipo con horas predeterminadas
-          generatedRoleIds.forEach(roleId => {
-            const role = roles.find(r => r.id === roleId);
-            if (role) {
-              const newMember = {
-                roleId: role.id,
-                personnelId: null,
-                hours: 10, // Horas predeterminadas
-                rate: role.defaultRate,
-                cost: 10 * role.defaultRate
-              };
-              
-              setTeamMembers(prev => [...prev, {
-                ...newMember,
-                id: uuidv4()
-              }]);
-            }
-          });
-          
-          return;
+    try {
+      console.log("Añadiendo roles recomendados:", recommendedRoleIds);
+      
+      // Siempre limpiamos roles existentes al añadir los recomendados
+      setTeamMembers([]);
+      
+      if (!roles || !selectedTemplateId) {
+        console.log("No hay roles disponibles o no se ha seleccionado plantilla");
+        return;
+      }
+      
+      // Si no hay roles recomendados o son menos de lo esperado, generamos basados en complejidad
+      if (recommendedRoleIds.length === 0 || recommendedRoleIds.length < 2) {
+        if (templates) {
+          const template = templates.find(t => t.id === selectedTemplateId);
+          if (template) {
+            useDefaultRolesBasedOnComplexity(template);
+            return; // Importante: salimos después de usar los roles por defecto
+          }
         }
       }
-    }
-    
-    // Si tenemos roles recomendados, intentamos cargar las asignaciones
-    // Cargar las asignaciones de roles desde la API para obtener las horas asignadas
-    apiRequest(`/api/template-roles/${selectedTemplateId}`)
-      .then(response => {
-        console.log("Asignaciones de roles para configuración de horas:", response);
+      
+      // Si llegamos aquí, tenemos roles recomendados y vamos a usarlos directamente
+      try {
+        // Para cada rol recomendado, añadirlo al equipo con horas estándar
+        let addedRoles = 0;
         
-        if (response && Array.isArray(response)) {
-          // Para cada rol recomendado, añadirlo al equipo si existe
-          recommendedRoleIds.forEach(roleId => {
-            const role = roles.find(r => r.id === roleId);
-            console.log("Procesando rol recomendado:", roleId, role);
-            
-            if (role) {
-              // Buscar si hay una asignación específica para este rol en esta plantilla
-              const roleAssignment = response.find(assignment => assignment.roleId === roleId);
-              // Determinar horas asignadas (usar las horas de la asignación si existe, o un valor predeterminado)
-              const assignedHours = roleAssignment ? parseInt(roleAssignment.hours) : 10;
-              
-              // Añadir el rol con las horas asignadas según la asignación de la plantilla
-              const newMember = {
-                roleId: role.id,
-                personnelId: null,
-                hours: assignedHours,
-                rate: role.defaultRate,
-                cost: assignedHours * role.defaultRate
-              };
-              
-              console.log("Añadiendo miembro con horas asignadas:", newMember);
-              
-              // Usamos directamente la función en lugar de la versión memorizada
-              // para evitar problemas de dependencias en useCallback
-              setTeamMembers(prev => [...prev, {
-                ...newMember,
-                id: uuidv4()
-              }]);
-            }
-          });
-          
-          console.log("Roles recomendados añadidos con horas asignadas");
-        } else {
-          // Usar lógica predeterminada si no hay asignaciones disponibles
-          recommendedRoleIds.forEach(roleId => {
-            const role = roles.find(r => r.id === roleId);
-            if (role) {
-              const newMember = {
-                roleId: role.id,
-                personnelId: null,
-                hours: 10, // Horas predeterminadas
-                rate: role.defaultRate,
-                cost: 10 * role.defaultRate
-              };
-              
-              setTeamMembers(prev => [...prev, {
-                ...newMember,
-                id: uuidv4()
-              }]);
-            }
-          });
-          
-          console.log("Roles recomendados añadidos con horas predeterminadas");
-        }
-      })
-      .catch(error => {
-        console.error("Error al cargar asignaciones para horas:", error);
-        
-        // En caso de error, usar lógica predeterminada
         recommendedRoleIds.forEach(roleId => {
           const role = roles.find(r => r.id === roleId);
           if (role) {
+            addedRoles++;
+            const hours = 10; // Horas predeterminadas
+            
             const newMember = {
               roleId: role.id,
               personnelId: null,
-              hours: 10, // Horas predeterminadas
+              hours: hours,
               rate: role.defaultRate,
-              cost: 10 * role.defaultRate
+              cost: hours * role.defaultRate
             };
             
             setTeamMembers(prev => [...prev, {
@@ -499,8 +396,131 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }]);
           }
         });
-      });
+        
+        console.log(`Se añadieron ${addedRoles} roles recomendados al equipo`);
+        
+        // Si no se añadió ningún rol, recurrimos a la generación por defecto
+        if (addedRoles === 0 && templates) {
+          const template = templates.find(t => t.id === selectedTemplateId);
+          if (template) {
+            useDefaultRolesBasedOnComplexity(template);
+          }
+        }
+      } catch (error) {
+        console.error("Error al añadir roles recomendados:", error);
+        
+        // En caso de error, intentamos usar la lógica por defecto
+        if (templates) {
+          const template = templates.find(t => t.id === selectedTemplateId);
+          if (template) {
+            useDefaultRolesBasedOnComplexity(template);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error general en addRecommendedRoles:", error);
+      
+      // Añadir al menos un rol por defecto para evitar que el usuario se quede sin opciones
+      if (roles && roles.length > 0) {
+        // Buscar roles prioritarios que son casi siempre necesarios
+        const analistaRole = roles.find(r => r.name.toLowerCase().includes("analista"));
+        const managerRole = roles.find(r => r.name.toLowerCase().includes("manager") || r.name.toLowerCase().includes("gerente"));
+        
+        const roleToAdd = analistaRole || managerRole || roles[0];
+        
+        if (roleToAdd) {
+          const hours = 10;
+          setTeamMembers([{
+            id: uuidv4(),
+            roleId: roleToAdd.id,
+            personnelId: null,
+            hours: hours, 
+            rate: roleToAdd.defaultRate,
+            cost: hours * roleToAdd.defaultRate
+          }]);
+          
+          console.log("Se añadió un rol de emergencia al equipo:", roleToAdd.name);
+        }
+      }
+    }
   }, [recommendedRoleIds, roles, selectedTemplateId, templates]);
+  
+  // Función auxiliar para usar roles predeterminados basados en la complejidad
+  const useDefaultRolesBasedOnComplexity = (template: ReportTemplate) => {
+    if (!roles) return;
+    
+    console.log("Usando roles predeterminados basados en complejidad:", template.complexity);
+    
+    try {
+      // Buscar roles por nombre
+      const analistaId = roles.find(r => r.name.toLowerCase().includes("analista"))?.id;
+      const dataId = roles.find(r => r.name.toLowerCase().includes("data"))?.id;
+      const managerId = roles.find(r => r.name.toLowerCase().includes("manager") || r.name.toLowerCase().includes("gerente"))?.id;
+      const diseñadorId = roles.find(r => r.name.toLowerCase().includes("diseñador") || r.name.toLowerCase().includes("designer"))?.id;
+      
+      // Filtrar los que existan
+      const availableRoles = [analistaId, dataId, managerId, diseñadorId].filter(id => id !== undefined) as number[];
+      
+      // Si no encontramos roles específicos, usamos los primeros de la lista completa
+      const defaultRoleIds = availableRoles.length > 0 
+        ? availableRoles 
+        : roles.slice(0, 3).map(r => r.id);
+      
+      console.log("Roles predeterminados a utilizar:", defaultRoleIds);
+      
+      // Determinar cuántos roles usar según complejidad
+      let roleIdsToUse: number[];
+      
+      if (template.complexity === "high") {
+        // Para proyectos complejos usamos todos los roles disponibles (máx 4)
+        roleIdsToUse = defaultRoleIds.slice(0, Math.min(4, defaultRoleIds.length));
+      } else if (template.complexity === "medium") {
+        // Para proyectos medios usamos hasta 3 roles
+        roleIdsToUse = defaultRoleIds.slice(0, Math.min(3, defaultRoleIds.length));
+      } else {
+        // Para proyectos simples usamos hasta 2 roles
+        roleIdsToUse = defaultRoleIds.slice(0, Math.min(2, defaultRoleIds.length));
+      }
+      
+      // Añadir los roles seleccionados al equipo
+      roleIdsToUse.forEach(roleId => {
+        const role = roles.find(r => r.id === roleId);
+        if (role) {
+          const hours = 10; // Horas predeterminadas
+          
+          setTeamMembers(prev => [...prev, {
+            id: uuidv4(),
+            roleId: role.id,
+            personnelId: null,
+            hours: hours,
+            rate: role.defaultRate,
+            cost: hours * role.defaultRate
+          }]);
+        }
+      });
+      
+      console.log(`Se añadieron ${roleIdsToUse.length} roles predeterminados al equipo`);
+    } catch (error) {
+      console.error("Error al generar roles predeterminados:", error);
+      
+      // En caso de error extremo, añadir el primer rol de la lista
+      if (roles.length > 0) {
+        const role = roles[0];
+        const hours = 10;
+        
+        setTeamMembers([{
+          id: uuidv4(),
+          roleId: role.id,
+          personnelId: null,
+          hours: hours,
+          rate: role.defaultRate,
+          cost: hours * role.defaultRate
+        }]);
+        
+        console.log("Se añadió un rol de emergencia al equipo:", role.name);
+      }
+    }
+  };
 
   const value = {
     projectDetails,
