@@ -76,10 +76,21 @@ const OptimizedTeamConfig: React.FC = () => {
       // Calcular costo
       const cost = newMember.hours * newMember.rate;
       
-      // Añadir miembro, asegurando que personnelId sea un número válido
+      // Asegurarnos de tener un personnelId válido
+      let validPersonnelId = newMember.personnelId;
+      
+      // Si no hay personal asignado, usamos el primer miembro disponible
+      if (!validPersonnelId && availablePersonnel && availablePersonnel.length > 0) {
+        validPersonnelId = availablePersonnel[0].id;
+      } else if (!validPersonnelId) {
+        // Si no hay personal disponible, usamos un ID conocido
+        validPersonnelId = 39;
+      }
+      
+      // Añadir miembro con ID válido
       addTeamMember({
         ...newMember,
-        personnelId: newMember.personnelId || 0, // Convertir null a 0 explícitamente
+        personnelId: validPersonnelId,
         cost
       });
       

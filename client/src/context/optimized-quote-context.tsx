@@ -324,7 +324,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     }));
   }, []);
 
-  const applyRecommendedTeam = useCallback(() => {
+  const applyRecommendedTeam = useCallback(async () => {
     // Si no hay roles disponibles o recomendados, no hacemos nada
     if (!availableRoles || !recommendedRoleIds.length || !quotationData.template) {
       return;
@@ -333,63 +333,83 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     // Limpiar equipo actual
     setQuotationData(prev => ({...prev, teamMembers: []}));
 
-    // Cargar asignaciones de roles para obtener horas
-    apiRequest(`/api/template-roles/${quotationData.template.id}`)
-      .then(assignments => {
-        if (!Array.isArray(assignments) || !assignments.length) {
-          return;
+    try {
+      // Primero encontrar un ID de personal válido para usar
+      let defaultPersonnelId = 39; // Valor por defecto conocido
+      
+      if (availablePersonnel && availablePersonnel.length > 0) {
+        // Usar el primer personal disponible de la lista ya cargada
+        defaultPersonnelId = availablePersonnel[0].id;
+      } else {
+        // Si no está disponible, intentar cargar de la API
+        try {
+          const personnelList = await apiRequest('/api/personnel');
+          if (personnelList && personnelList.length > 0) {
+            defaultPersonnelId = personnelList[0].id;
+          }
+        } catch (err) {
+          console.warn("Error al cargar personal, usando ID por defecto:", err);
         }
+      }
+      
+      console.log("Usando ID de personal por defecto para equipo recomendado:", defaultPersonnelId);
+      
+      // Ahora cargar asignaciones de roles para obtener horas
+      const assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`);
+      
+      if (!Array.isArray(assignments) || !assignments.length) {
+        return;
+      }
 
-        const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
-        const newTeamMembers: TeamMember[] = [];
+      const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
+      const newTeamMembers: TeamMember[] = [];
 
-        uniqueRoleIds.forEach(roleId => {
-          // Encontrar el rol
-          const role = availableRoles.find(r => r.id === roleId);
-          if (!role) return;
+      uniqueRoleIds.forEach(roleId => {
+        // Encontrar el rol
+        const role = availableRoles.find(r => r.id === roleId);
+        if (!role) return;
 
-          // Encontrar todas las asignaciones para este rol
-          const roleAssignments = assignments.filter(a => a.roleId === roleId);
+        // Encontrar todas las asignaciones para este rol
+        const roleAssignments = assignments.filter(a => a.roleId === roleId);
 
-          if (!roleAssignments.length) {
-            // Usar horas predeterminadas si no hay asignaciones
+        if (!roleAssignments.length) {
+          // Usar horas predeterminadas si no hay asignaciones
+          newTeamMembers.push({
+            id: uuidv4(),
+            roleId: role.id,
+            personnelId: defaultPersonnelId, // Usar ID de personal válido
+            hours: 10, // Valor predeterminado
+            rate: role.defaultRate,
+            cost: 10 * role.defaultRate
+          });
+        } else {
+          // Añadir cada asignación como un miembro del equipo
+          roleAssignments.forEach(assignment => {
+            const hours = parseInt(assignment.hours);
             newTeamMembers.push({
               id: uuidv4(),
               roleId: role.id,
-              personnelId: 0, // Usar 0 en lugar de null para compatibilidad con la API
-              hours: 10, // Valor predeterminado
+              personnelId: defaultPersonnelId, // Usar ID de personal válido
+              hours: hours,
               rate: role.defaultRate,
-              cost: 10 * role.defaultRate
+              cost: hours * role.defaultRate
             });
-          } else {
-            // Añadir cada asignación como un miembro del equipo
-            roleAssignments.forEach(assignment => {
-              const hours = parseInt(assignment.hours);
-              newTeamMembers.push({
-                id: uuidv4(),
-                roleId: role.id,
-                personnelId: 0, // Usar 0 en lugar de null para compatibilidad con la API
-                hours: hours,
-                rate: role.defaultRate,
-                cost: hours * role.defaultRate
-              });
-            });
-          }
-        });
-
-        // Actualizar el equipo con los miembros recomendados
-        setQuotationData(prev => ({
-          ...prev,
-          teamMembers: newTeamMembers
-        }));
-
-        // Recalcular costos
-        calculateCosts(newTeamMembers);
-      })
-      .catch(error => {
-        console.error("Error al cargar asignaciones de roles:", error);
+          });
+        }
       });
-  }, [availableRoles, recommendedRoleIds, quotationData.template]);
+
+      // Actualizar el equipo con los miembros recomendados
+      setQuotationData(prev => ({
+        ...prev,
+        teamMembers: newTeamMembers
+      }));
+
+      // Recalcular costos
+      calculateCosts(newTeamMembers);
+    } catch (error) {
+      console.error("Error al aplicar equipo recomendado:", error);
+    }
+  }, [availableRoles, availablePersonnel, recommendedRoleIds, quotationData.template]);
 
   // Métodos para el Paso 4: Ajustes Financieros
   const updateFinancials = useCallback((updates: Partial<FinancialSettings>) => {
@@ -526,11 +546,27 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       if (response && response.id) {
         console.log("Guardando miembros del equipo para cotización ID:", response.id);
         
+        console.log("Obteniendo lista de personal disponible para asignación por defecto");
+        // Obtener primero todo el personal disponible para asignar uno por defecto
+        let defaultPersonnelId = 39; // ID de personal por defecto conocido
+        
+        try {
+          const personnelList = await apiRequest('/api/personnel');
+          if (personnelList && personnelList.length > 0) {
+            defaultPersonnelId = personnelList[0].id;
+            console.log("ID de personal por defecto:", defaultPersonnelId);
+          }
+        } catch (err) {
+          console.error("Error al obtener personal, usando ID predeterminado:", err);
+        }
+        
         // Guardar los miembros del equipo
         for (const member of quotationData.teamMembers) {
+          // Asegurarnos de que siempre tengamos un ID de personal válido
+          // Si no hay personal asignado, usar el ID por defecto
           const teamMemberPayload = {
             quotationId: response.id,
-            personnelId: member.personnelId || 0, // Si no hay personal asignado, usar 0
+            personnelId: member.personnelId || defaultPersonnelId,
             hours: member.hours,
             rate: member.rate,
             cost: member.hours * member.rate // Calcular el costo total
