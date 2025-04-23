@@ -236,11 +236,11 @@ const OptimizedTeamConfig: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="personnel-select">Personal (Opcional)</Label>
                   <Select
-                    value={newMember.personnelId ? String(newMember.personnelId) : ''}
+                    value={newMember.personnelId ? String(newMember.personnelId) : '0'}
                     onValueChange={(value) => {
                       setNewMember(prev => ({
                         ...prev,
-                        personnelId: value ? parseInt(value) : null
+                        personnelId: value === "0" ? null : parseInt(value)
                       }));
                     }}
                     disabled={!newMember.roleId}
@@ -249,7 +249,7 @@ const OptimizedTeamConfig: React.FC = () => {
                       <SelectValue placeholder="Seleccionar personal" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin asignar</SelectItem>
+                      <SelectItem value="0">Sin asignar</SelectItem>
                       {filteredPersonnel?.map(person => (
                         <SelectItem key={person.id} value={String(person.id)}>
                           {person.name}
