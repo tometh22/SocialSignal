@@ -555,19 +555,26 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   }, []);
 
   const nextStep = useCallback(() => {
-    // Si estamos en el paso 1 (selección de plantilla), asegurarse de que se haya seleccionado una plantilla
+    // Si estamos en el paso 1 (información básica), validar los campos de información básica
     if (currentStep === 1) {
-      if (!quotationData.template) {
-        // Mostrar alerta si no se ha seleccionado una plantilla
-        alert("Debe seleccionar una plantilla antes de continuar.");
+      // Verificar que el cliente esté seleccionado
+      if (!quotationData.client) {
+        alert("Debe seleccionar un cliente antes de continuar.");
         return;
       }
-      // Forzar ir a detalles y ajustes (paso 2)
+      
+      // Verificar que el nombre del proyecto esté ingresado
+      if (!quotationData.project.name.trim()) {
+        alert("Debe ingresar un nombre para el proyecto antes de continuar.");
+        return;
+      }
+      
+      // Forzar ir a selección de plantilla (paso 2)
       setCurrentStep(2);
       return;
     }
     
-    // Si estamos en el paso 2 (selección de plantilla y configuración), validar que se seleccionó una plantilla y se configuraron parámetros
+    // Si estamos en el paso 2 (selección de plantilla y configuración), validar plantilla y parámetros
     if (currentStep === 2) {
       // Verificar que se seleccionó una plantilla
       if (!quotationData.template) {
