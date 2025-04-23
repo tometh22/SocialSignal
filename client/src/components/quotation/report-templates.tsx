@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useQuoteContext } from "@/context/quote-context";
 import { ReportTemplate, Role } from "@shared/schema";
@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import CostBreakdown from "./cost-breakdown";
 import { v4 as uuidv4 } from "uuid";
@@ -59,10 +60,69 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   // Ya no necesitamos traducir las plantillas porque vienen en español desde la base de datos
   const templates = originalTemplates;
 
-  // Update cost calculations when template changes
+  // Update team members and cost calculations when template changes
   useEffect(() => {
-    calculateTotalCost();
-  }, [selectedTemplateId, calculateTotalCost]);
+    // Solo proceder si hay cambio genuino de plantilla y roles disponibles
+    if (selectedTemplateId && roles) {
+      console.log("[AUTOLOAD] Cargando roles y costos para la plantilla ID:", selectedTemplateId);
+      
+      // Cargar automáticamente los roles recomendados al seleccionar una plantilla
+      try {
+        // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
+        apiRequest(`/api/template-roles/${selectedTemplateId}`)
+          .then((assignments: any) => {
+            console.log("[AUTOLOAD] Asignaciones de roles cargadas:", assignments);
+            
+            if (!Array.isArray(assignments) || assignments.length === 0) {
+              console.log("[AUTOLOAD] No hay asignaciones disponibles para esta plantilla");
+              return;
+            }
+            
+            // Crear nuevos miembros del equipo
+            const newTeamMembers: TeamMember[] = [];
+            
+            // Para cada asignación, añadir un miembro al equipo con sus horas
+            assignments.forEach((assignment: any) => {
+              const roleId = assignment.roleId;
+              const role = roles.find(r => r.id === roleId);
+              
+              if (!role) {
+                console.warn(`[AUTOLOAD] Rol ID ${roleId} no encontrado`);
+                return;
+              }
+              
+              const hours = parseInt(assignment.hours);
+              
+              newTeamMembers.push({
+                id: uuidv4(),
+                roleId: role.id,
+                personnelId: null,
+                hours: hours,
+                rate: role.defaultRate,
+                cost: hours * role.defaultRate
+              });
+            });
+            
+            // Actualizar el estado con todos los miembros añadidos de una vez
+            if (newTeamMembers.length > 0) {
+              // Limpiar los roles actuales y establecer los nuevos
+              setTeamMembers(newTeamMembers);
+              console.log(`[AUTOLOAD] Se cargaron ${newTeamMembers.length} roles automáticamente`);
+              
+              // Recalcular los costos
+              setTimeout(() => {
+                calculateTotalCost();
+              }, 100);
+            }
+          })
+          .catch((error: any) => {
+            console.error("[AUTOLOAD] Error al cargar asignaciones de roles:", error);
+          });
+      } catch (error) {
+        console.error("[AUTOLOAD] Error general al cargar roles:", error);
+      }
+    }
+  }, [selectedTemplateId, roles, setTeamMembers, calculateTotalCost]);
 
   // Check if form is valid
   const validateForm = () => {
