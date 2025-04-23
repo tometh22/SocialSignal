@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Client, ReportTemplate, Role, Personnel } from '@shared/schema';
 import { 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -34,7 +34,7 @@ const OptimizedQuoteContent: React.FC = () => {
   } = useOptimizedQuote();
   
   const [isSaving, setIsSaving] = useState(false);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Validación por paso
@@ -111,7 +111,7 @@ const OptimizedQuoteContent: React.FC = () => {
         title: "Cotización guardada",
         description: `La cotización se ha guardado correctamente con ID: ${quotationId}`,
       });
-      navigate('/quotations');
+      setLocation('/manage-quotes');
     } catch (error) {
       console.error("Error al guardar:", error);
       toast({

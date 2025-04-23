@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import NewQuote from "@/pages/new-quote";
+import OptimizedQuote from "@/pages/optimized-quote";
 import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
 import Clients from "@/pages/clients";
@@ -24,6 +25,7 @@ function App() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/new-quote" component={NewQuote} />
+          <Route path="/optimized-quote" component={OptimizedQuote} />
           <Route path="/manage-quotes" component={ManageQuotes} />
           <Route path="/quote/:id" component={QuoteDetails} />
           <Route path="/clients" component={Clients} />
