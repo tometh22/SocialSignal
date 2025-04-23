@@ -191,13 +191,28 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               onClick={() => {
                 if (validateForm()) {
                   // Primero configuramos para usar roles recomendados
-                  addRecommendedRoles();
-                  toast({
-                    title: "Roles Recomendados",
-                    description: `Se aplicarán ${recommendedRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
-                  });
-                  calculateTotalCost();
-                  onNext();
+                  console.log("Ejecutando addRecommendedRoles desde el botón Usar Roles Recomendados");
+                  try {
+                    addRecommendedRoles();
+                    
+                    // Añadimos un retraso para permitir que se complete la carga de roles
+                    setTimeout(() => {
+                      console.log("Recalculando costos y continuando después de añadir roles");
+                      calculateTotalCost();
+                      toast({
+                        title: "Roles Recomendados Aplicados",
+                        description: `Se han aplicado ${recommendedRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
+                      });
+                      onNext();
+                    }, 500);
+                  } catch (error) {
+                    console.error("Error al añadir roles recomendados:", error);
+                    toast({
+                      title: "Error al aplicar roles",
+                      description: "Hubo un problema al aplicar los roles recomendados. Por favor, inténtalo de nuevo.",
+                      variant: "destructive"
+                    });
+                  }
                 }
               }}
               className="flex items-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
