@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Check, Search, FileText, BarChart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ComplexityFactorsCard } from './complexity-factors-card';
 
 const OptimizedTemplateSelection: React.FC = () => {
   const {
@@ -328,6 +329,14 @@ const OptimizedTemplateSelection: React.FC = () => {
                 />
               </div>
               
+              {/* Resumen de Factores de Complejidad */}
+              <ComplexityFactorsCard
+                analysisType={quotationData.analysisType}
+                mentionsVolume={quotationData.mentionsVolume}
+                countriesCovered={quotationData.countriesCovered}
+                clientEngagement={quotationData.clientEngagement}
+              />
+              
               {/* Visualización de costos */}
               <Card>
                 <CardHeader className="pb-2">
@@ -573,6 +582,14 @@ const OptimizedTemplateSelection: React.FC = () => {
                   rows={4}
                 />
               </div>
+
+              {/* Resumen de Factores de Complejidad */}
+              <ComplexityFactorsCard
+                analysisType={quotationData.analysisType}
+                mentionsVolume={quotationData.mentionsVolume}
+                countriesCovered={quotationData.countriesCovered}
+                clientEngagement={quotationData.clientEngagement}
+              />
 
               {/* Visualización de costos */}
               <Card>
