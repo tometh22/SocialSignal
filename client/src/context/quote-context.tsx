@@ -321,21 +321,42 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Calculate total cost with complexity adjustments and markup
   const calculateTotalCost = useCallback(() => {
+    console.log("[COST] Iniciando cálculo de costo total");
+    
     // Calculate base cost from team members
     const baseTeamCost = calculateBaseCost();
+    console.log("[COST] Costo base calculado:", baseTeamCost);
+    
+    // Si el costo base es 0 pero hay miembros en el equipo, hay un problema
+    if (baseTeamCost === 0 && teamMembers.length > 0) {
+      console.warn("[COST] ⚠️ Costo base es 0 pero hay", teamMembers.length, "miembros en el equipo");
+      // Calcular manualmente el costo base sumando los costos de los miembros
+      const manualBaseCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+      console.log("[COST] Costo base calculado manualmente:", manualBaseCost);
+      
+      // Actualizar el costo base con el valor calculado manualmente
+      if (manualBaseCost > 0) {
+        setBaseCost(manualBaseCost);
+      }
+    }
+    
+    // Usar el valor actualizado
+    const finalBaseCost = baseTeamCost > 0 ? baseTeamCost : baseCost;
     
     // Calculate complexity adjustment
-    const complexityAdj = calculateComplexityAdjustment(baseTeamCost, complexityFactors);
+    const complexityAdj = calculateComplexityAdjustment(finalBaseCost, complexityFactors);
     setComplexityAdjustment(complexityAdj);
+    console.log("[COST] Ajuste por complejidad:", complexityAdj);
     
     // Calculate markup (minimum 2x)
-    const adjusted = baseTeamCost + complexityAdj;
+    const adjusted = finalBaseCost + complexityAdj;
     const markup = calculateMarkup(adjusted);
     setMarkupAmount(markup);
+    console.log("[COST] Markup calculado:", markup);
     
     // Obtener los costos adicionales de la plantilla seleccionada
-    let currentPlatformCost = 0;
-    let currentDeviationPercentage = 0;
+    let currentPlatformCost = platformCost;
+    let currentDeviationPercentage = deviationPercentage;
     
     if (selectedTemplateId && templates) {
       const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
@@ -349,17 +370,23 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
     
+    console.log("[COST] Costo de plataformas:", currentPlatformCost);
+    console.log("[COST] Porcentaje de desvío:", currentDeviationPercentage);
+    
     // Calculate total with platform costs and deviation percentage
     const total = calculateTotalAmount(
-      baseTeamCost, 
+      finalBaseCost, 
       complexityAdj, 
       markup, 
       currentPlatformCost, 
       currentDeviationPercentage
     );
     
+    console.log("[COST] Monto total calculado:", total);
     setTotalAmount(total);
-  }, [calculateBaseCost, complexityFactors, selectedTemplateId, templates]);
+    
+    return total;
+  }, [calculateBaseCost, complexityFactors, selectedTemplateId, templates, teamMembers, baseCost, platformCost, deviationPercentage]);
   
   // Función para añadir roles recomendados al equipo basado en la plantilla seleccionada
   const addRecommendedRoles = useCallback(() => {

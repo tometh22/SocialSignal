@@ -152,11 +152,11 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
           </div>
         )}
         
-        <div className="p-4 bg-primary bg-opacity-10 rounded-lg border border-primary md:col-span-1">
-          <div className="text-sm text-primary mb-1">
+        <div className="p-4 bg-blue-600 rounded-lg md:col-span-1">
+          <div className="text-sm text-white mb-1">
             {showComplexity ? "Cotización Total" : "Cotización Preliminar Total"}
           </div>
-          <div className="text-2xl font-mono font-medium text-primary">{formatCurrency(totalAmount)}</div>
+          <div className="text-2xl font-mono font-medium text-white">{formatCurrency(totalAmount)}</div>
         </div>
       </div>
     </div>

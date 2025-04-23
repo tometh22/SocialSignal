@@ -116,10 +116,9 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               setTeamMembers(newTeamMembers);
               console.log(`[AUTOLOAD] Se cargaron ${newTeamMembers.length} roles automáticamente`);
               
-              // Recalcular los costos
-              setTimeout(() => {
-                calculateTotalCost();
-              }, 100);
+              // Recalcular los costos inmediatamente
+              calculateBaseCost();
+              calculateTotalCost();
             }
           })
           .catch((error: any) => {
@@ -378,10 +377,12 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                   }
                 }
               }}
-              className="flex items-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              className="flex items-center bg-blue-500 border-blue-200 text-white hover:bg-blue-600"
             >
               <span className="mr-1">✓</span>
-              Usar {Array.from(new Set(recommendedRoleIds || [])).length} Roles Recomendados
+              Usar {recommendedRoleIds && recommendedRoleIds.length > 0 
+                ? Array.from(new Set(recommendedRoleIds)).length 
+                : 0} Roles Recomendados
             </Button>
             
             <Button type="button" onClick={handleContinue} className="flex items-center">
