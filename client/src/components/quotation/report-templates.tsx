@@ -197,36 +197,92 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               variant="outline"
               onClick={() => {
                 if (validateForm()) {
-                  // Usamos la función del contexto para añadir roles recomendados
-                  console.log("Ejecutando addRecommendedRoles desde el botón");
+                  // Implementación directa para añadir roles recomendados
+                  console.log("Implementando método directo para añadir roles desde template.tsx");
                   
                   try {
-                    if (selectedTemplateId) {
-                      // Aplicar roles recomendados
-                      addRecommendedRoles();
-                      
-                      // Recalcular costos
-                      calculateTotalCost();
-                      
-                      toast({
-                        title: "Roles Recomendados Aplicados",
-                        description: `Se han aplicado ${recommendedRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
-                      });
-                      
-                      // Continuar al siguiente paso
-                      setTimeout(() => {
-                        onNext();
-                      }, 300);
-                    } else {
+                    if (!selectedTemplateId) {
                       console.error("No hay plantilla seleccionada");
                       toast({
                         title: "Error",
                         description: "Debes seleccionar una plantilla primero",
                         variant: "destructive"
                       });
+                      return;
                     }
+                    
+                    if (!roles || roles.length === 0) {
+                      console.error("No hay roles disponibles");
+                      toast({
+                        title: "Error",
+                        description: "No hay roles disponibles en el sistema",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    
+                    if (!recommendedRoleIds || recommendedRoleIds.length === 0) {
+                      console.error("No hay roles recomendados para esta plantilla");
+                      toast({
+                        title: "Sin roles recomendados",
+                        description: "Esta plantilla no tiene roles recomendados definidos",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    
+                    console.log("Procesando roles recomendados:", recommendedRoleIds);
+                    
+                    // Obtener roles únicos
+                    const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
+                    
+                    // Crear nuevos miembros del equipo
+                    const newTeamMembers: TeamMember[] = [];
+                    
+                    // Procesar cada rol único
+                    uniqueRoleIds.forEach(roleId => {
+                      const role = roles.find(r => r.id === roleId);
+                      
+                      if (!role) {
+                        console.warn(`Rol ID ${roleId} no encontrado`);
+                        return;
+                      }
+                      
+                      // Usar 40 horas por defecto
+                      const hours = 40;
+                      
+                      newTeamMembers.push({
+                        id: uuidv4(),
+                        roleId: role.id,
+                        personnelId: null,
+                        hours: hours,
+                        rate: role.defaultRate,
+                        cost: hours * role.defaultRate
+                      });
+                    });
+                    
+                    // Limpiar los roles actuales
+                    setTeamMembers([]);
+                    
+                    // Agregar los nuevos roles 
+                    setTeamMembers(newTeamMembers);
+                    
+                    console.log("Roles añadidos:", newTeamMembers);
+                    
+                    // Recalcular costos
+                    calculateTotalCost();
+                    
+                    toast({
+                      title: "Roles Recomendados Aplicados",
+                      description: `Se han aplicado ${newTeamMembers.length} roles recomendados basados en la plantilla seleccionada.`,
+                    });
+                    
+                    // Continuar al siguiente paso
+                    setTimeout(() => {
+                      onNext();
+                    }, 300);
                   } catch (error) {
-                    console.error("Error al añadir roles recomendados:", error);
+                    console.error("Error crítico al añadir roles recomendados:", error);
                     toast({
                       title: "Error al aplicar roles",
                       description: "Hubo un problema al aplicar los roles recomendados. Por favor, inténtalo de nuevo.",
