@@ -505,20 +505,28 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   // Método para guardar la cotización
   const saveQuotation = useCallback(async () => {
     try {
-      // Validar que tenemos los datos mínimos necesarios
-      if (!quotationData.client || !quotationData.project.name || !quotationData.template) {
-        throw new Error("Faltan datos requeridos para la cotización");
+      // 1. Validamos datos básicos
+      if (!quotationData.client) {
+        throw new Error("Debe seleccionar un cliente para la cotización");
+      }
+      
+      if (!quotationData.project.name) {
+        throw new Error("Debe ingresar un nombre para el proyecto");
+      }
+      
+      if (!quotationData.template) {
+        throw new Error("Debe seleccionar una plantilla para la cotización");
       }
 
-      // Preparar datos para la API
+      // 2. Preparamos el payload para la cotización
       const quotationPayload = {
         clientId: quotationData.client.id,
         projectName: quotationData.project.name,
         projectType: quotationData.project.type || "executive",
-        analysisType: "standard", // Valor por defecto si no está definido
-        mentionsVolume: "medium", // Valor por defecto
-        countriesCovered: "1", // Valor por defecto
-        clientEngagement: "medium", // Valor por defecto
+        analysisType: "standard",
+        mentionsVolume: "medium",
+        countriesCovered: "1",
+        clientEngagement: "medium",
         templateId: quotationData.template.id,
         templateCustomization: quotationData.customization || "",
         baseCost: baseCost,
@@ -532,77 +540,70 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         additionalNotes: "Generado desde cotización optimizada"
       };
 
-      console.log("Enviando payload:", quotationPayload);
+      console.log("Enviando payload de cotización:", quotationPayload);
 
-      // Enviar a la API
-      const response = await apiRequest('/api/quotations', {
+      // 3. Enviamos la solicitud para crear la cotización
+      const quotationResponse = await apiRequest('/api/quotations', {
         method: 'POST',
         body: JSON.stringify(quotationPayload)
       });
 
-      console.log("Respuesta de la API de cotización:", response);
+      console.log("Respuesta del servidor:", quotationResponse);
+      
+      // 4. Verificamos que la respuesta sea válida y tenga un ID
+      if (!quotationResponse || typeof quotationResponse !== 'object' || !quotationResponse.id) {
+        console.error("Respuesta inválida del servidor:", quotationResponse);
+        throw new Error("No se pudo crear la cotización: respuesta inválida del servidor");
+      }
+      
+      const quotationId = quotationResponse.id;
+      console.log("Cotización creada con ID:", quotationId);
 
-      // Si la API devuelve el ID de la cotización creada
-      if (response && response.id) {
-        console.log("Guardando miembros del equipo para cotización ID:", response.id);
+      // 5. Obtenemos ID de personal por defecto (por si acaso)
+      let defaultPersonnelId = 39; // ID conocido como respaldo
+      
+      try {
+        const personnelList = await apiRequest('/api/personnel');
+        if (personnelList && personnelList.length > 0) {
+          defaultPersonnelId = personnelList[0].id;
+          console.log("Usando ID de personal por defecto:", defaultPersonnelId);
+        }
+      } catch (err) {
+        console.warn("Error al obtener personal, usando ID de respaldo:", err);
+      }
+      
+      // 6. Guardamos cada miembro del equipo
+      console.log(`Guardando ${quotationData.teamMembers.length} miembros del equipo...`);
+      
+      for (const member of quotationData.teamMembers) {
+        const teamMemberPayload = {
+          quotationId: quotationId,
+          personnelId: member.personnelId || defaultPersonnelId,
+          hours: member.hours,
+          rate: member.rate,
+          cost: member.hours * member.rate
+        };
         
-        console.log("Obteniendo lista de personal disponible para asignación por defecto");
-        // Obtener primero todo el personal disponible para asignar uno por defecto
-        let defaultPersonnelId = 39; // ID de personal por defecto conocido
+        console.log("Enviando miembro del equipo:", teamMemberPayload);
         
         try {
-          const personnelList = await apiRequest('/api/personnel');
-          if (personnelList && personnelList.length > 0) {
-            defaultPersonnelId = personnelList[0].id;
-            console.log("ID de personal por defecto:", defaultPersonnelId);
-          }
-        } catch (err) {
-          console.error("Error al obtener personal, usando ID predeterminado:", err);
-        }
-        
-        // Guardar los miembros del equipo
-        for (const member of quotationData.teamMembers) {
-          // Asegurarnos de que siempre tengamos un ID de personal válido
-          // Si no hay personal asignado, usar el ID por defecto
-          const teamMemberPayload = {
-            quotationId: response.id,
-            personnelId: member.personnelId || defaultPersonnelId,
-            hours: member.hours,
-            rate: member.rate,
-            cost: member.hours * member.rate // Calcular el costo total
-          };
+          const teamResponse = await apiRequest('/api/quotation-team', {
+            method: 'POST',
+            body: JSON.stringify(teamMemberPayload)
+          });
           
-          console.log("Enviando miembro del equipo:", teamMemberPayload);
-          
-          try {
-            const teamResponse = await apiRequest('/api/quotation-team', {
-              method: 'POST',
-              body: JSON.stringify(teamMemberPayload)
-            });
-            
-            console.log("Miembro del equipo guardado:", teamResponse);
-          } catch (error) {
-            const teamError = error as Error;
-            console.error("Error al guardar miembro del equipo:", teamError);
-            throw new Error(`Error al guardar miembro del equipo: ${teamError.message || 'Error desconocido'}`);
-          }
-        }
-
-        return response.id;
-      } else {
-        throw new Error("No se pudo crear la cotización (respuesta sin ID)");
-      }
-    } catch (e) {
-      const error = e as any;
-      console.error("Error al guardar la cotización:", error);
-      if (error.response) {
-        try {
-          const errorData = await error.response.clone().json();
-          console.error("Detalles del error:", errorData);
-        } catch (jsonError) {
-          console.error("No se pudo parsear el error como JSON");
+          console.log("Miembro guardado:", teamResponse);
+        } catch (memberError) {
+          console.error("Error al guardar miembro:", memberError);
+          throw new Error(`Error al guardar miembro del equipo: ${memberError.message || 'Error desconocido'}`);
         }
       }
+      
+      console.log("Cotización guardada completamente con ID:", quotationId);
+      return quotationId;
+      
+    } catch (error) {
+      console.error("Error en saveQuotation:", error);
       throw error;
     }
   }, [quotationData, totalAmount, baseCost, complexityAdjustment, markupAmount]);

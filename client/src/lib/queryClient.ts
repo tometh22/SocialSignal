@@ -28,19 +28,28 @@ export async function apiRequest(
   // Manejar caso cuando se llama con un solo argumento (la URL)
   if (!isOldStyleUsage) {
     const url = methodOrUrl;
+    console.log(`Enviando GET request a ${url}`);
+    
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'include',
     });
     
+    console.log(`Respuesta de ${url} - Status: ${res.status}`);
+    
     await throwIfResNotOk(res);
-    return res.json();
+    const jsonData = await res.json();
+    console.log(`Datos recibidos de ${url}:`, jsonData);
+    
+    return jsonData;
   }
   
   // Manejar caso de uso tradicional con 2-3 argumentos
   const method = methodOrUrl;
   const url = urlOrData as string;
   const bodyData = data;
+  
+  console.log(`Enviando ${method} request a ${url}`, bodyData || '');
   
   const res = await fetch(url, {
     method,
@@ -49,7 +58,22 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  console.log(`Respuesta de ${url} - Status: ${res.status}`);
+  
   await throwIfResNotOk(res);
+  
+  // Para métodos POST, intentamos obtener un objeto JSON
+  if (method === 'POST' || method === 'PATCH') {
+    try {
+      const jsonData = await res.json();
+      console.log(`Datos recibidos de ${url}:`, jsonData);
+      return jsonData;
+    } catch (error) {
+      console.warn(`No se pudo parsear respuesta como JSON:`, error);
+      return res;
+    }
+  }
+  
   return res;
 }
 

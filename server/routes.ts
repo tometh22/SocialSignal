@@ -330,14 +330,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations", async (req, res) => {
     try {
-      const validatedData = insertQuotationSchema.parse(req.body);
-      const quotation = await storage.createQuotation(validatedData);
-      res.status(201).json(quotation);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid quotation data", errors: error.errors });
+      console.log("POST /api/quotations - Recibido payload:", req.body);
+      
+      try {
+        // Validar datos con Zod
+        const validatedData = insertQuotationSchema.parse(req.body);
+        console.log("Datos validados correctamente:", validatedData);
+        
+        // Crear cotización
+        const quotation = await storage.createQuotation(validatedData);
+        console.log("Cotización creada exitosamente:", quotation);
+        
+        res.status(201).json(quotation);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          console.error("Error de validación Zod:", JSON.stringify(validationError.errors, null, 2));
+          return res.status(400).json({ 
+            message: "Invalid quotation data", 
+            errors: validationError.errors 
+          });
+        }
+        throw validationError; // Re-lanzar para que sea capturado por el catch externo
       }
-      res.status(500).json({ message: "Failed to create quotation" });
+    } catch (error) {
+      console.error("Error al crear cotización:", error);
+      res.status(500).json({ message: "Failed to create quotation", error: String(error) });
     }
   });
 
@@ -393,14 +410,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotation-team", async (req, res) => {
     try {
-      const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
-      const member = await storage.createQuotationTeamMember(validatedData);
-      res.status(201).json(member);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid team member data", errors: error.errors });
+      console.log("POST /api/quotation-team - Recibido payload:", req.body);
+      
+      try {
+        // Validar datos con Zod
+        const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
+        console.log("Datos de miembro validados correctamente:", validatedData);
+        
+        // Crear miembro del equipo
+        const member = await storage.createQuotationTeamMember(validatedData);
+        console.log("Miembro del equipo creado exitosamente:", member);
+        
+        res.status(201).json(member);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          console.error("Error de validación Zod en miembro:", JSON.stringify(validationError.errors, null, 2));
+          return res.status(400).json({ 
+            message: "Invalid team member data", 
+            errors: validationError.errors 
+          });
+        }
+        throw validationError; // Re-lanzar para que sea capturado por el catch externo
       }
-      res.status(500).json({ message: "Failed to add team member" });
+    } catch (error) {
+      console.error("Error al crear miembro del equipo:", error);
+      res.status(500).json({ message: "Failed to add team member", error: String(error) });
     }
   });
 
