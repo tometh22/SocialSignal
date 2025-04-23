@@ -360,63 +360,132 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return;
       }
       
-      // Si no hay roles recomendados o son menos de lo esperado, generamos basados en complejidad
-      if (recommendedRoleIds.length === 0 || recommendedRoleIds.length < 2) {
-        if (templates) {
-          const template = templates.find(t => t.id === selectedTemplateId);
-          if (template) {
-            useDefaultRolesBasedOnComplexity(template);
-            return; // Importante: salimos después de usar los roles por defecto
+      // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
+      apiRequest(`/api/template-roles/${selectedTemplateId}`)
+        .then(assignments => {
+          console.log("Asignaciones de roles para horas cargadas:", assignments);
+          
+          if (!Array.isArray(assignments) || assignments.length === 0) {
+            console.log("No hay asignaciones disponibles, usando roles por defecto");
+            if (templates) {
+              const template = templates.find(t => t.id === selectedTemplateId);
+              if (template) {
+                useDefaultRolesBasedOnComplexity(template);
+              }
+            }
+            return;
           }
-        }
-      }
-      
-      // Si llegamos aquí, tenemos roles recomendados y vamos a usarlos directamente
-      try {
-        // Para cada rol recomendado, añadirlo al equipo con horas estándar
-        let addedRoles = 0;
-        
-        recommendedRoleIds.forEach(roleId => {
-          const role = roles.find(r => r.id === roleId);
-          if (role) {
-            addedRoles++;
-            const hours = 10; // Horas predeterminadas
+          
+          // Tenemos asignaciones, vamos a añadir los roles con sus horas correspondientes
+          // Convertimos a array después de eliminar duplicados
+          const rolesToAdd = Array.from(new Set(recommendedRoleIds)); 
+          console.log("Roles únicos a añadir:", rolesToAdd);
+          
+          let addedMembers: TeamMember[] = [];
+          let addedRoleCount = 0;
+          
+          // Para cada rol recomendado, buscamos sus asignaciones
+          rolesToAdd.forEach(roleId => {
+            // Encontrar el rol en la lista de roles disponibles
+            const role = roles.find(r => r.id === roleId);
+            if (!role) {
+              console.log(`Rol con ID ${roleId} no encontrado en la lista de roles disponibles`);
+              return;
+            }
             
-            const newMember = {
-              roleId: role.id,
-              personnelId: null,
-              hours: hours,
-              rate: role.defaultRate,
-              cost: hours * role.defaultRate
-            };
+            // Encontrar todas las asignaciones para este rol
+            const roleAssignments = assignments.filter(a => a.roleId === roleId);
             
-            setTeamMembers(prev => [...prev, {
-              ...newMember,
-              id: uuidv4()
-            }]);
+            if (roleAssignments.length === 0) {
+              console.log(`No hay asignaciones para el rol ${role.name}, usando horas predeterminadas`);
+              // Usar horas predeterminadas
+              addedMembers.push({
+                id: uuidv4(),
+                roleId: role.id,
+                personnelId: null,
+                hours: 10,
+                rate: role.defaultRate,
+                cost: 10 * role.defaultRate
+              });
+              addedRoleCount++;
+            } else {
+              // Para cada asignación, añadir una entrada al equipo
+              roleAssignments.forEach(assignment => {
+                const hours = parseInt(assignment.hours);
+                
+                addedMembers.push({
+                  id: uuidv4(),
+                  roleId: role.id,
+                  personnelId: null,
+                  hours: hours,
+                  rate: role.defaultRate,
+                  cost: hours * role.defaultRate
+                });
+                addedRoleCount++;
+              });
+            }
+          });
+          
+          // Actualizar el estado con todos los miembros añadidos de una vez
+          if (addedMembers.length > 0) {
+            setTeamMembers(addedMembers);
+            console.log(`Se añadieron ${addedRoleCount} roles al equipo (${addedMembers.length} entradas)`);
+            
+            // Recalcular los costos después de añadir los roles
+            setTimeout(() => {
+              calculateTotalCost();
+            }, 100);
+          } else {
+            console.log("No se añadió ningún rol, usando roles por defecto");
+            if (templates) {
+              const template = templates.find(t => t.id === selectedTemplateId);
+              if (template) {
+                useDefaultRolesBasedOnComplexity(template);
+              }
+            }
+          }
+        })
+        .catch(error => {
+          console.error("Error al cargar asignaciones de roles:", error);
+          // En caso de error, utilizar los roles recomendados con horas predeterminadas
+          if (recommendedRoleIds.length > 0) {
+            const rolesToAdd = Array.from(new Set(recommendedRoleIds)); // Eliminamos duplicados
+            let addedMembers: TeamMember[] = [];
+            
+            rolesToAdd.forEach(roleId => {
+              const role = roles.find(r => r.id === roleId);
+              if (role) {
+                const hours = 10; // Horas predeterminadas en caso de error
+                
+                addedMembers.push({
+                  id: uuidv4(),
+                  roleId: role.id,
+                  personnelId: null,
+                  hours: hours,
+                  rate: role.defaultRate,
+                  cost: hours * role.defaultRate
+                });
+              }
+            });
+            
+            if (addedMembers.length > 0) {
+              setTeamMembers(addedMembers);
+              console.log(`Se añadieron ${addedMembers.length} roles al equipo (modo recuperación)`);
+            } else if (templates) {
+              const template = templates.find(t => t.id === selectedTemplateId);
+              if (template) {
+                useDefaultRolesBasedOnComplexity(template);
+              }
+            }
+          } else {
+            if (templates) {
+              const template = templates.find(t => t.id === selectedTemplateId);
+              if (template) {
+                useDefaultRolesBasedOnComplexity(template);
+              }
+            }
           }
         });
-        
-        console.log(`Se añadieron ${addedRoles} roles recomendados al equipo`);
-        
-        // Si no se añadió ningún rol, recurrimos a la generación por defecto
-        if (addedRoles === 0 && templates) {
-          const template = templates.find(t => t.id === selectedTemplateId);
-          if (template) {
-            useDefaultRolesBasedOnComplexity(template);
-          }
-        }
-      } catch (error) {
-        console.error("Error al añadir roles recomendados:", error);
-        
-        // En caso de error, intentamos usar la lógica por defecto
-        if (templates) {
-          const template = templates.find(t => t.id === selectedTemplateId);
-          if (template) {
-            useDefaultRolesBasedOnComplexity(template);
-          }
-        }
-      }
     } catch (error) {
       console.error("Error general en addRecommendedRoles:", error);
       
@@ -443,7 +512,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
     }
-  }, [recommendedRoleIds, roles, selectedTemplateId, templates]);
+  }, [recommendedRoleIds, roles, selectedTemplateId, templates, calculateTotalCost]);
   
   // Función auxiliar para usar roles predeterminados basados en la complejidad
   const useDefaultRolesBasedOnComplexity = (template: ReportTemplate) => {

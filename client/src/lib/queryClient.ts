@@ -16,7 +16,7 @@ export async function apiRequest(
   const isOldStyleUsage = urlOrData !== undefined && typeof urlOrData === 'string';
   
   // Manejar caso cuando se llama con un solo argumento (la URL)
-  if (!isOldStyleUsage && arguments.length === 1) {
+  if (!isOldStyleUsage) {
     const url = methodOrUrl;
     const res = await fetch(url, {
       method: 'GET',
