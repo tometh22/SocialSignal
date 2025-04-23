@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import CostBreakdown from "./cost-breakdown";
 import { v4 as uuidv4 } from "uuid";
+import { TeamMember } from "@/context/quote-context";
 import {
   PieChart,
   Pie,
@@ -198,7 +199,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               onClick={() => {
                 if (validateForm()) {
                   // Implementación directa para añadir roles recomendados
-                  console.log("Implementando método directo para añadir roles desde template.tsx");
+                  console.log("[TEST] Implementando método directo para añadir roles desde template.tsx");
                   
                   try {
                     if (!selectedTemplateId) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useQuoteContext } from "@/context/quote-context";
+import { useQuoteContext, TeamMember } from "@/context/quote-context";
 import { Role, Personnel } from "@shared/schema";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
+    setTeamMembers, // Importamos explícitamente esta función 
     calculateTotalCost,
     quoteOption,
     updateQuoteOption,
@@ -505,7 +506,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                 variant="outline"
                 className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                 onClick={() => {
-                  console.log("Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
+                  console.log("[TEST] Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
                   
                   try {
                     // Implementación directa para añadir roles recomendados
@@ -557,11 +558,16 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                       });
                     });
                     
-                    // Limpiar miembros existentes
-                    setTeamMembers([]);
-                    
-                    // Añadir nuevos miembros
-                    setTeamMembers(newTeamMembers);
+                    // Actualizar miembros del equipo
+                    if (setTeamMembers) {
+                      // Primero limpiamos
+                      setTeamMembers([]);
+                      // Luego añadimos los nuevos
+                      setTeamMembers(newTeamMembers);
+                      console.log("Team members actualizados con éxito");
+                    } else {
+                      console.error("setTeamMembers no está disponible");
+                    }
                     
                     console.log("Roles añadidos:", newTeamMembers);
                     
