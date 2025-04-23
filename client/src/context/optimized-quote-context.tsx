@@ -500,7 +500,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         countriesCovered: "1", // Valor por defecto
         clientEngagement: "medium", // Valor por defecto
         templateId: quotationData.template.id,
-        templateCustomization: quotationData.customization,
+        templateCustomization: quotationData.customization || "",
         baseCost: baseCost,
         complexityAdjustment: complexityAdjustment,
         markupAmount: markupAmount,
@@ -508,9 +508,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         status: "draft",
         adjustmentReason: quotationData.financials ? 
           `Descuento: ${quotationData.financials.discount}%, Desviación: ${quotationData.financials.deviationPercentage}%` : 
-          null,
-        additionalNotes: `Generado desde cotización optimizada`
+          "",
+        additionalNotes: "Generado desde cotización optimizada"
       };
+
+      console.log("Enviando payload:", quotationPayload);
 
       // Enviar a la API
       const response = await apiRequest('/api/quotations', {
@@ -518,31 +520,56 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         body: JSON.stringify(quotationPayload)
       });
 
+      console.log("Respuesta de la API de cotización:", response);
+
       // Si la API devuelve el ID de la cotización creada
       if (response && response.id) {
+        console.log("Guardando miembros del equipo para cotización ID:", response.id);
+        
         // Guardar los miembros del equipo
         for (const member of quotationData.teamMembers) {
-          await apiRequest('/api/quotation-team', {
-            method: 'POST',
-            body: JSON.stringify({
-              quotationId: response.id,
-              personnelId: member.personnelId || 0, // Si no hay personal asignado, usar 0
-              hours: member.hours,
-              rate: member.rate,
-              cost: member.hours * member.rate // Calcular el costo total
-            })
-          });
+          const teamMemberPayload = {
+            quotationId: response.id,
+            personnelId: member.personnelId || 0, // Si no hay personal asignado, usar 0
+            hours: member.hours,
+            rate: member.rate,
+            cost: member.hours * member.rate // Calcular el costo total
+          };
+          
+          console.log("Enviando miembro del equipo:", teamMemberPayload);
+          
+          try {
+            const teamResponse = await apiRequest('/api/quotation-team', {
+              method: 'POST',
+              body: JSON.stringify(teamMemberPayload)
+            });
+            
+            console.log("Miembro del equipo guardado:", teamResponse);
+          } catch (error) {
+            const teamError = error as Error;
+            console.error("Error al guardar miembro del equipo:", teamError);
+            throw new Error(`Error al guardar miembro del equipo: ${teamError.message || 'Error desconocido'}`);
+          }
         }
 
         return response.id;
       } else {
-        throw new Error("No se pudo crear la cotización");
+        throw new Error("No se pudo crear la cotización (respuesta sin ID)");
       }
-    } catch (error) {
+    } catch (e) {
+      const error = e as any;
       console.error("Error al guardar la cotización:", error);
+      if (error.response) {
+        try {
+          const errorData = await error.response.clone().json();
+          console.error("Detalles del error:", errorData);
+        } catch (jsonError) {
+          console.error("No se pudo parsear el error como JSON");
+        }
+      }
       throw error;
     }
-  }, [quotationData, totalAmount]);
+  }, [quotationData, totalAmount, baseCost, complexityAdjustment, markupAmount]);
 
   // Inicializar datos cuando se carga el componente
   useEffect(() => {
