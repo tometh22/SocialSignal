@@ -183,6 +183,8 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     // Si seleccionamos la misma plantilla, no hacemos nada
     if (quotationData.template?.id === template?.id) {
       return;
+    } else if (quotationData.template === null && template === null) {
+      return;
     }
     
     // Limpiar equipos anteriores para evitar duplicidades
@@ -192,7 +194,9 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       teamMembers: [] // Limpiar equipos anteriores
     }));
 
-    // Cargar roles recomendados si hay una plantilla seleccionada
+    // Reiniciar los roleIds recomendados
+    setRecommendedRoleIds([]);
+
     if (template) {
       // Actualizar financials con valores de la plantilla
       setQuotationData(prev => ({
@@ -216,6 +220,17 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         .catch(error => {
           console.error("[TEMPLATE] Error al cargar roles recomendados:", error);
         });
+    } else {
+      // Caso "Personalizado / Sin Plantilla"
+      // Reiniciar los financials a valores predeterminados
+      setQuotationData(prev => ({
+        ...prev,
+        financials: {
+          ...prev.financials,
+          platformCost: 0,
+          deviationPercentage: 0,
+        }
+      }));
     }
   }, [quotationData.template]);
 

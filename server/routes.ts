@@ -198,8 +198,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const templates = await storage.getReportTemplates();
     res.json(templates);
   });
+  
+  // Ruta alternativa para las plantillas (para compatibilidad con el flujo optimizado)
+  app.get("/api/report-templates", async (_, res) => {
+    const templates = await storage.getReportTemplates();
+    res.json(templates);
+  });
 
   app.get("/api/templates/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
+
+    const template = await storage.getReportTemplate(id);
+    if (!template) return res.status(404).json({ message: "Template not found" });
+
+    res.json(template);
+  });
+  
+  // Ruta alternativa para obtener una plantilla específica (para compatibilidad con el flujo optimizado)
+  app.get("/api/report-templates/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -423,6 +440,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Template role assignments routes
   app.get("/api/template-roles/:templateId", async (req, res) => {
+    const templateId = parseInt(req.params.templateId);
+    if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
+
+    const assignments = await storage.getTemplateRoleAssignments(templateId);
+    res.json(assignments);
+  });
+  
+  // Ruta alternativa para asignaciones de roles (para compatibilidad con roles recomendados)
+  app.get("/api/report-templates/:templateId/role-assignments", async (req, res) => {
     const templateId = parseInt(req.params.templateId);
     if (isNaN(templateId)) return res.status(400).json({ message: "Invalid template ID" });
 
