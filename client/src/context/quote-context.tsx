@@ -152,13 +152,24 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Report template operations
   const updateReportTemplate = useCallback((templateId: number) => {
-    console.log("Actualizando plantilla a:", templateId);
+    // Si seleccionamos la misma plantilla, no hacemos nada para evitar recargas innecesarias
+    if (selectedTemplateId === templateId) {
+      console.log("[TEMPLATE] Evitando recarga innecesaria, misma plantilla:", templateId);
+      return;
+    }
+    
+    console.log("[TEMPLATE] Actualizando plantilla a:", templateId);
+    
+    // Limpiamos el equipo actual para evitar duplicidades
+    setTeamMembers([]);
+    
+    // Actualizamos la plantilla seleccionada
     setSelectedTemplateId(templateId);
     
     // Update template complexity factor
     if (templates && roles) {
       const template = templates.find(t => t.id === templateId);
-      console.log("Plantilla encontrada:", template);
+      console.log("[TEMPLATE] Plantilla encontrada:", template);
       
       if (template) {
         // Actualizar factor de complejidad
@@ -184,34 +195,31 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Esta llamada obtiene qué roles están asignados a la plantilla seleccionada
           apiRequest(`/api/template-roles/${templateId}`)
             .then(response => {
-              console.log("[TEST] Asignaciones de roles cargadas:", response);
-          if (templateId === 17) {
-            console.log("[TEST-WARNER] Asignaciones para Warner Bros:", response);
-          }
+              console.log("[TEMPLATE] Asignaciones de roles cargadas:", response);
               
               if (response && Array.isArray(response)) {
                 // Extraer los IDs de roles de las asignaciones
                 const recommendedIds = response.map(assignment => assignment.roleId);
-                console.log("Roles recomendados basados en asignaciones:", recommendedIds);
+                console.log("[TEMPLATE] Roles recomendados basados en asignaciones:", recommendedIds);
                 
                 // Guardar los roles recomendados en el estado
                 setRecommendedRoleIds(recommendedIds);
               } else {
-                console.log("No se encontraron asignaciones de roles para esta plantilla");
+                console.log("[TEMPLATE] No se encontraron asignaciones de roles para esta plantilla");
                 generarRolesRecomendadosPorComplejidad(template, roles);
               }
             })
             .catch(error => {
-              console.error("Error al cargar asignaciones de roles:", error);
+              console.error("[TEMPLATE] Error al cargar asignaciones de roles:", error);
               generarRolesRecomendadosPorComplejidad(template, roles);
             });
         } catch (error) {
-          console.error("Error general al cargar roles:", error);
+          console.error("[TEMPLATE] Error general al cargar roles:", error);
           generarRolesRecomendadosPorComplejidad(template, roles);
         }
       }
     }
-  }, [templates, roles]);
+  }, [templates, roles, selectedTemplateId]);
   
   // Función auxiliar para generar roles recomendados basados en complejidad
   const generarRolesRecomendadosPorComplejidad = (template: ReportTemplate, allRoles: Role[]) => {
