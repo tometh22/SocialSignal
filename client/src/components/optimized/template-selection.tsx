@@ -737,6 +737,38 @@ const OptimizedTemplateSelection: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+              
+              {/* Panel de navegación */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-lg border border-blue-100 shadow-sm mt-8">
+                <div className="flex items-center mb-3">
+                  <div className="bg-blue-100 p-1.5 rounded-full mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700">
+                      <path d="M12 5v14"></path>
+                      <path d="m19 12-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-lg text-blue-900">¿Has completado los parámetros?</h3>
+                </div>
+                
+                <p className="text-sm text-blue-800 mb-4 ml-9">
+                  Asegúrate de haber configurado todos los parámetros de análisis, volumen, países e interacción.
+                  Estos parámetros afectan directamente al costo del proyecto.
+                </p>
+                
+                <div className="flex justify-end mt-2">
+                  <Button 
+                    size="lg" 
+                    className="flex items-center px-5 py-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                    onClick={() => nextStep()}
+                  >
+                    Continuar a Configuración de Equipo
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
+                      <path d="M5 12h14"></path>
+                      <path d="m12 5 7 7-7 7"></path>
+                    </svg>
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed rounded-lg">
