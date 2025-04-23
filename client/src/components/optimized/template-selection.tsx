@@ -155,6 +155,49 @@ const OptimizedTemplateSelection: React.FC = () => {
             />
           </div>
 
+          {/* Opción para no usar plantilla */}
+          <Card 
+            className={`cursor-pointer transition-all border-dashed mb-4 ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
+            onClick={() => {
+              // Usar null para representar "Sin plantilla"
+              updateTemplate(null);
+              // Usar un nivel de complejidad por defecto
+              updateComplexity('medium');
+            }}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-base">Personalizado / Sin Plantilla</CardTitle>
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                  Personalizado
+                </Badge>
+              </div>
+              <CardDescription className="line-clamp-2">
+                Configura tu proyecto manualmente sin usar una plantilla predefinida
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-2 pt-0">
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Tipo:</span>
+                  <span>Completamente personalizado</span>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="pt-2">
+              {quotationData.template === null ? (
+                <div className="w-full flex items-center justify-center py-1 bg-primary/10 text-primary font-medium rounded-md text-sm">
+                  <Check className="h-4 w-4 mr-2" />
+                  Seleccionada
+                </div>
+              ) : (
+                <div className="w-full flex items-center justify-center py-1 border border-dashed border-neutral-300 rounded-md text-neutral-500 text-sm">
+                  Click para seleccionar
+                </div>
+              )}
+            </CardFooter>
+          </Card>
+
           {/* Lista de plantillas */}
           {isLoading ? (
             <div className="flex justify-center p-8">
@@ -183,7 +226,116 @@ const OptimizedTemplateSelection: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="details" className="space-y-4">
-          {quotationData.template ? (
+          {quotationData.template === null ? (
+            // Vista para el caso de "Personalizado / Sin Plantilla"
+            <div className="space-y-6">
+              {/* Información para el caso sin plantilla */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Personalizado / Sin Plantilla</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium text-base">Configuración Personalizada</h3>
+                      <p className="text-sm text-neutral-600 mt-1">
+                        Has seleccionado crear un proyecto completamente personalizado sin usar una plantilla predefinida.
+                        Configura las opciones a continuación según tus necesidades específicas.
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium text-neutral-700">Tipo:</p>
+                        <Badge className="mt-1 bg-blue-100 text-blue-800 border-blue-200">
+                          Personalizado
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="font-medium text-neutral-700">Ventajas:</p>
+                        <p className="mt-1">Flexibilidad total en la configuración</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Selección de complejidad para el caso personalizado */}
+              <div className="space-y-3">
+                <Label>Nivel de Complejidad del Proyecto</Label>
+                <RadioGroup 
+                  value={quotationData.complexity || 'medium'} 
+                  onValueChange={(value) => updateComplexity(value as 'low' | 'medium' | 'high')}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="low" id="complexity-custom-low" />
+                    <Label htmlFor="complexity-custom-low" className="cursor-pointer">Baja - Proyecto simple con requisitos estándar</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="medium" id="complexity-custom-medium" />
+                    <Label htmlFor="complexity-custom-medium" className="cursor-pointer">Media - Proyecto con algunas personalizaciones</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="high" id="complexity-custom-high" />
+                    <Label htmlFor="complexity-custom-high" className="cursor-pointer">Alta - Proyecto complejo con muchas personalizaciones</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Customización para el caso personalizado */}
+              <div className="space-y-3">
+                <Label htmlFor="customization-custom">Notas de Personalización</Label>
+                <Textarea
+                  id="customization-custom"
+                  placeholder="Ingresa cualquier detalle adicional o requisitos específicos para la personalización del informe..."
+                  value={quotationData.customization}
+                  onChange={(e) => updateCustomization(e.target.value)}
+                  rows={4}
+                />
+              </div>
+              
+              {/* Visualización de costos */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Resumen de Costos</CardTitle>
+                  <CardDescription>Vista previa del impacto de tus selecciones</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-60">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Valor']} />
+                        <Bar 
+                          dataKey="valor" 
+                          fill="#94a3b8"
+                          radius={[4, 4, 0, 0]} 
+                        />
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Costo Base:</span>
+                      <span className="font-medium">${baseCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Ajuste de Complejidad:</span>
+                      <span className="font-medium">${complexityAdjustment.toFixed(2)}</span>
+                    </div>
+                    <div className="col-span-2 pt-2 mt-2 border-t flex justify-between">
+                      <span className="font-medium">Total Estimado:</span>
+                      <span className="font-bold text-primary">${totalAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : quotationData.template ? (
             <div className="space-y-6">
               {/* Información de la plantilla seleccionada */}
               <Card>
