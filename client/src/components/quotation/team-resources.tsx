@@ -508,53 +508,17 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                   console.log("Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
                   
                   try {
-                    // Creamos aplicación directa de roles para evitar problemas
-                    // de asincronía en la función original
-                    if (roles && selectedTemplateId) {
-                      // Primero, limpiar roles existentes
-                      setTeamMembers([]);
-                      
-                      // Obtener roles únicos (sin duplicados)
-                      const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
-                      console.log("Roles únicos a añadir:", uniqueRoleIds);
-                      
-                      // Para cada rol, añadirlo directamente
-                      let newTeamMembers = [];
-                      
-                      uniqueRoleIds.forEach(roleId => {
-                        const role = roles.find(r => r.id === roleId);
-                        if (role) {
-                          // Horas predeterminadas para cada rol
-                          const hours = 40;
-                          
-                          newTeamMembers.push({
-                            id: uuidv4(),
-                            roleId: role.id,
-                            personnelId: null,
-                            hours: hours,
-                            rate: role.defaultRate,
-                            cost: hours * role.defaultRate
-                          });
-                        }
-                      });
-                      
-                      console.log("Nuevos miembros del equipo:", newTeamMembers);
-                      
-                      // Establecer los miembros del equipo
-                      setTeamMembers(newTeamMembers);
-                      
-                      // Recalcular costos
-                      setTimeout(() => {
-                        calculateTotalCost();
-                      }, 100);
-                    } else {
-                      console.error("Faltan roles o plantilla seleccionada");
-                    }
+                    // Usar addRecommendedRoles que es la función del contexto
+                    addRecommendedRoles();
                     
+                    // Mensaje al usuario
                     toast({
                       title: "Roles Recomendados Añadidos",
                       description: `Se han añadido ${recommendedRoleIds.length} roles recomendados a tu equipo.`,
                     });
+                    
+                    // Recalcular costos
+                    calculateTotalCost();
                   } catch (error) {
                     console.error("Error al aplicar roles recomendados:", error);
                     toast({

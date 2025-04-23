@@ -62,6 +62,7 @@ interface QuoteContextType {
   addTeamMember: (member: Omit<TeamMember, "id">) => void;
   updateTeamMember: (id: string, member: TeamMember) => void;
   removeTeamMember: (id: string) => void;
+  setTeamMembers: (members: TeamMember[]) => void;
   updateReportTemplate: (templateId: number) => void;
   updateTemplateCustomization: (customization: string) => void;
   updateQuoteOption: (option: "roles" | "team") => void;
@@ -610,6 +611,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addTeamMember,
     updateTeamMember,
     removeTeamMember,
+    setTeamMembers,
     updateReportTemplate,
     updateTemplateCustomization,
     updateQuoteOption,

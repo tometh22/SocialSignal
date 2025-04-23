@@ -197,55 +197,28 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               variant="outline"
               onClick={() => {
                 if (validateForm()) {
-                  // Implementamos un método directo para añadir roles
-                  console.log("Ejecutando método directo para añadir roles recomendados");
+                  // Usamos la función del contexto para añadir roles recomendados
+                  console.log("Ejecutando addRecommendedRoles desde el botón");
                   
                   try {
-                    if (roles && selectedTemplateId) {
-                      // Limpiar roles existentes
-                      setTeamMembers([]);
-                      
-                      // Obtener roles únicos (sin duplicados)
-                      const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
-                      console.log("Roles únicos a añadir desde la pantalla templates:", uniqueRoleIds);
-                      
-                      // Para cada rol, añadirlo directamente
-                      let newTeamMembers = [];
-                      
-                      uniqueRoleIds.forEach(roleId => {
-                        const role = roles.find(r => r.id === roleId);
-                        if (role) {
-                          // Horas predeterminadas para cada rol
-                          const hours = 40;
-                          
-                          newTeamMembers.push({
-                            id: uuidv4(),
-                            roleId: role.id,
-                            personnelId: null,
-                            hours: hours,
-                            rate: role.defaultRate,
-                            cost: hours * role.defaultRate
-                          });
-                        }
-                      });
-                      
-                      console.log("Roles a añadir:", newTeamMembers);
-                      
-                      // Establecer los miembros del equipo
-                      setTeamMembers(newTeamMembers);
+                    if (selectedTemplateId) {
+                      // Aplicar roles recomendados
+                      addRecommendedRoles();
                       
                       // Recalcular costos
                       calculateTotalCost();
                       
                       toast({
                         title: "Roles Recomendados Aplicados",
-                        description: `Se han aplicado ${uniqueRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
+                        description: `Se han aplicado ${recommendedRoleIds.length} roles recomendados basados en la plantilla seleccionada.`,
                       });
                       
                       // Continuar al siguiente paso
-                      onNext();
+                      setTimeout(() => {
+                        onNext();
+                      }, 300);
                     } else {
-                      console.error("No hay roles o plantilla seleccionada");
+                      console.error("No hay plantilla seleccionada");
                       toast({
                         title: "Error",
                         description: "Debes seleccionar una plantilla primero",
