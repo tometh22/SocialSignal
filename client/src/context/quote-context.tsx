@@ -184,7 +184,10 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Esta llamada obtiene qué roles están asignados a la plantilla seleccionada
           apiRequest(`/api/template-roles/${templateId}`)
             .then(response => {
-              console.log("Asignaciones de roles cargadas:", response);
+              console.log("[TEST] Asignaciones de roles cargadas:", response);
+          if (templateId === 17) {
+            console.log("[TEST-WARNER] Asignaciones para Warner Bros:", response);
+          }
               
               if (response && Array.isArray(response)) {
                 // Extraer los IDs de roles de las asignaciones
@@ -364,7 +367,10 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
       apiRequest(`/api/template-roles/${selectedTemplateId}`)
         .then(assignments => {
-          console.log("Asignaciones de roles para horas cargadas:", assignments);
+          console.log("[TEST] Asignaciones de roles para horas cargadas:", assignments);
+          if (selectedTemplateId === 17) {
+            console.log("[TEST-WARNER] Asignaciones para Warner Bros en addRecommendedRoles:", assignments);
+          }
           
           if (!Array.isArray(assignments) || assignments.length === 0) {
             console.log("No hay asignaciones disponibles, usando roles por defecto");
