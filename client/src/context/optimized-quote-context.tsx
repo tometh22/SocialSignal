@@ -494,12 +494,22 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       const quotationPayload = {
         clientId: quotationData.client.id,
         projectName: quotationData.project.name,
-        projectType: quotationData.project.type,
+        projectType: quotationData.project.type || "executive",
+        analysisType: "standard", // Valor por defecto si no está definido
+        mentionsVolume: "medium", // Valor por defecto
+        countriesCovered: "1", // Valor por defecto
+        clientEngagement: "medium", // Valor por defecto
         templateId: quotationData.template.id,
-        customization: quotationData.customization,
-        status: "draft",
+        templateCustomization: quotationData.customization,
+        baseCost: baseCost,
+        complexityAdjustment: complexityAdjustment,
+        markupAmount: markupAmount,
         totalAmount: totalAmount,
-        // Añadir cualquier otro campo necesario
+        status: "draft",
+        adjustmentReason: quotationData.financials ? 
+          `Descuento: ${quotationData.financials.discount}%, Desviación: ${quotationData.financials.deviationPercentage}%` : 
+          null,
+        additionalNotes: `Generado desde cotización optimizada`
       };
 
       // Enviar a la API
@@ -512,7 +522,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       if (response && response.id) {
         // Guardar los miembros del equipo
         for (const member of quotationData.teamMembers) {
-          await apiRequest('/api/quotation-team-members', {
+          await apiRequest('/api/quotation-team', {
             method: 'POST',
             body: JSON.stringify({
               quotationId: response.id,
