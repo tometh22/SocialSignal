@@ -555,10 +555,51 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   }, []);
 
   const nextStep = useCallback(() => {
+    // Si estamos en el paso 1 (selección de plantilla), asegurarse de que se haya seleccionado una plantilla
+    if (currentStep === 1) {
+      if (!quotationData.template) {
+        // Mostrar alerta si no se ha seleccionado una plantilla
+        alert("Debe seleccionar una plantilla antes de continuar.");
+        return;
+      }
+      // Forzar ir a detalles y ajustes (paso 2)
+      setCurrentStep(2);
+      return;
+    }
+    
+    // Si estamos en el paso 2 (detalles y ajustes), validar que todos los parámetros estén configurados
+    if (currentStep === 2) {
+      // Verificar que todos los parámetros obligatorios estén configurados
+      if (!quotationData.analysisType) {
+        alert("Debe seleccionar un tipo de análisis antes de continuar.");
+        return;
+      }
+      
+      if (!quotationData.mentionsVolume) {
+        alert("Debe seleccionar un volumen de menciones antes de continuar.");
+        return;
+      }
+      
+      if (!quotationData.countriesCovered) {
+        alert("Debe seleccionar la cantidad de países cubiertos antes de continuar.");
+        return;
+      }
+      
+      if (!quotationData.clientEngagement) {
+        alert("Debe seleccionar un nivel de interacción con el cliente antes de continuar.");
+        return;
+      }
+      
+      // Si todo está en orden, proceder al paso 3
+      setCurrentStep(3);
+      return;
+    }
+    
+    // Para otros pasos, simplemente avanzar
     if (currentStep < 4) {
       setCurrentStep(prev => prev + 1);
     }
-  }, [currentStep]);
+  }, [currentStep, quotationData]);
 
   const previousStep = useCallback(() => {
     if (currentStep > 1) {

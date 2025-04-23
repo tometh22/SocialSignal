@@ -27,7 +27,8 @@ const OptimizedTemplateSelection: React.FC = () => {
     updateClientEngagement,
     baseCost,
     complexityAdjustment,
-    totalAmount
+    totalAmount,
+    nextStep
   } = useOptimizedQuote();
 
   const [searchQuery, setSearchQuery] = useState('');
