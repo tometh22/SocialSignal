@@ -20,6 +20,10 @@ const OptimizedTemplateSelection: React.FC = () => {
     updateTemplate,
     updateComplexity,
     updateCustomization,
+    updateAnalysisType,
+    updateMentionsVolume,
+    updateCountriesCovered,
+    updateClientEngagement,
     baseCost,
     complexityAdjustment,
     totalAmount
@@ -204,24 +208,53 @@ const OptimizedTemplateSelection: React.FC = () => {
               <p>Cargando plantillas...</p>
             </div>
           ) : (
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredTemplates?.map(renderTemplateCard)}
-              </div>
-              {filteredTemplates?.length === 0 && (
-                <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <Search className="h-8 w-8 text-neutral-400 mb-2" />
-                  <p className="text-neutral-600">No se encontraron plantillas que coincidan con tu búsqueda.</p>
-                  <Button 
-                    variant="link" 
-                    onClick={() => setSearchQuery('')}
-                    className="mt-2"
-                  >
-                    Limpiar búsqueda
-                  </Button>
+            <>
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredTemplates?.map(renderTemplateCard)}
+                </div>
+                {filteredTemplates?.length === 0 && (
+                  <div className="flex flex-col items-center justify-center p-8 text-center">
+                    <Search className="h-8 w-8 text-neutral-400 mb-2" />
+                    <p className="text-neutral-600">No se encontraron plantillas que coincidan con tu búsqueda.</p>
+                    <Button 
+                      variant="link" 
+                      onClick={() => setSearchQuery('')}
+                      className="mt-2"
+                    >
+                      Limpiar búsqueda
+                    </Button>
+                  </div>
+                )}
+              </ScrollArea>
+              
+              {/* Mensaje guía después de seleccionar plantilla */}
+              {quotationData.template && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                  <div className="text-blue-500 mt-0.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M12 16v-4"></path>
+                      <path d="M12 8h.01"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-blue-700">¡Plantilla seleccionada correctamente!</h4>
+                    <p className="text-sm text-blue-600 mt-1">
+                      Ahora continúa con la configuración de parámetros adicionales en la pestaña "Detalles y Ajustes".
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="mt-2 bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
+                      onClick={() => setSelectedTab('details')}
+                    >
+                      Ir a Detalles y Ajustes
+                    </Button>
+                  </div>
                 </div>
               )}
-            </ScrollArea>
+            </>
           )}
         </TabsContent>
 
@@ -394,6 +427,134 @@ const OptimizedTemplateSelection: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="high" id="complexity-high" />
                     <Label htmlFor="complexity-high" className="cursor-pointer">Alta - Proyecto complejo con muchas personalizaciones</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              {/* Tipo de análisis */}
+              <div className="space-y-3">
+                <Label>Tipo de Análisis</Label>
+                <RadioGroup 
+                  value={quotationData.analysisType} 
+                  onValueChange={(value) => updateAnalysisType(value)}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="basic" id="analysis-basic" />
+                    <Label htmlFor="analysis-basic" className="cursor-pointer">
+                      <span className="font-medium">Básico</span> - Análisis general sin profundidad
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="standard" id="analysis-standard" />
+                    <Label htmlFor="analysis-standard" className="cursor-pointer">
+                      <span className="font-medium">Estándar</span> - Análisis detallado con métricas completas
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="deep" id="analysis-deep" />
+                    <Label htmlFor="analysis-deep" className="cursor-pointer">
+                      <span className="font-medium">Avanzado</span> - Análisis profundo con metodologías especializadas
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              {/* Volumen de menciones */}
+              <div className="space-y-3">
+                <Label>Volumen de Menciones</Label>
+                <RadioGroup 
+                  value={quotationData.mentionsVolume} 
+                  onValueChange={(value) => updateMentionsVolume(value)}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="small" id="volume-small" />
+                    <Label htmlFor="volume-small" className="cursor-pointer">
+                      <span className="font-medium">Pequeño</span> - Menos de 1,000 menciones
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="medium" id="volume-medium" />
+                    <Label htmlFor="volume-medium" className="cursor-pointer">
+                      <span className="font-medium">Medio</span> - Entre 1,000 y 10,000 menciones
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="large" id="volume-large" />
+                    <Label htmlFor="volume-large" className="cursor-pointer">
+                      <span className="font-medium">Grande</span> - Entre 10,000 y 50,000 menciones
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="xlarge" id="volume-xlarge" />
+                    <Label htmlFor="volume-xlarge" className="cursor-pointer">
+                      <span className="font-medium">Extra grande</span> - Más de 50,000 menciones
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              {/* Países cubiertos */}
+              <div className="space-y-3">
+                <Label>Países Cubiertos</Label>
+                <RadioGroup 
+                  value={quotationData.countriesCovered} 
+                  onValueChange={(value) => updateCountriesCovered(value)}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="countries-1" />
+                    <Label htmlFor="countries-1" className="cursor-pointer">
+                      <span className="font-medium">Un país</span> - Análisis local
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="2-5" id="countries-2-5" />
+                    <Label htmlFor="countries-2-5" className="cursor-pointer">
+                      <span className="font-medium">2-5 países</span> - Análisis regional
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="6-10" id="countries-6-10" />
+                    <Label htmlFor="countries-6-10" className="cursor-pointer">
+                      <span className="font-medium">6-10 países</span> - Análisis multirregional
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="10+" id="countries-10+" />
+                    <Label htmlFor="countries-10+" className="cursor-pointer">
+                      <span className="font-medium">Más de 10 países</span> - Análisis global
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              {/* Interacción con cliente */}
+              <div className="space-y-3">
+                <Label>Nivel de Interacción con Cliente</Label>
+                <RadioGroup 
+                  value={quotationData.clientEngagement} 
+                  onValueChange={(value) => updateClientEngagement(value)}
+                  className="flex flex-col space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="low" id="engagement-low" />
+                    <Label htmlFor="engagement-low" className="cursor-pointer">
+                      <span className="font-medium">Bajo</span> - Interacción mínima, entrega de informe final
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="medium" id="engagement-medium" />
+                    <Label htmlFor="engagement-medium" className="cursor-pointer">
+                      <span className="font-medium">Medio</span> - Reuniones periódicas y ajustes
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="high" id="engagement-high" />
+                    <Label htmlFor="engagement-high" className="cursor-pointer">
+                      <span className="font-medium">Alto</span> - Interacción constante, ajustes frecuentes, sesiones de trabajo
+                    </Label>
                   </div>
                 </RadioGroup>
               </div>
