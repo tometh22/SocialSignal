@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useQuoteContext } from "@/context/quote-context";
 import { ReportTemplate, Role } from "@shared/schema";
@@ -60,11 +60,18 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   // Ya no necesitamos traducir las plantillas porque vienen en español desde la base de datos
   const templates = originalTemplates;
 
+  // Utilizamos un useRef para rastrear si ya se han cargado los datos
+  const loadedTemplateRef = useRef<number | null>(null);
+  
   // Update team members and cost calculations when template changes
   useEffect(() => {
-    // Solo proceder si hay cambio genuino de plantilla y roles disponibles
-    if (selectedTemplateId && roles) {
+    // Solo procedemos si hay cambio genuino de plantilla y roles disponibles
+    // y si no hemos cargado ya datos para esta plantilla
+    if (selectedTemplateId && roles && loadedTemplateRef.current !== selectedTemplateId) {
       console.log("[AUTOLOAD] Cargando roles y costos para la plantilla ID:", selectedTemplateId);
+      
+      // Marcar esta plantilla como ya cargada para evitar cargas repetidas
+      loadedTemplateRef.current = selectedTemplateId;
       
       // Cargar automáticamente los roles recomendados al seleccionar una plantilla
       try {
@@ -374,7 +381,7 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               className="flex items-center bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
             >
               <span className="mr-1">✓</span>
-              Usar {recommendedRoleIds.length} Roles Recomendados
+              Usar {Array.from(new Set(recommendedRoleIds || [])).length} Roles Recomendados
             </Button>
             
             <Button type="button" onClick={handleContinue} className="flex items-center">
@@ -384,11 +391,11 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
           </div>
         </div>
         
-        {recommendedRoleIds.length > 0 && (
+        {recommendedRoleIds && recommendedRoleIds.length > 0 && (
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
             <h5 className="text-base font-medium text-blue-700">Roles Recomendados Disponibles</h5>
             <p className="text-sm text-blue-600 mt-1">
-              La plantilla seleccionada sugiere {recommendedRoleIds.length} roles específicos para este proyecto.
+              La plantilla seleccionada sugiere {Array.from(new Set(recommendedRoleIds)).length} roles específicos para este proyecto.
               Puedes aplicar estos roles automáticamente o configurar el equipo manualmente en el siguiente paso.
             </p>
           </div>
