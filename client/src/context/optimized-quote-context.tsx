@@ -356,7 +356,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
             newTeamMembers.push({
               id: uuidv4(),
               roleId: role.id,
-              personnelId: null,
+              personnelId: 0, // Usar 0 en lugar de null para compatibilidad con la API
               hours: 10, // Valor predeterminado
               rate: role.defaultRate,
               cost: 10 * role.defaultRate
@@ -368,7 +368,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
               newTeamMembers.push({
                 id: uuidv4(),
                 roleId: role.id,
-                personnelId: null,
+                personnelId: 0, // Usar 0 en lugar de null para compatibilidad con la API
                 hours: hours,
                 rate: role.defaultRate,
                 cost: hours * role.defaultRate
@@ -526,10 +526,10 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
             method: 'POST',
             body: JSON.stringify({
               quotationId: response.id,
-              roleId: member.roleId,
-              personnelId: member.personnelId,
+              personnelId: member.personnelId || 0, // Si no hay personal asignado, usar 0
               hours: member.hours,
               rate: member.rate,
+              cost: member.hours * member.rate // Calcular el costo total
             })
           });
         }

@@ -76,9 +76,10 @@ const OptimizedTeamConfig: React.FC = () => {
       // Calcular costo
       const cost = newMember.hours * newMember.rate;
       
-      // Añadir miembro
+      // Añadir miembro, asegurando que personnelId sea un número válido
       addTeamMember({
         ...newMember,
+        personnelId: newMember.personnelId || 0, // Convertir null a 0 explícitamente
         cost
       });
       
