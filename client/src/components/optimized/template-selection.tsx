@@ -667,23 +667,25 @@ const OptimizedTemplateSelection: React.FC = () => {
           <Card 
             className={`cursor-pointer transition-all border-dashed mb-4 ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
             onClick={() => {
-              // Usar null para representar "Sin plantilla"
-              updateTemplate(null);
-              // Usar un nivel de complejidad por defecto
+              console.log("✅ Seleccionando opción 'Personalizado / Sin Plantilla'");
+              
+              // Establecer valores por defecto siempre para garantizar estado consistente
+              updateAnalysisType('standard');
+              updateMentionsVolume('medium');
+              updateCountriesCovered('1');
+              updateClientEngagement('medium');
+              
+              // Asignar complejidad media por defecto
               updateComplexity('medium');
-              // Establecer valores por defecto
-              if (!quotationData.analysisType) {
-                updateAnalysisType('standard');
-              }
-              if (!quotationData.mentionsVolume) {
-                updateMentionsVolume('medium');
-              }
-              if (!quotationData.countriesCovered) {
-                updateCountriesCovered('1');
-              }
-              if (!quotationData.clientEngagement) {
-                updateClientEngagement('medium');
-              }
+              
+              // Cambiar a pestaña de detalles para mostrar opciones adicionales
+              setSelectedTab('details');
+              
+              // Marcar como personalizado (usar null para representar "Sin plantilla")
+              updateTemplate(null);
+              
+              // Ir siempre a la pestaña de detalles
+              setTimeout(() => setActiveTab('details'), 50);
             }}
           >
             <CardHeader className="pb-2">
