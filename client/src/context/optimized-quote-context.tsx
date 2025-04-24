@@ -217,29 +217,35 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       return;
     }
     
+    console.log(`Actualizando plantilla: ${template ? `ID: ${template.id}, ${template.name}` : 'Personalizado / Sin Plantilla'}`);
+    
     // Limpiar equipos anteriores para evitar duplicidades
     setQuotationData(prev => ({
       ...prev, 
-      template,
+      template, // Esto puede ser null para "Personalizado / Sin Plantilla"
       teamMembers: [] // Limpiar equipos anteriores
     }));
     
-    // Establecer la complejidad por separado, si hay una plantilla
+    // Establecer la complejidad por separado, para ambos casos
+    let newComplexity: 'low' | 'medium' | 'high' = 'medium'; // Por defecto
+
     if (template) {
       // Determinar el valor de complejidad basado en la plantilla
-      let newComplexity: 'low' | 'medium' | 'high' = 'medium';
       if (template.complexity === 'high') {
         newComplexity = 'high';
       } else if (template.complexity === 'low') {
         newComplexity = 'low';
       }
-      
-      // Actualizar la complejidad
-      setQuotationData(prev => ({
-        ...prev,
-        complexity: newComplexity
-      }));
+    } else {
+      // Para opción personalizada, asignar una complejidad media por defecto
+      newComplexity = 'medium';
     }
+      
+    // Actualizar la complejidad en todos los casos
+    setQuotationData(prev => ({
+      ...prev,
+      complexity: newComplexity
+    }));
 
     // Reiniciar los roleIds recomendados
     setRecommendedRoleIds([]);
@@ -269,6 +275,8 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         });
     } else {
       // Caso "Personalizado / Sin Plantilla"
+      console.log("Configurando opción 'Personalizado / Sin Plantilla'");
+      
       // Reiniciar los financials a valores predeterminados
       setQuotationData(prev => ({
         ...prev,
@@ -278,6 +286,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
           deviationPercentage: 0,
         }
       }));
+
+      // Para la opción personalizada, aún necesitamos roles generales recomendados
+      // Establecer algunos roles básicos como recomendados
+      const basicRoles = [9, 10, 12, 15, 18]; // IDs de roles básicos (ajustar según tus datos)
+      setRecommendedRoleIds(basicRoles);
     }
   }, [quotationData.template]);
 
