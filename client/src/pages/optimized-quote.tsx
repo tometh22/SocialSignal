@@ -63,11 +63,22 @@ const OptimizedQuoteContent: React.FC = () => {
     }
     
     if (currentStep === 2) {
-      // Validar selección de plantilla
-      if (!quotationData.template) {
+      // Validar selección de plantilla o opción personalizada
+      if (quotationData.template === undefined) {
         toast({
-          title: "Plantilla requerida",
-          description: "Por favor, selecciona una plantilla para la cotización",
+          title: "Plantilla o personalizado requerido",
+          description: "Por favor, selecciona una plantilla o la opción 'Personalizado / Sin Plantilla'",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Validar factores de complejidad
+      if (!quotationData.analysisType || !quotationData.mentionsVolume || 
+          !quotationData.countriesCovered || !quotationData.clientEngagement) {
+        toast({
+          title: "Factores de complejidad requeridos",
+          description: "Por favor, configura todos los factores de complejidad (tipo de análisis, volumen de menciones, países cubiertos e interacción con cliente)",
           variant: "destructive",
         });
         return false;
