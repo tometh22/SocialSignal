@@ -169,7 +169,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
       
       // Factor de complejidad de la plantilla
-      templateFactor: quotationData.template?.complexity === 'high' ? 0.25 :
+      // Si template es null (sin plantilla), usamos el factor de complejidad directamente
+      templateFactor: quotationData.template === null ? 
+                     (quotationData.complexity === 'high' ? 0.20 : 
+                      quotationData.complexity === 'medium' ? 0.10 : 0) :
+                     quotationData.template?.complexity === 'high' ? 0.25 :
                      quotationData.template?.complexity === 'medium' ? 0.15 : 0.05,
     };
   }, [
@@ -403,7 +407,12 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   const applyRecommendedTeam = useCallback(async () => {
     // Si no hay roles disponibles o recomendados, no hacemos nada
-    if (!availableRoles || !recommendedRoleIds.length || !quotationData.template) {
+    if (!availableRoles || !recommendedRoleIds.length) {
+      return;
+    }
+    
+    // Si es la opción personalizada (template = null), también podemos asignar un equipo básico
+    if (quotationData.template === undefined) {
       return;
     }
 
@@ -587,11 +596,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       return;
     }
     
-    // Si estamos en el paso 2 (selección de plantilla y configuración), validar plantilla y parámetros
+    // Si estamos en el paso 2 (selección directa de complejidad), verificamos parámetros
     if (currentStep === 2) {
-      // Verificar que se seleccionó una plantilla
-      if (!quotationData.template) {
-        alert("Debe seleccionar una plantilla antes de continuar.");
+      // Verificar que quotationData.template no es undefined (puede ser null para "Sin plantilla")
+      if (quotationData.template === undefined) {
+        alert("Debe configurar factores de complejidad antes de continuar.");
         return;
       }
       

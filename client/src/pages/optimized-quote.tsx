@@ -64,26 +64,20 @@ const OptimizedQuoteContent: React.FC = () => {
     }
     
     if (currentStep === 2) {
-      // Comprobar si es personalizado o plantilla seleccionada
-      console.log("Validando paso 2, template:", quotationData.template === null ? "Personalizado/Sin Plantilla" : 
-                  quotationData.template ? `Plantilla seleccionada: ${quotationData.template.name}` : "Undefined/No seleccionado");
+      // En este paso, ahora usamos la opción "DirectComplexitySelection" que establece template = null
+      // y configura directamente los factores de complejidad, así que debemos aceptar siempre
       
-      // Si template es undefined, es que no se ha seleccionado nada
-      if (quotationData.template === undefined) {
-        toast({
-          title: "Plantilla o personalizado requerido",
-          description: "Por favor, selecciona una plantilla o la opción 'Personalizado / Sin Plantilla'",
-          variant: "destructive",
-        });
-        return false;
-      }
+      console.log("Paso 2: Factores de complejidad configurados directamente.");
+      console.log("Análisis:", quotationData.analysisType);
+      console.log("Menciones:", quotationData.mentionsVolume);
+      console.log("Países:", quotationData.countriesCovered);
+      console.log("Interacción:", quotationData.clientEngagement);
+      console.log("Complejidad:", quotationData.complexity);
       
-      // VALIDACIÓN FORZADA: Permitir siempre continuar si hay algo seleccionado
-      // Ya sea una plantilla real o la opción personalizada (null)
-      console.log("✅ Validación de plantilla correcta:", quotationData.template === null ? "Opción personalizada" : "Plantilla normal");
-      
-      // Asegurémonos de que sea true
+      // Asegurémonos de que teamMembers esté inicializado
       quotationData.teamMembers = quotationData.teamMembers || [];
+      
+      // Siempre permitir continuar con este nuevo enfoque
       return true;
     }
     

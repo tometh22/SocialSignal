@@ -146,9 +146,20 @@ const OptimizedTeamConfig: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {quotationData.template ? (
+              {quotationData.template !== undefined ? (
                 <>
-                  {recommendedRoleIds.length > 0 ? (
+                  {quotationData.template === null ? (
+                    // Opción "Sin plantilla / Personalizado"
+                    <Alert variant="default" className="bg-amber-50 text-amber-800 border-amber-200">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Configuración Personalizada</AlertTitle>
+                      <AlertDescription>
+                        Has elegido configurar la cotización sin plantilla.
+                        Por favor, configura el equipo manualmente.
+                      </AlertDescription>
+                    </Alert>
+                  ) : recommendedRoleIds.length > 0 ? (
+                    // Plantilla con roles recomendados
                     <div className="space-y-4">
                       <div className="flex flex-wrap gap-2">
                         {recommendedRoleIds.map(roleId => {
@@ -172,6 +183,7 @@ const OptimizedTeamConfig: React.FC = () => {
                       </div>
                     </div>
                   ) : (
+                    // Plantilla sin roles recomendados
                     <Alert variant="default" className="bg-amber-50 text-amber-800 border-amber-200">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>No hay recomendaciones disponibles</AlertTitle>
@@ -183,12 +195,13 @@ const OptimizedTeamConfig: React.FC = () => {
                   )}
                 </>
               ) : (
-                <Alert variant="default" className="bg-blue-50 text-blue-800 border-blue-200">
+                // Estado inconsistente (no debería ocurrir)
+                <Alert variant="default" className="bg-red-50 text-red-800 border-red-200">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Selecciona una plantilla primero</AlertTitle>
+                  <AlertTitle>Error de configuración</AlertTitle>
                   <AlertDescription>
-                    Para ver el equipo recomendado, primero debes seleccionar una plantilla
-                    en el paso anterior.
+                    Por favor regresa al paso anterior y selecciona una plantilla
+                    o la opción personalizada.
                   </AlertDescription>
                 </Alert>
               )}
