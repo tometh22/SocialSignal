@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Download, Printer, Mail, Edit, FileCheck, FileClock } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
@@ -268,46 +269,54 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
   }
 
   return (
-    <div className="container py-8">
-      {/* Encabezado y datos básicos */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <Button 
-            variant="outline" 
-            className="mr-4"
-            onClick={() => setLocation('/manage-quotes')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{quotation.projectName}</h1>
-            <div className="flex items-center mt-1">
-              <p className="text-neutral-500 mr-3">Cotización #{quotation.id}</p>
-              {getStatusBadge(quotation.status)}
-              <span className="mx-2 text-neutral-300">•</span>
-              <p className="text-neutral-500">{formatDate(quotation.createdAt)}</p>
+    <div className="container py-8 pb-24 overflow-y-auto">
+      {/* Barra superior fija con botones de acción */}
+      <div className="fixed top-0 left-0 right-0 z-10 bg-white border-b shadow-sm py-3 px-4">
+        <div className="container mx-auto flex justify-between items-center">
+          <div className="flex items-center">
+            <Button 
+              variant="outline" 
+              className="mr-4"
+              onClick={() => setLocation('/manage-quotes')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold">{quotation.projectName}</h1>
+              <div className="flex items-center mt-1">
+                <p className="text-neutral-500 mr-3">Cotización #{quotation.id}</p>
+                {getStatusBadge(quotation.status)}
+              </div>
             </div>
           </div>
+          <div className="flex space-x-2">
+            <Button variant="outline" className="flex items-center">
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </Button>
+            <Button variant="outline" className="flex items-center">
+              <Download className="mr-2 h-4 w-4" />
+              Descargar PDF
+            </Button>
+            <Button variant="outline" className="flex items-center">
+              <Mail className="mr-2 h-4 w-4" />
+              Enviar por Email
+            </Button>
+            <Button variant="default" className="flex items-center">
+              <Edit className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" className="flex items-center">
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir
-          </Button>
-          <Button variant="outline" className="flex items-center">
-            <Download className="mr-2 h-4 w-4" />
-            Descargar PDF
-          </Button>
-          <Button variant="outline" className="flex items-center">
-            <Mail className="mr-2 h-4 w-4" />
-            Enviar por Email
-          </Button>
-          <Button variant="default" className="flex items-center">
-            <Edit className="mr-2 h-4 w-4" />
-            Editar
-          </Button>
-        </div>
+      </div>
+      
+      {/* Espacio para compensar la barra fija */}
+      <div className="h-24"></div>
+      
+      {/* Encabezado con información básica */}
+      <div className="mb-6">
+        <p className="text-neutral-500">{formatDate(quotation.createdAt)}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -380,35 +389,37 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
             </CardHeader>
             <CardContent>
               {teamMembers.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Rol</TableHead>
-                      <TableHead>Personal</TableHead>
-                      <TableHead className="text-right">Horas</TableHead>
-                      <TableHead className="text-right">Tarifa</TableHead>
-                      <TableHead className="text-right">Costo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {teamMembers.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">{getRoleName(member.personnelId)}</TableCell>
-                        <TableCell>{getPersonnelName(member.personnelId)}</TableCell>
-                        <TableCell className="text-right">{member.hours}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.rate)}/h</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(member.cost)}</TableCell>
+                <ScrollArea className="h-auto max-h-[400px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-white z-10">
+                      <TableRow>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Personal</TableHead>
+                        <TableHead className="text-right">Horas</TableHead>
+                        <TableHead className="text-right">Tarifa</TableHead>
+                        <TableHead className="text-right">Costo</TableHead>
                       </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell colSpan={3} />
-                      <TableCell className="text-right font-semibold">Total horas:</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {teamMembers.reduce((sum, member) => sum + member.hours, 0)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {teamMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell className="font-medium">{getRoleName(member.personnelId)}</TableCell>
+                          <TableCell>{getPersonnelName(member.personnelId)}</TableCell>
+                          <TableCell className="text-right">{member.hours}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(member.rate)}/h</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(member.cost)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2">
+                        <TableCell colSpan={3} />
+                        <TableCell className="text-right font-semibold">Total horas:</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {teamMembers.reduce((sum, member) => sum + member.hours, 0)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
               ) : (
                 <p className="text-neutral-500">No hay miembros del equipo asignados a esta cotización.</p>
               )}
