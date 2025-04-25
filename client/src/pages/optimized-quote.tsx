@@ -133,7 +133,7 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="container py-6">
+    <div className="pl-4 pr-8 py-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
         <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
@@ -170,8 +170,8 @@ const OptimizedQuoteContent: React.FC = () => {
       </div>
       
       {/* Botones de navegación (fijos en la parte inferior) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 py-3 px-4 z-50 shadow-md">
-        <div className="container flex justify-between mx-auto">
+      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-neutral-200 py-3 px-8 z-50 shadow-md">
+        <div className="max-w-4xl mx-auto flex justify-between w-full">
           <Button
             variant="outline"
             onClick={previousStep}

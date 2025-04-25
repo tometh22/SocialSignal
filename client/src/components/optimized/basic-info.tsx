@@ -27,7 +27,7 @@ const OptimizedBasicInfo: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <div className="mb-2">
         <h2 className="text-lg font-semibold">Información Básica</h2>
         <p className="text-sm text-neutral-500">
