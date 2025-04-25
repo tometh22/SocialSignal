@@ -137,7 +137,7 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="container py-6 pb-20">
+    <div className="container py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
         <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
@@ -166,7 +166,7 @@ const OptimizedQuoteContent: React.FC = () => {
       </Tabs>
       
       {/* Contenido del paso actual */}
-      <div className="mb-6">
+      <div className="mb-6 overflow-auto max-h-[calc(100vh-230px)] pr-2">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <DirectComplexitySelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}
