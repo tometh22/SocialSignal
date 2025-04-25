@@ -440,8 +440,18 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       
       console.log("Usando ID de personal por defecto para equipo recomendado:", defaultPersonnelId);
       
-      // Ahora cargar asignaciones de roles para obtener horas
-      const assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`);
+      // Ahora cargar asignaciones de roles para obtener horas (si hay plantilla)
+      let assignments = [];
+      if (quotationData.template !== null) {
+        assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`);
+      } else {
+        // Caso "Sin plantilla": crear asignaciones básicas basadas en recommendedRoleIds
+        console.log("Usando configuración de equipo personalizada...");
+        assignments = recommendedRoleIds.map(roleId => ({
+          roleId: roleId,
+          hours: "10" // Horas predeterminadas
+        }));
+      }
       
       if (!Array.isArray(assignments) || !assignments.length) {
         return;
@@ -658,9 +668,10 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         throw new Error("Debe ingresar un nombre de proyecto");
       }
       
-      if (!quotationData.template) {
-        console.error("Error: Plantilla no seleccionada");
-        throw new Error("Debe seleccionar una plantilla");
+      // Verificar que template no sea undefined (puede ser null para "Sin plantilla")
+      if (quotationData.template === undefined) {
+        console.error("Error: Configuración de plantilla indefinida");
+        throw new Error("Debe completar la configuración de plantilla o seleccionar la opción personalizada");
       }
       
       // Preparar datos
@@ -672,15 +683,19 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         mentionsVolume: quotationData.mentionsVolume,
         countriesCovered: quotationData.countriesCovered,
         clientEngagement: quotationData.clientEngagement,
-        templateId: quotationData.template.id,
-        templateCustomization: quotationData.customization || "",
+        // Si es "Sin plantilla", usamos un ID especial (normalmente 0 o null dependiendo del backend)
+        templateId: quotationData.template ? quotationData.template.id : null,
+        templateCustomization: quotationData.customization || 
+                              (quotationData.template === null ? "Cotización personalizada sin plantilla" : ""),
         baseCost: baseCost,
         complexityAdjustment: complexityAdjustment,
         markupAmount: markupAmount,
         totalAmount: totalAmount,
         status: "draft",
         adjustmentReason: `Descuento: ${quotationData.financials.discount}%, Desviación: ${quotationData.financials.deviationPercentage}%`,
-        additionalNotes: "Generado desde cotización optimizada"
+        additionalNotes: quotationData.template === null 
+                        ? "Cotización personalizada sin plantilla predefinida"
+                        : "Generado desde cotización optimizada"
       };
       
       console.log("Payload a enviar:", payload);
