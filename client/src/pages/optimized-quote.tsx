@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, Check, Save } from 'lucide-react';
 // Importación de los componentes para cada paso
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
+import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import OptimizedTeamConfig from '@/components/optimized/team-config';
 import OptimizedFinancialReview from '@/components/optimized/financial-review';
 
@@ -150,7 +151,7 @@ const OptimizedQuoteContent: React.FC = () => {
             1. Información Básica
           </TabsTrigger>
           <TabsTrigger value="2" disabled={currentStep < 2}>
-            2. Factores de Complejidad
+            2. Selección de Plantilla
           </TabsTrigger>
           <TabsTrigger value="3" disabled={currentStep < 3}>
             3. Configuración de Equipo
@@ -164,7 +165,7 @@ const OptimizedQuoteContent: React.FC = () => {
       {/* Contenido del paso actual */}
       <div className="mb-6">
         {currentStep === 1 && <OptimizedBasicInfo />}
-        {currentStep === 2 && <DirectComplexitySelection />}
+        {currentStep === 2 && <OptimizedTemplateSelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}
         {currentStep === 4 && <OptimizedFinancialReview />}
       </div>
