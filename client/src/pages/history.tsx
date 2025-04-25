@@ -21,7 +21,7 @@ import {
   Cell,
 } from "recharts";
 
-export default function History() {
+export default function Statistics() {
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
   });
@@ -141,7 +141,7 @@ export default function History() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Quotation History & Analytics</h2>
+        <h2 className="text-lg font-semibold text-neutral-900">Estadísticas y Análisis</h2>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
