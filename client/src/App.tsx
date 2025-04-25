@@ -7,7 +7,7 @@ import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
 import QuotationDetail from "@/pages/quotation-detail";
 import Clients from "@/pages/clients";
-import History from "@/pages/history";
+import Statistics from "@/pages/statistics";
 import Admin from "@/pages/admin";
 import Sidebar from "@/components/layout/sidebar";
 import { useEffect } from "react";
@@ -32,7 +32,10 @@ function App() {
           <Route path="/quote/:id" component={QuoteDetails} />
           <Route path="/quotation/:id" component={QuotationDetail} />
           <Route path="/clients" component={Clients} />
-          <Route path="/history" component={History} />
+          <Route path="/statistics" component={Statistics} />
+          <Route path="/history">
+            <Redirect to="/statistics" />
+          </Route>
           <Route path="/admin" component={Admin} />
           <Route component={NotFound} />
         </Switch>

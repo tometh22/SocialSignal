@@ -27,7 +27,7 @@ export default function Sidebar() {
     { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: true },
     { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List },
     { href: "/clients", label: "Clientes", icon: Users },
-    { href: "/history", label: "Estadísticas y Análisis", icon: PieChart },
+    { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart },
     { href: "/admin", label: "Panel Admin", icon: Settings },
   ];
 
