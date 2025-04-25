@@ -44,7 +44,7 @@ export const OptimizedTemplateSelection = () => {
   // Filtrar plantillas basadas en la búsqueda
   const filteredTemplates = templates?.filter(template => 
     template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Si se selecciona una plantilla, cambiar a la pestaña de detalles
@@ -378,7 +378,7 @@ export const OptimizedTemplateSelection = () => {
           
           {/* Nivel de Complejidad del Proyecto - Componente separado */}
           <ComplexityLevel 
-            value={quotationData.complexity} 
+            value={quotationData.complexity || 'medium'} 
             onChange={updateComplexity}
           />
         </TabsContent>

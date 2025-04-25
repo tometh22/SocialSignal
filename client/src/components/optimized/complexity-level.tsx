@@ -3,8 +3,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
 interface ComplexityLevelProps {
-  value: 'low' | 'medium' | 'high';
-  onChange: (value: 'low' | 'medium' | 'high') => void;
+  value: string;
+  onChange: (value: string) => void;
 }
 
 export function ComplexityLevel({ value, onChange }: ComplexityLevelProps) {
