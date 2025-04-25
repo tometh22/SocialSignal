@@ -165,17 +165,15 @@ const OptimizedQuoteContent: React.FC = () => {
       </Tabs>
       
       {/* Contenido del paso actual */}
-      <Card className="p-6 mb-32 overflow-visible max-h-none">
-        <div className="overflow-y-auto max-h-full">
-          {currentStep === 1 && <OptimizedBasicInfo />}
-          {currentStep === 2 && <OptimizedTemplateSelection />}
-          {currentStep === 3 && <OptimizedTeamConfig />}
-          {currentStep === 4 && <OptimizedFinancialReview />}
-        </div>
+      <Card className="p-6 mb-6 border-0 shadow-none">
+        {currentStep === 1 && <OptimizedBasicInfo />}
+        {currentStep === 2 && <OptimizedTemplateSelection />}
+        {currentStep === 3 && <OptimizedTeamConfig />}
+        {currentStep === 4 && <OptimizedFinancialReview />}
       </Card>
       
-      {/* Botones de navegación (fijos en la parte inferior) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 p-4 z-10">
+      {/* Botones de navegación (al final del contenido, no fijos) */}
+      <div className="mt-12 mb-20 bg-white border-t border-neutral-200 pt-4">
         <div className="container flex justify-between mx-auto">
           <Button
             variant="outline"
