@@ -162,8 +162,8 @@ const OptimizedQuoteContent: React.FC = () => {
         </TabsList>
       </Tabs>
       
-      {/* Contenedor principal con altura fija y scroll */}
-      <div style={{ height: 'calc(100vh - 220px)', overflowY: 'auto' }} className="mb-20">
+      {/* Contenedor principal */}
+      <div className="mb-20">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <OptimizedTemplateSelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}

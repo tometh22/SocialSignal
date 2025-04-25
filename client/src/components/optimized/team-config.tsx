@@ -105,7 +105,7 @@ const OptimizedTeamConfig: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-[600px] overflow-y-auto pr-2">
       <div className="mb-2">
         <h2 className="text-lg font-semibold">Configuración del Equipo</h2>
         <p className="text-sm text-neutral-500">
