@@ -150,7 +150,7 @@ const OptimizedQuoteContent: React.FC = () => {
             1. Información Básica
           </TabsTrigger>
           <TabsTrigger value="2" disabled={currentStep < 2}>
-            2. Selección de Plantilla
+            2. Factores de Complejidad
           </TabsTrigger>
           <TabsTrigger value="3" disabled={currentStep < 3}>
             3. Configuración de Equipo

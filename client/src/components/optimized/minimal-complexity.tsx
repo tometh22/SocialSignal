@@ -26,7 +26,7 @@ export const DirectComplexitySelection: React.FC = () => {
   }, []);
 
   return (
-    <div className="pb-16">
+    <div className="pb-16 max-w-3xl">
       <Card className="mb-5">
         <CardHeader>
           <CardTitle>Tipo de Análisis</CardTitle>
