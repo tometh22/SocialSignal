@@ -77,10 +77,12 @@ const OptimizedQuoteContent: React.FC = () => {
         return false;
       }
       
-      // SOLUCIÓN AGRESIVA: Permitir siempre continuar si hay algo seleccionado
+      // VALIDACIÓN FORZADA: Permitir siempre continuar si hay algo seleccionado
       // Ya sea una plantilla real o la opción personalizada (null)
       console.log("✅ Validación de plantilla correcta:", quotationData.template === null ? "Opción personalizada" : "Plantilla normal");
       
+      // Asegurémonos de que sea true
+      quotationData.teamMembers = quotationData.teamMembers || [];
       return true;
     }
     
@@ -163,7 +165,7 @@ const OptimizedQuoteContent: React.FC = () => {
       </Tabs>
       
       {/* Contenido del paso actual */}
-      <Card className="p-6 mb-20">
+      <Card className="p-6 mb-20 overflow-visible">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <OptimizedTemplateSelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}

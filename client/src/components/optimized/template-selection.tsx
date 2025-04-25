@@ -783,7 +783,7 @@ const OptimizedTemplateSelection: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="details" className="space-y-4">
-          <div className="overflow-y-auto max-h-[80vh] pr-2">
+          <div className="pr-2">
             {renderDetailsContent()}
           </div>
         </TabsContent>
