@@ -134,40 +134,44 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="pl-4 pr-8 py-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
-        <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+    <div className="flex flex-col min-h-screen pl-4 pr-8">
+      <div className="flex-none py-6 max-w-4xl mx-auto w-full">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
+          <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+        </div>
+        
+        {/* Navegación de pasos */}
+        <Tabs 
+          value={currentStep.toString()} 
+          onValueChange={(value) => goToStep(parseInt(value))}
+          className="mb-6"
+        >
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="1" disabled={currentStep < 1}>
+              1. Información Básica
+            </TabsTrigger>
+            <TabsTrigger value="2" disabled={currentStep < 2}>
+              2. Selección de Plantilla
+            </TabsTrigger>
+            <TabsTrigger value="3" disabled={currentStep < 3}>
+              3. Configuración de Equipo
+            </TabsTrigger>
+            <TabsTrigger value="4" disabled={currentStep < 4}>
+              4. Revisión y Ajustes
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       
-      {/* Navegación de pasos */}
-      <Tabs 
-        value={currentStep.toString()} 
-        onValueChange={(value) => goToStep(parseInt(value))}
-        className="mb-6"
-      >
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="1" disabled={currentStep < 1}>
-            1. Información Básica
-          </TabsTrigger>
-          <TabsTrigger value="2" disabled={currentStep < 2}>
-            2. Selección de Plantilla
-          </TabsTrigger>
-          <TabsTrigger value="3" disabled={currentStep < 3}>
-            3. Configuración de Equipo
-          </TabsTrigger>
-          <TabsTrigger value="4" disabled={currentStep < 4}>
-            4. Revisión y Ajustes
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      
-      {/* Contenido del paso actual */}
-      <div className="mb-6">
-        {currentStep === 1 && <OptimizedBasicInfo />}
-        {currentStep === 2 && <OptimizedTemplateSelection />}
-        {currentStep === 3 && <OptimizedTeamConfig />}
-        {currentStep === 4 && <OptimizedFinancialReview />}
+      {/* Contenido del paso actual - área scrollable */}
+      <div className="flex-grow overflow-y-auto pb-24 max-w-4xl mx-auto w-full">
+        <div className="mb-6">
+          {currentStep === 1 && <OptimizedBasicInfo />}
+          {currentStep === 2 && <OptimizedTemplateSelection />}
+          {currentStep === 3 && <OptimizedTeamConfig />}
+          {currentStep === 4 && <OptimizedFinancialReview />}
+        </div>
       </div>
       
       {/* Botones de navegación (fijos en la parte inferior) */}
@@ -215,9 +219,6 @@ const OptimizedQuoteContent: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* Espaciador para evitar que el contenido quede debajo de los botones fijos */}
-      <div className="h-20"></div>
     </div>
   );
 };
