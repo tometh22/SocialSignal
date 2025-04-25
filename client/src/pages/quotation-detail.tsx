@@ -4,12 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Download, Printer, Mail, Edit, FileCheck, FileClock } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { Personnel, Role } from '@shared/schema';
 
+// Interfaces
 interface QuotationDetailProps {}
 
 interface TeamMember {
@@ -269,108 +269,99 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
   }
 
   return (
-    <div className="container py-8 pb-24 overflow-y-auto">
-      {/* Barra superior fija con botones de acción */}
-      <div className="fixed top-0 left-0 right-0 z-10 bg-white border-b shadow-sm py-3 px-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Button 
-              variant="outline" 
-              className="mr-4"
-              onClick={() => setLocation('/manage-quotes')}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
-            </Button>
-            <div>
-              <h1 className="text-xl font-bold">{quotation.projectName}</h1>
-              <div className="flex items-center mt-1">
-                <p className="text-neutral-500 mr-3">Cotización #{quotation.id}</p>
-                {getStatusBadge(quotation.status)}
-              </div>
+    <div className="container py-6">
+      {/* Encabezado y acciones */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-6 sticky top-0 bg-white z-10">
+        <div className="flex items-center">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="mr-2"
+            onClick={() => setLocation('/manage-quotes')}
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Volver
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">{quotation.projectName}</h1>
+            <div className="flex items-center mt-1">
+              <p className="text-sm text-neutral-500 mr-2">Cotización #{quotation.id}</p>
+              {getStatusBadge(quotation.status)}
+              <span className="mx-2 text-neutral-300">•</span>
+              <p className="text-sm text-neutral-500">{formatDate(quotation.createdAt)}</p>
             </div>
           </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" className="flex items-center">
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
-            </Button>
-            <Button variant="outline" className="flex items-center">
-              <Download className="mr-2 h-4 w-4" />
-              Descargar PDF
-            </Button>
-            <Button variant="outline" className="flex items-center">
-              <Mail className="mr-2 h-4 w-4" />
-              Enviar por Email
-            </Button>
-            <Button variant="default" className="flex items-center">
-              <Edit className="mr-2 h-4 w-4" />
-              Editar
-            </Button>
-          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
+          <Button variant="outline" size="sm" className="h-8">
+            <Printer className="mr-1 h-4 w-4" />
+            Imprimir
+          </Button>
+          <Button variant="outline" size="sm" className="h-8">
+            <Download className="mr-1 h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="default" size="sm" className="h-8">
+            <Edit className="mr-1 h-4 w-4" />
+            Editar
+          </Button>
         </div>
       </div>
-      
-      {/* Espacio para compensar la barra fija */}
-      <div className="h-24"></div>
-      
-      {/* Encabezado con información básica */}
-      <div className="mb-6">
-        <p className="text-neutral-500">{formatDate(quotation.createdAt)}</p>
-      </div>
 
+      {/* Contenido principal */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Columna izquierda */}
         <div className="md:col-span-2 space-y-6">
           {/* Información del proyecto */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <FileCheck className="h-5 w-5 mr-2 text-blue-600" />
                 Detalles del Proyecto
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Tipo de Proyecto</h3>
-                  <p className="mt-1 text-md">{getProjectTypeName(quotation.projectType)}</p>
+                  <p className="mt-1">{getProjectTypeName(quotation.projectType)}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Plantilla</h3>
-                  <p className="mt-1 text-md">
+                  <p className="mt-1">
                     {template ? template.name : 'Personalizado / Sin Plantilla'}
                   </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Tipo de Análisis</h3>
-                  <p className="mt-1 text-md">{getAnalysisTypeInfo(quotation.analysisType)}</p>
+                  <p className="mt-1">{getAnalysisTypeInfo(quotation.analysisType)}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Volumen de Menciones</h3>
-                  <p className="mt-1 text-md">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
+                  <p className="mt-1">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Países Cubiertos</h3>
-                  <p className="mt-1 text-md">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
+                  <p className="mt-1">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-500">Interacción con Cliente</h3>
-                  <p className="mt-1 text-md">{getClientEngagementInfo(quotation.clientEngagement)}</p>
+                  <p className="mt-1">{getClientEngagementInfo(quotation.clientEngagement)}</p>
                 </div>
               </div>
 
               {quotation.templateCustomization && (
                 <div className="mt-6 bg-neutral-50 p-4 rounded-md">
                   <h3 className="text-sm font-medium text-neutral-500 mb-2">Personalización / Notas</h3>
-                  <p className="text-md whitespace-pre-line">{quotation.templateCustomization}</p>
+                  <p className="text-sm whitespace-pre-line">{quotation.templateCustomization}</p>
                 </div>
               )}
               
               {quotation.additionalNotes && (
                 <div className="mt-4 bg-neutral-50 p-4 rounded-md">
                   <h3 className="text-sm font-medium text-neutral-500 mb-2">Notas Adicionales</h3>
-                  <p className="text-md whitespace-pre-line">{quotation.additionalNotes}</p>
+                  <p className="text-sm whitespace-pre-line">{quotation.additionalNotes}</p>
                 </div>
               )}
             </CardContent>
@@ -378,7 +369,7 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
 
           {/* Tabla de miembros del equipo */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <FileClock className="h-5 w-5 mr-2 text-blue-600" />
                 Equipo del Proyecto
@@ -389,7 +380,7 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
             </CardHeader>
             <CardContent>
               {teamMembers.length > 0 ? (
-                <ScrollArea className="h-auto max-h-[400px]">
+                <div className="overflow-auto border rounded-md" style={{ maxHeight: '300px' }}>
                   <Table>
                     <TableHeader className="sticky top-0 bg-white z-10">
                       <TableRow>
@@ -410,18 +401,18 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
                           <TableCell className="text-right font-medium">{formatCurrency(member.cost)}</TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="border-t-2">
-                        <TableCell colSpan={3} />
-                        <TableCell className="text-right font-semibold">Total horas:</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {teamMembers.reduce((sum, member) => sum + member.hours, 0)}
-                        </TableCell>
-                      </TableRow>
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
               ) : (
                 <p className="text-neutral-500">No hay miembros del equipo asignados a esta cotización.</p>
+              )}
+              
+              {teamMembers.length > 0 && (
+                <div className="mt-4 flex justify-between items-center px-4 py-2 bg-neutral-50 rounded-md">
+                  <span className="font-medium">Total horas:</span>
+                  <span className="font-medium">{teamMembers.reduce((sum, member) => sum + member.hours, 0)}</span>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -431,7 +422,7 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
         <div className="space-y-6">
           {/* Desglose de costos */}
           <Card className="bg-white shadow-md">
-            <CardHeader className="pb-3 border-b">
+            <CardHeader className="pb-2 border-b">
               <CardTitle className="text-lg">Resumen Financiero</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
@@ -471,7 +462,7 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
           {/* Información del cliente */}
           {client && (
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Información del Cliente</CardTitle>
               </CardHeader>
               <CardContent>
