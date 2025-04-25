@@ -23,8 +23,7 @@ export default function Sidebar() {
 
   const navigationItems = [
     { href: "/", label: "Dashboard", icon: BarChart },
-    { href: "/new-quote", label: "Nueva Cotización", icon: PlusCircle },
-    { href: "/optimized-quote", label: "Cotización Optimizada", icon: PlusCircle, highlight: true },
+    { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: true },
     { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List },
     { href: "/clients", label: "Clientes", icon: Users },
     { href: "/history", label: "Historial", icon: History },
