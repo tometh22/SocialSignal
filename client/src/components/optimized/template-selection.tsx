@@ -685,7 +685,7 @@ const OptimizedTemplateSelection: React.FC = () => {
               updateTemplate(null);
               
               // Ir siempre a la pestaña de detalles
-              setTimeout(() => setActiveTab('details'), 50);
+              setTimeout(() => setSelectedTab('details'), 50);
             }}
           >
             <CardHeader className="pb-2">
