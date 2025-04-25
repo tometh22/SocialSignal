@@ -116,6 +116,17 @@
   }
   body {
     @apply bg-secondary text-foreground font-sans antialiased;
+    overflow-y: visible !important;
+  }
+  html, body {
+    height: auto !important;
+    min-height: 100%;
+  }
+  
+  /* Fix para el problema de scroll en los contenedores */
+  .overflow-scroll, .overflow-auto, .overflow-y-auto, .overflow-y-scroll {
+    overflow: visible !important;
+    overflow-y: visible !important;
   }
 }
 
