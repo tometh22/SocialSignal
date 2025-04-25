@@ -831,12 +831,12 @@ const OptimizedTemplateSelection: React.FC = () => {
                     <div className="text-xs text-blue-600 mt-1">+20%</div>
                   </label>
                 </div>
-                <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('variable')}>
-                  <input type="radio" id="complejidad-variable" name="complejidad" 
-                    checked={quotationData.complexity === 'variable'} 
-                    onChange={() => updateComplexity('variable')}
+                <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('high')}>
+                  <input type="radio" id="complejidad-alta-especial" name="complejidad" 
+                    checked={quotationData.complexity === 'high'} 
+                    onChange={() => updateComplexity('high')}
                     className="h-4 w-4 text-blue-600 mr-2" />
-                  <label htmlFor="complejidad-variable" className="cursor-pointer">
+                  <label htmlFor="complejidad-alta-especial" className="cursor-pointer">
                     <div className="font-medium">Variable</div>
                     <div className="text-xs text-neutral-500">Complejidad cambiante durante el desarrollo</div>
                     <div className="text-xs text-blue-600 mt-1">+15%</div>
