@@ -5,6 +5,7 @@ import Dashboard from "@/pages/dashboard";
 import OptimizedQuote from "@/pages/optimized-quote";
 import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
+import QuotationDetail from "@/pages/quotation-detail";
 import Clients from "@/pages/clients";
 import History from "@/pages/history";
 import Admin from "@/pages/admin";
@@ -29,6 +30,7 @@ function App() {
           </Route>
           <Route path="/manage-quotes" component={ManageQuotes} />
           <Route path="/quote/:id" component={QuoteDetails} />
+          <Route path="/quotation/:id" component={QuotationDetail} />
           <Route path="/clients" component={Clients} />
           <Route path="/history" component={History} />
           <Route path="/admin" component={Admin} />

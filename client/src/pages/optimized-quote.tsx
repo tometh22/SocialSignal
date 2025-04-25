@@ -116,7 +116,9 @@ const OptimizedQuoteContent: React.FC = () => {
         title: "Cotización guardada",
         description: `La cotización se ha guardado correctamente con ID: ${quotationId}`,
       });
-      setLocation('/manage-quotes');
+      
+      // Redirigir a la página de detalle de la cotización en lugar del listado
+      setLocation(`/quotation/${quotationId}`);
     } catch (error) {
       console.error("Error al guardar:", error);
       toast({
