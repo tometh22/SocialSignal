@@ -173,8 +173,8 @@ const OptimizedQuoteContent: React.FC = () => {
         {currentStep === 4 && <OptimizedFinancialReview />}
       </div>
       
-      {/* Botones de navegación (al final del contenido, no fijos) */}
-      <div className="mt-12 mb-20 bg-white border-t border-neutral-200 pt-4">
+      {/* Botones de navegación (fijos en la parte inferior) */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 py-3 px-4 z-50 shadow-md">
         <div className="container flex justify-between mx-auto">
           <Button
             variant="outline"
@@ -200,7 +200,7 @@ const OptimizedQuoteContent: React.FC = () => {
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="flex items-center"
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Siguiente
                 <ChevronRight className="ml-1 h-4 w-4" />
@@ -209,7 +209,7 @@ const OptimizedQuoteContent: React.FC = () => {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center bg-green-600 hover:bg-green-700"
+                className="flex items-center bg-green-600 hover:bg-green-700 text-white"
               >
                 <Check className="mr-1 h-4 w-4" />
                 Finalizar Cotización
@@ -218,6 +218,9 @@ const OptimizedQuoteContent: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Espaciador para evitar que el contenido quede debajo de los botones fijos */}
+      <div className="h-20"></div>
     </div>
   );
 };
