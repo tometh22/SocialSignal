@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Check, Save } from 'lucide-react';
 
 // Importación de los componentes para cada paso
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
-import { DirectComplexitySelection } from '@/components/optimized/ultra-simple-complexity';
+import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTeamConfig from '@/components/optimized/team-config';
 import OptimizedFinancialReview from '@/components/optimized/financial-review';
 
@@ -166,7 +166,7 @@ const OptimizedQuoteContent: React.FC = () => {
       </Tabs>
       
       {/* Contenido del paso actual */}
-      <div className="mb-6 overflow-auto max-h-[calc(100vh-230px)] pr-2">
+      <div className="mb-6">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <DirectComplexitySelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}
