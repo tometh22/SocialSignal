@@ -24,7 +24,7 @@ export function ComplexityFactorsCard({
   } = useOptimizedQuote();
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6" id="factores-complejidad">
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center">
           <span className="text-primary mr-2">

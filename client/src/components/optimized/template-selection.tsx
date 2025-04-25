@@ -783,8 +783,51 @@ const OptimizedTemplateSelection: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="details" className="space-y-4">
-          <div className="pr-2">
+          <div className="pr-2 space-y-8 pb-20">
             {renderDetailsContent()}
+            
+            {/* Nivel de Complejidad del Proyecto */}
+            <div className="mt-8 border rounded-lg p-4" id="nivel-complejidad">
+              <h3 className="text-lg font-medium mb-4">Nivel de Complejidad del Proyecto</h3>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <input type="radio" id="complejidad-baja" name="complejidad" 
+                    checked={quotationData.complexity === 'low'} 
+                    onChange={() => updateComplexity('low')}
+                    className="h-4 w-4 text-blue-600" />
+                  <label htmlFor="complejidad-baja" className="text-sm cursor-pointer">
+                    Baja - Proyecto simple con requisitos estándar
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="radio" id="complejidad-media" name="complejidad" 
+                    checked={quotationData.complexity === 'medium'} 
+                    onChange={() => updateComplexity('medium')}
+                    className="h-4 w-4 text-blue-600" />
+                  <label htmlFor="complejidad-media" className="text-sm cursor-pointer">
+                    Media - Proyecto complejo con algunos requisitos específicos
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="radio" id="complejidad-alta" name="complejidad" 
+                    checked={quotationData.complexity === 'high'} 
+                    onChange={() => updateComplexity('high')}
+                    className="h-4 w-4 text-blue-600" />
+                  <label htmlFor="complejidad-alta" className="text-sm cursor-pointer">
+                    Alta - Proyecto muy complejo con muchos requisitos específicos
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="radio" id="complejidad-variable" name="complejidad" 
+                    checked={quotationData.complexity === 'variable'} 
+                    onChange={() => updateComplexity('variable')}
+                    className="h-4 w-4 text-blue-600" />
+                  <label htmlFor="complejidad-variable" className="text-sm cursor-pointer">
+                    Variable - Complejidad cambiante durante el desarrollo
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
