@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Check, Save } from 'lucide-react';
 
 // Importación de los componentes para cada paso
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
-import OptimizedTemplateSelection from '@/components/optimized/template-selection';
+import OptimizedTemplateSelection from '@/components/optimized/new-template-selection';
 import OptimizedTeamConfig from '@/components/optimized/team-config';
 import OptimizedFinancialReview from '@/components/optimized/financial-review';
 
