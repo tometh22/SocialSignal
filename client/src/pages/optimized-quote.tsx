@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Check, Save } from 'lucide-react';
 
 // Importación de los componentes para cada paso
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
-import { OptimizedTemplateSelection } from '@/components/optimized/new-template-selection';
+import { DirectComplexitySelection } from '@/components/optimized/ultra-simple-complexity';
 import OptimizedTeamConfig from '@/components/optimized/team-config';
 import OptimizedFinancialReview from '@/components/optimized/financial-review';
 
@@ -30,7 +30,8 @@ const OptimizedQuoteContent: React.FC = () => {
     previousStep, 
     goToStep,
     saveQuotation,
-    quotationData
+    quotationData,
+    updateTemplate
   } = useOptimizedQuote();
   
   const [isSaving, setIsSaving] = useState(false);
@@ -165,12 +166,12 @@ const OptimizedQuoteContent: React.FC = () => {
       </Tabs>
       
       {/* Contenido del paso actual */}
-      <Card className="p-6 mb-6 border-0 shadow-none">
+      <div className="mb-6">
         {currentStep === 1 && <OptimizedBasicInfo />}
-        {currentStep === 2 && <OptimizedTemplateSelection />}
+        {currentStep === 2 && <DirectComplexitySelection />}
         {currentStep === 3 && <OptimizedTeamConfig />}
         {currentStep === 4 && <OptimizedFinancialReview />}
-      </Card>
+      </div>
       
       {/* Botones de navegación (al final del contenido, no fijos) */}
       <div className="mt-12 mb-20 bg-white border-t border-neutral-200 pt-4">
