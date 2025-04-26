@@ -236,3 +236,122 @@ export const reportTemplatesRelationsWithRoles = relations(reportTemplates, ({ m
 
 export type TemplateRoleAssignment = typeof templateRoleAssignments.$inferSelect;
 export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssignmentSchema>;
+
+// Proyectos Activos
+export const activeProjects = pgTable("active_projects", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold
+  startDate: timestamp("start_date").notNull(),
+  expectedEndDate: timestamp("expected_end_date"),
+  actualEndDate: timestamp("actual_end_date"),
+  trackingFrequency: text("tracking_frequency").notNull().default("weekly"), // daily, weekly, biweekly, monthly
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertActiveProjectSchema = createInsertSchema(activeProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Nota: La relación con timeEntries se definirá después de declarar timeEntries
+export const activeProjectsRelations = relations(activeProjects, ({ one }) => ({
+  quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
+}));
+
+// Registro de horas
+export const timeEntries = pgTable("time_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  date: timestamp("date").notNull(),
+  hours: doublePrecision("hours").notNull(),
+  description: text("description"),
+  approved: boolean("approved").default(false),
+  approvedBy: integer("approved_by").references(() => personnel.id),
+  approvedDate: timestamp("approved_date"),
+  billable: boolean("billable").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
+  project: one(activeProjects, { fields: [timeEntries.projectId], references: [activeProjects.id] }),
+  personnel: one(personnel, { fields: [timeEntries.personnelId], references: [personnel.id] }),
+  approver: one(personnel, { fields: [timeEntries.approvedBy], references: [personnel.id] }),
+}));
+
+// Informes de progreso
+export const progressReports = pgTable("progress_reports", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  reportDate: timestamp("report_date").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  totalHoursLogged: doublePrecision("total_hours_logged").notNull(),
+  totalCostToDate: doublePrecision("total_cost_to_date").notNull(),
+  budgetPercentUsed: doublePrecision("budget_percent_used").notNull(),
+  statusSummary: text("status_summary").notNull(),
+  challenges: text("challenges"),
+  nextSteps: text("next_steps"),
+  createdBy: integer("created_by").notNull().references(() => personnel.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProgressReportSchema = createInsertSchema(progressReports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const progressReportsRelations = relations(progressReports, ({ one }) => ({
+  project: one(activeProjects, { fields: [progressReports.projectId], references: [activeProjects.id] }),
+  creator: one(personnel, { fields: [progressReports.createdBy], references: [personnel.id] }),
+}));
+
+// Opciones de estado de proyecto
+export const projectStatusOptions = [
+  { value: "active", label: "Activo" },
+  { value: "completed", label: "Completado" },
+  { value: "cancelled", label: "Cancelado" },
+  { value: "on-hold", label: "En Pausa" },
+];
+
+// Opciones de frecuencia de seguimiento
+export const trackingFrequencyOptions = [
+  { value: "daily", label: "Diario" },
+  { value: "weekly", label: "Semanal" },
+  { value: "biweekly", label: "Quincenal" },
+  { value: "monthly", label: "Mensual" },
+];
+
+// Tipos exportados
+export type ActiveProject = typeof activeProjects.$inferSelect;
+export type InsertActiveProject = z.infer<typeof insertActiveProjectSchema>;
+
+export type TimeEntry = typeof timeEntries.$inferSelect;
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+
+export type ProgressReport = typeof progressReports.$inferSelect;
+export type InsertProgressReport = z.infer<typeof insertProgressReportSchema>;
+
+// Completamos las relaciones circulares
+export const activeProjectsRelationsComplete = relations(activeProjects, ({ one, many }) => ({
+  quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
+  timeEntries: many(timeEntries),
+  progressReports: many(progressReports),
+}));
+
+// Actualizar relaciones de quotations para incluir proyectos activos
+export const quotationsRelationsWithProjects = relations(quotations, ({ one, many }) => ({
+  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
+  template: one(reportTemplates, { fields: [quotations.templateId], references: [reportTemplates.id] }),
+  teamMembers: many(quotationTeamMembers),
+  activeProjects: many(activeProjects),
+}));
