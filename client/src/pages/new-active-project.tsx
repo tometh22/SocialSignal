@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { queryClient, apiRequest } from "@lib/queryClient";
+import { queryClient, apiRequest } from "../lib/queryClient";
 import {
   Card,
   CardContent,

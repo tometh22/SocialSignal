@@ -15,7 +15,9 @@ import {
   BarChart,
   ChevronRight,
   Activity,
-  PieChart
+  PieChart,
+  LineChart,
+  ClipboardList
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -24,8 +26,9 @@ export default function Sidebar() {
 
   const navigationItems = [
     { href: "/", label: "Dashboard", icon: BarChart },
-    { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: true },
+    { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: false },
     { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List },
+    { href: "/active-projects", label: "Proyectos Activos", icon: ClipboardList, highlight: true },
     { href: "/clients", label: "Clientes", icon: Users },
     { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart },
     { href: "/admin", label: "Panel Admin", icon: Settings },

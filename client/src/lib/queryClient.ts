@@ -1,111 +1,67 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
-
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    try {
-      const text = await res.text();
-      const jsonError = JSON.parse(text);
-      console.error("API Error Details:", jsonError);
-      const error = new Error(`${res.status}: ${text}`);
-      (error as any).response = res;
-      throw error;
-    } catch (jsonParseError) {
-      const error = new Error(`${res.status}: ${res.statusText}`);
-      (error as any).response = res;
-      throw error;
-    }
-  }
-}
-
-export async function apiRequest(
-  methodOrUrl: string,
-  urlOrData?: string | unknown,
-  data?: unknown | undefined,
-): Promise<Response | any> {
-  // Detectar tipo de uso
-  const isOldStyleUsage = urlOrData !== undefined && typeof urlOrData === 'string';
-  
-  // Manejar caso cuando se llama con un solo argumento (la URL)
-  if (!isOldStyleUsage) {
-    const url = methodOrUrl;
-    console.log(`Enviando GET request a ${url}`);
-    
-    const res = await fetch(url, {
-      method: 'GET',
-      credentials: 'include',
-    });
-    
-    console.log(`Respuesta de ${url} - Status: ${res.status}`);
-    
-    await throwIfResNotOk(res);
-    const jsonData = await res.json();
-    console.log(`Datos recibidos de ${url}:`, jsonData);
-    
-    return jsonData;
-  }
-  
-  // Manejar caso de uso tradicional con 2-3 argumentos
-  const method = methodOrUrl;
-  const url = urlOrData as string;
-  const bodyData = data;
-  
-  console.log(`Enviando ${method} request a ${url}`, bodyData || '');
-  
-  const res = await fetch(url, {
-    method,
-    headers: bodyData ? { "Content-Type": "application/json" } : {},
-    body: bodyData ? JSON.stringify(bodyData) : undefined,
-    credentials: "include",
-  });
-
-  console.log(`Respuesta de ${url} - Status: ${res.status}`);
-  
-  await throwIfResNotOk(res);
-  
-  // Para métodos POST, intentamos obtener un objeto JSON
-  if (method === 'POST' || method === 'PATCH') {
-    try {
-      const jsonData = await res.json();
-      console.log(`Datos recibidos de ${url}:`, jsonData);
-      return jsonData;
-    } catch (error) {
-      console.warn(`No se pudo parsear respuesta como JSON:`, error);
-      return res;
-    }
-  }
-  
-  return res;
-}
-
-type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
-    },
-    mutations: {
-      retry: false,
     },
   },
 });
+
+interface ApiError extends Error {
+  status?: number;
+  info?: any;
+}
+
+export const apiRequest = async (
+  url: string,
+  method: string = "GET",
+  data?: any
+): Promise<any> => {
+  const options: RequestInit = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  };
+
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+
+  const response = await fetch(url, options);
+
+  if (!response.ok) {
+    const error: ApiError = new Error(
+      `API request failed with status ${response.status}`
+    );
+    error.status = response.status;
+    
+    try {
+      error.info = await response.json();
+    } catch (e) {
+      error.info = { message: "Could not parse error response" };
+    }
+    
+    throw error;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+};
+
+// Default fetcher for useQuery
+export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
+  const [url, ...params] = queryKey;
+  
+  // If the URL contains parameters, we need to construct the full URL
+  const fullUrl = params.length > 0 
+    ? `${url}/${params.join('/')}`
+    : url;
+    
+  return apiRequest(fullUrl);
+};

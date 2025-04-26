@@ -9,6 +9,10 @@ import QuotationDetail from "@/pages/quotation-detail";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics";
 import Admin from "@/pages/admin";
+import ActiveProjects from "@/pages/active-projects";
+import NewActiveProject from "@/pages/new-active-project";
+import TimeEntries from "@/pages/time-entries";
+import ProjectSummary from "@/pages/project-summary";
 import Sidebar from "@/components/layout/sidebar";
 import { useEffect } from "react";
 
@@ -37,6 +41,11 @@ function App() {
             <Redirect to="/statistics" />
           </Route>
           <Route path="/admin" component={Admin} />
+          {/* Rutas para gestión de proyectos activos */}
+          <Route path="/active-projects" component={ActiveProjects} />
+          <Route path="/active-projects/new" component={NewActiveProject} />
+          <Route path="/time-entries/project/:projectId" component={TimeEntries} />
+          <Route path="/project-summary/:projectId" component={ProjectSummary} />
           <Route component={NotFound} />
         </Switch>
       </div>
