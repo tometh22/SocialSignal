@@ -9,7 +9,12 @@ import {
   insertReportTemplateSchema, 
   insertQuotationSchema,
   insertQuotationTeamMemberSchema,
-  insertTemplateRoleAssignmentSchema
+  insertTemplateRoleAssignmentSchema,
+  insertActiveProjectSchema,
+  insertTimeEntrySchema,
+  insertProgressReportSchema,
+  projectStatusOptions,
+  trackingFrequencyOptions
 } from "@shared/schema";
 import { reinitializeDatabase } from "./reinit-data";
 
@@ -558,6 +563,369 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete template role assignments" });
+    }
+  });
+
+  // ---------- RUTAS PARA PROYECTOS ACTIVOS ----------
+  
+  // Obtener todos los proyectos activos
+  app.get("/api/active-projects", async (_, res) => {
+    try {
+      const projects = await storage.getActiveProjects();
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching active projects:", error);
+      res.status(500).json({ message: "Failed to fetch active projects" });
+    }
+  });
+  
+  // Obtener proyectos activos por cliente
+  app.get("/api/active-projects/client/:clientId", async (req, res) => {
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    
+    try {
+      const projects = await storage.getActiveProjectsByClient(clientId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error fetching client active projects:", error);
+      res.status(500).json({ message: "Failed to fetch client active projects" });
+    }
+  });
+  
+  // Obtener un proyecto activo específico
+  app.get("/api/active-projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const project = await storage.getActiveProject(id);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      
+      res.json(project);
+    } catch (error) {
+      console.error("Error fetching active project:", error);
+      res.status(500).json({ message: "Failed to fetch active project" });
+    }
+  });
+  
+  // Crear un nuevo proyecto activo desde una cotización
+  app.post("/api/active-projects", async (req, res) => {
+    try {
+      const validatedData = insertActiveProjectSchema.parse(req.body);
+      
+      // Verificar que la cotización existe
+      const quotation = await storage.getQuotation(validatedData.quotationId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      
+      // Verificar que la cotización está aprobada
+      if (quotation.status !== "approved") {
+        return res.status(400).json({ 
+          message: "Cannot create project from non-approved quotation",
+          currentStatus: quotation.status
+        });
+      }
+      
+      const project = await storage.createActiveProject(validatedData);
+      res.status(201).json(project);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid project data", errors: error.errors });
+      }
+      console.error("Error creating active project:", error);
+      res.status(500).json({ message: "Failed to create active project" });
+    }
+  });
+  
+  // Actualizar un proyecto activo
+  app.patch("/api/active-projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const validatedData = insertActiveProjectSchema.partial().parse(req.body);
+      const updatedProject = await storage.updateActiveProject(id, validatedData);
+      
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      res.json(updatedProject);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid project data", errors: error.errors });
+      }
+      console.error("Error updating active project:", error);
+      res.status(500).json({ message: "Failed to update active project" });
+    }
+  });
+  
+  // ---------- RUTAS PARA REGISTRO DE HORAS ----------
+  
+  // Obtener registros de horas por proyecto
+  app.get("/api/time-entries/project/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const entries = await storage.getTimeEntriesByProject(projectId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+  
+  // Obtener registros de horas por persona
+  app.get("/api/time-entries/personnel/:personnelId", async (req, res) => {
+    const personnelId = parseInt(req.params.personnelId);
+    if (isNaN(personnelId)) return res.status(400).json({ message: "Invalid personnel ID" });
+    
+    try {
+      const entries = await storage.getTimeEntriesByPersonnel(personnelId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching personnel time entries:", error);
+      res.status(500).json({ message: "Failed to fetch personnel time entries" });
+    }
+  });
+  
+  // Obtener una entrada de tiempo específica
+  app.get("/api/time-entries/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    
+    try {
+      const entry = await storage.getTimeEntryById(id);
+      if (!entry) return res.status(404).json({ message: "Time entry not found" });
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching time entry:", error);
+      res.status(500).json({ message: "Failed to fetch time entry" });
+    }
+  });
+  
+  // Crear un nuevo registro de horas
+  app.post("/api/time-entries", async (req, res) => {
+    try {
+      const validatedData = insertTimeEntrySchema.parse(req.body);
+      
+      // Verificar que el proyecto existe
+      const project = await storage.getActiveProject(validatedData.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Verificar que la persona existe
+      const person = await storage.getPersonnelById(validatedData.personnelId);
+      if (!person) {
+        return res.status(404).json({ message: "Personnel not found" });
+      }
+      
+      const entry = await storage.createTimeEntry(validatedData);
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
+      }
+      console.error("Error creating time entry:", error);
+      res.status(500).json({ message: "Failed to create time entry" });
+    }
+  });
+  
+  // Actualizar un registro de horas
+  app.patch("/api/time-entries/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    
+    try {
+      const validatedData = insertTimeEntrySchema.partial().parse(req.body);
+      const updatedEntry = await storage.updateTimeEntry(id, validatedData);
+      
+      if (!updatedEntry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      
+      res.json(updatedEntry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
+      }
+      console.error("Error updating time entry:", error);
+      res.status(500).json({ message: "Failed to update time entry" });
+    }
+  });
+  
+  // Eliminar un registro de horas
+  app.delete("/api/time-entries/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    
+    try {
+      const deleted = await storage.deleteTimeEntry(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      
+      res.json({ success: true, message: "Time entry deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting time entry:", error);
+      res.status(500).json({ message: "Failed to delete time entry" });
+    }
+  });
+  
+  // Aprobar un registro de horas
+  app.post("/api/time-entries/:id/approve", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid time entry ID" });
+    
+    const { approverId } = req.body;
+    if (!approverId || isNaN(parseInt(approverId))) {
+      return res.status(400).json({ message: "Valid approver ID is required" });
+    }
+    
+    try {
+      const entry = await storage.getTimeEntryById(id);
+      if (!entry) {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      
+      if (entry.approved) {
+        return res.status(400).json({ message: "Time entry already approved" });
+      }
+      
+      const updatedEntry = await storage.approveTimeEntry(id, parseInt(approverId));
+      res.json(updatedEntry);
+    } catch (error) {
+      console.error("Error approving time entry:", error);
+      res.status(500).json({ message: "Failed to approve time entry" });
+    }
+  });
+  
+  // ---------- RUTAS PARA INFORMES DE PROGRESO ----------
+  
+  // Obtener informes de progreso por proyecto
+  app.get("/api/progress-reports/project/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const reports = await storage.getProgressReportsByProject(projectId);
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching progress reports:", error);
+      res.status(500).json({ message: "Failed to fetch progress reports" });
+    }
+  });
+  
+  // Obtener un informe de progreso específico
+  app.get("/api/progress-reports/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
+    
+    try {
+      const report = await storage.getProgressReport(id);
+      if (!report) return res.status(404).json({ message: "Progress report not found" });
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching progress report:", error);
+      res.status(500).json({ message: "Failed to fetch progress report" });
+    }
+  });
+  
+  // Crear un nuevo informe de progreso
+  app.post("/api/progress-reports", async (req, res) => {
+    try {
+      const validatedData = insertProgressReportSchema.parse(req.body);
+      
+      // Verificar que el proyecto existe
+      const project = await storage.getActiveProject(validatedData.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Verificar que la persona existe
+      const person = await storage.getPersonnelById(validatedData.createdBy);
+      if (!person) {
+        return res.status(404).json({ message: "Creator not found" });
+      }
+      
+      const report = await storage.createProgressReport(validatedData);
+      res.status(201).json(report);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid report data", errors: error.errors });
+      }
+      console.error("Error creating progress report:", error);
+      res.status(500).json({ message: "Failed to create progress report" });
+    }
+  });
+  
+  // Actualizar un informe de progreso
+  app.patch("/api/progress-reports/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid report ID" });
+    
+    try {
+      const validatedData = insertProgressReportSchema.partial().parse(req.body);
+      const updatedReport = await storage.updateProgressReport(id, validatedData);
+      
+      if (!updatedReport) {
+        return res.status(404).json({ message: "Progress report not found" });
+      }
+      
+      res.json(updatedReport);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid report data", errors: error.errors });
+      }
+      console.error("Error updating progress report:", error);
+      res.status(500).json({ message: "Failed to update progress report" });
+    }
+  });
+  
+  // ---------- RUTAS PARA COMPARACIONES FINANCIERAS ----------
+  
+  // Obtener resumen de costos de un proyecto
+  app.get("/api/projects/:id/cost-summary", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const summary = await storage.getProjectCostSummary(id);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching project cost summary:", error);
+      res.status(500).json({ message: "Failed to fetch project cost summary" });
+    }
+  });
+  
+  // ---------- RUTAS PARA OPCIONES ----------
+  
+  // Obtener opciones de estado de proyecto
+  app.get("/api/options/project-status", async (_, res) => {
+    try {
+      const options = await storage.getProjectStatusOptions();
+      res.json(options);
+    } catch (error) {
+      console.error("Error fetching project status options:", error);
+      res.status(500).json({ message: "Failed to fetch project status options" });
+    }
+  });
+  
+  // Obtener opciones de frecuencia de seguimiento
+  app.get("/api/options/tracking-frequency", async (_, res) => {
+    try {
+      const options = await storage.getTrackingFrequencyOptions();
+      res.json(options);
+    } catch (error) {
+      console.error("Error fetching tracking frequency options:", error);
+      res.status(500).json({ message: "Failed to fetch tracking frequency options" });
     }
   });
 
