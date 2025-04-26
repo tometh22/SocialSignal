@@ -97,7 +97,7 @@ const ActiveProjects: React.FC = () => {
 
   // Filtrar proyectos según pestaña activa y búsqueda
   const filteredProjects = React.useMemo(() => {
-    let filtered = selectedClient && activeTab !== "all" 
+    let filtered = selectedClient && selectedClient !== "all" && activeTab !== "all" 
       ? clientProjects || [] 
       : projects || [];
 
@@ -193,7 +193,7 @@ const ActiveProjects: React.FC = () => {
                     <SelectValue placeholder="Filtrar por cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los clientes</SelectItem>
+                    <SelectItem value="all">Todos los clientes</SelectItem>
                     {!isLoadingClients &&
                       clients?.map((client: Client) => (
                         <SelectItem key={client.id} value={client.id.toString()}>

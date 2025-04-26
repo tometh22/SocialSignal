@@ -1,67 +1,55 @@
 import { QueryClient } from "@tanstack/react-query";
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// Crear una instancia de QueryClient para ser usada en toda la aplicación
+export const queryClient = new QueryClient();
 
-interface ApiError extends Error {
-  status?: number;
-  info?: any;
-}
-
+// Función para hacer peticiones a la API
 export const apiRequest = async (
   url: string,
   method: string = "GET",
   data?: any
 ): Promise<any> => {
-  const options: RequestInit = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
+  try {
+    const options: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
 
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-
-  const response = await fetch(url, options);
-
-  if (!response.ok) {
-    const error: ApiError = new Error(
-      `API request failed with status ${response.status}`
-    );
-    error.status = response.status;
-    
-    try {
-      error.info = await response.json();
-    } catch (e) {
-      error.info = { message: "Could not parse error response" };
+    if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
+      options.body = JSON.stringify(data);
     }
-    
-    throw error;
-  }
 
-  if (response.status === 204) {
-    return null;
-  }
+    const response = await fetch(url, options);
 
-  return response.json();
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.message || `Error en la petición: ${response.status}`
+      );
+    }
+
+    // Para las peticiones DELETE no hay respuesta JSON
+    if (method === "DELETE") {
+      return true;
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("API request error:", error);
+    throw new Error(error.message || "Error desconocido");
+  }
 };
 
-// Default fetcher for useQuery
+// Función por defecto para consultas
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
-  const [url, ...params] = queryKey;
+  const url = queryKey[0];
+  const response = await fetch(url);
   
-  // If the URL contains parameters, we need to construct the full URL
-  const fullUrl = params.length > 0 
-    ? `${url}/${params.join('/')}`
-    : url;
-    
-  return apiRequest(fullUrl);
+  if (!response.ok) {
+    throw new Error(`Error en la petición: ${response.status}`);
+  }
+  
+  return response.json();
 };
