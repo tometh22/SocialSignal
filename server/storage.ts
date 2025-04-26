@@ -6,8 +6,13 @@ import {
   type Quotation, type InsertQuotation,
   type QuotationTeamMember, type InsertQuotationTeamMember,
   type TemplateRoleAssignment, type InsertTemplateRoleAssignment,
+  type ActiveProject, type InsertActiveProject,
+  type TimeEntry, type InsertTimeEntry,
+  type ProgressReport, type InsertProgressReport,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
-  analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions
+  activeProjects, timeEntries, progressReports,
+  analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
+  projectStatusOptions, trackingFrequencyOptions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
@@ -61,12 +66,44 @@ export interface IStorage {
   createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
   deleteQuotationTeamMembers(quotationId: number): Promise<void>;
 
+  // Active project operations
+  getActiveProjects(): Promise<ActiveProject[]>;
+  getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]>;
+  getActiveProject(id: number): Promise<ActiveProject | undefined>;
+  createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
+  updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
+  
+  // Time entry operations
+  getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
+  getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
+  getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
+  createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
+  deleteTimeEntry(id: number): Promise<boolean>;
+  approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined>;
+  
+  // Progress report operations
+  getProgressReportsByProject(projectId: number): Promise<ProgressReport[]>;
+  getProgressReport(id: number): Promise<ProgressReport | undefined>;
+  createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
+  updateProgressReport(id: number, report: Partial<InsertProgressReport>): Promise<ProgressReport | undefined>;
+  
+  // Financial comparison operations
+  getProjectCostSummary(projectId: number): Promise<{
+    estimatedCost: number;
+    actualCost: number;
+    variance: number;
+    percentageUsed: number;
+  }>;
+  
   // Get option lists
   getAnalysisTypes(): Promise<typeof analysisTypes>;
   getProjectTypes(): Promise<typeof projectTypes>;
   getMentionsVolumeOptions(): Promise<typeof mentionsVolumeOptions>;
   getCountriesCoveredOptions(): Promise<typeof countriesCoveredOptions>;
   getClientEngagementOptions(): Promise<typeof clientEngagementOptions>;
+  getProjectStatusOptions(): Promise<typeof projectStatusOptions>;
+  getTrackingFrequencyOptions(): Promise<typeof trackingFrequencyOptions>;
 }
 
 export class MemStorage implements IStorage {
@@ -77,6 +114,9 @@ export class MemStorage implements IStorage {
   private quotations: Map<number, Quotation>;
   private quotationTeamMembers: Map<number, QuotationTeamMember>;
   private templateRoleAssignments: Map<number, TemplateRoleAssignment>;
+  private activeProjects: Map<number, ActiveProject>;
+  private timeEntries: Map<number, TimeEntry>;
+  private progressReports: Map<number, ProgressReport>;
   
   private clientId: number;
   private roleId: number;
@@ -85,6 +125,9 @@ export class MemStorage implements IStorage {
   private quotationId: number;
   private quotationTeamMemberId: number;
   private templateRoleAssignmentId: number;
+  private activeProjectId: number;
+  private timeEntryId: number;
+  private progressReportId: number;
 
   constructor() {
     this.clients = new Map();
@@ -94,6 +137,9 @@ export class MemStorage implements IStorage {
     this.quotations = new Map();
     this.quotationTeamMembers = new Map();
     this.templateRoleAssignments = new Map();
+    this.activeProjects = new Map();
+    this.timeEntries = new Map();
+    this.progressReports = new Map();
     
     this.clientId = 1;
     this.roleId = 1;
@@ -102,6 +148,9 @@ export class MemStorage implements IStorage {
     this.quotationId = 1;
     this.quotationTeamMemberId = 1;
     this.templateRoleAssignmentId = 1;
+    this.activeProjectId = 1;
+    this.timeEntryId = 1;
+    this.progressReportId = 1;
     
     // Initialize with sample data
     this.initializeSampleData();
@@ -900,6 +949,179 @@ export class DatabaseStorage implements IStorage {
 
   async getClientEngagementOptions() {
     return clientEngagementOptions;
+  }
+  
+  async getProjectStatusOptions() {
+    return projectStatusOptions;
+  }
+  
+  async getTrackingFrequencyOptions() {
+    return trackingFrequencyOptions;
+  }
+  
+  // Active project operations
+  async getActiveProjects(): Promise<ActiveProject[]> {
+    return await db.select().from(activeProjects);
+  }
+  
+  async getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]> {
+    const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+    const clientQuotationIds = clientQuotations.map(q => q.id);
+    
+    const result = [];
+    for (const quotationId of clientQuotationIds) {
+      const projects = await db.select({
+        project: activeProjects,
+        quotation: quotations
+      })
+      .from(activeProjects)
+      .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+      .where(eq(quotations.id, quotationId));
+      
+      for (const item of projects) {
+        result.push({
+          ...item.project,
+          quotation: item.quotation
+        });
+      }
+    }
+      
+    return result;
+  }
+  
+  async getActiveProject(id: number): Promise<ActiveProject | undefined> {
+    const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, id));
+    return project;
+  }
+  
+  async createActiveProject(project: InsertActiveProject): Promise<ActiveProject> {
+    const [newProject] = await db.insert(activeProjects).values(project).returning();
+    return newProject;
+  }
+  
+  async updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined> {
+    const [updatedProject] = await db
+      .update(activeProjects)
+      .set({
+        ...project,
+        updatedAt: new Date()
+      })
+      .where(eq(activeProjects.id, id))
+      .returning();
+    return updatedProject;
+  }
+  
+  // Time entry operations
+  async getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
+    return await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
+  }
+  
+  async getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]> {
+    return await db.select().from(timeEntries).where(eq(timeEntries.personnelId, personnelId));
+  }
+  
+  async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
+    const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
+    return entry;
+  }
+  
+  async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
+    const [newEntry] = await db.insert(timeEntries).values(entry).returning();
+    return newEntry;
+  }
+  
+  async updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined> {
+    const [updatedEntry] = await db
+      .update(timeEntries)
+      .set(entry)
+      .where(eq(timeEntries.id, id))
+      .returning();
+    return updatedEntry;
+  }
+  
+  async deleteTimeEntry(id: number): Promise<boolean> {
+    await db.delete(timeEntries).where(eq(timeEntries.id, id));
+    const entry = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
+    return entry.length === 0;
+  }
+  
+  async approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined> {
+    const [updatedEntry] = await db
+      .update(timeEntries)
+      .set({
+        approved: true,
+        approvedBy: approverId,
+        approvedDate: new Date()
+      })
+      .where(eq(timeEntries.id, id))
+      .returning();
+    return updatedEntry;
+  }
+  
+  // Progress report operations
+  async getProgressReportsByProject(projectId: number): Promise<ProgressReport[]> {
+    return await db.select().from(progressReports).where(eq(progressReports.projectId, projectId));
+  }
+  
+  async getProgressReport(id: number): Promise<ProgressReport | undefined> {
+    const [report] = await db.select().from(progressReports).where(eq(progressReports.id, id));
+    return report;
+  }
+  
+  async createProgressReport(report: InsertProgressReport): Promise<ProgressReport> {
+    const [newReport] = await db.insert(progressReports).values(report).returning();
+    return newReport;
+  }
+  
+  async updateProgressReport(id: number, report: Partial<InsertProgressReport>): Promise<ProgressReport | undefined> {
+    const [updatedReport] = await db
+      .update(progressReports)
+      .set(report)
+      .where(eq(progressReports.id, id))
+      .returning();
+    return updatedReport;
+  }
+  
+  // Financial comparison operations
+  async getProjectCostSummary(projectId: number): Promise<{
+    estimatedCost: number;
+    actualCost: number;
+    variance: number;
+    percentageUsed: number;
+  }> {
+    const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
+    if (!project) throw new Error(`Project with ID ${projectId} not found`);
+    
+    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, project.quotationId));
+    if (!quotation) throw new Error(`Quotation with ID ${project.quotationId} not found`);
+    
+    // Obtener todas las entradas de tiempo para el proyecto
+    const entries = await db.select({
+      timeEntry: timeEntries,
+      personnel: personnel
+    })
+    .from(timeEntries)
+    .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+    .where(eq(timeEntries.projectId, projectId));
+    
+    // Calcular el costo real basado en las horas registradas
+    let actualCost = 0;
+    for (const entry of entries) {
+      if (entry.timeEntry.billable) {
+        actualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
+      }
+    }
+    
+    const estimatedCost = quotation.totalAmount;
+    const variance = estimatedCost - actualCost;
+    const percentageUsed = estimatedCost > 0 ? (actualCost / estimatedCost) * 100 : 0;
+    
+    return {
+      estimatedCost,
+      actualCost,
+      variance,
+      percentageUsed
+    };
   }
 }
 
