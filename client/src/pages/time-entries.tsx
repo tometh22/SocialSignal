@@ -837,11 +837,11 @@ const TimeEntries: React.FC = () => {
               <div className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between p-6">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold">{project.quotation.projectName}</h2>
+                    <h2 className="text-2xl font-bold">{project.quotation?.projectName || "Proyecto sin nombre"}</h2>
                     <ProjectStatusBadge status={project.status} />
                   </div>
                   <div className="text-muted-foreground">
-                    Cliente: {getClientNameById(project.quotation.clientId)} | Tipo: {project.quotation.projectType.toUpperCase()}
+                    Cliente: {project.quotation?.clientId ? getClientNameById(project.quotation.clientId) : "Desconocido"} | Tipo: {project.quotation?.projectType?.toUpperCase() || "N/A"}
                   </div>
                 </div>
                 <div className="flex mt-4 md:mt-0">
@@ -889,7 +889,7 @@ const TimeEntries: React.FC = () => {
                       <h3 className="text-sm font-medium mb-1">Presupuesto</h3>
                       <div className="flex items-center text-sm">
                         <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>${project.quotation.totalAmount.toFixed(2)}</span>
+                        <span>${project.quotation?.totalAmount?.toFixed(2) || "0.00"}</span>
                       </div>
                     </div>
                   </div>
@@ -1194,7 +1194,7 @@ const TimeEntries: React.FC = () => {
               <DialogHeader>
                 <DialogTitle>Nuevo Registro de Horas</DialogTitle>
                 <DialogDescription>
-                  Registra el tiempo trabajado en el proyecto {project.quotation.projectName}
+                  Registra el tiempo trabajado en el proyecto {project.quotation?.projectName || "seleccionado"}
                 </DialogDescription>
               </DialogHeader>
               <TimeRegistrationForm
