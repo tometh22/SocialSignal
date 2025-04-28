@@ -302,13 +302,15 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      // Invalidar la caché para forzar una actualización
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      
       // Actualizar la caché de manera optimista para mostrar inmediatamente el nuevo registro
+      // Esto debe ocurrir ANTES de invalidar la consulta
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        console.log("Añadiendo nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
+      
+      // Después actualizamos la caché para que se sincronice con el servidor
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       
       toast({
         title: "Tiempo registrado",
@@ -1045,7 +1047,12 @@ const TimeEntries: React.FC = () => {
                   <div className="flex justify-between items-center mb-4">
                     <TabsList className="grid grid-cols-5 w-full md:w-auto">
                       <TabsTrigger value="all">Todos</TabsTrigger>
-                      <TabsTrigger value="pending">Pendientes</TabsTrigger>
+                      <TabsTrigger value="pending" className="relative group">
+                        Pendientes
+                        <span className="absolute hidden group-hover:block bg-black/80 text-white text-xs p-1 rounded whitespace-nowrap -top-8 left-1/2 transform -translate-x-1/2">
+                          Pendientes de aprobación
+                        </span>
+                      </TabsTrigger>
                       <TabsTrigger value="approved">Aprobados</TabsTrigger>
                       <TabsTrigger value="billable">Facturables</TabsTrigger>
                       <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
@@ -1249,7 +1256,12 @@ const TimeEntries: React.FC = () => {
               <TimeRegistrationForm
                 personnel={personnel}
                 projectId={projectId}
-                onSuccess={() => setDialogOpen(false)}
+                onSuccess={() => {
+                  // Retrasamos un poco el cierre del diálogo para asegurar que se muestre el registro
+                  setTimeout(() => {
+                    setDialogOpen(false);
+                  }, 300);
+                }}
                 onCancel={() => setDialogOpen(false)}
                 isLoading={isLoading}
               />
