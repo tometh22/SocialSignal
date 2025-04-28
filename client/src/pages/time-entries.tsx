@@ -424,8 +424,8 @@ const TimeRegistrationForm: React.FC<{
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Horas trabajadas</FormLabel>
-                  <div className="flex items-center space-x-2">
-                    <div className="relative flex-1">
+                  <div className="flex flex-col space-y-2">
+                    <div className="relative">
                       <FormControl>
                         <Input
                           type="number"
@@ -440,30 +440,43 @@ const TimeRegistrationForm: React.FC<{
                       <Clock className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
                     </div>
 
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center border rounded bg-muted/40 px-3 h-11 space-x-2 text-sm">
-                            <span className="text-muted-foreground">Presets:</span>
-                            <div className="flex gap-1">
-                              {[0.5, 1, 2, 4, 8].map((value) => (
-                                <Button
-                                  key={value}
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-8 text-xs font-normal"
-                                  onClick={() => field.onChange(value)}
-                                >
-                                  {value}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>Valores rápidos</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    {/* Presets para móvil */}
+                    <div className="md:hidden flex items-center justify-start">
+                      <span className="text-xs text-muted-foreground mr-2">Presets:</span>
+                      <div className="flex gap-1">
+                        {[0.5, 1, 2, 4, 8].map((value) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 w-7 text-xs font-normal p-0"
+                            onClick={() => field.onChange(value)}
+                          >
+                            {value}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Presets para desktop */}
+                    <div className="hidden md:flex items-center border rounded bg-muted/40 px-3 h-11 space-x-2 text-sm">
+                      <span className="text-muted-foreground">Presets:</span>
+                      <div className="flex gap-1">
+                        {[0.5, 1, 2, 4, 8].map((value) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-8 text-xs font-normal"
+                            onClick={() => field.onChange(value)}
+                          >
+                            {value}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -837,11 +850,27 @@ const TimeEntries: React.FC = () => {
               <div className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between p-6">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold">{project.quotation?.projectName || "Proyecto sin nombre"}</h2>
+                    <h2 className="text-2xl font-bold">
+                      {project.quotation && project.quotation.projectName 
+                        ? project.quotation.projectName 
+                        : "Proyecto sin nombre"}
+                    </h2>
                     <ProjectStatusBadge status={project.status} />
                   </div>
                   <div className="text-muted-foreground">
-                    Cliente: {project.quotation?.clientId ? getClientNameById(project.quotation.clientId) : "Desconocido"} | Tipo: {project.quotation?.projectType?.toUpperCase() || "N/A"}
+                    <span className="inline-flex items-center">
+                      <Users2 className="h-4 w-4 mr-1" />
+                      Cliente: {project.quotation && project.quotation.clientId 
+                        ? getClientNameById(project.quotation.clientId) 
+                        : "Sin cliente asignado"}
+                    </span>
+                    <span className="mx-2">|</span>
+                    <span className="inline-flex items-center">
+                      <FolderKanban className="h-4 w-4 mr-1" />
+                      Tipo: {project.quotation && project.quotation.projectType 
+                        ? project.quotation.projectType.toUpperCase() 
+                        : "No especificado"}
+                    </span>
                   </div>
                 </div>
                 <div className="flex mt-4 md:mt-0">
