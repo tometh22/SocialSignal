@@ -84,10 +84,12 @@ import {
   BarChart3,
   Clock3,
   DollarSign,
+  FolderKanban,
   MoreHorizontal,
   Timer,
   UserCircle2,
   UserCheck,
+  Users2,
   AlertCircle,
   FileText,
   ExternalLink,
@@ -609,7 +611,7 @@ const TimeEntries: React.FC = () => {
 
   // Obtener registros de tiempo
   const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
-    queryKey: [`/api/time-entries/project/${projectId}`],
+    queryKey: ["/api/time-entries/project", projectId],
     enabled: !!projectId,
   });
 
@@ -657,7 +659,7 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
       toast({
         title: "Registro eliminado",
         description: "El registro de horas ha sido eliminado con éxito",
@@ -680,7 +682,7 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${id}/approve`, "POST", { approverId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
       toast({
         title: "Registro aprobado",
         description: "El registro de horas ha sido aprobado con éxito",
@@ -918,7 +920,11 @@ const TimeEntries: React.FC = () => {
                       <h3 className="text-sm font-medium mb-1">Presupuesto</h3>
                       <div className="flex items-center text-sm">
                         <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>${project.quotation?.totalAmount?.toFixed(2) || "0.00"}</span>
+                        <span>
+                          ${project.quotation && typeof project.quotation.totalAmount === 'number' 
+                            ? project.quotation.totalAmount.toFixed(2) 
+                            : "0.00"}
+                        </span>
                       </div>
                     </div>
                   </div>
