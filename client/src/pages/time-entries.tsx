@@ -517,6 +517,11 @@ const TimeRegistrationForm: React.FC<{
                       </SelectContent>
                     </Select>
                   </div>
+                  <FormDescription className="text-xs mt-1">
+                    <strong>Facturable:</strong> Horas que se cobran al cliente.
+                    <br />
+                    <strong>No facturable:</strong> Trabajo interno que no se cobra al cliente.
+                  </FormDescription>
                 </FormItem>
               )}
             />
