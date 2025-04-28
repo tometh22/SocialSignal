@@ -188,15 +188,10 @@ const ProjectStatusBadge: React.FC<{ status: string }> = ({ status }) => {
 };
 
 const TimeEntryApprovalStatus: React.FC<{ approved: boolean }> = ({ approved }) => {
-  return approved ? (
+  return (
     <div className="flex items-center gap-1.5 text-green-600">
       <CheckCircle2 className="h-4 w-4" />
-      <span className="text-xs font-medium">Aprobado</span>
-    </div>
-  ) : (
-    <div className="flex items-center gap-1.5 text-amber-600">
-      <Clock3 className="h-4 w-4" />
-      <span className="text-xs font-medium">Pendiente</span>
+      <span className="text-xs font-medium">Registrado</span>
     </div>
   );
 };
@@ -1045,15 +1040,8 @@ const TimeEntries: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex justify-between items-center mb-4">
-                    <TabsList className="grid grid-cols-5 w-full md:w-auto">
+                    <TabsList className="grid grid-cols-3 w-full md:w-auto">
                       <TabsTrigger value="all">Todos</TabsTrigger>
-                      <TabsTrigger value="pending" className="relative group">
-                        Pendientes
-                        <span className="absolute hidden group-hover:block bg-black/80 text-white text-xs p-1 rounded whitespace-nowrap -top-8 left-1/2 transform -translate-x-1/2">
-                          Pendientes de aprobación
-                        </span>
-                      </TabsTrigger>
-                      <TabsTrigger value="approved">Aprobados</TabsTrigger>
                       <TabsTrigger value="billable">Facturables</TabsTrigger>
                       <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
                     </TabsList>

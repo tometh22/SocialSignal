@@ -278,7 +278,7 @@ export const timeEntries = pgTable("time_entries", {
   date: timestamp("date").notNull(),
   hours: doublePrecision("hours").notNull(),
   description: text("description"),
-  approved: boolean("approved").default(false),
+  approved: boolean("approved").default(true),
   approvedBy: integer("approved_by").references(() => personnel.id),
   approvedDate: timestamp("approved_date"),
   billable: boolean("billable").default(true),

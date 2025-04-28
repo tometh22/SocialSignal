@@ -739,7 +739,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: req.body.date ? new Date(req.body.date) : undefined
       };
       
-      const validatedData = insertTimeEntrySchema.parse(processedData);
+      // Añadir por defecto que está aprobado y establecer la fecha de aprobación
+      const dataWithDefaults = {
+        ...processedData,
+        approved: true,
+        approvedDate: new Date(),
+        approvedBy: processedData.personnelId // Auto-aprobado por la persona que registra
+      };
+      
+      const validatedData = insertTimeEntrySchema.parse(dataWithDefaults);
       
       // Verificar que el proyecto existe
       const project = await storage.getActiveProject(validatedData.projectId);
