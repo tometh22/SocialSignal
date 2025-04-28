@@ -251,10 +251,18 @@ export const activeProjects = pgTable("active_projects", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertActiveProjectSchema = createInsertSchema(activeProjects).omit({
+// Esquema base generado por drizzle-zod
+const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+// Esquema personalizado que permite tanto Date como string para las fechas
+export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 // Nota: La relación con timeEntries se definirá después de declarar timeEntries
@@ -277,9 +285,16 @@ export const timeEntries = pgTable("time_entries", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+// Esquema base generado por drizzle-zod
+const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   id: true,
   createdAt: true,
+});
+
+// Esquema personalizado que permite tanto Date como string para las fechas
+export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
+  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
