@@ -572,6 +572,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/active-projects", async (_, res) => {
     try {
       const projects = await storage.getActiveProjects();
+      
+      // Depuración para ver qué está pasando con las cotizaciones
+      console.log("Proyectos activos con cotizaciones:");
+      projects.forEach(project => {
+        console.log(`Proyecto ID: ${project.id}, Cotización ID: ${project.quotationId}`);
+        console.log(`Cotización completa:`, project.quotation ? "Disponible" : "No disponible");
+        if (project.quotation) {
+          console.log(`Nombre del proyecto: ${project.quotation.projectName}`);
+        }
+      });
+      
       res.json(projects);
     } catch (error) {
       console.error("Error fetching active projects:", error);
