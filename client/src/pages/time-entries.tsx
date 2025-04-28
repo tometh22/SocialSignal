@@ -292,9 +292,11 @@ const TimeRegistrationForm: React.FC<{
   // Mutación para crear entrada de tiempo
   const createTimeEntryMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
+      // Convertir fecha a formato ISO String para que el servidor la procese correctamente
       return apiRequest("/api/time-entries", "POST", {
         ...data,
         projectId,
+        date: data.date.toISOString(),
       });
     },
     onSuccess: () => {

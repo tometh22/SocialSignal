@@ -612,18 +612,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Crear un nuevo proyecto activo desde una cotización
   app.post("/api/active-projects", async (req, res) => {
     try {
-      const validatedData = insertActiveProjectSchema.parse(req.body);
+      // Adaptar fechas si vienen como strings ISO
+      const processedData = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        expectedEndDate: req.body.expectedEndDate ? new Date(req.body.expectedEndDate) : undefined,
+        actualEndDate: req.body.actualEndDate ? new Date(req.body.actualEndDate) : undefined,
+      };
+
+      const validatedData = insertActiveProjectSchema.parse(processedData);
       
       // Verificar que la cotización existe
       const quotation = await storage.getQuotation(validatedData.quotationId);
       if (!quotation) {
-        return res.status(404).json({ message: "Quotation not found" });
+        return res.status(404).json({ message: "Cotización no encontrada" });
       }
       
       // Verificar que la cotización está aprobada
       if (quotation.status !== "approved") {
         return res.status(400).json({ 
-          message: "Cannot create project from non-approved quotation",
+          message: "No se puede crear un proyecto a partir de una cotización no aprobada",
           currentStatus: quotation.status
         });
       }
@@ -632,10 +640,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid project data", errors: error.errors });
+        console.error("Error de validación:", error.errors);
+        return res.status(400).json({ message: "Datos de proyecto inválidos", errors: error.errors });
       }
       console.error("Error creating active project:", error);
-      res.status(500).json({ message: "Failed to create active project" });
+      res.status(500).json({ message: "Error al crear el proyecto activo" });
     }
   });
   
@@ -711,28 +720,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Crear un nuevo registro de horas
   app.post("/api/time-entries", async (req, res) => {
     try {
-      const validatedData = insertTimeEntrySchema.parse(req.body);
+      // Adaptar fechas si vienen como strings ISO
+      const processedData = {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : undefined
+      };
+      
+      const validatedData = insertTimeEntrySchema.parse(processedData);
       
       // Verificar que el proyecto existe
       const project = await storage.getActiveProject(validatedData.projectId);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: "Proyecto no encontrado" });
       }
       
       // Verificar que la persona existe
       const person = await storage.getPersonnelById(validatedData.personnelId);
       if (!person) {
-        return res.status(404).json({ message: "Personnel not found" });
+        return res.status(404).json({ message: "Personal no encontrado" });
       }
       
       const entry = await storage.createTimeEntry(validatedData);
       res.status(201).json(entry);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid time entry data", errors: error.errors });
+        console.error("Error de validación:", error.errors);
+        return res.status(400).json({ message: "Datos de registro de horas inválidos", errors: error.errors });
       }
       console.error("Error creating time entry:", error);
-      res.status(500).json({ message: "Failed to create time entry" });
+      res.status(500).json({ message: "Error al crear el registro de horas" });
     }
   });
   

@@ -246,7 +246,13 @@ const NewActiveProject: React.FC = () => {
 
   // Manejar el envío del formulario
   const onSubmit = (data: FormData) => {
-    createProjectMutation.mutate(data);
+    // Convertir fechas a formato ISO String para que el servidor las procese correctamente
+    const formattedData = {
+      ...data,
+      startDate: data.startDate.toISOString(),
+      expectedEndDate: data.expectedEndDate ? data.expectedEndDate.toISOString() : undefined,
+    };
+    createProjectMutation.mutate(formattedData as any);
   };
 
   // Estado de carga
