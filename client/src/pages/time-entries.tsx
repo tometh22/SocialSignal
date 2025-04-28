@@ -301,17 +301,26 @@ const TimeRegistrationForm: React.FC<{
         date: data.date.toISOString(),
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
+    onSuccess: (newEntry) => {
+      // Invalidar la caché para forzar una actualización
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      
+      // Actualizar la caché de manera optimista para mostrar inmediatamente el nuevo registro
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        return [...oldData, newEntry];
+      });
+      
       toast({
         title: "Tiempo registrado",
         description: "El registro de horas ha sido creado con éxito",
       });
+      
       form.reset({
         date: new Date(),
         hours: 1,
         billable: true,
       });
+      
       onSuccess();
     },
     onError: (error: any) => {
@@ -616,7 +625,7 @@ const TimeEntries: React.FC = () => {
 
   // Obtener registros de tiempo
   const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
-    queryKey: ["/api/time-entries/project", projectId],
+    queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
   });
 
@@ -664,7 +673,7 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       toast({
         title: "Registro eliminado",
         description: "El registro de horas ha sido eliminado con éxito",
@@ -687,7 +696,7 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${id}/approve`, "POST", { approverId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       toast({
         title: "Registro aprobado",
         description: "El registro de horas ha sido aprobado con éxito",
