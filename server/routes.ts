@@ -701,6 +701,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener entradas de tiempo por proyecto
+  app.get("/api/time-entries/project/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const entries = await storage.getTimeEntriesByProject(projectId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching project time entries:", error);
+      res.status(500).json({ message: "Failed to fetch project time entries" });
+    }
+  });
+  
   // Obtener una entrada de tiempo específica
   app.get("/api/time-entries/:id", async (req, res) => {
     const id = parseInt(req.params.id);
