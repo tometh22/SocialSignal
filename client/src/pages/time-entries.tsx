@@ -297,14 +297,18 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      // Actualizar la caché de manera optimista para mostrar inmediatamente el nuevo registro
-      // Esto debe ocurrir ANTES de invalidar la consulta
+      // Actualizar el estado local para mostrar el nuevo registro inmediatamente
+      setLocalTimeEntries((prev) => {
+        console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
+        return [...prev, newEntry];
+      });
+      
+      // También actualizamos la caché para que se sincronice con el servidor
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
-        console.log("Añadiendo nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
       
-      // Después actualizamos la caché para que se sincronice con el servidor
+      // Invalidar la consulta para asegurar la sincronización completa en segundo plano
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       
       toast({
@@ -594,10 +598,11 @@ const TimeEntries: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
-  const [entryToApprove, setEntryToApprove] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [search, setSearch] = useState("");
+  
+  // Estado local para mantener las entradas de tiempo más recientes
+  const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
 
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
@@ -626,26 +631,29 @@ const TimeEntries: React.FC = () => {
     enabled: !!projectId,
   });
 
+  // Actualizar localTimeEntries cuando se cargan los datos del servidor
+  useEffect(() => {
+    if (timeEntries) {
+      setLocalTimeEntries(timeEntries);
+    }
+  }, [timeEntries]);
+
   // Filtrar entradas según pestaña activa y búsqueda
   const filteredEntries = React.useMemo(() => {
-    if (!timeEntries) return [];
+    // Usar localTimeEntries para asegurar que se muestran los registros nuevos al instante
+    const entries = localTimeEntries.length > 0 ? localTimeEntries : timeEntries || [];
     
-    let filtered = timeEntries;
+    let filtered = entries;
     
     // Filtrar por pestaña
     switch (activeTab) {
-      case "pending":
-        filtered = filtered.filter(entry => !entry.approved);
-        break;
-      case "approved":
-        filtered = filtered.filter(entry => entry.approved);
-        break;
       case "billable":
         filtered = filtered.filter(entry => entry.billable);
         break;
       case "non-billable":
         filtered = filtered.filter(entry => !entry.billable);
         break;
+      // El caso "all" no necesita filtro
     }
     
     // Filtrar por búsqueda
@@ -662,7 +670,7 @@ const TimeEntries: React.FC = () => {
     return [...filtered].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [timeEntries, activeTab, search, personnel]);
+  }, [localTimeEntries, timeEntries, activeTab, search, personnel]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -687,29 +695,6 @@ const TimeEntries: React.FC = () => {
     },
   });
 
-  // Mutación para aprobar entrada de tiempo
-  const approveTimeEntryMutation = useMutation({
-    mutationFn: async ({ id, approverId }: { id: number; approverId: number }) => {
-      return apiRequest(`/api/time-entries/${id}/approve`, "POST", { approverId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      toast({
-        title: "Registro aprobado",
-        description: "El registro de horas ha sido aprobado con éxito",
-      });
-      setApproveDialogOpen(false);
-    },
-    onError: (error: any) => {
-      console.error("Error approving time entry:", error);
-      toast({
-        title: "Error al aprobar",
-        description: error.message || "Ha ocurrido un error al aprobar el registro",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleDeleteEntry = (id: number) => {
     setEntryToDelete(id);
     setDeleteDialogOpen(true);
@@ -718,17 +703,6 @@ const TimeEntries: React.FC = () => {
   const confirmDelete = () => {
     if (entryToDelete) {
       deleteTimeEntryMutation.mutate(entryToDelete);
-    }
-  };
-
-  const handleApproveEntry = (id: number) => {
-    setEntryToApprove(id);
-    setApproveDialogOpen(true);
-  };
-
-  const confirmApprove = (approverId: number) => {
-    if (entryToApprove) {
-      approveTimeEntryMutation.mutate({ id: entryToApprove, approverId });
     }
   };
 
@@ -788,8 +762,7 @@ const TimeEntries: React.FC = () => {
     isLoadingProject || 
     isLoadingPersonnel || 
     isLoadingTimeEntries || 
-    deleteTimeEntryMutation.isPending ||
-    approveTimeEntryMutation.isPending;
+    deleteTimeEntryMutation.isPending;
 
   const getRoleNameById = (roleId: number) => {
     return roles?.find(role => role.id === roleId)?.name || "Rol desconocido";
