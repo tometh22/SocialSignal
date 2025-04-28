@@ -287,7 +287,7 @@ const ProjectSummary: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Nombre:</span>
-                    <span className="font-medium">{project.quotation.projectName}</span>
+                    <span className="font-medium">{project.quotation?.projectName || "Sin nombre"}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
