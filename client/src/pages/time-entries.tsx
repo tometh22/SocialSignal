@@ -298,9 +298,9 @@ const TimeRegistrationForm: React.FC<{
     },
     onSuccess: (newEntry) => {
       // Actualizar el estado local para mostrar el nuevo registro inmediatamente
-      setLocalTimeEntries((prev) => {
+      setLocalTimeEntries((prevEntries: TimeEntry[]) => {
         console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
-        return [...prev, newEntry];
+        return [...prevEntries, newEntry];
       });
       
       // También actualizamos la caché para que se sincronice con el servidor
@@ -694,11 +694,6 @@ const TimeEntries: React.FC = () => {
       });
     },
   });
-
-  const handleDeleteEntry = (id: number) => {
-    setEntryToDelete(id);
-    setDeleteDialogOpen(true);
-  };
 
   const confirmDelete = () => {
     if (entryToDelete) {
@@ -1145,31 +1140,16 @@ const TimeEntries: React.FC = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                    {!entry.approved && (
-                                      <>
-                                        <DropdownMenuItem 
-                                          onClick={() => handleApproveEntry(entry.id)}
-                                          className="text-green-600"
-                                        >
-                                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                                          Aprobar registro
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem 
-                                          onClick={() => handleDeleteEntry(entry.id)}
-                                          className="text-red-600"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Eliminar registro
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                    {entry.approved && (
-                                      <DropdownMenuItem disabled>
-                                        <UserCheck className="mr-2 h-4 w-4" />
-                                        Aprobado el {formatDate(entry.approvedDate)}
-                                      </DropdownMenuItem>
-                                    )}
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setEntryToDelete(entry.id);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Eliminar registro
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </TableCell>
@@ -1260,69 +1240,7 @@ const TimeEntries: React.FC = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Diálogo de aprobación */}
-          <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Aprobar registro de horas</DialogTitle>
-                <DialogDescription>
-                  Selecciona quién aprueba este registro de horas.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <div className="space-y-4">
-                  <div className="bg-muted/40 p-3 rounded-md">
-                    <h4 className="font-medium text-sm mb-1">Información del registro</h4>
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      {entryToApprove && timeEntries && (
-                        <>
-                          {(() => {
-                            const entry = timeEntries.find(e => e.id === entryToApprove);
-                            if (!entry) return null;
-                            const person = personnel?.find(p => p.id === entry.personnelId);
-                            
-                            return (
-                              <>
-                                <div>Persona: {person?.name}</div>
-                                <div>Fecha: {formatDate(entry.date)}</div>
-                                <div>Horas: {entry.hours}</div>
-                                <div>Tipo: {entry.billable ? 'Facturable' : 'No facturable'}</div>
-                              </>
-                            );
-                          })()}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <FormLabel>Aprobador</FormLabel>
-                  <Select onValueChange={(value) => confirmApprove(parseInt(value))}>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecciona un aprobador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {personnel?.map((p) => (
-                        <SelectItem key={p.id} value={p.id.toString()} className="py-3">
-                          <div className="flex items-center gap-2">
-                            <PersonAvatar name={p.name} />
-                            <span>{p.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setApproveDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+
         </>
       )}
     </div>
