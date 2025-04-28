@@ -27,6 +27,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   CalendarIcon, 
   Clock, 
@@ -299,30 +305,59 @@ const ActiveProjects: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setLocation(`/active-projects/${project.id}`)}
-                              >
-                                <FileText className="h-4 w-4" />
-                                <span className="sr-only">Ver</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setLocation(`/time-entries/project/${project.id}`)}
-                              >
-                                <Clock className="h-4 w-4" />
-                                <span className="sr-only">Registrar Horas</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setLocation(`/project-summary/${project.id}`)}
-                              >
-                                <LineChart className="h-4 w-4" />
-                                <span className="sr-only">Estadísticas</span>
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setLocation(`/project-summary/${project.id}`)}
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                      <span className="sr-only">Ver Detalles</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Ver Detalles del Proyecto</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setLocation(`/time-entries/project/${project.id}`)}
+                                    >
+                                      <Clock className="h-4 w-4" />
+                                      <span className="sr-only">Registrar Horas</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Registrar Horas de Trabajo</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setLocation(`/project-summary/${project.id}`)}
+                                    >
+                                      <LineChart className="h-4 w-4" />
+                                      <span className="sr-only">Estadísticas</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Ver Estadísticas del Proyecto</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           </TableCell>
                         </TableRow>
