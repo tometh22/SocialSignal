@@ -78,7 +78,8 @@ import {
   Eye,
   Clock3,
   UserCheck,
-  Bell
+  Bell,
+  Info as InfoIcon
 } from "lucide-react";
 import { format, subDays, differenceInDays, differenceInBusinessDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -144,6 +145,13 @@ interface Personnel {
   id: number;
   name: string;
   roleId: number;
+  hourlyRate: number;
+}
+
+interface Role {
+  id: number;
+  name: string;
+  description: string;
   hourlyRate: number;
 }
 
@@ -408,6 +416,11 @@ const ProjectSummary: React.FC = () => {
   const { data: personnel, isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
     queryKey: ['/api/personnel'],
   });
+  
+  // Obtener roles
+  const { data: roles, isLoading: isLoadingRoles } = useQuery<Role[]>({
+    queryKey: ['/api/roles'],
+  });
 
   // Total de horas calculado una sola vez
   const totalHours = useMemo(() => {
@@ -520,7 +533,7 @@ const ProjectSummary: React.FC = () => {
 
   // Preparar datos para gráficos usando useMemo para evitar cálculos repetidos
   const timeByPersonnelData = useMemo(() => {
-    if (!timeEntries || !personnel) return [];
+    if (!timeEntries || !personnel || !roles) return [];
 
     const filteredEntries = filterDataByTime(timeEntries);
     const hoursByPersonnel: Record<number, number> = {};
@@ -535,13 +548,16 @@ const ProjectSummary: React.FC = () => {
     return Object.keys(hoursByPersonnel).map(personnelId => {
       const id = parseInt(personnelId);
       const person = personnel.find(p => p.id === id);
+      const role = roles.find(r => r.id === person?.roleId);
+      
       return {
         name: person?.name || "Desconocido",
+        role: role?.name || "Sin rol",
         hours: hoursByPersonnel[id],
         cost: hoursByPersonnel[id] * (person?.hourlyRate || 0)
       };
     }).sort((a, b) => b.hours - a.hours);
-  }, [timeEntries, personnel, timeFilter]);
+  }, [timeEntries, personnel, roles, timeFilter]);
 
   const billableVsNonBillableData = useMemo(() => {
     if (!timeEntries) return [];
@@ -1356,14 +1372,33 @@ const ProjectSummary: React.FC = () => {
                                     tickLine={false}
                                   />
                                   <RechartsTooltip 
-                                    formatter={(value, name) => [
-                                      name === "hours" ? `${value} horas` : formatCurrency(value as number),
-                                      name === "hours" ? "Horas" : "Costo"
-                                    ]}
-                                    contentStyle={{ 
-                                      borderRadius: '8px',
-                                      border: '1px solid rgba(0, 0, 0, 0.1)',
-                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                                    formatter={(value, name, entry) => {
+                                      if (name === "hours") {
+                                        return [`${value} horas`, "Horas"];
+                                      } else if (name === "cost") {
+                                        return [formatCurrency(value as number), "Costo"];
+                                      }
+                                      return [value, name];
+                                    }}
+                                    content={({ active, payload, label }) => {
+                                      if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                          <div className="bg-white p-3 rounded-md shadow-md border border-gray-200">
+                                            <p className="font-bold mb-1">{data.name}</p>
+                                            <p className="text-sm text-gray-600 mb-2">
+                                              <span className="font-medium">Rol:</span> {data.role}
+                                            </p>
+                                            <p className="text-sm mb-1">
+                                              <span className="font-medium">Horas:</span> {data.hours}
+                                            </p>
+                                            <p className="text-sm">
+                                              <span className="font-medium">Costo:</span> {formatCurrency(data.cost)}
+                                            </p>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
                                     }}
                                   />
                                   <Legend iconType="circle" />
@@ -1459,6 +1494,27 @@ const ProjectSummary: React.FC = () => {
                           <CardDescription>
                             Proporción de horas facturables y no facturables
                           </CardDescription>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 mt-2">
+                                <InfoIcon className="h-4 w-4 mr-1" />
+                                <span className="text-xs">¿Qué significa esto?</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Horas Facturables vs No Facturables</AlertDialogTitle>
+                                <AlertDialogDescription className="space-y-4">
+                                  <p><strong>Horas Facturables:</strong> Son horas de trabajo que se cobran directamente al cliente según lo estipulado en el contrato. Esto incluye tareas como análisis de datos, elaboración de informes, reuniones con el cliente, y trabajo de monitoreo social directo.</p>
+                                  <p><strong>Horas No Facturables:</strong> Son horas de trabajo interno que no se cobran al cliente. Incluyen capacitaciones, reuniones internas, mantenimiento de plataformas, desarrollo de herramientas, y tiempo administrativo que no está directamente relacionado con los entregables del proyecto.</p>
+                                  <p>Esta distinción es importante para el análisis de rentabilidad del proyecto y para entender cómo se distribuye el esfuerzo del equipo.</p>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogAction>Entendido</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </CardHeader>
                         <CardContent className="pt-6">
                           <div className="h-[300px]"> {/* Altura fija para el gráfico */}
