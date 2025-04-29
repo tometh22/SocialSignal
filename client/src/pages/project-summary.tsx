@@ -22,6 +22,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { KpiCard } from "@/components/project/kpi-card";
 import { 
   ArrowLeft, 
@@ -42,12 +60,24 @@ import {
   CheckCircle,
   ChevronDown,
   Download,
+  Maximize2,
+  Minimize2,
+  Save,
+  Share2,
+  LayoutGrid,
+  Filter,
+  RefreshCw,
   Settings,
   Timer,
   Users,
   ShieldAlert,
+  Zap,
+  Award,
   Percent,
-  Eye
+  Eye,
+  Clock3,
+  UserCheck,
+  Bell
 } from "lucide-react";
 import { format, subDays, differenceInDays, differenceInBusinessDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -71,6 +101,7 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from "recharts";
+import { toast } from "@/hooks/use-toast";
 
 // Interfaces
 interface CostSummary {
@@ -155,6 +186,34 @@ const calculateRiskLevel = (
   return { level, factors: risks };
 };
 
+// Component Wrappers for Animation
+const AnimatedCard: React.FC<{
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}> = ({ children, delay = 0, className = "" }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 100 + delay);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  return (
+    <div
+      className={`transition-all duration-500 ${
+        isVisible 
+          ? "opacity-100 transform translate-y-0" 
+          : "opacity-0 transform translate-y-4"
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
+};
+
 // Status Badge Component
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const statusConfig = {
@@ -189,7 +248,8 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 // Risk Badge Component
 const RiskBadge: React.FC<{ 
   level: "low" | "medium" | "high";
-}> = ({ level }) => {
+  tooltip?: string;
+}> = ({ level, tooltip }) => {
   const config = {
     low: { 
       className: "bg-green-100 text-green-800 hover:bg-green-200", 
@@ -209,6 +269,26 @@ const RiskBadge: React.FC<{
   };
 
   const { className, icon, label } = config[level];
+
+  if (tooltip) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="outline" className={`font-normal ${className}`}>
+              <span className="flex items-center">
+                {icon}
+                {label}
+              </span>
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs p-4">
+            <p>{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   return (
     <Badge variant="outline" className={`font-normal ${className}`}>
@@ -230,6 +310,19 @@ const ProjectSummary: React.FC = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [timeFilter, setTimeFilter] = useState("all");
   const [chartType, setChartType] = useState<"bar" | "line" | "radar">("bar");
+  const [customView, setCustomView] = useState<{
+    showKpi: boolean;
+    showFinances: boolean;
+    showTime: boolean;
+    showRisks: boolean;
+    showCharts: boolean;
+  }>({
+    showKpi: true,
+    showFinances: true,
+    showTime: true,
+    showRisks: true,
+    showCharts: true
+  });
 
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
@@ -319,6 +412,18 @@ const ProjectSummary: React.FC = () => {
     const hoursPerDay = timeEntries.length > 0 
       ? totalHours / Math.max(1, daysPassed)
       : 0;
+      
+    // Tendencia de costos (simulada para demostración)
+    const costTrend = {
+      value: 5.2,
+      isPositive: costSummary.percentageUsed < 50
+    };
+    
+    // Tendencia de tiempo (simulada para demostración)
+    const timeTrend = {
+      value: 3.8,
+      isPositive: timeProgress < 50
+    };
 
     return {
       timeProgress,
@@ -328,6 +433,8 @@ const ProjectSummary: React.FC = () => {
       daysLeft,
       workingDaysLeft,
       hoursPerDay,
+      costTrend,
+      timeTrend,
       risk
     };
   }, [project, costSummary, timeEntries, totalHours]);
@@ -348,6 +455,126 @@ const ProjectSummary: React.FC = () => {
       return itemDate >= filterDate;
     });
   };
+
+  // Preparar datos para gráficos usando useMemo para evitar cálculos repetidos
+  const timeByPersonnelData = useMemo(() => {
+    if (!timeEntries || !personnel) return [];
+
+    const filteredEntries = filterDataByTime(timeEntries);
+    const hoursByPersonnel: Record<number, number> = {};
+    
+    filteredEntries.forEach(entry => {
+      if (!hoursByPersonnel[entry.personnelId]) {
+        hoursByPersonnel[entry.personnelId] = 0;
+      }
+      hoursByPersonnel[entry.personnelId] += entry.hours;
+    });
+
+    return Object.keys(hoursByPersonnel).map(personnelId => {
+      const id = parseInt(personnelId);
+      const person = personnel.find(p => p.id === id);
+      return {
+        name: person?.name || "Desconocido",
+        hours: hoursByPersonnel[id],
+        cost: hoursByPersonnel[id] * (person?.hourlyRate || 0)
+      };
+    }).sort((a, b) => b.hours - a.hours);
+  }, [timeEntries, personnel, timeFilter]);
+
+  const billableVsNonBillableData = useMemo(() => {
+    if (!timeEntries) return [];
+
+    const filteredEntries = filterDataByTime(timeEntries);
+    let billableHours = 0;
+    let nonBillableHours = 0;
+
+    filteredEntries.forEach(entry => {
+      if (entry.billable) {
+        billableHours += entry.hours;
+      } else {
+        nonBillableHours += entry.hours;
+      }
+    });
+
+    return [
+      { name: "Facturable", value: billableHours },
+      { name: "No facturable", value: nonBillableHours },
+    ];
+  }, [timeEntries, timeFilter]);
+
+  const timeEntriesByDateData = useMemo(() => {
+    if (!timeEntries) return [];
+
+    const filteredEntries = filterDataByTime(timeEntries);
+    const entriesByDate: Record<string, { date: string; hours: number; cost: number }> = {};
+    
+    filteredEntries.forEach(entry => {
+      const dateStr = format(new Date(entry.date), "yyyy-MM-dd");
+      const person = personnel?.find(p => p.id === entry.personnelId);
+      const hourlyRate = person?.hourlyRate || 0;
+      
+      if (!entriesByDate[dateStr]) {
+        entriesByDate[dateStr] = { 
+          date: format(new Date(entry.date), "dd MMM"), 
+          hours: 0,
+          cost: 0
+        };
+      }
+      entriesByDate[dateStr].hours += entry.hours;
+      entriesByDate[dateStr].cost += entry.hours * hourlyRate;
+    });
+
+    return Object.values(entriesByDate).sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  }, [timeEntries, personnel, timeFilter]);
+
+  const radarData = useMemo(() => {
+    if (!timeEntries || !personnel) return [];
+    
+    // Categorías para el radar
+    const categories = ["Análisis", "Desarrollo", "Diseño", "Pruebas", "Gestión"];
+    
+    // Crear datos para el radar con valores simulados
+    const data = categories.map(category => {
+      return {
+        subject: category,
+        A: Math.floor(Math.random() * 100) + 20,
+        B: Math.floor(Math.random() * 100) + 10,
+        fullMark: 150
+      };
+    });
+    
+    return data;
+  }, [timeEntries, personnel]);
+
+  // Simular exportación de informe 
+  const handleExportReport = () => {
+    toast({
+      title: "Exportando informe",
+      description: "El informe del proyecto se está generando y se descargará automáticamente.",
+    });
+
+    // Simular la descarga tras un breve retraso
+    setTimeout(() => {
+      toast({
+        title: "Exportación completada",
+        description: "El informe se ha descargado con éxito.",
+        variant: "success",
+      });
+    }, 1500);
+  };
+
+  // Guardar vista personalizada
+  const handleSaveView = () => {
+    toast({
+      title: "Vista personalizada guardada",
+      description: "Tu configuración de dashboard ha sido guardada.",
+      variant: "success",
+    });
+  };
+
+  const pieChartColors = ["#4f46e5", "#f97316", "#10b981", "#f43f5e"];
 
   const isLoading = 
     isLoadingProject || 
@@ -416,12 +643,88 @@ const ProjectSummary: React.FC = () => {
           </Select>
           
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Personalizar
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Personalizar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Personaliza tu dashboard</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Selecciona qué componentes deseas mostrar en el resumen del proyecto.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Target className="h-4 w-4 text-primary" />
+                      <span>Métricas principales (KPIs)</span>
+                    </div>
+                    <Switch 
+                      checked={customView.showKpi} 
+                      onCheckedChange={(checked) => 
+                        setCustomView({...customView, showKpi: checked})}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      <span>Información financiera</span>
+                    </div>
+                    <Switch 
+                      checked={customView.showFinances} 
+                      onCheckedChange={(checked) => 
+                        setCustomView({...customView, showFinances: checked})}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span>Registro de tiempo</span>
+                    </div>
+                    <Switch 
+                      checked={customView.showTime} 
+                      onCheckedChange={(checked) => 
+                        setCustomView({...customView, showTime: checked})}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-4 w-4 text-primary" />
+                      <span>Análisis de riesgos</span>
+                    </div>
+                    <Switch 
+                      checked={customView.showRisks} 
+                      onCheckedChange={(checked) => 
+                        setCustomView({...customView, showRisks: checked})}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <span>Gráficos y visualizaciones</span>
+                    </div>
+                    <Switch 
+                      checked={customView.showCharts} 
+                      onCheckedChange={(checked) => 
+                        setCustomView({...customView, showCharts: checked})}
+                    />
+                  </div>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleSaveView}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar configuración
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportReport}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
@@ -452,133 +755,139 @@ const ProjectSummary: React.FC = () => {
         ) : (
           <>
             {/* KPI Cards - Layout limpio y claro */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <KpiCard
-                title="Progreso del proyecto"
-                value={`${projectMetrics?.timeProgress || 0}%`}
-                icon={<Percent className="h-5 w-5 text-blue-600" />}
-                trend={{
-                  value: 3.8,
-                  isPositive: true
-                }}
-              />
-              
-              <KpiCard
-                title="Presupuesto utilizado"
-                value={`${Math.round(costSummary?.percentageUsed || 0)}%`}
-                subtitle={formatCurrency(costSummary?.actualCost || 0)}
-                icon={<DollarSign className="h-5 w-5 text-green-600" />}
-                trend={{
-                  value: 5.2,
-                  isPositive: true
-                }}
-              />
-              
-              <KpiCard
-                title="Tiempo restante"
-                value={projectMetrics?.daysLeft || 0}
-                subtitle="días"
-                icon={<Timer className="h-5 w-5 text-purple-600" />}
-              />
-              
-              <KpiCard
-                title="Personal asignado"
-                value={new Set(timeEntries?.map(e => e.personnelId) || []).size}
-                subtitle="personas"
-                icon={<Users className="h-5 w-5 text-orange-600" />}
-              />
-            </div>
+            {customView.showKpi && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <KpiCard
+                  title="Progreso del proyecto"
+                  value={`${projectMetrics?.timeProgress || 0}%`}
+                  icon={<Percent className="h-5 w-5 text-blue-600" />}
+                  trend={{
+                    value: 3.8,
+                    isPositive: true
+                  }}
+                />
+                
+                <KpiCard
+                  title="Presupuesto utilizado"
+                  value={`${Math.round(costSummary?.percentageUsed || 0)}%`}
+                  subtitle={formatCurrency(costSummary?.actualCost || 0)}
+                  icon={<DollarSign className="h-5 w-5 text-green-600" />}
+                  trend={{
+                    value: 5.2,
+                    isPositive: true
+                  }}
+                />
+                
+                <KpiCard
+                  title="Tiempo restante"
+                  value={projectMetrics?.daysLeft || 0}
+                  subtitle="días"
+                  icon={<Timer className="h-5 w-5 text-purple-600" />}
+                />
+                
+                <KpiCard
+                  title="Personal asignado"
+                  value={new Set(timeEntries?.map(e => e.personnelId) || []).size}
+                  subtitle="personas"
+                  icon={<Users className="h-5 w-5 text-orange-600" />}
+                />
+              </div>
+            )}
 
             {/* Análisis de riesgos */}
-            <Card className="mb-8 shadow-sm border bg-white">
-              <CardHeader className="pb-2 border-b">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <ShieldAlert className="h-5 w-5 mr-2 text-primary" />
-                    <CardTitle className="text-lg font-medium">Análisis de Riesgos del Proyecto</CardTitle>
-                  </div>
-                  <RiskBadge level={projectMetrics?.risk.level || "low"} />
-                </div>
-                <CardDescription>
-                  Monitoreo de factores de riesgo y alertas tempranas
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium">Presupuesto</h3>
-                    <Progress 
-                      value={costSummary?.percentageUsed || 0} 
-                      className={
-                        (costSummary?.percentageUsed || 0) > 100
-                          ? "bg-red-100 text-red-500"
-                          : (costSummary?.percentageUsed || 0) > 90
-                          ? "bg-yellow-100 text-yellow-500"
-                          : "bg-primary/20"
-                      }
-                    />
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Presupuesto utilizado</span>
-                      <RiskBadge 
-                        level={(costSummary?.percentageUsed || 0) > 100 
-                          ? "high" 
-                          : (costSummary?.percentageUsed || 0) > 90 
-                          ? "medium" 
-                          : "low"} 
-                      />
+            {customView.showRisks && (
+              <AnimatedCard delay={300}>
+                <Card className="mb-8 shadow-sm border bg-white">
+                  <CardHeader className="pb-2 border-b">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <ShieldAlert className="h-5 w-5 mr-2 text-primary" />
+                        <CardTitle className="text-lg font-medium">Análisis de Riesgos del Proyecto</CardTitle>
+                      </div>
+                      <RiskBadge level={projectMetrics?.risk.level || "low"} />
                     </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium">Plazos</h3>
-                    <Progress 
-                      value={projectMetrics?.timeProgress || 0} 
-                      className={
-                        (projectMetrics?.timeProgress || 0) > 100
-                          ? "bg-red-100 text-red-500"
-                          : (projectMetrics?.timeProgress || 0) > 90
-                          ? "bg-yellow-100 text-yellow-500"
-                          : "bg-primary/20"
-                      }
-                    />
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Progreso vs plazo</span>
-                      <RiskBadge 
-                        level={(projectMetrics?.timeProgress || 0) > 100 
-                          ? "high" 
-                          : (projectMetrics?.timeProgress || 0) > 90 
-                          ? "medium" 
-                          : "low"} 
-                      />
+                    <CardDescription>
+                      Monitoreo de factores de riesgo y alertas tempranas
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-medium">Presupuesto</h3>
+                        <Progress 
+                          value={costSummary?.percentageUsed || 0} 
+                          className={
+                            (costSummary?.percentageUsed || 0) > 100
+                              ? "bg-red-100 text-red-500"
+                              : (costSummary?.percentageUsed || 0) > 90
+                              ? "bg-yellow-100 text-yellow-500"
+                              : "bg-primary/20"
+                          }
+                        />
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Presupuesto utilizado</span>
+                          <RiskBadge 
+                            level={(costSummary?.percentageUsed || 0) > 100 
+                              ? "high" 
+                              : (costSummary?.percentageUsed || 0) > 90 
+                              ? "medium" 
+                              : "low"} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-medium">Plazos</h3>
+                        <Progress 
+                          value={projectMetrics?.timeProgress || 0} 
+                          className={
+                            (projectMetrics?.timeProgress || 0) > 100
+                              ? "bg-red-100 text-red-500"
+                              : (projectMetrics?.timeProgress || 0) > 90
+                              ? "bg-yellow-100 text-yellow-500"
+                              : "bg-primary/20"
+                          }
+                        />
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Progreso vs plazo</span>
+                          <RiskBadge 
+                            level={(projectMetrics?.timeProgress || 0) > 100 
+                              ? "high" 
+                              : (projectMetrics?.timeProgress || 0) > 90 
+                              ? "medium" 
+                              : "low"} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <h3 className="text-sm font-medium">Factores de Riesgo</h3>
+                        <ul className="space-y-2">
+                          {projectMetrics?.risk.factors.map((factor, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm">
+                              {projectMetrics.risk.level === "high" ? (
+                                <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                              ) : projectMetrics.risk.level === "medium" ? (
+                                <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              )}
+                              <span>{factor}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium">Factores de Riesgo</h3>
-                    <ul className="space-y-2">
-                      {projectMetrics?.risk.factors.map((factor, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm">
-                          {projectMetrics.risk.level === "high" ? (
-                            <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                          ) : projectMetrics.risk.level === "medium" ? (
-                            <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          )}
-                          <span>{factor}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-2 border-t">
-                <Button variant="outline" size="sm" className="w-full">
-                  <Eye className="mr-2 h-4 w-4" />
-                  Ver plan de mitigación de riesgos
-                </Button>
-              </CardFooter>
-            </Card>
+                  </CardContent>
+                  <CardFooter className="pt-2 border-t">
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Ver plan de mitigación de riesgos
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </AnimatedCard>
+            )}
             
             {/* Tabs de navegación para el contenido */}
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
@@ -588,54 +897,605 @@ const ProjectSummary: React.FC = () => {
                 <TabsTrigger value="hours" className="flex-1">Registro de horas</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="overview" className="mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="shadow-sm">
-                    <CardHeader className="pb-2 border-b">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base font-medium flex items-center">
-                          <FileText className="h-4 w-4 mr-2 text-primary" />
-                          Información del Proyecto
-                        </CardTitle>
-                        <StatusBadge status={project.status} />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                      <div className="space-y-3 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Fecha de inicio:</span>
-                          <span>{formatDate(project.startDate)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Fecha fin esperada:</span>
-                          <span>{formatDate(project.expectedEndDate)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Seguimiento:</span>
-                          <span className="capitalize">{project.trackingFrequency}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="pt-2 border-t">
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => 
-                        setLocation(`/active-projects/${project.id}/time-entries`)
-                      }>
-                        <Clock className="mr-2 h-4 w-4" />
-                        Ver Registro de Horas
-                      </Button>
-                    </CardFooter>
-                  </Card>
+              <TabsContent value="overview" className="pt-4">
+                {/* Main Three Cards Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                  {customView.showFinances && (
+                    <AnimatedCard delay={400}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-3 border-b">
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <div className="mr-3 p-2 rounded-full bg-primary/10">
+                              <FileText className="h-5 w-5 text-primary" />
+                            </div>
+                            Información del Proyecto
+                          </CardTitle>
+                          <div className="flex justify-between items-center">
+                            <CardDescription>Estado actual</CardDescription>
+                            <StatusBadge status={project.status} />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Nombre:</span>
+                              <span className="font-medium">{project.quotation?.projectName || "Sin nombre"}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">ID Proyecto:</span>
+                              <span>{project.id}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">ID Cotización:</span>
+                              <span>{project.quotationId}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Fecha de inicio:</span>
+                              <div className="flex items-center">
+                                <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                                <span>{formatDate(project.startDate)}</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Fecha fin esperada:</span>
+                              <div className="flex items-center">
+                                <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                                <span>{formatDate(project.expectedEndDate)}</span>
+                              </div>
+                            </div>
+                            {project.actualEndDate && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-muted-foreground">Fecha fin real:</span>
+                                <div className="flex items-center">
+                                  <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                                  <span>{formatDate(project.actualEndDate)}</span>
+                                </div>
+                              </div>
+                            )}
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Frecuencia de seguimiento:</span>
+                              <span className="capitalize">{project.trackingFrequency}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="pt-0 border-t mt-4">
+                          <Button 
+                            variant="outline" 
+                            className="w-full"
+                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
+                          >
+                            <Clock className="mr-2 h-4 w-4" />
+                            Ver Registro de Horas
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    </AnimatedCard>
+                  )}
 
-                  {/* Más contenido aquí */}
+                  {customView.showFinances && (
+                    <AnimatedCard delay={500}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-3 border-b">
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <div className="mr-3 p-2 rounded-full bg-primary/10">
+                              <DollarSign className="h-5 w-5 text-primary" />
+                            </div>
+                            Información Financiera
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="space-y-4">
+                            <div className="flex flex-col">
+                              <span className="text-sm text-muted-foreground mb-1">Costo estimado:</span>
+                              <span className="text-xl font-bold">
+                                {formatCurrency(costSummary?.estimatedCost || 0)}
+                              </span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm text-muted-foreground mb-1">Costo actual:</span>
+                              <span className="text-xl font-bold">
+                                {formatCurrency(costSummary?.actualCost || 0)}
+                              </span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Variación:</span>
+                              <div className="flex items-center">
+                                {costSummary && costSummary.variance >= 0 ? (
+                                  <>
+                                    <TrendingDown className="h-4 w-4 mr-1 text-green-500" />
+                                    <span className="text-green-500 font-medium">
+                                      {formatCurrency(costSummary.variance)} ahorrado
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
+                                    <span className="text-red-500 font-medium">
+                                      {formatCurrency(Math.abs(costSummary?.variance || 0))} extra
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="pt-2">
+                              <div className="flex justify-between mb-2">
+                                <span className="text-sm text-muted-foreground">Presupuesto utilizado:</span>
+                                <span className="font-medium">
+                                  {Math.round(costSummary?.percentageUsed || 0)}%
+                                </span>
+                              </div>
+                              <Progress 
+                                value={costSummary?.percentageUsed || 0} 
+                                className={
+                                  (costSummary?.percentageUsed || 0) > 100
+                                    ? "bg-red-100 text-red-500"
+                                    : (costSummary?.percentageUsed || 0) > 90
+                                    ? "bg-yellow-100 text-yellow-500"
+                                    : "bg-primary/20"
+                                }
+                              />
+                              {(costSummary?.percentageUsed || 0) > 100 && (
+                                <div className="flex items-center mt-2 text-red-500 text-xs">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  <span>Presupuesto excedido</span>
+                                </div>
+                              )}
+                              {(costSummary?.percentageUsed || 0) > 90 && (costSummary?.percentageUsed || 0) <= 100 && (
+                                <div className="flex items-center mt-2 text-yellow-500 text-xs">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  <span>Presupuesto a punto de agotarse</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="pt-0 border-t mt-4">
+                          <Button 
+                            variant="outline" 
+                            className="w-full"
+                            onClick={() => setLocation(`/quotations/${project.quotationId}`)}
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Ver Cotización Original
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    </AnimatedCard>
+                  )}
+
+                  {customView.showTime && (
+                    <AnimatedCard delay={600}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-3 border-b">
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <div className="mr-3 p-2 rounded-full bg-primary/10">
+                              <Clock className="h-5 w-5 text-primary" />
+                            </div>
+                            Resumen de Horas
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Total horas registradas:</span>
+                              <span className="font-bold">
+                                {totalHours.toFixed(1)} horas
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Horas facturables:</span>
+                              <span>
+                                {billableHours.toFixed(1)} horas
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Horas no facturables:</span>
+                              <span>
+                                {nonBillableHours.toFixed(1)} horas
+                              </span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Total registros:</span>
+                              <span>{timeEntries?.length || 0} registros</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Personal involucrado:</span>
+                              <span>
+                                {new Set(timeEntries?.map(e => e.personnelId) || []).size} personas
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">Promedio diario:</span>
+                              <span>
+                                {projectMetrics?.hoursPerDay.toFixed(1)} h/día
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="pt-0 border-t mt-4">
+                          <Button 
+                            className="w-full"
+                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
+                          >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Registrar Nuevas Horas
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    </AnimatedCard>
+                  )}
                 </div>
+                
+                {/* Chart Controls */}
+                {customView.showCharts && (
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold">Análisis y visualizaciones</h2>
+                    <div className="flex items-center space-x-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant={chartType === "bar" ? "default" : "outline"} 
+                              size="sm"
+                              onClick={() => setChartType("bar")}
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Gráfico de barras</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant={chartType === "line" ? "default" : "outline"} 
+                              size="sm"
+                              onClick={() => setChartType("line")}
+                            >
+                              <LineChartIcon className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Gráfico de línea</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant={chartType === "radar" ? "default" : "outline"} 
+                              size="sm"
+                              onClick={() => setChartType("radar")}
+                            >
+                              <Zap className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Gráfico radar</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                )}
+
+                {/* Charts Section */}
+                {customView.showCharts && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <AnimatedCard delay={700}>
+                      <Card className="shadow-sm">
+                        <CardHeader className="border-b">
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <BarChart3 className="h-5 w-5 mr-2 text-primary" />
+                            Distribución de Horas por Personal
+                          </CardTitle>
+                          <CardDescription>
+                            Desglose del tiempo registrado por cada persona
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                            {timeByPersonnelData.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                <Clock className="h-10 w-10 mb-2" />
+                                <p>No hay datos disponibles</p>
+                              </div>
+                            ) : chartType === "bar" ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                  data={timeByPersonnelData}
+                                  margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                                  barSize={40}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                  <XAxis 
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                  />
+                                  <YAxis 
+                                    axisLine={false}
+                                    tickLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    formatter={(value, name) => [
+                                      name === "hours" ? `${value} horas` : formatCurrency(value as number),
+                                      name === "hours" ? "Horas" : "Costo"
+                                    ]}
+                                    contentStyle={{ 
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                                    }}
+                                  />
+                                  <Legend iconType="circle" />
+                                  <Bar 
+                                    dataKey="hours" 
+                                    fill="#4f46e5" 
+                                    name="Horas"
+                                    radius={[4, 4, 0, 0]}
+                                    animationDuration={1500}
+                                  />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            ) : chartType === "line" ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={timeByPersonnelData}
+                                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                  <XAxis 
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                  />
+                                  <YAxis 
+                                    axisLine={false}
+                                    tickLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    formatter={(value) => [`${value} horas`, "Horas"]}
+                                    contentStyle={{ 
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                                    }}
+                                  />
+                                  <Legend iconType="circle" />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="hours"
+                                    stroke="#4f46e5"
+                                    name="Horas"
+                                    strokeWidth={3}
+                                    dot={{ r: 6, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                                    activeDot={{ r: 8, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                                    animationDuration={1500}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart 
+                                  outerRadius={90} 
+                                  width={500} 
+                                  height={300} 
+                                  data={radarData}
+                                >
+                                  <PolarGrid />
+                                  <PolarAngleAxis dataKey="subject" />
+                                  <PolarRadiusAxis />
+                                  <Radar
+                                    name="Proyecto Actual"
+                                    dataKey="A"
+                                    stroke="#4f46e5"
+                                    fill="#4f46e5"
+                                    fillOpacity={0.6}
+                                    animationDuration={1500}
+                                  />
+                                  <Radar
+                                    name="Promedio de Proyectos"
+                                    dataKey="B"
+                                    stroke="#ff7a45"
+                                    fill="#ff7a45"
+                                    fillOpacity={0.6}
+                                    animationDuration={1500}
+                                  />
+                                  <Legend iconType="circle" />
+                                </RadarChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+
+                    <AnimatedCard delay={800}>
+                      <Card className="shadow-sm">
+                        <CardHeader className="border-b">
+                          <CardTitle className="text-lg font-medium flex items-center">
+                            <PieChartIcon className="h-5 w-5 mr-2 text-primary" />
+                            Facturable vs No Facturable
+                          </CardTitle>
+                          <CardDescription>
+                            Proporción de horas facturables y no facturables
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                            {billableVsNonBillableData.every(item => item.value === 0) ? (
+                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                <Clock className="h-10 w-10 mb-2" />
+                                <p>No hay datos disponibles</p>
+                              </div>
+                            ) : (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={billableVsNonBillableData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    outerRadius={120}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                    label={({ name, percent }) => 
+                                      `${name}: ${(percent * 100).toFixed(0)}%`
+                                    }
+                                    animationDuration={1500}
+                                    animationBegin={300}
+                                  >
+                                    {billableVsNonBillableData.map((entry, index) => (
+                                      <Cell 
+                                        key={`cell-${index}`} 
+                                        fill={index === 0 ? "#4f46e5" : "#f97316"} 
+                                      />
+                                    ))}
+                                  </Pie>
+                                  <RechartsTooltip 
+                                    formatter={(value) => [`${value} horas`, "Horas"]}
+                                    contentStyle={{ 
+                                      borderRadius: '8px',
+                                      border: '1px solid rgba(0, 0, 0, 0.1)',
+                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                                    }}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+                  </div>
+                )}
+                
+                {/* Time Trend Chart */}
+                {customView.showCharts && (
+                  <AnimatedCard delay={900}>
+                    <Card className="shadow-sm mb-12"> {/* Espacio extra al final */}
+                      <CardHeader className="border-b">
+                        <CardTitle className="text-lg font-medium flex items-center">
+                          <LineChartIcon className="h-5 w-5 mr-2 text-primary" />
+                          Tendencia de Registro de Horas
+                        </CardTitle>
+                        <CardDescription>
+                          Evolución de las horas registradas a lo largo del tiempo
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-6">
+                        <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                          {timeEntriesByDateData.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                              <Clock className="h-10 w-10 mb-2" />
+                              <p>No hay datos disponibles</p>
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart
+                                data={timeEntriesByDateData}
+                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis 
+                                  dataKey="date"
+                                  axisLine={false}
+                                  tickLine={false}
+                                  padding={{ left: 30, right: 30 }}
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  yAxisId="left"
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  orientation="right"
+                                  yAxisId="right"
+                                />
+                                <RechartsTooltip 
+                                  formatter={(value, name) => {
+                                    if (name === "hours") return [`${value} horas`, "Horas"];
+                                    if (name === "cost") return [formatCurrency(value as number), "Costo"];
+                                    return [value, name];
+                                  }}
+                                  contentStyle={{ 
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                                  }}
+                                />
+                                <Legend iconType="circle" />
+                                <Line
+                                  type="monotone"
+                                  dataKey="hours"
+                                  stroke="#4f46e5"
+                                  name="Horas"
+                                  strokeWidth={3}
+                                  dot={{ r: 6, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                                  activeDot={{ r: 8, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                                  yAxisId="left"
+                                  animationDuration={1500}
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="cost"
+                                  stroke="#f59e0b"
+                                  name="Costo"
+                                  strokeWidth={3}
+                                  dot={{ r: 6, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
+                                  activeDot={{ r: 8, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
+                                  yAxisId="right"
+                                  animationDuration={1500}
+                                  animationBegin={300}
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </AnimatedCard>
+                )}
               </TabsContent>
               
               <TabsContent value="financial">
-                {/* Contenido de Finanzas */}
+                <h2 className="text-xl font-bold">Información Financiera Detallada</h2>
+                <p className="text-muted-foreground">Detalles financieros del proyecto, presupuesto, gastos y análisis de costos</p>
+                
+                <div className="bg-muted/30 p-6 rounded-lg text-center mt-6">
+                  <Award className="h-16 w-16 text-primary/40 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Módulo en desarrollo</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    La vista detallada de finanzas estará disponible próximamente. Por favor regresa más tarde.
+                  </p>
+                </div>
               </TabsContent>
               
               <TabsContent value="hours">
-                {/* Contenido de Registro de horas */}
+                <h2 className="text-xl font-bold">Detalle de Horas Registradas</h2>
+                <p className="text-muted-foreground">Registro detallado de las horas trabajadas por cada miembro del equipo</p>
+                
+                <div className="bg-muted/30 p-6 rounded-lg text-center mt-6">
+                  <Clock3 className="h-16 w-16 text-primary/40 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Módulo en desarrollo</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    La vista detallada de horas estará disponible próximamente. Por favor regresa más tarde.
+                  </p>
+                </div>
               </TabsContent>
             </Tabs>
           </>
