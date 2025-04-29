@@ -93,7 +93,8 @@ import {
   AlertCircle,
   FileText,
   ExternalLink,
-  Search
+  Search,
+  ClipboardCheck
 } from "lucide-react";
 import { format, parseISO, differenceInDays, isAfter, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
@@ -187,14 +188,7 @@ const ProjectStatusBadge: React.FC<{ status: string }> = ({ status }) => {
   }
 };
 
-const TimeEntryApprovalStatus: React.FC<{ approved: boolean }> = ({ approved }) => {
-  return (
-    <div className="flex items-center gap-1.5 text-green-600">
-      <CheckCircle2 className="h-4 w-4" />
-      <span className="text-xs font-medium">Registrado</span>
-    </div>
-  );
-};
+// Este componente ha sido eliminado de la aplicación ya que no se necesita más la funcionalidad de aprobación
 
 const PersonAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
