@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
@@ -342,7 +343,7 @@ const ProjectSummary: React.FC = () => {
   }, [project?.quotation?.projectName]);
   
   // Guardar el nombre del proyecto
-  const handleSaveProjectName = () => {
+  const handleSaveProjectName = async () => {
     if (!editedName.trim()) {
       toast({
         title: "Error",
@@ -352,14 +353,43 @@ const ProjectSummary: React.FC = () => {
       return;
     }
     
-    // En una implementación real, aquí haríamos una petición PUT para actualizar el nombre
-    // Por ahora simulamos que se actualiza correctamente
-    toast({
-      title: "Nombre actualizado",
-      description: `El proyecto ahora se llama "${editedName}"`,
+    // Mostrar toast de carga
+    const toastId = toast({
+      title: "Actualizando nombre...",
+      description: "Guardando cambios en el servidor",
     });
     
-    setEditing(false);
+    try {
+      // Hacemos la petición para actualizar el nombre del proyecto
+      const response = await fetch(`/api/projects/${projectId}/update-name`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: editedName.trim() }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al actualizar el nombre del proyecto');
+      }
+      
+      toast({
+        title: "Nombre actualizado",
+        description: `El proyecto ahora se llama "${editedName}"`,
+      });
+      
+      // Invalidar la caché de consultas para recargar los datos actualizados
+      await queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${projectId}`] });
+      
+      setEditing(false);
+    } catch (error) {
+      console.error("Error updating project name:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el nombre del proyecto. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Obtener resumen de costos

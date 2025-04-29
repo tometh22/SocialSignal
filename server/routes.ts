@@ -942,6 +942,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Actualizar nombre de proyecto
+  app.patch("/api/projects/:id/update-name", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ message: "Project name is required" });
+      }
+      
+      const project = await storage.getActiveProject(id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      const quotation = await storage.getQuotation(project.quotationId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      
+      // Actualizar el nombre del proyecto en la cotización
+      const updatedQuotation = await storage.updateQuotation(project.quotationId, {
+        projectName: name.trim()
+      });
+      
+      if (!updatedQuotation) {
+        return res.status(500).json({ message: "Failed to update project name" });
+      }
+      
+      // Obtenemos el proyecto actualizado
+      const updatedProject = await storage.getActiveProject(id);
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating project name:", error);
+      res.status(500).json({ message: "Failed to update project name" });
+    }
+  });
+
   // ---------- RUTAS PARA OPCIONES ----------
   
   // Obtener opciones de estado de proyecto
