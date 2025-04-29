@@ -1613,13 +1613,29 @@ const ProjectSummary: React.FC = () => {
                     <AnimatedCard delay={700}>
                       <Card className="shadow-sm">
                         <CardHeader className="border-b">
-                          <CardTitle className="text-lg font-medium flex items-center">
-                            <BarChart3 className="h-5 w-5 mr-2 text-primary" />
-                            Distribución de Horas por Personal
-                          </CardTitle>
-                          <CardDescription>
-                            Desglose del tiempo registrado por cada persona
-                          </CardDescription>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg font-medium flex items-center">
+                                <BarChart3 className="h-5 w-5 mr-2 text-primary" />
+                                Distribución de Horas por Personal
+                              </CardTitle>
+                              <CardDescription>
+                                Desglose del tiempo registrado por cada persona
+                              </CardDescription>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => setExpandedChart({
+                                isOpen: true,
+                                title: "Distribución de Horas por Personal",
+                                type: "personnelBar"
+                              })}
+                            >
+                              <ExpandIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </CardHeader>
                         <CardContent className="pt-6">
                           <div className="h-[300px]"> {/* Altura fija para el gráfico */}
@@ -1761,13 +1777,29 @@ const ProjectSummary: React.FC = () => {
                     <AnimatedCard delay={800}>
                       <Card className="shadow-sm">
                         <CardHeader className="border-b">
-                          <CardTitle className="text-lg font-medium flex items-center">
-                            <PieChartIcon className="h-5 w-5 mr-2 text-primary" />
-                            Facturable vs No Facturable
-                          </CardTitle>
-                          <CardDescription>
-                            Proporción de horas facturables y no facturables
-                          </CardDescription>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg font-medium flex items-center">
+                                <PieChartIcon className="h-5 w-5 mr-2 text-primary" />
+                                Facturable vs No Facturable
+                              </CardTitle>
+                              <CardDescription>
+                                Proporción de horas facturables y no facturables
+                              </CardDescription>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => setExpandedChart({
+                                isOpen: true,
+                                title: "Facturable vs No Facturable",
+                                type: "billablePie"
+                              })}
+                            >
+                              <ExpandIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="sm" className="h-8 mt-2">
@@ -1844,13 +1876,29 @@ const ProjectSummary: React.FC = () => {
                   <AnimatedCard delay={900}>
                     <Card className="shadow-sm mb-12"> {/* Espacio extra al final */}
                       <CardHeader className="border-b">
-                        <CardTitle className="text-lg font-medium flex items-center">
-                          <LineChartIcon className="h-5 w-5 mr-2 text-primary" />
-                          Tendencia de Registro de Horas
-                        </CardTitle>
-                        <CardDescription>
-                          Evolución de las horas registradas a lo largo del tiempo
-                        </CardDescription>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg font-medium flex items-center">
+                              <LineChartIcon className="h-5 w-5 mr-2 text-primary" />
+                              Tendencia de Registro de Horas
+                            </CardTitle>
+                            <CardDescription>
+                              Evolución de las horas registradas a lo largo del tiempo
+                            </CardDescription>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => setExpandedChart({
+                              isOpen: true,
+                              title: "Tendencia de Registro de Horas",
+                              type: "timeTrend"
+                            })}
+                          >
+                            <ExpandIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </CardHeader>
                       <CardContent className="pt-6">
                         <div className="h-[300px]"> {/* Altura fija para el gráfico */}
