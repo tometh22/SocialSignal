@@ -275,13 +275,30 @@ const ProjectSummary = () => {
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [customView, setCustomView] = useState<CustomView>({
-    showKpi: false,  // Cambiamos a false para no mostrar las tarjetas superiores duplicadas
+    showKpi: true,  // Mostramos las KPIs en el ribbon horizontal
     showFinances: true,
     showTime: true,
     showRisks: true,
     showCharts: true,
     showTeam: true,
   });
+  
+  // Referencia para la barra de filtros fija
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const [isFilterBarSticky, setIsFilterBarSticky] = useState(false);
+  
+  // Efecto para manejar la barra de filtros fija
+  useEffect(() => {
+    const handleScroll = () => {
+      if (filterBarRef.current) {
+        const rect = filterBarRef.current.getBoundingClientRect();
+        setIsFilterBarSticky(rect.top <= 0);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Función para manejar el diálogo de ayuda
   const handleOpenHelpDialog = (helpType: string) => {
@@ -2559,7 +2576,7 @@ const ProjectSummary = () => {
                 <p className="text-muted-foreground">Registro detallado de las horas trabajadas por cada miembro del equipo</p>
                 
                 <div className="bg-muted/30 p-6 rounded-lg text-center mt-6">
-                  <Clock3 className="h-16 w-16 text-primary/40 mx-auto mb-4" />
+                  <Clock className="h-16 w-16 text-primary/40 mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">Módulo en desarrollo</h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
                     La vista detallada de horas estará disponible próximamente. Por favor regresa más tarde.
