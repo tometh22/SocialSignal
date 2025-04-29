@@ -293,16 +293,19 @@ const TimeRegistrationForm: React.FC<{
     onSuccess: (newEntry) => {
       console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
       
+      // IMPORTANTE: Actualizar el estado local directamente para mostrar inmediatamente
+      setLocalTimeEntries(prev => [...prev, newEntry]);
+      
       // Actualizamos la caché de forma optimista
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
         console.log("Actualizando caché con nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
       
-      // Forzamos una recarga completa de los datos para asegurar sincronización
+      // Forzamos una recarga completa de los datos para asegurar sincronización total
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      }, 100);
+      }, 300);
       
       toast({
         title: "Tiempo registrado",
@@ -595,6 +598,9 @@ const TimeEntries: React.FC = () => {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [search, setSearch] = useState("");
   
+  // Estado local para actualización en tiempo real
+  const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
+  
 
 
   // Obtener proyecto activo
@@ -623,11 +629,19 @@ const TimeEntries: React.FC = () => {
     queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
   });
+  
+  // Sincronizar estado local con datos del servidor
+  useEffect(() => {
+    if (timeEntries) {
+      console.log("Actualizando estado local con datos del servidor:", timeEntries);
+      setLocalTimeEntries(timeEntries);
+    }
+  }, [timeEntries]);
 
   // Filtrar entradas según pestaña activa y búsqueda
   const filteredEntries = React.useMemo(() => {
-    // Usar los registros de tiempo del servidor
-    const entries = timeEntries || [];
+    // Usar el estado local de registros de tiempo para actualización en tiempo real
+    const entries = localTimeEntries || [];
     
     let filtered = entries;
     
@@ -656,7 +670,7 @@ const TimeEntries: React.FC = () => {
     return [...filtered].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [timeEntries, activeTab, search, personnel]);
+  }, [localTimeEntries, activeTab, search, personnel]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -664,11 +678,24 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${id}`, "DELETE");
     },
     onSuccess: () => {
+      // Actualizar el estado local también para reflejar cambios inmediatamente
+      if (entryToDelete) {
+        setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryToDelete));
+      }
+      
+      // Actualizar caché de TanStack Query
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        return oldData.filter(entry => entry.id !== entryToDelete);
+      });
+      
+      // Invalidar consulta para asegurar sincronización completa
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      
       toast({
         title: "Registro eliminado",
         description: "El registro de horas ha sido eliminado con éxito",
       });
+      
       setDeleteDialogOpen(false);
     },
     onError: (error: any) => {
@@ -723,7 +750,7 @@ const TimeEntries: React.FC = () => {
 
   // Agrupar entradas por fecha para la vista calendario
   const groupEntriesByDate = () => {
-    if (!timeEntries) return new Map();
+    if (!localTimeEntries || localTimeEntries.length === 0) return new Map();
     
     const grouped = new Map<string, TimeEntry[]>();
     
@@ -928,14 +955,14 @@ const TimeEntries: React.FC = () => {
                       </div>
                     </div>
                     
-                    {timeEntries && (
+                    {localTimeEntries && localTimeEntries.length > 0 && (
                       <>
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <div className="flex items-start justify-between">
                             <div>
                               <h4 className="text-xs text-muted-foreground mb-1">Total Registros</h4>
                               <p className="text-2xl font-bold">
-                                {timeEntries.length}
+                                {localTimeEntries.length}
                               </p>
                             </div>
                             <ClipboardCheck className="h-8 w-8 text-blue-500/70" />
