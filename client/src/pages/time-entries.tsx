@@ -1068,11 +1068,10 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  // Contenedor con altura fija y scroll vertical
-                  <ScrollArea className="h-[calc(100vh-300px)] min-h-[500px]">
-                    <div className="overflow-auto w-full">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                  // Contenedor con altura fija y scroll vertical nativo
+                  <div className="overflow-y-auto max-h-[calc(100vh-250px)] min-h-[500px] border rounded-md">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Personal</TableHead>
@@ -1178,10 +1177,9 @@ const TimeEntries: React.FC = () => {
                         </TableBody>
                       </Table>
                     </div>
-                  </ScrollArea>
                 ) : (
                   <div className="p-6 space-y-6">
-                    <ScrollArea className="h-[calc(100vh-300px)] min-h-[500px] pr-4">
+                    <div className="overflow-y-auto pr-4 max-h-[calc(100vh-250px)] min-h-[500px]">
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
@@ -1198,7 +1196,7 @@ const TimeEntries: React.FC = () => {
                           No hay registros para mostrar en el calendario
                         </div>
                       )}
-                    </ScrollArea>
+                    </div>
                   </div>
                 )}
               </CardContent>
