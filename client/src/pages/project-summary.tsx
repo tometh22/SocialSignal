@@ -67,6 +67,7 @@ import {
   TrendingUp,
   Calendar,
   CalendarDays,
+  AlertCircle as InfoCircle,
   BarChart2 as ChartBarIcon,
   LayoutDashboard,
   ClipboardList,
