@@ -1001,18 +1001,22 @@ const ProjectSummary = () => {
           </div>
         ) : (
           <>
-            {/* KPI Cards */}
+            {/* KPI Cards con diseño moderno */}
             {customView.showKpi && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 h-[200px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                 <AnimatedCard delay={100}>
                   <KpiCard 
                     title="Horas Registradas"
                     value={`${totalHours.toFixed(1)} h`}
-                    description="Total de horas en el proyecto"
+                    description={
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span className="text-blue-600 font-medium">{billableHours.toFixed(1)}h facturables</span>
+                        <span className="text-muted-foreground">{nonBillableHours.toFixed(1)}h no facturables</span>
+                      </div>
+                    }
                     icon={<Clock className="h-5 w-5" />}
-                    trend={5}
-                    trendText="vs. periodo anterior"
                     color="blue"
+                    progress={billableHours / Math.max(totalHours, 1) * 100}
                   />
                 </AnimatedCard>
                 
@@ -1020,12 +1024,13 @@ const ProjectSummary = () => {
                   <KpiCard 
                     title="Costo Actual"
                     value={formatCurrency(costSummary?.actualCost || 0)}
-                    description={`${Math.round(costSummary?.percentageUsed || 0)}% del presupuesto`}
+                    description={`${Math.round(costSummary?.percentageUsed || 0)}% del presupuesto total`}
                     icon={<DollarSign className="h-5 w-5" />}
-                    trend={costSummary?.variance ? (costSummary.variance > 0 ? costSummary.variance : -costSummary.variance) : 0}
+                    trend={costSummary?.variance ? Math.round((Math.abs(costSummary.variance) / (costSummary.estimatedCost || 1)) * 100) : 0}
                     trendDirection={costSummary?.variance && costSummary.variance > 0 ? 'down' : 'up'}
                     trendText={costSummary?.variance && costSummary.variance > 0 ? "por debajo del presupuesto" : "por encima del presupuesto"}
                     color={costSummary?.percentageUsed && costSummary.percentageUsed > 90 ? "red" : "green"}
+                    progress={Math.min(costSummary?.percentageUsed || 0, 100)}
                   />
                 </AnimatedCard>
                 
@@ -1033,7 +1038,13 @@ const ProjectSummary = () => {
                   <KpiCard 
                     title="Personal Asignado"
                     value={new Set(timeEntries?.map(e => e.personnelId) || []).size.toString()}
-                    description="Trabajando en el proyecto"
+                    description={
+                      <div className="text-xs text-muted-foreground">
+                        {timeEntries && timeEntries.length > 0 
+                          ? `En ${timeEntries.length} registros de tiempo`
+                          : "Sin registros de tiempo"}
+                      </div>
+                    }
                     icon={<Users className="h-5 w-5" />}
                     color="purple"
                   />
@@ -1045,8 +1056,10 @@ const ProjectSummary = () => {
                     value={projectMetrics ? `${Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed)} días` : "0 días"}
                     description={
                       <div className="flex flex-col">
-                        <span>{`${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado`}</span>
-                        <span className="text-xs text-muted-foreground mt-1">Inicio: {formatDate(project?.startDate || "")}</span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span>{`${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado`}</span>
+                          <span className="text-muted-foreground">de {projectMetrics?.daysTotal || 0} días</span>
+                        </div>
                       </div>
                     }
                     icon={<Calendar className="h-5 w-5" />}
