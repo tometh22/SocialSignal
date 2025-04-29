@@ -1082,8 +1082,12 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  <div style={{ maxHeight: "75vh", overflow: "auto" }} className="border rounded-md">
-                    <Table>
+                  <div className="border rounded-md" style={{ 
+                    height: "400px", 
+                    maxHeight: "80vh", 
+                    overflowY: "auto"
+                  }}>
+                    <Table className="w-full" style={{ tableLayout: "fixed" }}>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
                             <TableHead>Fecha</TableHead>
@@ -1192,7 +1196,12 @@ const TimeEntries: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-6 space-y-6">
-                    <div className="pr-4" style={{ maxHeight: "75vh", overflow: "auto" }}>
+                    <div className="pr-4" style={{ 
+                      height: "400px", 
+                      maxHeight: "80vh", 
+                      overflowY: "auto",
+                      display: "block"
+                    }}>
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
