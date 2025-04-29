@@ -1317,11 +1317,12 @@ const ProjectSummary: React.FC = () => {
               </TabsList>
               
               <TabsContent value="overview" className="pt-4">
-                {/* Main Three Cards Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {/* Información general y estado del proyecto */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                  {/* Información del Proyecto - Ocupa 4 columnas */}
                   {customView.showFinances && (
-                    <AnimatedCard delay={400}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <AnimatedCard delay={400} className="lg:col-span-4">
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="pb-3 border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
                             <div className="mr-3 p-2 rounded-full bg-primary/10">
@@ -1384,19 +1385,20 @@ const ProjectSummary: React.FC = () => {
                           <Button 
                             variant="outline" 
                             className="w-full"
-                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
+                            onClick={() => setLocation(`/quotations/${project.quotationId}`)}
                           >
-                            <Clock className="mr-2 h-4 w-4" />
-                            Ver Registro de Horas
+                            <FileText className="mr-2 h-4 w-4" />
+                            Ver Cotización Original
                           </Button>
                         </CardFooter>
                       </Card>
                     </AnimatedCard>
                   )}
 
+                  {/* Información Financiera - Ocupa 4 columnas */}
                   {customView.showFinances && (
-                    <AnimatedCard delay={500}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <AnimatedCard delay={500} className="lg:col-span-4">
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="pb-3 border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
                             <div className="mr-3 p-2 rounded-full bg-primary/10">
@@ -1476,19 +1478,20 @@ const ProjectSummary: React.FC = () => {
                           <Button 
                             variant="outline" 
                             className="w-full"
-                            onClick={() => setLocation(`/quotations/${project.quotationId}`)}
+                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
                           >
-                            <FileText className="mr-2 h-4 w-4" />
-                            Ver Cotización Original
+                            <Clock className="mr-2 h-4 w-4" />
+                            Ver Registro de Horas
                           </Button>
                         </CardFooter>
                       </Card>
                     </AnimatedCard>
                   )}
 
+                  {/* Resumen de Horas - Ocupa 4 columnas */}
                   {customView.showTime && (
-                    <AnimatedCard delay={600}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                    <AnimatedCard delay={600} className="lg:col-span-4">
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="pb-3 border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
                             <div className="mr-3 p-2 rounded-full bg-primary/10">
@@ -1609,10 +1612,16 @@ const ProjectSummary: React.FC = () => {
                   </div>
                 )}
 
-                {/* Charts Section */}
+                {/* Sección de Gráficos y Visualizaciones */}
+                <h2 className="text-xl font-semibold mt-8 mb-4 flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Análisis y visualizaciones
+                </h2>
+                
                 {customView.showCharts && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    <AnimatedCard delay={700}>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                    {/* Distribución de Horas por Personal - Ocupa 6 columnas */}
+                    <AnimatedCard delay={700} className="lg:col-span-6">
                       <Card className="shadow-sm">
                         <CardHeader className="border-b">
                           <div className="flex justify-between items-start">
@@ -1776,8 +1785,9 @@ const ProjectSummary: React.FC = () => {
                       </Card>
                     </AnimatedCard>
 
-                    <AnimatedCard delay={800}>
-                      <Card className="shadow-sm">
+                    {/* Horas Facturables vs No Facturables - Ocupa 6 columnas */}
+                    <AnimatedCard delay={800} className="lg:col-span-6">
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="border-b">
                           <div className="flex justify-between items-start">
                             <div>
