@@ -1068,8 +1068,9 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  // Contenedor básico sin complicaciones
-                  <div style={{ maxHeight: "700px", overflow: "scroll" }} className="border rounded-md">
+                  // Usando el componente ScrollArea nativo de shadcn
+                  <div className="border rounded-md">
+                    <ScrollArea className="h-[800px]">
                     <Table>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
@@ -1176,7 +1177,8 @@ const TimeEntries: React.FC = () => {
                           })}
                         </TableBody>
                       </Table>
-                    </div>
+                    </ScrollArea>
+                  </div>
                 ) : (
                   <div className="p-6 space-y-6">
                     <div style={{ maxHeight: "700px", overflow: "scroll" }} className="pr-4">
