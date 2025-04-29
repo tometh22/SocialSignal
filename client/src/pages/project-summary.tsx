@@ -1041,48 +1041,80 @@ const ProjectSummary = () => {
                         </CardHeader>
                         <CardContent className="pt-4">
                           <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Estado actual:</span>
-                              <StatusBadge status={project.status} />
-                            </div>
-                            
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Fecha esperada de fin:</span>
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1 text-primary/70" />
-                                <span>{formatDate(project.expectedEndDate)}</span>
-                              </div>
-                            </div>
-                            
-                            {project.actualEndDate && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-muted-foreground">Fecha fin real:</span>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                              <div className="col-span-2 flex justify-between items-center p-2 bg-muted/40 rounded-md">
                                 <div className="flex items-center">
+                                  <Activity className="h-4 w-4 mr-2 text-primary" />
+                                  <span className="font-medium">Estado actual:</span>
+                                </div>
+                                <StatusBadge status={project?.status || "No definido"} />
+                              </div>
+
+                              <div className="flex flex-col space-y-1">
+                                <span className="text-sm font-medium">Fecha de inicio:</span>
+                                <div className="flex items-center text-muted-foreground">
                                   <Calendar className="h-4 w-4 mr-1 text-primary/70" />
-                                  <span>{formatDate(project.actualEndDate)}</span>
+                                  <span>{formatDate(project?.startDate || null)}</span>
                                 </div>
                               </div>
-                            )}
-                            
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Frecuencia de seguimiento:</span>
-                              <Badge variant="outline">{project.trackingFrequency}</Badge>
+
+                              <div className="flex flex-col space-y-1">
+                                <span className="text-sm font-medium">Fecha esperada de fin:</span>
+                                <div className="flex items-center text-muted-foreground">
+                                  <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                                  <span>{formatDate(project?.expectedEndDate || null)}</span>
+                                </div>
+                              </div>
+
+                              {project?.actualEndDate && (
+                                <div className="flex flex-col space-y-1">
+                                  <span className="text-sm font-medium">Fecha fin real:</span>
+                                  <div className="flex items-center text-muted-foreground">
+                                    <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                                    <span>{formatDate(project.actualEndDate)}</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex flex-col space-y-1">
+                                <span className="text-sm font-medium">Frecuencia de seguimiento:</span>
+                                <div className="flex items-center">
+                                  <Clock3 className="h-4 w-4 mr-1 text-primary/70" />
+                                  <Badge variant="outline">{project?.trackingFrequency || "No definida"}</Badge>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col space-y-1">
+                                <span className="text-sm font-medium">Tiempo transcurrido:</span>
+                                <div className="flex items-center text-muted-foreground">
+                                  <Clock className="h-4 w-4 mr-1 text-primary/70" />
+                                  <span>{projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días</span>
+                                </div>
+                              </div>
                             </div>
                             
                             <Separator />
                             
                             <div className="flex flex-col gap-2">
-                              <p className="text-sm text-muted-foreground">Progreso del proyecto:</p>
-                              <div className="h-2 w-full bg-gray-100 rounded-full">
+                              <div className="flex justify-between items-center">
+                                <p className="text-sm font-medium">Progreso del proyecto:</p>
+                                <span className="text-sm font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%
+                                </span>
+                              </div>
+                              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                                 <div 
-                                  className="h-full rounded-full bg-primary transition-all duration-500"
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isNaN(projectMetrics?.progressPercentage) ? 'bg-gray-400' :
+                                    projectMetrics?.progressPercentage > 90 ? 'bg-green-500' :
+                                    projectMetrics?.progressPercentage > 50 ? 'bg-primary' : 'bg-amber-500'
+                                  }`}
                                   style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : projectMetrics?.progressPercentage || 0}%` }}
                                 ></div>
                               </div>
                               <div className="flex justify-between items-center text-xs text-muted-foreground">
-                                <span>Inicio</span>
-                                <span>{isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%</span>
-                                <span>Fin</span>
+                                <span>Inicio: {formatDate(project?.startDate || null)}</span>
+                                <span>Fin: {formatDate(project?.expectedEndDate || null)}</span>
                               </div>
                             </div>
                           </div>
