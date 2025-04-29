@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   ArrowLeft, 
   Loader2, 
@@ -24,7 +25,9 @@ import {
   BadgeDollarSign,
   Calendar,
   FileText,
-  PlusCircle
+  PlusCircle,
+  BarChart3,
+  PieChart as PieChartIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -86,6 +89,37 @@ interface Personnel {
   roleId: number;
   hourlyRate: number;
 }
+
+// Status Badge Component
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const statusConfig = {
+    active: { 
+      className: "bg-green-500 hover:bg-green-600", 
+      label: "Activo" 
+    },
+    completed: { 
+      className: "bg-blue-500 hover:bg-blue-600", 
+      label: "Completado" 
+    },
+    "on-hold": { 
+      className: "bg-yellow-500 hover:bg-yellow-600", 
+      label: "En Pausa" 
+    },
+    cancelled: { 
+      className: "bg-red-500 hover:bg-red-600", 
+      label: "Cancelado" 
+    }
+  };
+
+  const config = statusConfig[status as keyof typeof statusConfig] || 
+    { className: "bg-slate-500", label: "Desconocido" };
+
+  return (
+    <Badge className={config.className}>
+      {config.label}
+    </Badge>
+  );
+};
 
 // Componente principal
 const ProjectSummary: React.FC = () => {
@@ -221,7 +255,7 @@ const ProjectSummary: React.FC = () => {
 
   if (!projectId) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto py-6 px-6">
         <div className="flex justify-center items-center h-[400px]">
           <Card className="w-[600px]">
             <CardHeader>
@@ -240,386 +274,432 @@ const ProjectSummary: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver a Proyectos
-        </Button>
-        <h1 className="text-3xl font-bold ml-4">Resumen del Proyecto</h1>
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center items-center h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <ScrollArea className="flex-1 h-[calc(100vh-4rem)]"> {/* Contenedor principal con scroll */}
+      <div className="container mx-auto py-8 px-6 pb-24"> {/* Aumentamos padding y añadimos espacio inferior */}
+        <div className="flex items-center mb-8">
+          <Button variant="outline" onClick={() => setLocation("/active-projects")} className="shadow-sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a Proyectos
+          </Button>
+          <h1 className="text-3xl font-bold ml-6">Resumen del Proyecto</h1>
         </div>
-      ) : !project ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Proyecto no encontrado</CardTitle>
-            <CardDescription>
-              El proyecto especificado no existe o no está disponible.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button onClick={() => setLocation("/active-projects")}>
-              Ver todos los proyectos
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-medium">
-                    Información del Proyecto
-                  </CardTitle>
-                  <Badge
-                    className={
-                      project.status === "active"
-                        ? "bg-green-500"
-                        : project.status === "completed"
-                        ? "bg-blue-500"
-                        : project.status === "on-hold"
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }
-                  >
-                    {project.status === "active"
-                      ? "Activo"
-                      : project.status === "completed"
-                      ? "Completado"
-                      : project.status === "on-hold"
-                      ? "En Pausa"
-                      : "Cancelado"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Nombre:</span>
-                    <span className="font-medium">{project.quotation?.projectName || "Sin nombre"}</span>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Cargando datos del proyecto...</p>
+            </div>
+          </div>
+        ) : !project ? (
+          <Card className="w-full max-w-3xl mx-auto shadow-md">
+            <CardHeader className="bg-muted/30">
+              <CardTitle>Proyecto no encontrado</CardTitle>
+              <CardDescription>
+                El proyecto especificado no existe o no está disponible.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="border-t py-4">
+              <Button onClick={() => setLocation("/active-projects")}>
+                Ver todos los proyectos
+              </Button>
+            </CardFooter>
+          </Card>
+        ) : (
+          <>
+            {/* Header/Top Cards Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8"> {/* Aumentamos gap y margin */}
+              <Card className="shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-medium flex items-center">
+                      <div className="mr-3 p-2 rounded-full bg-primary/10">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      Información del Proyecto
+                    </CardTitle>
+                    <StatusBadge status={project.status} />
                   </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">ID Proyecto:</span>
-                    <span>{project.id}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">ID Cotización:</span>
-                    <span>{project.quotationId}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Fecha de inicio:</span>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
-                      <span>{formatDate(project.startDate)}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Fecha fin esperada:</span>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
-                      <span>{formatDate(project.expectedEndDate)}</span>
-                    </div>
-                  </div>
-                  {project.actualEndDate && (
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Fecha fin real:</span>
+                      <span className="text-sm text-muted-foreground">Nombre:</span>
+                      <span className="font-medium">{project.quotation?.projectName || "Sin nombre"}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">ID Proyecto:</span>
+                      <span>{project.id}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">ID Cotización:</span>
+                      <span>{project.quotationId}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Fecha de inicio:</span>
                       <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
-                        <span>{formatDate(project.actualEndDate)}</span>
+                        <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                        <span>{formatDate(project.startDate)}</span>
                       </div>
                     </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Frecuencia de seguimiento:</span>
-                    <span>{project.trackingFrequency}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Fecha fin esperada:</span>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                        <span>{formatDate(project.expectedEndDate)}</span>
+                      </div>
+                    </div>
+                    {project.actualEndDate && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Fecha fin real:</span>
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 mr-1 text-primary/70" />
+                          <span>{formatDate(project.actualEndDate)}</span>
+                        </div>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Frecuencia de seguimiento:</span>
+                      <span className="capitalize">{project.trackingFrequency}</span>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-0">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-                  Ver Registro de Horas
-                </Button>
-              </CardFooter>
-            </Card>
+                </CardContent>
+                <CardFooter className="pt-0 border-t mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    Ver Registro de Horas
+                  </Button>
+                </CardFooter>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">
-                  Información Financiera
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Costo estimado:</span>
-                    <span className="text-xl font-bold">
-                      {formatCurrency(costSummary?.estimatedCost || 0)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Costo actual:</span>
-                    <span className="text-xl font-bold">
-                      {formatCurrency(costSummary?.actualCost || 0)}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Variación:</span>
-                    <div className="flex items-center">
-                      {costSummary && costSummary.variance >= 0 ? (
-                        <>
-                          <TrendingDown className="h-4 w-4 mr-1 text-green-500" />
-                          <span className="text-green-500 font-medium">
-                            {formatCurrency(costSummary.variance)} ahorrado
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
-                          <span className="text-red-500 font-medium">
-                            {formatCurrency(Math.abs(costSummary?.variance || 0))} extra
-                          </span>
-                        </>
+              <Card className="shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <CardTitle className="text-lg font-medium flex items-center">
+                    <div className="mr-3 p-2 rounded-full bg-primary/10">
+                      <BadgeDollarSign className="h-5 w-5 text-primary" />
+                    </div>
+                    Información Financiera
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground mb-1">Costo estimado:</span>
+                      <span className="text-xl font-bold">
+                        {formatCurrency(costSummary?.estimatedCost || 0)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground mb-1">Costo actual:</span>
+                      <span className="text-xl font-bold">
+                        {formatCurrency(costSummary?.actualCost || 0)}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Variación:</span>
+                      <div className="flex items-center">
+                        {costSummary && costSummary.variance >= 0 ? (
+                          <>
+                            <TrendingDown className="h-4 w-4 mr-1 text-green-500" />
+                            <span className="text-green-500 font-medium">
+                              {formatCurrency(costSummary.variance)} ahorrado
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
+                            <span className="text-red-500 font-medium">
+                              {formatCurrency(Math.abs(costSummary?.variance || 0))} extra
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm text-muted-foreground">Presupuesto utilizado:</span>
+                        <span className="font-medium">
+                          {Math.round(costSummary?.percentageUsed || 0)}%
+                        </span>
+                      </div>
+                      <Progress 
+                        value={costSummary?.percentageUsed || 0} 
+                        className={
+                          (costSummary?.percentageUsed || 0) > 100
+                            ? "bg-red-100 text-red-500"
+                            : (costSummary?.percentageUsed || 0) > 90
+                            ? "bg-yellow-100 text-yellow-500"
+                            : "bg-primary/20"
+                        }
+                      />
+                      {(costSummary?.percentageUsed || 0) > 100 && (
+                        <div className="flex items-center mt-2 text-red-500 text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          <span>Presupuesto excedido</span>
+                        </div>
+                      )}
+                      {(costSummary?.percentageUsed || 0) > 90 && (costSummary?.percentageUsed || 0) <= 100 && (
+                        <div className="flex items-center mt-2 text-yellow-500 text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          <span>Presupuesto a punto de agotarse</span>
+                        </div>
                       )}
                     </div>
                   </div>
-                  <div className="pt-2">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Presupuesto utilizado:</span>
-                      <span className="font-medium">
-                        {Math.round(costSummary?.percentageUsed || 0)}%
+                </CardContent>
+                <CardFooter className="pt-0 border-t mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setLocation(`/quotations/${project.quotationId}`)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Ver Cotización Original
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card className="shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <CardTitle className="text-lg font-medium flex items-center">
+                    <div className="mr-3 p-2 rounded-full bg-primary/10">
+                      <Clock className="h-5 w-5 text-primary" />
+                    </div>
+                    Resumen de Horas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total horas registradas:</span>
+                      <span className="font-bold">
+                        {totalHours.toFixed(1)} horas
                       </span>
                     </div>
-                    <Progress 
-                      value={costSummary?.percentageUsed || 0} 
-                      className={
-                        (costSummary?.percentageUsed || 0) > 100
-                          ? "text-red-500"
-                          : (costSummary?.percentageUsed || 0) > 90
-                          ? "text-yellow-500"
-                          : "text-primary"
-                      }
-                    />
-                    {(costSummary?.percentageUsed || 0) > 100 && (
-                      <div className="flex items-center mt-2 text-red-500 text-xs">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        <span>Presupuesto excedido</span>
-                      </div>
-                    )}
-                    {(costSummary?.percentageUsed || 0) > 90 && (costSummary?.percentageUsed || 0) <= 100 && (
-                      <div className="flex items-center mt-2 text-yellow-500 text-xs">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        <span>Presupuesto a punto de agotarse</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Horas facturables:</span>
+                      <span>
+                        {billableHours.toFixed(1)} horas
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Horas no facturables:</span>
+                      <span>
+                        {nonBillableHours.toFixed(1)} horas
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total registros:</span>
+                      <span>{timeEntries?.length || 0} registros</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Personal involucrado:</span>
+                      <span>
+                        {new Set(timeEntries?.map(e => e.personnelId) || []).size} personas
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-0">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setLocation(`/quotations/${project.quotationId}`)}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Ver Cotización Original
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">
-                  Resumen de Horas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total horas registradas:</span>
-                    <span className="font-bold">
-                      {totalHours.toFixed(1)} horas
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Horas facturables:</span>
-                    <span>
-                      {billableHours.toFixed(1)} horas
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Horas no facturables:</span>
-                    <span>
-                      {nonBillableHours.toFixed(1)} horas
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total registros:</span>
-                    <span>{timeEntries?.length || 0} registros</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Personal involucrado:</span>
-                    <span>
-                      {new Set(timeEntries?.map(e => e.personnelId) || []).size} personas
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="pt-0">
-                <Button 
-                  className="w-full"
-                  onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Registrar Nuevas Horas
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-medium">
-                  Distribución de Horas por Personal
-                </CardTitle>
-                <CardDescription>
-                  Desglose del tiempo registrado por cada persona
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                {timeByPersonnelData.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <Clock className="h-10 w-10 mb-2" />
-                    <p>No hay datos disponibles</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={timeByPersonnelData}
-                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value, name) => [
-                          name === "hours" ? `${value} horas` : formatCurrency(value as number),
-                          name === "hours" ? "Horas" : "Costo"
-                        ]}
-                      />
-                      <Legend />
-                      <Bar dataKey="hours" fill="#4f46e5" name="Horas" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-medium">
-                  Facturable vs No Facturable
-                </CardTitle>
-                <CardDescription>
-                  Proporción de horas facturables y no facturables
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                {billableVsNonBillableData.every(item => item.value === 0) ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <Clock className="h-10 w-10 mb-2" />
-                    <p>No hay datos disponibles</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={billableVsNonBillableData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {billableVsNonBillableData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={index === 0 ? "#4f46e5" : "#f97316"} 
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value) => [`${value} horas`, "Horas"]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-medium">
-                Tendencia de Registro de Horas
-              </CardTitle>
-              <CardDescription>
-                Evolución de las horas registradas a lo largo del tiempo
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              {timeEntriesByDateData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Clock className="h-10 w-10 mb-2" />
-                  <p>No hay datos disponibles</p>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={timeEntriesByDateData}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                </CardContent>
+                <CardFooter className="pt-0 border-t mt-4">
+                  <Button 
+                    className="w-full"
+                    onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [`${value} horas`, "Horas"]}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="hours"
-                      stroke="#4f46e5"
-                      name="Horas"
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Registrar Nuevas Horas
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8"> {/* Aumentamos gap y margin */}
+              <Card className="shadow-md">
+                <CardHeader className="bg-muted/30">
+                  <CardTitle className="text-lg font-medium flex items-center">
+                    <BarChart3 className="h-5 w-5 mr-2 text-primary" />
+                    Distribución de Horas por Personal
+                  </CardTitle>
+                  <CardDescription>
+                    Desglose del tiempo registrado por cada persona
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                    {timeByPersonnelData.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                        <Clock className="h-10 w-10 mb-2" />
+                        <p>No hay datos disponibles</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={timeByPersonnelData}
+                          margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                          barSize={40}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis 
+                            dataKey="name"
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis 
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip 
+                            formatter={(value, name) => [
+                              name === "hours" ? `${value} horas` : formatCurrency(value as number),
+                              name === "hours" ? "Horas" : "Costo"
+                            ]}
+                            contentStyle={{ 
+                              borderRadius: '8px',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                          <Legend iconType="circle" />
+                          <Bar 
+                            dataKey="hours" 
+                            fill="#4f46e5" 
+                            name="Horas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md">
+                <CardHeader className="bg-muted/30">
+                  <CardTitle className="text-lg font-medium flex items-center">
+                    <PieChartIcon className="h-5 w-5 mr-2 text-primary" />
+                    Facturable vs No Facturable
+                  </CardTitle>
+                  <CardDescription>
+                    Proporción de horas facturables y no facturables
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                    {billableVsNonBillableData.every(item => item.value === 0) ? (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                        <Clock className="h-10 w-10 mb-2" />
+                        <p>No hay datos disponibles</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={billableVsNonBillableData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, percent }) => 
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                          >
+                            {billableVsNonBillableData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={index === 0 ? "#4f46e5" : "#f97316"} 
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value) => [`${value} horas`, "Horas"]}
+                            contentStyle={{ 
+                              borderRadius: '8px',
+                              border: '1px solid rgba(0, 0, 0, 0.1)',
+                              boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Time Trend Chart */}
+            <Card className="shadow-md mb-12"> {/* Espacio extra al final */}
+              <CardHeader className="bg-muted/30">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2 text-primary" />
+                  Tendencia de Registro de Horas
+                </CardTitle>
+                <CardDescription>
+                  Evolución de las horas registradas a lo largo del tiempo
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="h-[300px]"> {/* Altura fija para el gráfico */}
+                  {timeEntriesByDateData.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <Clock className="h-10 w-10 mb-2" />
+                      <p>No hay datos disponibles</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={timeEntriesByDateData}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis 
+                          dataKey="date"
+                          axisLine={false}
+                          tickLine={false}
+                          padding={{ left: 30, right: 30 }}
+                        />
+                        <YAxis 
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip 
+                          formatter={(value) => [`${value} horas`, "Horas"]}
+                          contentStyle={{ 
+                            borderRadius: '8px',
+                            border: '1px solid rgba(0, 0, 0, 0.1)',
+                            boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        <Legend iconType="circle" />
+                        <Line
+                          type="monotone"
+                          dataKey="hours"
+                          stroke="#4f46e5"
+                          name="Horas"
+                          strokeWidth={3}
+                          dot={{ r: 6, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                          activeDot={{ r: 8, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    </ScrollArea>
   );
 };
 
