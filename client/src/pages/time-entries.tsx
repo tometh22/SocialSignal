@@ -590,7 +590,21 @@ const TimeRegistrationForm: React.FC<{
 const TimeEntries: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
-  const projectId = parseInt(params.projectId || "0");
+  
+  // Manejar ambos patrones de URL:
+  // 1. /time-entries/project/:projectId
+  // 2. /active-projects/:projectId/time-entries
+  let projectId: number = 0;
+  
+  if (params.projectId) {
+    projectId = parseInt(params.projectId);
+  } else if (window.location.pathname.includes('/active-projects/')) {
+    // Extraer el ID del proyecto de la URL utilizando una expresión regular
+    const match = window.location.pathname.match(/\/active-projects\/(\d+)\/time-entries/);
+    if (match && match[1]) {
+      projectId = parseInt(match[1]);
+    }
+  }
   
   const [activeTab, setActiveTab] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);

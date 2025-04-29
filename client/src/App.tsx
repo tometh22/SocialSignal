@@ -44,6 +44,7 @@ function App() {
           {/* Rutas para gestión de proyectos activos */}
           <Route path="/active-projects" component={ActiveProjects} />
           <Route path="/active-projects/new" component={NewActiveProject} />
+          <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
           <Route path="/time-entries/project/:projectId" component={TimeEntries} />
           <Route path="/project-summary/:projectId" component={ProjectSummary} />
           <Route component={NotFound} />
