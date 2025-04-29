@@ -284,10 +284,27 @@ const ProjectSummary = () => {
     }
 
     try {
+      // Optimistic update: actualiza la UI inmediatamente
+      const oldProjectName = project.quotation?.projectName || "";
+      
+      // Actualizar inmediatamente la UI antes de la petición API
+      const updatedProject = {
+        ...project,
+        quotation: {
+          ...project.quotation,
+          projectName: editedName.trim()
+        }
+      };
+      
+      // Usa la función queryClient.setQueryData para actualizar el caché inmediatamente
+      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
+      
+      // Luego realiza la petición API
       await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
         projectName: editedName.trim()
       });
       
+      // Finalmente, invalida las consultas para asegurarte de que los datos están frescos
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects', parsedProjectId] });
       
@@ -295,6 +312,7 @@ const ProjectSummary = () => {
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
       setEditing(false);
+      // Podría agregarse una alerta o notificación para el usuario
     }
   };
 

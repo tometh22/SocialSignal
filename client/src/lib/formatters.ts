@@ -1,12 +1,12 @@
 /**
- * Formatea un número a una representación de moneda en euros
+ * Formatea un número a una representación de moneda en dólares
  * @param amount La cantidad a formatear
  * @returns La cadena formateada con formato de moneda
  */
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('es-ES', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'EUR',
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
