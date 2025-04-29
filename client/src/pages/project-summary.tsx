@@ -67,7 +67,7 @@ import {
   Award,
   Activity,
   ThumbsUp,
-  ArrowsUpDown,
+  ArrowUpDown,
   Lightbulb,
   Smile
 } from "lucide-react";
@@ -966,7 +966,7 @@ const ProjectSummary = () => {
           <>
             {/* KPI Cards */}
             {customView.showKpi && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 h-[200px]">
                 <AnimatedCard delay={100}>
                   <KpiCard 
                     title="Horas Registradas"
@@ -1030,7 +1030,7 @@ const ProjectSummary = () => {
               
               <TabsContent value="overview" className="pt-4">
                 {/* Información general y estado del proyecto */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 lg:auto-rows-fr">
                   {/* Estado del Proyecto y Cotización - Ocupa 4 columnas */}
                   {customView.showFinances && (
                     <AnimatedCard delay={400} className="lg:col-span-4">
@@ -1822,31 +1822,38 @@ const ProjectSummary = () => {
                       <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
-                            <AlertCircle className="h-5 w-5 mr-2 text-primary" />
-                            Monitoreo de riesgos
+                            <div className="mr-3 p-2 rounded-full bg-primary/10">
+                              <AlertCircle className="h-5 w-5 text-primary" />
+                            </div>
+                            Monitoreo de Desviaciones
                           </CardTitle>
                           <CardDescription>
-                            Alertas tempranas y factores críticos
+                            Control de desviaciones en costos y tiempo
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
                           <div className="space-y-6">
                             <div className="space-y-2">
-                              <p className="text-sm font-medium">Presupuesto</p>
-                              <div className="relative pt-1">
-                                <div className="flex mb-2 items-center justify-between">
-                                  <div>
-                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
-                                      Presupuesto utilizado
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-xs font-semibold inline-block">
-                                      {Math.round(costSummary?.percentageUsed || 0)}%
-                                    </span>
-                                  </div>
+                              <h3 className="text-sm font-medium flex items-center">
+                                <ArrowUpDown className="h-4 w-4 mr-2 text-primary" />
+                                Desviación en Costos
+                              </h3>
+                              <div className="p-3 rounded-md border bg-muted/20 mt-2">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm">Presupuesto estimado:</span>
+                                  <span className="font-semibold">{formatCurrency(costSummary?.estimatedCost || 0)}</span>
                                 </div>
-                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
+                                <div className="flex justify-between items-center mb-3">
+                                  <span className="text-sm">Costo actual:</span>
+                                  <span className="font-semibold">{formatCurrency(costSummary?.actualCost || 0)}</span>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                  <span>0%</span>
+                                  <span>50%</span>
+                                  <span>100%</span>
+                                </div>
+                                <div className="overflow-hidden h-2 mb-2 text-xs flex rounded bg-gray-100">
                                   <div 
                                     style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }} 
                                     className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
@@ -1854,70 +1861,93 @@ const ProjectSummary = () => {
                                     }`}
                                   ></div>
                                 </div>
-                                <div className="flex items-center">
-                                  {(costSummary?.percentageUsed || 0) <= 25 ? (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      <CheckCircle className="h-3 w-3 mr-1" /> Bajo
-                                    </Badge>
-                                  ) : (costSummary?.percentageUsed || 0) <= 90 ? (
-                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                      <AlertCircle className="h-3 w-3 mr-1" /> Medio
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                      <AlertTriangle className="h-3 w-3 mr-1" /> Alto
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Plazos</p>
-                              <div className="relative pt-1">
-                                <div className="flex mb-2 items-center justify-between">
-                                  <div>
-                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
-                                      Progreso vs plazo
-                                    </span>
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center">
+                                    {costSummary && costSummary.variance >= 0 ? (
+                                      <Badge className="bg-green-100 text-green-700 border-0">
+                                        <TrendingDown className="h-3 w-3 mr-1" /> 
+                                        {formatCurrency(costSummary.variance)} ahorrado
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-red-100 text-red-700 border-0">
+                                        <TrendingUp className="h-3 w-3 mr-1" /> 
+                                        {formatCurrency(Math.abs(costSummary?.variance || 0))} excedido
+                                      </Badge>
+                                    )}
                                   </div>
-                                  <div className="text-right">
-                                    <span className="text-xs font-semibold inline-block">
-                                      {projectMetrics?.progressPercentage?.toFixed(0) || 0}%
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
-                                  <div 
-                                    style={{ width: `${projectMetrics?.progressPercentage || 0}%` }} 
-                                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
-                                  ></div>
-                                </div>
-                                <div className="flex items-center">
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    <CheckCircle className="h-3 w-3 mr-1" /> Bajo
+                                  <Badge variant="outline">
+                                    {Math.round(costSummary?.percentageUsed || 0)}% utilizado
                                   </Badge>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                          
-                          <div className="mt-6">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <div className="flex-1">
-                                <h3 className="text-sm font-medium">Factores de Riesgo</h3>
-                              </div>
-                              <div>
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                  Proyecto en curso normal
-                                </Badge>
+                            
+                            <div className="space-y-2 mt-4">
+                              <h3 className="text-sm font-medium flex items-center">
+                                <Clock className="h-4 w-4 mr-2 text-primary" />
+                                Desviación en Tiempo
+                              </h3>
+                              <div className="p-3 rounded-md border bg-muted/20 mt-2">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-sm">Tiempo transcurrido:</span>
+                                  <span className="font-semibold">{projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-3">
+                                  <span className="text-sm">Progreso real:</span>
+                                  <span className="font-semibold">{isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%</span>
+                                </div>
+                                
+                                <div className="relative h-2 rounded-full bg-gray-100 mb-2">
+                                  {/* Barra de tiempo transcurrido */}
+                                  <div 
+                                    className="absolute h-full bg-blue-500 rounded-full"
+                                    style={{ width: `${Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}%` }}
+                                  ></div>
+                                  
+                                  {/* Marcador de progreso */}
+                                  <div 
+                                    className="absolute top-0 w-1 h-4 bg-primary -mt-1 rounded-full"
+                                    style={{ 
+                                      left: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%`,
+                                      transform: 'translateX(-50%)'
+                                    }}
+                                  ></div>
+                                </div>
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                                  <span className="text-blue-600">Tiempo</span>
+                                  <span className="text-primary">Progreso</span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                  {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
+                                    <Badge className="bg-red-100 text-red-700 border-0">
+                                      <TrendingDown className="h-3 w-3 mr-1" /> 
+                                      {Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% retraso
+                                    </Badge>
+                                  ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
+                                    <Badge className="bg-green-100 text-green-700 border-0">
+                                      <TrendingUp className="h-3 w-3 mr-1" /> 
+                                      {Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% adelanto
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-blue-100 text-blue-700 border-0">
+                                      <CheckCircle className="h-3 w-3 mr-1" /> 
+                                      En tiempo
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline">
+                                    {Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}% tiempo
+                                  </Badge>
+                                </div>
                               </div>
                             </div>
                             
-                            <Button variant="outline" className="w-full flex items-center justify-center" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver plan de mitigación
-                            </Button>
+                            <div className="mt-5">
+                              <Button variant="outline" className="w-full flex items-center justify-center" size="sm">
+                                <Lightbulb className="h-4 w-4 mr-2" />
+                                Ver recomendaciones
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
