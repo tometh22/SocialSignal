@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { KpiCard } from "@/components/project/kpi-card";
 import { 
   ArrowLeft, 
   Loader2, 
@@ -71,6 +70,7 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from "recharts";
+import { toast } from "@/hooks/use-toast";
 
 // Interfaces
 interface CostSummary {
@@ -155,6 +155,34 @@ const calculateRiskLevel = (
   return { level, factors: risks };
 };
 
+// Component Wrappers for Animation
+const AnimatedCard: React.FC<{
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}> = ({ children, delay = 0, className = "" }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 100 + delay);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  return (
+    <div
+      className={`transition-all duration-500 ${
+        isVisible 
+          ? "opacity-100 transform translate-y-0" 
+          : "opacity-0 transform translate-y-4"
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
+};
+
 // Status Badge Component
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const statusConfig = {
@@ -183,6 +211,54 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     <Badge className={config.className}>
       {config.label}
     </Badge>
+  );
+};
+
+// Modern KPI Card Component
+const SimpleKpiCard: React.FC<{
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  trend?: {
+    value: number;
+    isPositive: boolean;
+  };
+}> = ({ title, value, subtitle, icon, trend }) => {
+  return (
+    <Card className="shadow-sm bg-white">
+      <CardContent className="p-6">
+        <div className="flex flex-col">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <div className="bg-primary/10 p-2 rounded-full">
+              {icon}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold tracking-tight">{value}</h3>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+            )}
+            {trend && (
+              <div className="flex items-center mt-2">
+                {trend.isPositive ? (
+                  <span className="text-xs text-green-600 flex items-center">
+                    <TrendingUp className="mr-1 h-3 w-3" />
+                    +{trend.value}% semana anterior
+                  </span>
+                ) : (
+                  <span className="text-xs text-red-600 flex items-center">
+                    <TrendingDown className="mr-1 h-3 w-3" />
+                    {trend.value}% semana anterior
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -230,6 +306,19 @@ const ProjectSummary: React.FC = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [timeFilter, setTimeFilter] = useState("all");
   const [chartType, setChartType] = useState<"bar" | "line" | "radar">("bar");
+  const [customView, setCustomView] = useState<{
+    showKpi: boolean;
+    showFinances: boolean;
+    showTime: boolean;
+    showRisks: boolean;
+    showCharts: boolean;
+  }>({
+    showKpi: true,
+    showFinances: true,
+    showTime: true,
+    showRisks: true,
+    showCharts: true
+  });
 
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
@@ -280,7 +369,7 @@ const ProjectSummary: React.FC = () => {
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -377,54 +466,49 @@ const ProjectSummary: React.FC = () => {
 
   return (
     <ScrollArea className="flex-1 h-[calc(100vh-4rem)]">
-      <div className="container mx-auto px-6 py-6 pb-24 max-w-[1200px]">
-        {/* Header navigation */}
-        <div className="mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setLocation("/active-projects")}
-            className="px-2 py-1 h-auto"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Proyectos
-          </Button>
-        </div>
-        
-        {/* Project Title */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-1">
-            {project?.quotation?.projectName || "Cargando..."}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            ID: {projectId} | Última actualización: {format(new Date(), "dd MMM yyyy, HH:mm", { locale: es })}
-          </p>
-        </div>
-        
-        {/* Controls */}
-        <div className="flex justify-between items-center mb-6">
-          <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Todo el periodo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo el periodo</SelectItem>
-              <SelectItem value="week">Última semana</SelectItem>
-              <SelectItem value="month">Último mes</SelectItem>
-              <SelectItem value="quarter">Último trimestre</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Personalizar
+      <div className="container mx-auto py-4 px-6 pb-24">
+        {/* Header similar a la imagen */}
+        <div className="flex flex-col mb-6 space-y-3">
+          {/* Barra superior con botón de volver y controles */}
+          <div className="flex justify-between items-center py-2">
+            <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a Proyectos
             </Button>
             
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Select value={timeFilter} onValueChange={setTimeFilter}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder="Todo el periodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo el periodo</SelectItem>
+                  <SelectItem value="week">Última semana</SelectItem>
+                  <SelectItem value="month">Último mes</SelectItem>
+                  <SelectItem value="quarter">Último trimestre</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button variant="outline" size="sm" className="h-9">
+                <Settings className="h-4 w-4 mr-2" />
+                Personalizar
+              </Button>
+              
+              <Button variant="outline" size="sm" className="h-9">
+                <Download className="h-4 w-4 mr-2" />
+                Exportar
+              </Button>
+            </div>
+          </div>
+          
+          {/* Título del proyecto y fecha */}
+          <div>
+            <h1 className="text-3xl font-bold">
+              {project?.quotation?.projectName || "Cargando..."}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              ID: {projectId} | Última actualización: {format(new Date(), "dd MMM yyyy, HH:mm", { locale: es })}
+            </p>
           </div>
         </div>
 
@@ -451,9 +535,9 @@ const ProjectSummary: React.FC = () => {
           </Card>
         ) : (
           <>
-            {/* KPI Cards - Layout limpio y claro */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <KpiCard
+            {/* KPI Cards - Layout similar a la imagen */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <SimpleKpiCard
                 title="Progreso del proyecto"
                 value={`${projectMetrics?.timeProgress || 0}%`}
                 icon={<Percent className="h-5 w-5 text-blue-600" />}
@@ -463,7 +547,7 @@ const ProjectSummary: React.FC = () => {
                 }}
               />
               
-              <KpiCard
+              <SimpleKpiCard
                 title="Presupuesto utilizado"
                 value={`${Math.round(costSummary?.percentageUsed || 0)}%`}
                 subtitle={formatCurrency(costSummary?.actualCost || 0)}
@@ -474,14 +558,14 @@ const ProjectSummary: React.FC = () => {
                 }}
               />
               
-              <KpiCard
+              <SimpleKpiCard
                 title="Tiempo restante"
                 value={projectMetrics?.daysLeft || 0}
                 subtitle="días"
                 icon={<Timer className="h-5 w-5 text-purple-600" />}
               />
               
-              <KpiCard
+              <SimpleKpiCard
                 title="Personal asignado"
                 value={new Set(timeEntries?.map(e => e.personnelId) || []).size}
                 subtitle="personas"
@@ -490,8 +574,8 @@ const ProjectSummary: React.FC = () => {
             </div>
 
             {/* Análisis de riesgos */}
-            <Card className="mb-8 shadow-sm border bg-white">
-              <CardHeader className="pb-2 border-b">
+            <Card className="mb-8 shadow-sm border bg-gradient-to-r from-primary/5 to-transparent">
+              <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
                     <ShieldAlert className="h-5 w-5 mr-2 text-primary" />
@@ -572,8 +656,8 @@ const ProjectSummary: React.FC = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="pt-2 border-t">
-                <Button variant="outline" size="sm" className="w-full">
+              <CardFooter className="pt-0 border-t mt-4">
+                <Button variant="outline" className="w-full">
                   <Eye className="mr-2 h-4 w-4" />
                   Ver plan de mitigación de riesgos
                 </Button>
@@ -582,26 +666,29 @@ const ProjectSummary: React.FC = () => {
             
             {/* Tabs de navegación para el contenido */}
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full max-w-md mb-4">
-                <TabsTrigger value="overview" className="flex-1">Vista general</TabsTrigger>
-                <TabsTrigger value="financial" className="flex-1">Finanzas</TabsTrigger>
-                <TabsTrigger value="hours" className="flex-1">Registro de horas</TabsTrigger>
+              <TabsList className="grid grid-cols-3 w-full max-w-md">
+                <TabsTrigger value="overview">Vista general</TabsTrigger>
+                <TabsTrigger value="financial">Finanzas</TabsTrigger>
+                <TabsTrigger value="hours">Registro de horas</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="overview" className="mt-4">
+              <TabsContent value="overview" className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <Card className="shadow-sm">
-                    <CardHeader className="pb-2 border-b">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base font-medium flex items-center">
-                          <FileText className="h-4 w-4 mr-2 text-primary" />
-                          Información del Proyecto
-                        </CardTitle>
-                        <StatusBadge status={project.status} />
-                      </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base font-medium flex items-center">
+                        <div className="mr-2 p-1.5 rounded-full bg-primary/10">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        Información del Proyecto
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-2">
                       <div className="space-y-3 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Estado:</span>
+                          <StatusBadge status={project.status} />
+                        </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Fecha de inicio:</span>
                           <span>{formatDate(project.startDate)}</span>
@@ -616,11 +703,9 @@ const ProjectSummary: React.FC = () => {
                         </div>
                       </div>
                     </CardContent>
-                    <CardFooter className="pt-2 border-t">
-                      <Button variant="outline" size="sm" className="w-full" onClick={() => 
-                        setLocation(`/active-projects/${project.id}/time-entries`)
-                      }>
-                        <Clock className="mr-2 h-4 w-4" />
+                    <CardFooter className="pt-0 border-t mt-2">
+                      <Button variant="outline" size="sm" className="w-full text-xs">
+                        <Clock className="mr-1 h-3 w-3" />
                         Ver Registro de Horas
                       </Button>
                     </CardFooter>
