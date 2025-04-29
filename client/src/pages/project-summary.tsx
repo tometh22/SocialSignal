@@ -35,40 +35,61 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
+import { 
+  ToggleGroup, 
+  ToggleGroupItem 
+} from "@/components/ui/toggle-group";
 import { KpiCard } from "@/components/project/kpi-card";
+import { cn } from "@/lib/utils";
+
+// Lucide icons
 import { 
   ArrowLeft, 
   Loader2, 
   AlertTriangle,
   TrendingDown,
   TrendingUp,
-  Info as InfoCircle,
-  UserIcon,
-  PlusCircle as Plus,
-  BarChart2,
-  Clock as CalendarClock,
-  Clock,
   Calendar,
-  FileText,
+  CalendarDays,
+  BarChart as ChartBarIcon,
+  LayoutDashboard,
+  ClipboardList,
+  Sliders,
+  Clock,
+  User, // Cambiado de Users a User para evitar conflictos
+  Edit2,
+  DollarSign,
+  Plus,
+  ExternalLink,
+  Info,
   PlusCircle,
+  BarChart2,
+  FileText,
   BarChart3,
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
-  DollarSign,
   Target,
   AlertCircle,
   Settings,
-  Info as InfoIcon,
   Zap,
   Eye,
   CheckCircle,
-  Clock3,
   Award,
   Activity,
   ThumbsUp,
@@ -78,7 +99,23 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { 
+  Bar, 
+  Pie, 
+  Cell, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Legend, 
+  ResponsiveContainer, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  PolarRadiusAxis, 
+  Radar 
+} from 'recharts';
+import { Tooltip as RechartsTooltip } from 'recharts';
 import { apiRequest } from "@/lib/queryClient";
 import ChartModal from "@/components/project/chart-modal";
 import { formatCurrency } from "@/lib/formatters";
@@ -1001,72 +1038,324 @@ const ProjectSummary = () => {
           </div>
         ) : (
           <>
-            {/* KPI Cards con diseño moderno */}
-            {customView.showKpi && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                <AnimatedCard delay={100}>
-                  <KpiCard 
-                    title="Horas Registradas"
-                    value={`${totalHours.toFixed(1)} h`}
-                    description={
-                      <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="text-blue-600 font-medium">{billableHours.toFixed(1)}h facturables</span>
-                        <span className="text-muted-foreground">{nonBillableHours.toFixed(1)}h no facturables</span>
-                      </div>
-                    }
-                    icon={<Clock className="h-5 w-5" />}
-                    color="blue"
-                    progress={billableHours / Math.max(totalHours, 1) * 100}
-                  />
-                </AnimatedCard>
+            {/* Barra de filtros y acciones fijas */}
+            <div className="sticky top-20 z-10 bg-white dark:bg-background/60 backdrop-blur-sm pb-4 border-b mb-8">
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Select 
+                    value={timeFilter} 
+                    onValueChange={setTimeFilter}
+                  >
+                    <SelectTrigger className="w-[160px] h-9 border-muted">
+                      <CalendarRange className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todo el período</SelectItem>
+                      <SelectItem value="week">Última semana</SelectItem>
+                      <SelectItem value="month">Último mes</SelectItem>
+                      <SelectItem value="quarter">Último trimestre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <ToggleGroup type="single" value={activeTab} onValueChange={(val) => val && setActiveTab(val)}>
+                    <ToggleGroupItem value="overview" className="px-3 text-xs">
+                      <LayoutDashboard className="h-4 w-4 mr-1.5" />
+                      <span>KPI</span>
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="financial" className="px-3 text-xs">
+                      <DollarSign className="h-4 w-4 mr-1.5" />
+                      <span>Detallado</span>
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="hours" className="px-3 text-xs">
+                      <BarChart className="h-4 w-4 mr-1.5" />
+                      <span>Comparativo</span>
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
                 
-                <AnimatedCard delay={200}>
-                  <KpiCard 
-                    title="Costo Actual"
-                    value={formatCurrency(costSummary?.actualCost || 0)}
-                    description={`${Math.round(costSummary?.percentageUsed || 0)}% del presupuesto total`}
-                    icon={<DollarSign className="h-5 w-5" />}
-                    trend={costSummary?.variance ? Math.round((Math.abs(costSummary.variance) / (costSummary.estimatedCost || 1)) * 100) : 0}
-                    trendDirection={costSummary?.variance && costSummary.variance > 0 ? 'down' : 'up'}
-                    trendText={costSummary?.variance && costSummary.variance > 0 ? "por debajo del presupuesto" : "por encima del presupuesto"}
-                    color={costSummary?.percentageUsed && costSummary.percentageUsed > 90 ? "red" : "green"}
-                    progress={Math.min(costSummary?.percentageUsed || 0, 100)}
-                  />
-                </AnimatedCard>
-                
-                <AnimatedCard delay={300}>
-                  <KpiCard 
-                    title="Personal Asignado"
-                    value={new Set(timeEntries?.map(e => e.personnelId) || []).size.toString()}
-                    description={
-                      <div className="text-xs text-muted-foreground">
-                        {timeEntries && timeEntries.length > 0 
-                          ? `En ${timeEntries.length} registros de tiempo`
-                          : "Sin registros de tiempo"}
-                      </div>
-                    }
-                    icon={<Users className="h-5 w-5" />}
-                    color="purple"
-                  />
-                </AnimatedCard>
-                
-                <AnimatedCard delay={400}>
-                  <KpiCard 
-                    title="Tiempo Restante"
-                    value={projectMetrics ? `${Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed)} días` : "0 días"}
-                    description={
-                      <div className="flex flex-col">
-                        <div className="flex items-center justify-between text-xs">
-                          <span>{`${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado`}</span>
-                          <span className="text-muted-foreground">de {projectMetrics?.daysTotal || 0} días</span>
+                <div className="flex items-center gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 text-xs">
+                        <Sliders className="mr-1.5 h-4 w-4" />
+                        Personalizar
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Personalizar Panel</DialogTitle>
+                        <DialogDescription>
+                          Configura qué componentes quieres visualizar
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-5">
+                        {/* Opciones de personalización */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="p-1.5 bg-primary/5 rounded-md">
+                              <LayoutDashboard className="h-4 w-4 text-primary" />
+                            </div>
+                            <span>Tarjetas KPI</span>
+                          </div>
+                          <Switch 
+                            checked={customView.showKpi} 
+                            onCheckedChange={(checked) => 
+                              setCustomView({...customView, showKpi: checked})}
+                            className="data-[state=checked]:bg-primary"
+                          />
                         </div>
+                        <Separator />
+                        {/* Más opciones... */}
                       </div>
-                    }
-                    icon={<Calendar className="h-5 w-5" />}
-                    color="amber"
-                    progress={isNaN(projectMetrics?.progressPercentage) ? 0 : projectMetrics?.progressPercentage || 0}
-                  />
-                </AnimatedCard>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setCustomView({
+                          showKpi: true,
+                          showFinances: true,
+                          showTime: true,
+                          showRisks: true,
+                          showCharts: true,
+                          showTeam: true,
+                        })}>
+                          Restablecer
+                        </Button>
+                        <DialogClose asChild>
+                          <Button>Aplicar</Button>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  
+                  <Button 
+                    className="h-9 gap-1.5" 
+                    onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
+                  >
+                    <ClockPlus className="h-4 w-4" />
+                    <span>Registrar Horas</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {/* KPI Cards en ribbon horizontal con los 3 indicadores críticos */}
+            {customView.showKpi && (
+              <div className="mb-10">
+                <h3 className="text-lg font-medium mb-4 text-gray-700 flex items-center">
+                  <LayoutDashboard className="h-5 w-5 mr-2 text-primary/70" />
+                  Indicadores Clave de Rendimiento
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="col-span-1">
+                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
+                      <CardHeader className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-background p-4 pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900/30">
+                              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <h4 className="font-medium">Horas Registradas</h4>
+                          </div>
+                          <Info 
+                            className="h-4 w-4 text-muted-foreground cursor-help" 
+                            onClick={() => handleOpenHelpDialog('hoursHelp')}
+                          />
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-5 pt-4">
+                        <div className="flex items-baseline mb-2">
+                          <span className="text-3xl font-bold tracking-tight">{totalHours.toFixed(1)}</span>
+                          <span className="text-sm text-muted-foreground ml-1">h</span>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div className="flex h-full">
+                              <div 
+                                className="h-full bg-blue-500"
+                                style={{ width: `${(billableHours / Math.max(totalHours, 1)) * 100}%` }}
+                              ></div>
+                              <div 
+                                className="h-full bg-neutral-400"
+                                style={{ width: `${(nonBillableHours / Math.max(totalHours, 1)) * 100}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-0.5 text-blue-600">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span className="ml-1 font-medium">{billableHours.toFixed(1)}h</span>
+                              <span className="ml-0.5 text-muted-foreground">facturables</span>
+                            </div>
+                            <div className="flex items-center gap-0.5 text-neutral-600">
+                              <span className="w-2 h-2 rounded-full bg-neutral-400"></span>
+                              <span className="ml-1 font-medium">{nonBillableHours.toFixed(1)}h</span>
+                              <span className="ml-0.5 text-muted-foreground">no facturables</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-6">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-center border-blue-200 bg-blue-50/50 hover:bg-blue-100 text-blue-700 hover:text-blue-800"
+                            onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
+                          >
+                            <Plus className="h-3 w-3 mr-1.5" />
+                            Registrar Horas
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <div className="col-span-1">
+                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
+                      <CardHeader className={cn(
+                        "p-4 pb-2 bg-gradient-to-r",
+                        (costSummary?.percentageUsed || 0) > 100 
+                          ? "from-red-50 to-white dark:from-red-950/20 dark:to-background" 
+                          : (costSummary?.percentageUsed || 0) > 90 
+                            ? "from-amber-50 to-white dark:from-amber-950/20 dark:to-background" 
+                            : "from-green-50 to-white dark:from-green-950/20 dark:to-background"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "p-2 rounded-md",
+                              (costSummary?.percentageUsed || 0) > 100 
+                                ? "bg-red-100 dark:bg-red-900/30" 
+                                : (costSummary?.percentageUsed || 0) > 90 
+                                  ? "bg-amber-100 dark:bg-amber-900/30" 
+                                  : "bg-green-100 dark:bg-green-900/30"
+                            )}>
+                              <DollarSign className={cn(
+                                "h-5 w-5",
+                                (costSummary?.percentageUsed || 0) > 100 
+                                  ? "text-red-600 dark:text-red-400" 
+                                  : (costSummary?.percentageUsed || 0) > 90 
+                                    ? "text-amber-600 dark:text-amber-400" 
+                                    : "text-green-600 dark:text-green-400"
+                              )} />
+                            </div>
+                            <h4 className="font-medium">Costo vs Presupuesto</h4>
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={`${
+                              (costSummary?.percentageUsed || 0) > 100 ? "bg-red-50 text-red-600 border-red-200" :
+                              (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-50 text-amber-600 border-amber-200" :
+                              "bg-green-50 text-green-600 border-green-200"
+                            }`}
+                          >
+                            {Math.round(costSummary?.percentageUsed || 0)}%
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-5 pt-4">
+                        <div className="flex items-baseline mb-1">
+                          <span className="text-3xl font-bold tracking-tight">{formatCurrency(costSummary?.actualCost || 0, true)}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          de {formatCurrency(costSummary?.estimatedCost || 0, true)} presupuestados
+                        </div>
+                        
+                        <div className="mt-3 mb-4">
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
+                                (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
+                                "bg-green-500"
+                              }`}
+                              style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="flex items-center text-xs gap-1">
+                            {costSummary && costSummary.variance >= 0 ? (
+                              <div className="flex items-center bg-green-50 text-green-700 px-2 py-1 rounded-md">
+                                <TrendingDown className="h-3.5 w-3.5 mr-1" />
+                                <span>{formatCurrency(costSummary.variance)} ahorrado</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center bg-red-50 text-red-700 px-2 py-1 rounded-md">
+                                <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                                <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} excedido</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => setActiveTab("financial")}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Detalles
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <div className="col-span-1">
+                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
+                      <CardHeader className="bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-background p-4 pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-md bg-amber-100 dark:bg-amber-900/30">
+                              <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <h4 className="font-medium">Tiempo Restante</h4>
+                          </div>
+                          <div className="text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                            {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-5 pt-4">
+                        <div className="flex items-baseline mb-1">
+                          <span className="text-3xl font-bold tracking-tight">
+                            {projectMetrics ? Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed) : 0}
+                          </span>
+                          <span className="text-sm text-muted-foreground ml-1">días restantes</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          <span>de {projectMetrics?.daysTotal || 0} días totales</span>
+                        </div>
+                        
+                        <div className="mt-3 mb-2">
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-amber-500"
+                              style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.min(projectMetrics?.progressPercentage || 0, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col space-y-2 mt-3">
+                          <div className="grid grid-cols-2 text-xs gap-2">
+                            <div className="flex flex-col border border-slate-100 rounded p-1.5">
+                              <span className="text-muted-foreground">Inicio</span>
+                              <span className="font-medium">{formatDate(project?.startDate || "")}</span>
+                            </div>
+                            <div className="flex flex-col border border-slate-100 rounded p-1.5">
+                              <span className="text-muted-foreground">Fin estimado</span>
+                              <span className="font-medium">{formatDate(project?.expectedEndDate || "")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </div>
             )}
             
@@ -2282,8 +2571,8 @@ const ProjectSummary = () => {
   );
 };
 
-// Define la interfaz para el componente Users
-const Users = ({ className }: { className?: string }) => {
+// Define la interfaz para el componente TeamIcon (renombrado para evitar conflictos)
+const TeamIcon = ({ className }: { className?: string }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

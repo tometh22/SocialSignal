@@ -1,0 +1,72 @@
+quí tienes varias recomendaciones para llevar este dashboard de “Sistema de Cotización” a un nivel más moderno, limpio y 100 % profesional, optimizando la disposición de la información y la experiencia de usuario:
+
+1. Estructura en rejilla modular (12-column grid)
+
+Grid consistente: Usa un sistema de 12 columnas con gutters de 16 px y márgenes de 24 px.
+Tarjetas alineadas: Cada “card” ocupa múltiplos de 3 columnas (e.g. KPI cards de 3×1, sección de riesgo de 6×1, gráficas de 6×2).
+Altura uniforme: Define alturas base (por ejemplo 240 px) para que las filas siempre queden parejas, salvo en las visualizaciones que requieran más espacio (línea de evolución).
+2. Barra de filtros y acciones fijas
+
+Sticky toolbar en la parte superior, justo debajo del header, que incluya:
+Selector de periodo (hoy/semana/mes/rango personalizado)
+Switch de vista (KPI / detallado / comparativo)
+Botón primario “Registrar horas” y secundario “Personalizar”
+Así libreas espacio en cada sección y evitas que el usuario deba desplazarse para cambiar filtros.
+3. Prioriza los KPI clave en un “ribbon” horizontal
+
+Coloca en la primera fila (full-width) sólo tres KPIs básicos:
+
+Horas Registradas
+Costo vs Presupuesto
+Tiempo Restante / % Avance
+Deja las tarjetas de “Personal Asignado” y “Monitoreo de Desviaciones” en la segunda fila, ya como bloques de mayor tamaño. Esto da foco inmediato a los 3 indicadores críticos.
+
+4. Agrupación lógica y progresiva
+
+Resumen rápido (fila 1)
+Desviaciones y riesgos (fila 2), lado a lado:
+Card “Desviaciones” (Costo & Tiempo)
+Card “Riesgos” (Presupuesto, Cronograma, Alertas)
+Detalle y drill-downs (fila 3):
+“Personal Asignado”+Roles (card expandable)
+Botón “Ver detalle” dispara modal/tab interna
+Análisis y gráficas (fila 4 y 5):
+Dos gráficas en 50/50: Barra vs Doughnut
+Línea de evolución full-width al pie para dar espacio y mejor lectura
+5. Diseño visual y estilo
+
+Paleta minimalista:
+Fondo: #F7F9FC
+Cards: #FFFFFF, sombras sutiles (0 px 4 px 8 px rgba(0,0,0,0.04))
+Primarios: azul #2962FF para acciones y acentos
+Neutros/Texto: gris oscuro #333 / gris medio #666
+Tipografía jerárquica:
+H1: 24 px semibold
+H2 (títulos de cards): 18 px medium
+Body: 14 px regular
+Espaciados:
+Padding interno de cards: 20 px
+Márgenes entre cards: 24 px
+6. Microinteracciones y feedback
+
+Hover states: sombras elevadas y cambio de fondo (#F0F4FF) en cards clicables.
+Tooltips en iconos de ayuda, con explicaciones breves.
+Skeleton loaders para las gráficas al cargar.
+Indicadores de estado animados (e.g. barras de progreso que se “llenan” al entrar en vista).
+7. Enfoque en la usabilidad
+
+Accesos directos: un mini-search para filtrar rápidamente al personal asignado.
+Drill-through: al clicar una barra de la gráfica “Distribución de horas”, filtras automáticamente el listado de registros o resaltas el card “Horas Registradas”.
+Export & share: iconos discretos para exportar cada sección (PDF/PNG) o compartir un link de vista.
+8. Personalización y modularidad
+
+Permite “arrastrar y soltar” cards para que cada usuario configure su propio layout.
+Guarda presets de dashboards (e.g. “Finanzas”, “Operaciones”), accesibles desde un switch en la barra de filtros.
+Resultado esperado
+Un dashboard que:
+
+Comunica inmediatamente los tres KPIs más críticos.
+Agrupa la info en bloques lógicos, escalonados de resumen a detalle.
+Se siente moderno, con amplios espacios en blanco, tipografía clara y animaciones suaves.
+Empodera al usuario con interactividad (drill-downs, personalización y exportación).
+Con estas pautas lograrás una interfaz más limpia, eficiente y alineada con estándares de UX/UI de productos top del mercado.
