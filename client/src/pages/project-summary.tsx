@@ -250,7 +250,7 @@ const ProjectSummary = () => {
 
   // Obtener registros de tiempo del proyecto
   const { data: timeEntries = [] } = useQuery({
-    queryKey: ['/api/time-entries/project', parsedProjectId],
+    queryKey: [`/api/time-entries/project/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
@@ -266,7 +266,7 @@ const ProjectSummary = () => {
 
   // Obtener resumen de costos
   const { data: costSummary } = useQuery({
-    queryKey: ['/api/projects', parsedProjectId, 'cost-summary'],
+    queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
     enabled: !!parsedProjectId,
   });
 
