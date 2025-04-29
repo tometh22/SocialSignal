@@ -1076,12 +1076,12 @@ const ProjectSummary = () => {
                               <div className="h-2 w-full bg-gray-100 rounded-full">
                                 <div 
                                   className="h-full rounded-full bg-primary transition-all duration-500"
-                                  style={{ width: `${projectMetrics?.progressPercentage || 0}%` }}
+                                  style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : projectMetrics?.progressPercentage || 0}%` }}
                                 ></div>
                               </div>
                               <div className="flex justify-between items-center text-xs text-muted-foreground">
                                 <span>Inicio</span>
-                                <span>{projectMetrics?.progressPercentage.toFixed(0)}%</span>
+                                <span>{isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%</span>
                                 <span>Fin</span>
                               </div>
                             </div>
@@ -1240,7 +1240,7 @@ const ProjectSummary = () => {
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-muted-foreground">Promedio diario:</span>
                               <span>
-                                {projectMetrics?.hoursPerDay.toFixed(1)} h/día
+                                {isNaN(projectMetrics?.hoursPerDay) ? "0.0" : projectMetrics?.hoursPerDay.toFixed(1)} h/día
                               </span>
                             </div>
                           </div>
