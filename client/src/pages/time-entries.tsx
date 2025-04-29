@@ -1043,12 +1043,7 @@ const TimeEntries: React.FC = () => {
                   </div>
                 </Tabs>
               </CardHeader>
-              <CardContent className="p-0" style={{ 
-                height: "700px", 
-                overflowY: "scroll", 
-                display: "block",
-                position: "relative"
-              }}>
+              <CardContent className="p-0" style={{ maxHeight: "750px", overflowY: "auto" }}>
                 {isLoadingTimeEntries ? (
                   <div className="flex justify-center items-center h-[300px]">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1073,7 +1068,12 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  <div className="border rounded-md">
+                  <div className="border rounded-md" style={{ 
+                    height: "550px",
+                    overflowY: "scroll",
+                    display: "block",
+                    position: "relative"
+                  }}>
                     <Table>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
@@ -1183,7 +1183,12 @@ const TimeEntries: React.FC = () => {
                   </div>
                 ) : (
                   <div className="p-6 space-y-6">
-                    <div className="pr-4">
+                    <div className="pr-4" style={{ 
+                      height: "550px", 
+                      overflowY: "scroll", 
+                      display: "block",
+                      position: "relative"
+                    }}>
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
