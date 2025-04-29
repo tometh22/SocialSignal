@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import {
   Card,
@@ -29,14 +29,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -54,52 +52,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
 import { 
   CalendarIcon, 
   Loader2, 
   ArrowLeft, 
   PlusCircle, 
   Trash2,
-  CheckCircle2,
   Clock,
-  X,
-  ChevronDown,
-  Filter,
   ClipboardList,
   Calendar as CalendarSquare,
   BarChart3,
-  Clock3,
   DollarSign,
   FolderKanban,
   MoreHorizontal,
-  Timer,
-  UserCircle2,
-  UserCheck,
-  Users2,
-  AlertCircle,
-  FileText,
-  ExternalLink,
-  Search,
-  ClipboardCheck
+  Search
 } from "lucide-react";
-import { format, parseISO, differenceInDays, isAfter, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 
 // Interfaces de datos
 interface Personnel {
@@ -116,25 +96,6 @@ interface Role {
   defaultHourlyRate: number;
 }
 
-interface ActiveProject {
-  id: number;
-  quotationId: number;
-  status: string;
-  startDate: string;
-  expectedEndDate: string | null;
-  actualEndDate: string | null;
-  trackingFrequency: string;
-  notes: string | null;
-  quotation: {
-    id: number;
-    projectName: string;
-    clientId: number;
-    totalAmount: number;
-    status: string;
-    projectType: string;
-  };
-}
-
 interface TimeEntry {
   id: number;
   projectId: number;
@@ -147,14 +108,6 @@ interface TimeEntry {
   approvedDate: string | null;
   billable: boolean;
   createdAt: string;
-}
-
-interface Client {
-  id: number;
-  name: string;
-  contactName: string | null;
-  contactEmail: string | null;
-  contactPhone: string | null;
 }
 
 // Esquema del formulario
@@ -173,23 +126,6 @@ const formSchema = z.object({
 });
 
 // Componentes personalizados
-const ProjectStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  switch (status) {
-    case "active":
-      return <Badge className="bg-green-500 hover:bg-green-600">Activo</Badge>;
-    case "completed":
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Completado</Badge>;
-    case "cancelled":
-      return <Badge className="bg-red-500 hover:bg-red-600">Cancelado</Badge>;
-    case "on-hold":
-      return <Badge className="bg-amber-500 hover:bg-amber-600">En Pausa</Badge>;
-    default:
-      return <Badge>{status}</Badge>;
-  }
-};
-
-// Este componente ha sido eliminado de la aplicación ya que no se necesita más la funcionalidad de aprobación
-
 const PersonAvatar: React.FC<{ name: string }> = ({ name }) => {
   const initials = name
     .split(" ")
@@ -263,6 +199,12 @@ const DaySummary: React.FC<{
   );
 };
 
+// Función para formatear fecha legible
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return format(date, "dd 'de' MMM", { locale: es });
+};
+
 const TimeRegistrationForm: React.FC<{
   personnel: Personnel[] | undefined;
   projectId: number;
@@ -292,18 +234,15 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
-      
-      // IMPORTANTE: Actualizar el estado local directamente para mostrar inmediatamente
+      // Actualizar el estado local directamente para mostrar inmediatamente
       updateLocalEntries(newEntry);
       
       // Actualizamos la caché de forma optimista
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
-        console.log("Actualizando caché con nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
       
-      // Forzamos una recarga completa de los datos para asegurar sincronización total
+      // Forzamos una recarga completa de los datos
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       }, 300);
@@ -449,44 +388,6 @@ const TimeRegistrationForm: React.FC<{
                       </FormControl>
                       <Clock className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
                     </div>
-
-                    {/* Presets para móvil */}
-                    <div className="md:hidden flex items-center justify-start">
-                      <span className="text-xs text-muted-foreground mr-2">Presets:</span>
-                      <div className="flex gap-1">
-                        {[0.5, 1, 2, 4, 8].map((value) => (
-                          <Button
-                            key={value}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-6 w-7 text-xs font-normal p-0"
-                            onClick={() => field.onChange(value)}
-                          >
-                            {value}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Presets para desktop */}
-                    <div className="hidden md:flex items-center border rounded bg-muted/40 px-3 h-11 space-x-2 text-sm">
-                      <span className="text-muted-foreground">Presets:</span>
-                      <div className="flex gap-1">
-                        {[0.5, 1, 2, 4, 8].map((value) => (
-                          <Button
-                            key={value}
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-8 text-xs font-normal"
-                            onClick={() => field.onChange(value)}
-                          >
-                            {value}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -499,37 +400,25 @@ const TimeRegistrationForm: React.FC<{
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Tipo de horas</FormLabel>
-                  <div className="flex items-center space-x-4 h-11">
-                    <Select
-                      onValueChange={(value) => field.onChange(value === "billable")}
-                      defaultValue={field.value ? "billable" : "non-billable"}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Tipo de horas" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="billable">
-                          <div className="flex items-center">
-                            <DollarSign className="mr-2 h-4 w-4 text-green-600" />
-                            <span>Facturable</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="non-billable">
-                          <div className="flex items-center">
-                            <Clock className="mr-2 h-4 w-4 text-amber-600" />
-                            <span>No facturable</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center h-11 space-x-2">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-sm">
+                        {field.value ? "Facturable" : "No facturable"}
+                      </FormLabel>
+                      <FormDescription className="text-xs">
+                        {field.value
+                          ? "Estas horas se facturarán al cliente"
+                          : "Estas horas son para uso interno"}
+                      </FormDescription>
+                    </div>
                   </div>
-                  <FormDescription className="text-xs mt-1">
-                    <strong>Facturable:</strong> Horas que se cobran al cliente.
-                    <br />
-                    <strong>No facturable:</strong> Trabajo interno que no se cobra al cliente.
-                  </FormDescription>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -540,34 +429,25 @@ const TimeRegistrationForm: React.FC<{
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Descripción del trabajo realizado</FormLabel>
+                <FormLabel>Descripción (opcional)</FormLabel>
                 <FormControl>
-                  <Textarea
-                    placeholder="Describe las tareas realizadas, resultados o cualquier información relevante..."
-                    className="min-h-[100px] resize-none"
+                  <Textarea 
+                    className="resize-none h-[100px]" 
+                    placeholder="Describe brevemente el trabajo realizado..."
                     {...field}
                     value={field.value || ""}
                   />
                 </FormControl>
-                <FormDescription>
-                  Esta información ayudará al equipo a entender el contexto de las horas registradas.
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-
-        <div className="flex justify-end space-x-2 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isPending}
-          >
+        <DialogFooter>
+          <Button variant="outline" type="button" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending} className="min-w-[120px]">
+          <Button type="submit" disabled={isPending}>
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -580,13 +460,12 @@ const TimeRegistrationForm: React.FC<{
               </>
             )}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Form>
   );
 };
 
-// Componente principal
 const TimeEntries: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
@@ -620,453 +499,233 @@ const TimeEntries: React.FC = () => {
   const updateLocalEntries = (entry: TimeEntry) => {
     setLocalTimeEntries(prev => [...prev, entry]);
   };
-  
 
-
-  // Obtener proyecto activo
-  const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
-    queryKey: ["/api/active-projects", projectId],
-    enabled: !!projectId,
+  // Obtener datos del proyecto
+  const { data: project, isLoading: projectLoading } = useQuery({
+    queryKey: [`/api/active-projects/${projectId}`],
+    enabled: projectId > 0
   });
 
-  // Obtener personal
-  const { data: personnel, isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel"],
-  });
-
-  // Obtener roles
-  const { data: roles } = useQuery<Role[]>({
-    queryKey: ["/api/roles"],
-  });
-
-  // Obtener clientes
-  const { data: clients } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-  });
-
-  // Obtener registros de tiempo
-  const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
+  // Obtener datos de entradas de tiempo
+  const { data: timeEntries, isLoading } = useQuery({
     queryKey: [`/api/time-entries/project/${projectId}`],
-    enabled: !!projectId,
+    enabled: projectId > 0
   });
-  
-  // Sincronizar estado local con datos del servidor
+
   useEffect(() => {
     if (timeEntries) {
-      console.log("Actualizando estado local con datos del servidor:", timeEntries);
       setLocalTimeEntries(timeEntries);
     }
   }, [timeEntries]);
 
-  // Filtrar entradas según pestaña activa y búsqueda
-  const filteredEntries = React.useMemo(() => {
-    // Usar el estado local de registros de tiempo para actualización en tiempo real
-    const entries = localTimeEntries || [];
-    
-    let filtered = entries;
-    
-    // Filtrar por pestaña
-    switch (activeTab) {
-      case "billable":
-        filtered = filtered.filter(entry => entry.billable);
-        break;
-      case "non-billable":
-        filtered = filtered.filter(entry => !entry.billable);
-        break;
-      // El caso "all" no necesita filtro
-    }
-    
-    // Filtrar por búsqueda
-    if (search.trim()) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(entry => {
-        const personName = personnel?.find(p => p.id === entry.personnelId)?.name?.toLowerCase() || "";
-        const description = entry.description?.toLowerCase() || "";
-        return personName.includes(searchLower) || description.includes(searchLower);
-      });
-    }
-    
-    // Ordenar por fecha (más reciente primero)
-    return [...filtered].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [localTimeEntries, activeTab, search, personnel]);
-
-  // Mutación para eliminar entrada de tiempo
-  const deleteTimeEntryMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiRequest(`/api/time-entries/${id}`, "DELETE");
-    },
-    onSuccess: () => {
-      // Actualizar el estado local también para reflejar cambios inmediatamente
-      if (entryToDelete) {
-        setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryToDelete));
-      }
-      
-      // Actualizar caché de TanStack Query
-      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
-        return oldData.filter(entry => entry.id !== entryToDelete);
-      });
-      
-      // Invalidar consulta para asegurar sincronización completa
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      
-      toast({
-        title: "Registro eliminado",
-        description: "El registro de horas ha sido eliminado con éxito",
-      });
-      
-      setDeleteDialogOpen(false);
-    },
-    onError: (error: any) => {
-      console.error("Error deleting time entry:", error);
-      toast({
-        title: "Error al eliminar",
-        description: error.message || "Ha ocurrido un error al eliminar el registro",
-        variant: "destructive",
-      });
-    },
+  // Obtener datos de personal
+  const { data: personnel } = useQuery({
+    queryKey: ['/api/personnel'],
+  });
+  
+  // Obtener datos de roles
+  const { data: roles } = useQuery({
+    queryKey: ['/api/roles'],
   });
 
+  // Mutación para eliminar registro de tiempo
+  const deleteTimeEntryMutation = useMutation({
+    mutationFn: async (entryId: number) => {
+      return apiRequest(`/api/time-entries/${entryId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      toast({
+        title: "Registro eliminado",
+        description: "El registro de horas ha sido eliminado con éxito"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Ha ocurrido un error al eliminar el registro",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const getRoleNameById = (roleId: number): string => {
+    if (!roles) return "Rol Desconocido";
+    const role = roles.find(r => r.id === roleId);
+    return role ? role.name : "Rol Desconocido";
+  };
+
+  // Confirmación para eliminar un registro
   const confirmDelete = () => {
     if (entryToDelete) {
       deleteTimeEntryMutation.mutate(entryToDelete);
+      setDeleteDialogOpen(false);
+      setEntryToDelete(null);
     }
   };
 
-  // Funciones de utilidad
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "N/A";
-    return format(new Date(dateString), "dd MMM yyyy", { locale: es });
-  };
+  // Filtrar entradas según criterios
+  const filteredEntries = localTimeEntries
+    ? localTimeEntries.filter(entry => {
+        // Filtro por tipo (facturable/no facturable)
+        if (activeTab === "billable" && !entry.billable) return false;
+        if (activeTab === "non-billable" && entry.billable) return false;
+        
+        // Filtro por búsqueda
+        if (search) {
+          const person = personnel?.find(p => p.id === entry.personnelId);
+          const personName = person?.name?.toLowerCase() || "";
+          const description = entry.description?.toLowerCase() || "";
+          const searchLower = search.toLowerCase();
+          
+          return personName.includes(searchLower) || 
+                 description.includes(searchLower) || 
+                 format(new Date(entry.date), "dd/MM/yyyy").includes(searchLower);
+        }
+        
+        return true;
+      })
+    : [];
 
-  const getTotalHours = () => {
-    if (!filteredEntries) return 0;
-    return filteredEntries.reduce((sum, entry) => sum + entry.hours, 0);
-  };
-
-  const getTotalBillableHours = () => {
-    if (!filteredEntries) return 0;
-    return filteredEntries
-      .filter(entry => entry.billable)
-      .reduce((sum, entry) => sum + entry.hours, 0);
-  };
-
-  // Calcular progreso del proyecto
-  const calculateProjectProgress = () => {
-    if (!project || !project.startDate) return 0;
-    
-    const start = new Date(project.startDate);
-    const end = project.expectedEndDate ? new Date(project.expectedEndDate) : addDays(start, 30);
-    const today = new Date();
-    
-    if (isAfter(today, end)) return 100;
-    
-    const totalDays = differenceInDays(end, start) || 1;
-    const daysElapsed = differenceInDays(today, start);
-    
-    return Math.min(Math.round((daysElapsed / totalDays) * 100), 100);
-  };
-
-  // Agrupar entradas por fecha para la vista calendario
+  // Agrupar entradas por fecha para la vista de calendario
   const groupEntriesByDate = () => {
-    if (!localTimeEntries || localTimeEntries.length === 0) return new Map();
-    
     const grouped = new Map<string, TimeEntry[]>();
     
-    filteredEntries.forEach(entry => {
-      const dateKey = entry.date.substring(0, 10); // YYYY-MM-DD
-      if (!grouped.has(dateKey)) {
-        grouped.set(dateKey, []);
-      }
-      grouped.get(dateKey)!.push(entry);
-    });
+    if (filteredEntries) {
+      filteredEntries.forEach(entry => {
+        // Obtener solo la fecha (sin hora)
+        const dateStr = entry.date.split('T')[0];
+        
+        if (!grouped.has(dateStr)) {
+          grouped.set(dateStr, []);
+        }
+        
+        grouped.get(dateStr)?.push(entry);
+      });
+    }
     
     return grouped;
   };
 
-  // Estado de carga
-  const isLoading = 
-    isLoadingProject || 
-    isLoadingPersonnel || 
-    isLoadingTimeEntries || 
-    deleteTimeEntryMutation.isPending;
-
-  const getRoleNameById = (roleId: number) => {
-    return roles?.find(role => role.id === roleId)?.name || "Rol desconocido";
-  };
-
-  const getClientNameById = (clientId: number) => {
-    return clients?.find(client => client.id === clientId)?.name || "Cliente desconocido";
-  };
-
-  // Manejo de errores
+  // Si no se encuentra el ID del proyecto, mostrar mensaje de error
   if (!projectId) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="flex justify-center items-center h-[400px]">
-          <Card className="w-[600px]">
-            <CardHeader className="text-center">
-              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-2" />
-              <CardTitle>Error de navegación</CardTitle>
-              <CardDescription>
-                No se ha especificado un proyecto válido para el registro de horas.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="flex justify-center">
-              <Button onClick={() => setLocation("/active-projects")}>
-                Ver Proyectos Activos
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Componente principal
-  return (
-    <div className="container mx-auto py-6 max-w-6xl">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver a Proyectos
-        </Button>
-        <h1 className="text-3xl font-bold ml-4">Registro de Horas</h1>
-      </div>
-
-      {isLoadingProject ? (
-        <div className="flex justify-center items-center h-[300px]">
-          <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground">Cargando datos del proyecto...</p>
-          </div>
-        </div>
-      ) : !project ? (
+      <div className="container max-w-6xl mx-auto py-6">
         <Card>
-          <CardHeader className="text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+          <CardHeader>
             <CardTitle>Proyecto no encontrado</CardTitle>
             <CardDescription>
-              El proyecto especificado no existe o no está disponible en el sistema.
+              No se ha especificado un proyecto válido para registrar horas.
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex justify-center">
+          <CardContent>
+            <p className="text-muted-foreground">
+              Por favor, selecciona un proyecto activo desde el panel de proyectos.
+            </p>
+          </CardContent>
+          <CardFooter>
             <Button onClick={() => setLocation("/active-projects")}>
               Ver todos los proyectos
             </Button>
           </CardFooter>
         </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-6xl mx-auto py-6">
+      {projectLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       ) : (
         <>
-          <Card className="mb-6 overflow-hidden">
-            <div className="bg-primary/5 border-b">
-              <div className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between p-6">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold">
-                      {project.quotation && project.quotation.projectName 
-                        ? project.quotation.projectName 
-                        : "Proyecto sin nombre"}
-                    </h2>
-                    <ProjectStatusBadge status={project.status} />
-                  </div>
-                  <div className="text-muted-foreground">
-                    <span className="inline-flex items-center">
-                      <Users2 className="h-4 w-4 mr-1" />
-                      Cliente: {project.quotation && project.quotation.clientId 
-                        ? getClientNameById(project.quotation.clientId) 
-                        : "Sin cliente asignado"}
-                    </span>
-                    <span className="mx-2">|</span>
-                    <span className="inline-flex items-center">
-                      <FolderKanban className="h-4 w-4 mr-1" />
-                      Tipo: {project.quotation && project.quotation.projectType 
-                        ? project.quotation.projectType.toUpperCase() 
-                        : "No especificado"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex mt-4 md:mt-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mr-2"
-                    onClick={() => setLocation(`/project-summary/${project.id}`)}
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Ver análisis
-                  </Button>
-                  <Button size="sm" onClick={() => setDialogOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Registrar Horas
-                  </Button>
-                </div>
-              </div>
-            </div>
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-4"
+              onClick={() => setLocation("/active-projects")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a Proyectos
+            </Button>
             
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap justify-between items-center">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Progreso del Proyecto</h3>
-                    <div className="space-y-2">
-                      <Progress value={calculateProjectProgress()} className="h-2" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Inicio: {formatDate(project.startDate)}</span>
-                        <span>Fin: {formatDate(project.expectedEndDate)}</span>
-                      </div>
-                    </div>
+                    <CardTitle className="text-2xl">Registro de Horas</CardTitle>
+                    <CardDescription>
+                      Proyecto: {project?.quotation?.projectName || "Sin nombre"}
+                    </CardDescription>
                   </div>
-                  
-                  <div className="flex space-x-8">
-                    <div>
-                      <h3 className="text-sm font-medium mb-1">Seguimiento</h3>
-                      <div className="flex items-center text-sm">
-                        <CalendarSquare className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span className="capitalize">{project.trackingFrequency}</span>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium mb-1">Presupuesto</h3>
-                      <div className="flex items-center text-sm">
-                        <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>
-                          ${project.quotation && typeof project.quotation.totalAmount === 'number' 
-                            ? project.quotation.totalAmount.toFixed(2) 
-                            : "0.00"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {project.notes && (
-                    <div>
-                      <h3 className="text-sm font-medium mb-1">Notas</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {project.notes}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium">Resumen de horas</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="text-xs text-muted-foreground mb-1">Total Horas</h4>
-                          <p className="text-2xl font-bold">{getTotalHours().toFixed(1)}</p>
-                        </div>
-                        <Timer className="h-8 w-8 text-primary/70" />
-                      </div>
-                    </div>
-                    
-                    <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="text-xs text-muted-foreground mb-1">Horas Facturables</h4>
-                          <p className="text-2xl font-bold">{getTotalBillableHours().toFixed(1)}</p>
-                        </div>
-                        <DollarSign className="h-8 w-8 text-green-500/70" />
-                      </div>
-                    </div>
-                    
-                    {localTimeEntries && localTimeEntries.length > 0 && (
-                      <>
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="text-xs text-muted-foreground mb-1">Total Registros</h4>
-                              <p className="text-2xl font-bold">
-                                {localTimeEntries.length}
-                              </p>
-                            </div>
-                            <ClipboardCheck className="h-8 w-8 text-blue-500/70" />
-                          </div>
-                        </div>
-                      </>
-                    )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setLocation(`/project-summary/${projectId}`)}>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Ver resumen
+                    </Button>
+                    <Button size="sm" onClick={() => setDialogOpen(true)}>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Registrar Horas
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <Card className="flex-1">
-              <CardHeader className="py-4 px-6">
-                <Tabs
-                  defaultValue="all"
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="w-full"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">Registros de tiempo</h3>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant={viewMode === "list" ? "default" : "outline"}
-                        size="sm"
-                        className="h-8"
-                        onClick={() => setViewMode("list")}
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                        <span className="sr-only">Vista Lista</span>
-                      </Button>
-                      <Button
-                        variant={viewMode === "calendar" ? "default" : "outline"}
-                        size="sm"
-                        className="h-8"
-                        onClick={() => setViewMode("calendar")}
-                      >
-                        <CalendarSquare className="h-4 w-4" />
-                        <span className="sr-only">Vista Calendario</span>
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center mb-4">
-                    <TabsList className="grid grid-cols-3 w-full md:w-auto">
-                      <TabsTrigger value="all">Todos</TabsTrigger>
-                      <TabsTrigger value="billable">Facturables</TabsTrigger>
-                      <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
-                    </TabsList>
-                    <div className="hidden md:flex items-center relative">
+              </CardHeader>
+              
+              <CardContent>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <div className="flex-1 max-w-[300px]">
+                    <div className="relative">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="search"
-                        placeholder="Buscar en registros..."
-                        className="w-[280px] pl-9 h-9"
+                        placeholder="Buscar registros..."
+                        className="pl-9"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="md:hidden relative mb-4">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="search"
-                      placeholder="Buscar en registros..."
-                      className="w-full pl-9"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
+                  <div className="flex gap-2">
+                    <Tabs defaultValue="all" className="w-[400px]" value={activeTab} onValueChange={setActiveTab}>
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="all">Todos</TabsTrigger>
+                        <TabsTrigger value="billable">Facturables</TabsTrigger>
+                        <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <div className="flex border rounded-md p-0.5 h-9">
+                      <Button
+                        variant={viewMode === "list" ? "default" : "outline"}
+                        size="sm"
+                        className="h-full rounded-r-none"
+                        onClick={() => setViewMode("list")}
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "calendar" ? "default" : "outline"}
+                        size="sm"
+                        className="h-full rounded-l-none"
+                        onClick={() => setViewMode("calendar")}
+                      >
+                        <CalendarSquare className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </Tabs>
-              </CardHeader>
-              <CardContent className="p-0" style={{ maxHeight: "750px", overflowY: "auto" }}>
-                {isLoadingTimeEntries ? (
-                  <div className="flex justify-center items-center h-[300px]">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : filteredEntries.length === 0 ? (
-                  <div className="flex flex-col justify-center items-center h-[300px] text-center px-4">
-                    <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-medium">No hay registros de horas</h3>
-                    <p className="text-muted-foreground mt-2 max-w-md">
+                  <div className="text-center py-16 border rounded-md">
+                    <Clock className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No hay registros de tiempo</h3>
+                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                       {search 
                         ? "No se encontraron registros que coincidan con tu búsqueda."
                         : activeTab !== "all"
@@ -1082,13 +741,19 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  <div className="border rounded-md" style={{ 
-                    height: "400px", 
-                    maxHeight: "80vh", 
-                    overflowY: "auto"
-                  }}>
-                    <Table className="w-full" style={{ tableLayout: "fixed" }}>
-                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                  <div 
+                    className="border rounded-md" 
+                    style={{
+                      height: "450px",
+                      maxHeight: "70vh",
+                      position: "relative",
+                      overflowY: "auto",
+                      marginBottom: "120px" // Espacio adicional después del contenedor
+                    }}
+                  >
+                    <div style={{ paddingBottom: "150px" }}> {/* Espacio adicional dentro del contenedor */}
+                      <Table className="w-full" style={{ tableLayout: "fixed" }}>
+                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Personal</TableHead>
@@ -1193,15 +858,20 @@ const TimeEntries: React.FC = () => {
                           })}
                         </TableBody>
                       </Table>
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-6 space-y-6">
-                    <div className="pr-4" style={{ 
-                      height: "400px", 
-                      maxHeight: "80vh", 
+                  <div 
+                    className="p-6" 
+                    style={{
+                      height: "450px",
+                      maxHeight: "70vh",
+                      position: "relative",
                       overflowY: "auto",
-                      display: "block"
-                    }}>
+                      marginBottom: "120px" // Espacio adicional después del contenedor
+                    }}
+                  >
+                    <div style={{ paddingBottom: "150px" }}> {/* Espacio adicional dentro del contenedor */}
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
@@ -1231,14 +901,13 @@ const TimeEntries: React.FC = () => {
               <DialogHeader>
                 <DialogTitle>Nuevo Registro de Horas</DialogTitle>
                 <DialogDescription>
-                  Registra el tiempo trabajado en el proyecto {project.quotation?.projectName || "seleccionado"}
+                  Registra el tiempo trabajado en el proyecto
                 </DialogDescription>
               </DialogHeader>
               <TimeRegistrationForm
                 personnel={personnel}
                 projectId={projectId}
                 onSuccess={() => {
-                  // Retrasamos un poco el cierre del diálogo para asegurar que se muestre el registro
                   setTimeout(() => {
                     setDialogOpen(false);
                   }, 300);
@@ -1280,8 +949,6 @@ const TimeEntries: React.FC = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-
         </>
       )}
     </div>
