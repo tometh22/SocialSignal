@@ -988,7 +988,12 @@ const ProjectSummary = () => {
                   <KpiCard 
                     title="Tiempo Restante"
                     value={projectMetrics ? `${Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed)} días` : "0 días"}
-                    description={`${projectMetrics?.progressPercentage.toFixed(0)}% completado`}
+                    description={
+                      <div className="flex flex-col">
+                        <span>{`${projectMetrics?.progressPercentage.toFixed(0)}% completado`}</span>
+                        <span className="text-xs text-muted-foreground mt-1">Inicio: {formatDate(project.startDate)}</span>
+                      </div>
+                    }
                     icon={<Calendar className="h-5 w-5" />}
                     color="amber"
                     progress={projectMetrics?.progressPercentage || 0}
@@ -1008,52 +1013,33 @@ const ProjectSummary = () => {
               <TabsContent value="overview" className="pt-4">
                 {/* Información general y estado del proyecto */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-                  {/* Información del Proyecto - Ocupa 4 columnas */}
+                  {/* Estado del Proyecto y Cotización - Ocupa 4 columnas */}
                   {customView.showFinances && (
                     <AnimatedCard delay={400} className="lg:col-span-4">
                       <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="pb-3 border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
                             <div className="mr-3 p-2 rounded-full bg-primary/10">
-                              <FileText className="h-5 w-5 text-primary" />
+                              <Activity className="h-5 w-5 text-primary" />
                             </div>
-                            Información del Proyecto
+                            Estado del Proyecto
                           </CardTitle>
-                          <div className="flex justify-between items-center">
-                            <CardDescription>Estado actual</CardDescription>
-                            <StatusBadge status={project.status} />
-                          </div>
                         </CardHeader>
                         <CardContent className="pt-4">
                           <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Nombre:</span>
-                              <span className="font-medium">{project.quotation?.projectName || "Sin nombre"}</span>
+                              <span className="text-sm text-muted-foreground">Estado actual:</span>
+                              <StatusBadge status={project.status} />
                             </div>
-                            <Separator />
+                            
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">ID Proyecto:</span>
-                              <span>{project.id}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">ID Cotización:</span>
-                              <span>{project.quotationId}</span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Fecha de inicio:</span>
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1 text-primary/70" />
-                                <span>{formatDate(project.startDate)}</span>
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Fecha fin esperada:</span>
+                              <span className="text-sm text-muted-foreground">Fecha esperada de fin:</span>
                               <div className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-1 text-primary/70" />
                                 <span>{formatDate(project.expectedEndDate)}</span>
                               </div>
                             </div>
+                            
                             {project.actualEndDate && (
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-muted-foreground">Fecha fin real:</span>
@@ -1063,10 +1049,27 @@ const ProjectSummary = () => {
                                 </div>
                               </div>
                             )}
-                            <Separator />
+                            
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-muted-foreground">Frecuencia de seguimiento:</span>
-                              <span className="capitalize">{project.trackingFrequency}</span>
+                              <Badge variant="outline">{project.trackingFrequency}</Badge>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div className="flex flex-col gap-2">
+                              <p className="text-sm text-muted-foreground">Progreso del proyecto:</p>
+                              <div className="h-2 w-full bg-gray-100 rounded-full">
+                                <div 
+                                  className="h-full rounded-full bg-primary transition-all duration-500"
+                                  style={{ width: `${projectMetrics?.progressPercentage || 0}%` }}
+                                ></div>
+                              </div>
+                              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                <span>Inicio</span>
+                                <span>{projectMetrics?.progressPercentage.toFixed(0)}%</span>
+                                <span>Fin</span>
+                              </div>
                             </div>
                           </div>
                         </CardContent>
