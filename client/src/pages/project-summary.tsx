@@ -402,6 +402,21 @@ const ProjectSummary: React.FC = () => {
     queryKey: ['/api/personnel'],
   });
 
+  // Total de horas calculado una sola vez - MOVIDO AQUÍ PARA RESOLVER EL ERROR
+  const totalHours = useMemo(() => {
+    return timeEntries?.reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
+
+  // Horas facturables calculadas una sola vez
+  const billableHours = useMemo(() => {
+    return timeEntries?.filter(e => e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
+
+  // Horas no facturables calculadas una sola vez
+  const nonBillableHours = useMemo(() => {
+    return timeEntries?.filter(e => !e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
+
   // Formatear fecha
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
@@ -477,7 +492,7 @@ const ProjectSummary: React.FC = () => {
       timeTrend,
       risk
     };
-  }, [project, costSummary, timeEntries]);
+  }, [project, costSummary, timeEntries, totalHours]);
 
   // Filtrar datos por periodo de tiempo
   const filterDataByTime = (data: any[], dateKey: string = 'date') => {
@@ -587,21 +602,6 @@ const ProjectSummary: React.FC = () => {
     
     return data;
   }, [timeEntries, personnel]);
-
-  // Total de horas calculado una sola vez
-  const totalHours = useMemo(() => {
-    return timeEntries?.reduce((acc, entry) => acc + entry.hours, 0) || 0;
-  }, [timeEntries]);
-
-  // Horas facturables calculadas una sola vez
-  const billableHours = useMemo(() => {
-    return timeEntries?.filter(e => e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
-  }, [timeEntries]);
-
-  // Horas no facturables calculadas una sola vez
-  const nonBillableHours = useMemo(() => {
-    return timeEntries?.filter(e => !e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
-  }, [timeEntries]);
 
   // Simular exportación de informe 
   const handleExportReport = () => {
