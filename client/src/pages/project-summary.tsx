@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import {
@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   TrendingDown,
   TrendingUp,
-  ArrowRight,
   CheckCircle2,
   Clock,
   BadgeDollarSign,
@@ -96,25 +95,25 @@ const ProjectSummary: React.FC = () => {
 
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
-    queryKey: ["/api/active-projects", projectId],
+    queryKey: [`/api/active-projects/${projectId}`],
     enabled: !!projectId,
   });
 
   // Obtener resumen de costos
   const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery<CostSummary>({
-    queryKey: ["/api/projects", projectId, "cost-summary"],
+    queryKey: [`/api/projects/${projectId}/cost-summary`],
     enabled: !!projectId,
   });
 
-  // Obtener registros de tiempo
+  // Obtener registros de tiempo - URL corregida
   const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
-    queryKey: ["/api/time-entries/project", projectId],
+    queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
   });
 
   // Obtener personal
   const { data: personnel, isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel"],
+    queryKey: ['/api/personnel'],
   });
 
   // Formatear fecha
@@ -132,8 +131,8 @@ const ProjectSummary: React.FC = () => {
     }).format(amount);
   };
 
-  // Preparar datos para gráficos
-  const prepareTimeByPersonnelData = () => {
+  // Preparar datos para gráficos usando useMemo para evitar cálculos repetidos
+  const timeByPersonnelData = useMemo(() => {
     if (!timeEntries || !personnel) return [];
 
     const hoursByPersonnel: Record<number, number> = {};
@@ -154,9 +153,9 @@ const ProjectSummary: React.FC = () => {
         cost: hoursByPersonnel[id] * (person?.hourlyRate || 0)
       };
     }).sort((a, b) => b.hours - a.hours);
-  };
+  }, [timeEntries, personnel]);
 
-  const prepareBillableVsNonBillableData = () => {
+  const billableVsNonBillableData = useMemo(() => {
     if (!timeEntries) return [];
 
     let billableHours = 0;
@@ -174,9 +173,9 @@ const ProjectSummary: React.FC = () => {
       { name: "Facturable", value: billableHours },
       { name: "No facturable", value: nonBillableHours },
     ];
-  };
+  }, [timeEntries]);
 
-  const prepareTimeEntriesByDateData = () => {
+  const timeEntriesByDateData = useMemo(() => {
     if (!timeEntries) return [];
 
     const entriesByDate: Record<string, { date: string; hours: number }> = {};
@@ -195,7 +194,22 @@ const ProjectSummary: React.FC = () => {
     return Object.values(entriesByDate).sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-  };
+  }, [timeEntries]);
+
+  // Total de horas calculado una sola vez
+  const totalHours = useMemo(() => {
+    return timeEntries?.reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
+
+  // Horas facturables calculadas una sola vez
+  const billableHours = useMemo(() => {
+    return timeEntries?.filter(e => e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
+
+  // Horas no facturables calculadas una sola vez
+  const nonBillableHours = useMemo(() => {
+    return timeEntries?.filter(e => !e.billable).reduce((acc, entry) => acc + entry.hours, 0) || 0;
+  }, [timeEntries]);
 
   const pieChartColors = ["#4f46e5", "#f97316", "#10b981", "#f43f5e"];
 
@@ -333,7 +347,7 @@ const ProjectSummary: React.FC = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => setLocation(`/time-entries/project/${project.id}`)}
+                  onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
                 >
                   <Clock className="mr-2 h-4 w-4" />
                   Ver Registro de Horas
@@ -437,60 +451,41 @@ const ProjectSummary: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total horas registradas:</span>
                     <span className="font-bold">
-                      {timeEntries?.reduce((acc, entry) => acc + entry.hours, 0).toFixed(1)} horas
+                      {totalHours.toFixed(1)} horas
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Horas facturables:</span>
                     <span>
-                      {timeEntries?.filter(e => e.billable).reduce((acc, entry) => acc + entry.hours, 0).toFixed(1)} horas
+                      {billableHours.toFixed(1)} horas
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Horas no facturables:</span>
                     <span>
-                      {timeEntries?.filter(e => !e.billable).reduce((acc, entry) => acc + entry.hours, 0).toFixed(1)} horas
+                      {nonBillableHours.toFixed(1)} horas
                     </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Horas aprobadas:</span>
-                    <div className="flex items-center">
-                      <CheckCircle2 className="h-4 w-4 mr-1 text-green-500" />
-                      <span>
-                        {timeEntries?.filter(e => e.approved).reduce((acc, entry) => acc + entry.hours, 0).toFixed(1)} horas
-                      </span>
-                    </div>
+                    <span className="text-sm text-muted-foreground">Total registros:</span>
+                    <span>{timeEntries?.length || 0} registros</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Horas pendientes:</span>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1 text-yellow-500" />
-                      <span>
-                        {timeEntries?.filter(e => !e.approved).reduce((acc, entry) => acc + entry.hours, 0).toFixed(1)} horas
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Costo por hora (promedio):</span>
-                    <div className="flex items-center">
-                      <BadgeDollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
-                      <span>
-                        {formatCurrency(costSummary && timeEntries && timeEntries.length > 0 
-                          ? costSummary.actualCost / timeEntries.reduce((acc, entry) => acc + entry.hours, 0)
-                          : 0)}
-                      </span>
-                    </div>
+                    <span className="text-sm text-muted-foreground">Personal involucrado:</span>
+                    <span>
+                      {new Set(timeEntries?.map(e => e.personnelId) || []).size} personas
+                    </span>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="pt-0">
                 <Button 
                   className="w-full"
-                  onClick={() => setLocation(`/time-entries/project/${project.id}`)}
+                  onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Registrar Horas
+                  Registrar Nuevas Horas
                 </Button>
               </CardFooter>
             </Card>
@@ -499,129 +494,128 @@ const ProjectSummary: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <Card>
               <CardHeader>
-                <CardTitle>Horas por Personal</CardTitle>
+                <CardTitle className="text-lg font-medium">
+                  Distribución de Horas por Personal
+                </CardTitle>
                 <CardDescription>
-                  Distribución de horas trabajadas por cada miembro del equipo
+                  Desglose del tiempo registrado por cada persona
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  {prepareTimeByPersonnelData().length === 0 ? (
-                    <div className="flex flex-col justify-center items-center h-full">
-                      <Clock className="h-12 w-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">No hay datos disponibles</p>
-                    </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={prepareTimeByPersonnelData()}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`${value} horas`, ""]} />
-                        <Legend />
-                        <Bar dataKey="hours" name="Horas" fill="#4f46e5" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+              <CardContent className="h-[300px]">
+                {timeByPersonnelData.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <Clock className="h-10 w-10 mb-2" />
+                    <p>No hay datos disponibles</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={timeByPersonnelData}
+                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value, name) => [
+                          name === "hours" ? `${value} horas` : formatCurrency(value as number),
+                          name === "hours" ? "Horas" : "Costo"
+                        ]}
+                      />
+                      <Legend />
+                      <Bar dataKey="hours" fill="#4f46e5" name="Horas" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Horas Facturables vs No Facturables</CardTitle>
+                <CardTitle className="text-lg font-medium">
+                  Facturable vs No Facturable
+                </CardTitle>
                 <CardDescription>
                   Proporción de horas facturables y no facturables
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  {prepareBillableVsNonBillableData().every(item => item.value === 0) ? (
-                    <div className="flex flex-col justify-center items-center h-full">
-                      <Clock className="h-12 w-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">No hay datos disponibles</p>
-                    </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={prepareBillableVsNonBillableData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => 
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                        >
-                          {prepareBillableVsNonBillableData().map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={pieChartColors[index % pieChartColors.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => [`${value} horas`, ""]} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+              <CardContent className="h-[300px]">
+                {billableVsNonBillableData.every(item => item.value === 0) ? (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <Clock className="h-10 w-10 mb-2" />
+                    <p>No hay datos disponibles</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={billableVsNonBillableData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {billableVsNonBillableData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={index === 0 ? "#4f46e5" : "#f97316"} 
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value) => [`${value} horas`, "Horas"]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Historial de Horas Registradas</CardTitle>
+              <CardTitle className="text-lg font-medium">
+                Tendencia de Registro de Horas
+              </CardTitle>
               <CardDescription>
-                Evolución de las horas registradas en el tiempo
+                Evolución de las horas registradas a lo largo del tiempo
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                {prepareTimeEntriesByDateData().length === 0 ? (
-                  <div className="flex flex-col justify-center items-center h-full">
-                    <Clock className="h-12 w-12 text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground">No hay datos disponibles</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={prepareTimeEntriesByDateData()}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`${value} horas`, ""]} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="hours"
-                        name="Horas"
-                        stroke="#4f46e5"
-                        activeDot={{ r: 8 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+            <CardContent className="h-[300px]">
+              {timeEntriesByDateData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <Clock className="h-10 w-10 mb-2" />
+                  <p>No hay datos disponibles</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={timeEntriesByDateData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [`${value} horas`, "Horas"]}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="hours"
+                      stroke="#4f46e5"
+                      name="Horas"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
-            <CardFooter className="justify-end">
-              <Button variant="outline" className="mr-2">
-                Exportar Datos
-              </Button>
-              <Button onClick={() => setLocation(`/progress-report/${project.id}`)}>
-                Generar Informe de Progreso
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </CardFooter>
           </Card>
         </>
       )}
