@@ -367,28 +367,41 @@ const ProjectSummary = () => {
       };
     }
     
-    const startDate = new Date(project.startDate);
-    const endDate = project.expectedEndDate ? new Date(project.expectedEndDate) : new Date();
-    const today = new Date();
-    
-    const daysTotal = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const daysElapsed = Math.ceil((Math.min(today.getTime(), endDate.getTime()) - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Para simplificar, estimamos las horas planificadas proporcionalmente al costo
-    const plannedHours = 100; // Valor ficticio para ejemplo
-    
-    const progressPercentage = Math.min(100, (daysElapsed / Math.max(1, daysTotal)) * 100);
-    const hoursPerDay = totalHours / Math.max(1, daysElapsed);
-    
-    return {
-      hoursPerDay,
-      progressPercentage,
-      plannedHours,
-      actualHours: totalHours,
-      daysElapsed,
-      daysTotal,
-    };
-  }, [project, timeEntries, totalHours]);
+    try {
+      const startDate = new Date(project.startDate);
+      // Si no hay fecha esperada de fin, usar fecha actual + 30 días como estimación
+      const endDate = project.expectedEndDate ? new Date(project.expectedEndDate) : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+      const today = new Date();
+      
+      const daysTotal = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const daysElapsed = Math.max(0, Math.ceil((Math.min(today.getTime(), endDate.getTime()) - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Para simplificar, estimamos las horas planificadas proporcionalmente al costo
+      const plannedHours = costSummary?.estimatedCost ? Math.round(costSummary.estimatedCost / 100) : 100; 
+      
+      const progressPercentage = Math.min(100, Math.max(0, (daysElapsed / daysTotal) * 100));
+      const hoursPerDay = daysElapsed > 0 ? totalHours / daysElapsed : 0;
+      
+      return {
+        hoursPerDay: isNaN(hoursPerDay) ? 0 : hoursPerDay,
+        progressPercentage: isNaN(progressPercentage) ? 0 : progressPercentage,
+        plannedHours,
+        actualHours: totalHours,
+        daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
+        daysTotal: isNaN(daysTotal) ? 30 : daysTotal,
+      };
+    } catch (error) {
+      console.error("Error al calcular métricas:", error);
+      return {
+        hoursPerDay: 0,
+        progressPercentage: 0,
+        plannedHours: 100,
+        actualHours: totalHours,
+        daysElapsed: 0,
+        daysTotal: 30,
+      };
+    }
+  }, [project, timeEntries, totalHours, costSummary]);
 
   // Preparar datos para los gráficos
   const timeByPersonnelData = useMemo(() => {
@@ -991,13 +1004,13 @@ const ProjectSummary = () => {
                     value={projectMetrics ? `${Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed)} días` : "0 días"}
                     description={
                       <div className="flex flex-col">
-                        <span>{`${projectMetrics?.progressPercentage.toFixed(0)}% completado`}</span>
-                        <span className="text-xs text-muted-foreground mt-1">Inicio: {formatDate(project.startDate)}</span>
+                        <span>{`${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado`}</span>
+                        <span className="text-xs text-muted-foreground mt-1">Inicio: {formatDate(project?.startDate || "")}</span>
                       </div>
                     }
                     icon={<Calendar className="h-5 w-5" />}
                     color="amber"
-                    progress={projectMetrics?.progressPercentage || 0}
+                    progress={isNaN(projectMetrics?.progressPercentage) ? 0 : projectMetrics?.progressPercentage || 0}
                   />
                 </AnimatedCard>
               </div>
