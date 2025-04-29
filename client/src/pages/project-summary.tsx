@@ -352,7 +352,7 @@ const ProjectSummary: React.FC = () => {
   const [expandedChart, setExpandedChart] = useState<{
     isOpen: boolean;
     title: string;
-    type: 'personnelBar' | 'billablePie' | 'timelineTrend' | null;
+    type: 'personnelBar' | 'billablePie' | 'timeTrend' | null;
   }>({
     isOpen: false,
     title: "",
@@ -831,7 +831,7 @@ const ProjectSummary: React.FC = () => {
             </ResponsiveContainer>
           </div>
         );
-      case 'timelineTrend':
+      case 'timeTrend':
         return (
           <div className="h-[80vh]">
             <ResponsiveContainer width="100%" height="100%">
@@ -922,6 +922,8 @@ const ProjectSummary: React.FC = () => {
         return null;
     }
   };
+
+
 
   if (!projectId) {
     return (
