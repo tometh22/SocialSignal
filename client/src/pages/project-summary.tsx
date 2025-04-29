@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/toggle-group";
 import { KpiCard } from "@/components/project/kpi-card";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 // Lucide icons
 import { 
@@ -861,8 +862,8 @@ const ProjectSummary = () => {
         content={showHelp.content}
       />
       
-      <div className="container mx-auto px-6 py-6 pb-24 max-w-[1200px]">
-        {/* Header navigation */}
+      <div className="container mx-auto py-4 px-4 sm:px-6 max-w-[1200px]">
+        {/* Barra de navegación superior */}
         <div className="mb-4">
           <Button 
             variant="ghost" 
@@ -873,6 +874,108 @@ const ProjectSummary = () => {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a Proyectos
           </Button>
+        </div>
+        
+        {/* Barra de filtros fija */}
+        <div 
+          ref={filterBarRef}
+          className={cn(
+            "bg-background transition-all duration-200 z-20",
+            isFilterBarSticky 
+              ? "fixed top-0 left-0 right-0 shadow-md py-4 px-6" 
+              : "relative mb-6 pb-4 border-b"
+          )}
+        >
+          <div className={cn(
+            "max-w-[1200px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4",
+            isFilterBarSticky ? "container" : ""
+          )}>
+            <div className="flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {editing ? (
+                    <Input
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="max-w-md"
+                      onBlur={handleSaveProjectName}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveProjectName()}
+                      autoFocus
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span>{project?.quotation?.projectName || "Proyecto sin nombre"}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditedName(project?.quotation?.projectName || "");
+                          setEditing(true);
+                        }}
+                        className="h-6 w-6"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </h1>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={project?.status} />
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    {formatCurrency(project?.quotation?.totalAmount || 0)}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <ToggleGroup type="multiple" variant="outline" className="justify-end">
+                <ToggleGroupItem 
+                  value="kpi" 
+                  aria-label="Mostrar KPIs" 
+                  className={cn("text-xs h-8", customView.showKpi ? "bg-primary text-primary-foreground" : "")}
+                  onClick={() => setCustomView(prev => ({ ...prev, showKpi: !prev.showKpi }))}
+                >
+                  <Activity className="h-3.5 w-3.5 mr-1" />
+                  KPIs
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="finances" 
+                  aria-label="Mostrar finanzas"
+                  className={cn("text-xs h-8", customView.showFinances ? "bg-primary text-primary-foreground" : "")}
+                  onClick={() => setCustomView(prev => ({ ...prev, showFinances: !prev.showFinances }))}
+                >
+                  <DollarSign className="h-3.5 w-3.5 mr-1" />
+                  Finanzas
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="charts" 
+                  aria-label="Mostrar gráficos"
+                  className={cn("text-xs h-8", customView.showCharts ? "bg-primary text-primary-foreground" : "")}
+                  onClick={() => setCustomView(prev => ({ ...prev, showCharts: !prev.showCharts }))}
+                >
+                  <BarChart2 className="h-3.5 w-3.5 mr-1" />
+                  Gráficos
+                </ToggleGroupItem>
+              </ToggleGroup>
+              
+              <Select
+                value={timeFilter}
+                onValueChange={setTimeFilter}
+              >
+                <SelectTrigger className="h-8 text-xs w-[120px]">
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  <SelectValue placeholder="Periodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo el periodo</SelectItem>
+                  <SelectItem value="week">Última semana</SelectItem>
+                  <SelectItem value="month">Último mes</SelectItem>
+                  <SelectItem value="quarter">Último trimestre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
         
         {/* Project Title */}
