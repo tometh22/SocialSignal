@@ -1068,8 +1068,8 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  // Contenedor con altura fija y scroll vertical nativo
-                  <div className="overflow-y-auto max-h-[calc(100vh-250px)] min-h-[500px] border rounded-md">
+                  // Contenedor con altura fija y scroll vertical nativo mejorado
+                  <div className="overflow-y-auto max-h-[calc(100vh-250px)] min-h-[600px] border rounded-md" style={{ overflowY: 'auto' }}>
                     <Table>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
