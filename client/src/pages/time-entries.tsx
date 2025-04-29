@@ -1068,117 +1068,120 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  <div className="overflow-auto max-h-[600px]">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-background z-10">
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead>Personal</TableHead>
-                          <TableHead>Horas</TableHead>
-                          <TableHead className="hidden md:table-cell">Descripción</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredEntries.map((entry) => {
-                          const person = personnel?.find(p => p.id === entry.personnelId);
-                          return (
-                            <TableRow key={entry.id}>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span>{formatDate(entry.date)}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {format(new Date(entry.date), "EEEE", { locale: es })}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <PersonAvatar name={person?.name || "Usuario"} />
-                                  <div>
-                                    <div className="font-medium">{person?.name}</div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {getRoleNameById(person?.roleId || 0)}
+                  // Contenedor con altura fija y scroll vertical
+                  <ScrollArea className="h-[calc(100vh-300px)] min-h-[500px]">
+                    <div className="overflow-auto w-full">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Personal</TableHead>
+                            <TableHead>Horas</TableHead>
+                            <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEntries.map((entry) => {
+                            const person = personnel?.find(p => p.id === entry.personnelId);
+                            return (
+                              <TableRow key={entry.id}>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span>{formatDate(entry.date)}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(entry.date), "EEEE", { locale: es })}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <PersonAvatar name={person?.name || "Usuario"} />
+                                    <div>
+                                      <div className="font-medium">{person?.name}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {getRoleNameById(person?.roleId || 0)}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center">
-                                  <span className="font-medium">{entry.hours}</span>
-                                  {!entry.billable ? (
-                                    <Badge variant="outline" className="ml-2 text-xs">
-                                      No facturable
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="ml-2 text-xs bg-green-100 text-green-800 hover:bg-green-200">
-                                      Facturable
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="max-w-[200px] truncate hidden md:table-cell">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger className="cursor-help">
-                                      <span className="truncate block max-w-[250px]">
-                                        {entry.description || "-"}
-                                      </span>
-                                    </TooltipTrigger>
-                                    {entry.description && (
-                                      <TooltipContent className="max-w-[300px] p-4">
-                                        <p>{entry.description}</p>
-                                      </TooltipContent>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{entry.hours}</span>
+                                    {!entry.billable ? (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        No facturable
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="ml-2 text-xs bg-green-100 text-green-800 hover:bg-green-200">
+                                        Facturable
+                                      </Badge>
                                     )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell>
-                                {entry.billable ? (
-                                  <div className="flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4 text-green-600" />
-                                    <span className="text-sm">Facturable</span>
                                   </div>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-amber-600" />
-                                    <span className="text-sm">No facturable</span>
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                      <span className="sr-only">Opciones</span>
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                    <DropdownMenuItem 
-                                      onClick={() => {
-                                        setEntryToDelete(entry.id);
-                                        setDeleteDialogOpen(true);
-                                      }}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Eliminar registro
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                </TableCell>
+                                <TableCell className="max-w-[200px] truncate hidden md:table-cell">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger className="cursor-help">
+                                        <span className="truncate block max-w-[250px]">
+                                          {entry.description || "-"}
+                                        </span>
+                                      </TooltipTrigger>
+                                      {entry.description && (
+                                        <TooltipContent className="max-w-[300px] p-4">
+                                          <p>{entry.description}</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  {entry.billable ? (
+                                    <div className="flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-green-600" />
+                                      <span className="text-sm">Facturable</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-amber-600" />
+                                      <span className="text-sm">No facturable</span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Opciones</span>
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          setEntryToDelete(entry.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        className="text-red-600"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Eliminar registro
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </ScrollArea>
                 ) : (
                   <div className="p-6 space-y-6">
-                    <ScrollArea className="h-[600px] pr-4">
+                    <ScrollArea className="h-[calc(100vh-300px)] min-h-[500px] pr-4">
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
