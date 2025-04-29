@@ -114,7 +114,9 @@ import {
   PolarGrid, 
   PolarAngleAxis, 
   PolarRadiusAxis, 
-  Radar 
+  Radar,
+  PieChart,
+  LineChart 
 } from 'recharts';
 import { Tooltip as RechartsTooltip } from 'recharts';
 import { apiRequest } from "@/lib/queryClient";
@@ -1505,7 +1507,7 @@ const ProjectSummary = () => {
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center text-primary font-medium">
-                                <Users className="h-4 w-4 mr-2" />
+                                <User className="h-4 w-4 mr-2" />
                                 <span>Personal Asignado</span>
                               </div>
                               <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
@@ -1596,7 +1598,7 @@ const ProjectSummary = () => {
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center text-primary font-medium">
-                                <CalendarClock className="h-4 w-4 mr-2" />
+                                <Calendar className="h-4 w-4 mr-2" />
                                 <span>Tiempo Restante</span>
                               </div>
                               <TooltipProvider>
