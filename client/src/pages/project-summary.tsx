@@ -319,6 +319,14 @@ const ProjectSummary = () => {
         title = "Información sobre el Equipo";
         content = "Muestra el personal asignado al proyecto y cómo se distribuye el tiempo entre los distintos roles.";
         break;
+      case 'progressHelp':
+        title = "Información sobre Progreso";
+        content = "Muestra el avance del proyecto según los días transcurridos desde su inicio en relación a la fecha estimada de finalización. Este indicador ayuda a entender si el proyecto va según lo planeado.";
+        break;
+      case 'varianceHelp':
+        title = "Información sobre Varianza";
+        content = "La varianza de costos indica la diferencia porcentual entre el costo actual y el costo estimado originalmente. Un valor positivo significa que se está gastando más de lo presupuestado.";
+        break;
       default:
         title = "Ayuda";
         content = "Seleccione un elemento específico para obtener más información.";
@@ -977,6 +985,74 @@ const ProjectSummary = () => {
             </div>
           </div>
         </div>
+        
+        {/* KPI Ribbon - Métricas horizontales */}
+        {customView.showKpi && (
+          <div className="mb-8 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {/* KPI: Progreso del proyecto */}
+              <KpiCard
+                variant="ribbon"
+                title="Progreso"
+                value={`${Math.round(projectMetrics.progressPercentage)}%`}
+                icon={<Activity className="h-4 w-4" />}
+                color="blue"
+                progress={projectMetrics.progressPercentage}
+                description={`${projectMetrics.daysElapsed} de ${projectMetrics.daysTotal} días`}
+                helpTip="Información sobre el progreso"
+                onHelpClick={() => handleOpenHelpDialog('progressHelp')}
+              />
+              
+              {/* KPI: Horas registradas */}
+              <KpiCard
+                variant="ribbon"
+                title="Horas"
+                value={`${totalHours}`}
+                icon={<Clock className="h-4 w-4" />}
+                color="green"
+                progress={(totalHours / projectMetrics.plannedHours) * 100}
+                description={`${billableHours} facturables / ${nonBillableHours} no fact.`}
+                helpTip="Información sobre horas"
+                onHelpClick={() => handleOpenHelpDialog('hoursHelp')}
+              />
+              
+              {/* KPI: Presupuesto */}
+              <KpiCard
+                variant="ribbon"
+                title="Presupuesto"
+                value={formatCurrency(costSummary?.actualCost || 0)}
+                icon={<DollarSign className="h-4 w-4" />}
+                color={costSummary?.percentageUsed > 90 ? "red" : costSummary?.percentageUsed > 70 ? "amber" : "green"}
+                progress={costSummary?.percentageUsed || 0}
+                description={`${costSummary?.percentageUsed.toFixed(1)}% del total estimado`}
+                helpTip="Información sobre costos"
+                onHelpClick={() => handleOpenHelpDialog('costHelp')}
+              />
+              
+              {/* KPI: Varianza de costos */}
+              <KpiCard
+                variant="ribbon"
+                title="Varianza"
+                value={`${costSummary?.variance.toFixed(1)}%`}
+                icon={costSummary?.variance > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                color={costSummary?.variance > 10 ? "red" : costSummary?.variance > 5 ? "amber" : "green"}
+                description={`${formatCurrency(costSummary?.actualCost - costSummary?.estimatedCost || 0)}`}
+              />
+              
+              {/* KPI: Personal */}
+              <KpiCard
+                variant="ribbon"
+                title="Equipo"
+                value={`${personnel?.length || 0}`}
+                icon={<User className="h-4 w-4" />}
+                color="purple"
+                description="Personas asignadas"
+                helpTip="Información sobre el equipo"
+                onHelpClick={() => handleOpenHelpDialog('teamHelp')}
+              />
+            </div>
+          </div>
+        )}
         
         {/* Project Title */}
         <div className="mb-6">
