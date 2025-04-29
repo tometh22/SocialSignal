@@ -329,7 +329,7 @@ const ActiveProjects: React.FC = () => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setLocation(`/time-entries/project/${project.id}`)}
+                                      onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
                                     >
                                       <Clock className="h-4 w-4" />
                                       <span className="sr-only">Registrar Horas</span>
