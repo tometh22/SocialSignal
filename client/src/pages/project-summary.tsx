@@ -70,7 +70,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { apiRequest } from "@/lib/queryClient";
-import { getStatusColor } from "@/lib/utils";
 import ChartModal from "@/components/project/chart-modal";
 import { formatCurrency } from "@/lib/formatters";
 import { ExpandIcon } from "@/components/ui/icons";
@@ -159,14 +158,57 @@ interface HelpState {
 }
 
 // Componente para mostrar el estado del proyecto
-const StatusBadge = ({ status }: { status: string }) => {
-  const { color, bgColor, text } = getStatusColor(status);
+const StatusBadge = ({ status }: { status?: string }) => {
+  // Si no hay estado, mostrar un estado por defecto
+  if (!status) {
+    return (
+      <Badge className="bg-gray-100 text-gray-700">
+        No definido
+      </Badge>
+    );
+  }
+  
+  // Colores según estado
+  let bgColor = "bg-gray-100";
+  let textColor = "text-gray-700";
+  let displayText = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  
+  switch (status.toLowerCase()) {
+    case 'active':
+    case 'activo':
+      bgColor = "bg-green-100";
+      textColor = "text-green-700";
+      displayText = "Activo";
+      break;
+    case 'completed':
+    case 'completado':
+      bgColor = "bg-blue-100";
+      textColor = "text-blue-700";
+      displayText = "Completado";
+      break;
+    case 'paused':
+    case 'pausado':
+      bgColor = "bg-amber-100";
+      textColor = "text-amber-700";
+      displayText = "Pausado";
+      break;
+    case 'cancelled':
+    case 'cancelado':
+      bgColor = "bg-red-100";
+      textColor = "text-red-700";
+      displayText = "Cancelado";
+      break;
+    case 'pending':
+    case 'pendiente':
+      bgColor = "bg-purple-100";
+      textColor = "text-purple-700";
+      displayText = "Pendiente";
+      break;
+  }
   
   return (
-    <Badge 
-      className={`${bgColor} ${color}`}
-    >
-      {text}
+    <Badge className={`${bgColor} ${textColor}`}>
+      {displayText}
     </Badge>
   );
 };
