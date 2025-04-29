@@ -66,6 +66,10 @@ import {
   Clock3,
   Award,
   Activity,
+  ThumbsUp,
+  ArrowsUpDown,
+  Lightbulb,
+  Smile
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
