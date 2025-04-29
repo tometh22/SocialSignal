@@ -291,16 +291,18 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      // No hay necesidad de mantener estado local
       console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
       
-      // También actualizamos la caché para que se sincronice con el servidor
+      // Actualizamos la caché de forma optimista
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        console.log("Actualizando caché con nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
       
-      // Invalidar la consulta para asegurar la sincronización completa en segundo plano
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      // Forzamos una recarga completa de los datos para asegurar sincronización
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      }, 100);
       
       toast({
         title: "Tiempo registrado",
@@ -313,6 +315,7 @@ const TimeRegistrationForm: React.FC<{
         billable: true,
       });
       
+      // Cerramos el diálogo después de procesar todo
       onSuccess();
     },
     onError: (error: any) => {
@@ -1032,9 +1035,9 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : viewMode === "list" ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-auto max-h-[600px]">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-background z-10">
                         <TableRow>
                           <TableHead>Fecha</TableHead>
                           <TableHead>Personal</TableHead>
