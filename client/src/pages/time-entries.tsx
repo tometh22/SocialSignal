@@ -297,11 +297,8 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      // Actualizar el estado local para mostrar el nuevo registro inmediatamente
-      setLocalTimeEntries((prevEntries: TimeEntry[]) => {
-        console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
-        return [...prevEntries, newEntry];
-      });
+      // No hay necesidad de mantener estado local
+      console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
       
       // También actualizamos la caché para que se sincronice con el servidor
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
@@ -601,8 +598,7 @@ const TimeEntries: React.FC = () => {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [search, setSearch] = useState("");
   
-  // Estado local para mantener las entradas de tiempo más recientes
-  const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
+
 
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
@@ -631,17 +627,10 @@ const TimeEntries: React.FC = () => {
     enabled: !!projectId,
   });
 
-  // Actualizar localTimeEntries cuando se cargan los datos del servidor
-  useEffect(() => {
-    if (timeEntries) {
-      setLocalTimeEntries(timeEntries);
-    }
-  }, [timeEntries]);
-
   // Filtrar entradas según pestaña activa y búsqueda
   const filteredEntries = React.useMemo(() => {
-    // Usar localTimeEntries para asegurar que se muestran los registros nuevos al instante
-    const entries = localTimeEntries.length > 0 ? localTimeEntries : timeEntries || [];
+    // Usar los registros de tiempo del servidor
+    const entries = timeEntries || [];
     
     let filtered = entries;
     
@@ -670,7 +659,7 @@ const TimeEntries: React.FC = () => {
     return [...filtered].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [localTimeEntries, timeEntries, activeTab, search, personnel]);
+  }, [timeEntries, activeTab, search, personnel]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -947,24 +936,12 @@ const TimeEntries: React.FC = () => {
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <div className="flex items-start justify-between">
                             <div>
-                              <h4 className="text-xs text-muted-foreground mb-1">Registros Aprobados</h4>
+                              <h4 className="text-xs text-muted-foreground mb-1">Total Registros</h4>
                               <p className="text-2xl font-bold">
-                                {timeEntries.filter(e => e.approved).length}
+                                {timeEntries.length}
                               </p>
                             </div>
-                            <UserCheck className="h-8 w-8 text-blue-500/70" />
-                          </div>
-                        </div>
-                        
-                        <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="text-xs text-muted-foreground mb-1">Pendientes</h4>
-                              <p className="text-2xl font-bold">
-                                {timeEntries.filter(e => !e.approved).length}
-                              </p>
-                            </div>
-                            <Clock3 className="h-8 w-8 text-amber-500/70" />
+                            <ClipboardCheck className="h-8 w-8 text-blue-500/70" />
                           </div>
                         </div>
                       </>
@@ -1069,7 +1046,7 @@ const TimeEntries: React.FC = () => {
                           <TableHead>Personal</TableHead>
                           <TableHead>Horas</TableHead>
                           <TableHead className="hidden md:table-cell">Descripción</TableHead>
-                          <TableHead>Estado</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1128,7 +1105,17 @@ const TimeEntries: React.FC = () => {
                                 </TooltipProvider>
                               </TableCell>
                               <TableCell>
-                                <TimeEntryApprovalStatus approved={entry.approved} />
+                                {entry.billable ? (
+                                  <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-green-600" />
+                                    <span className="text-sm">Facturable</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-amber-600" />
+                                    <span className="text-sm">No facturable</span>
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-right">
                                 <DropdownMenu>
