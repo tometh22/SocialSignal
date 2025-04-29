@@ -1,15 +1,29 @@
 /**
  * Formatea un número a una representación de moneda en dólares
  * @param amount La cantidad a formatear
+ * @param shortVersion Si es true, muestra una versión abreviada para espacios pequeños
  * @returns La cadena formateada con formato de moneda
  */
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrency = (amount: number, shortVersion: boolean = false): string => {
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
+  
+  if (shortVersion) {
+    // Versión corta para espacios pequeños (ej: $1.2k en lugar de $1,234.56)
+    if (Math.abs(amount) >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`;
+    } else if (Math.abs(amount) >= 1000) {
+      return `$${(amount / 1000).toFixed(1)}k`;
+    } else {
+      return formatted;
+    }
+  }
+  
+  return formatted;
 };
 
 /**

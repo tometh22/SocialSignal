@@ -48,6 +48,11 @@ import {
   AlertTriangle,
   TrendingDown,
   TrendingUp,
+  Info as InfoCircle,
+  UserIcon,
+  PlusCircle as Plus,
+  BarChart2,
+  Clock as CalendarClock,
   Clock,
   Calendar,
   FileText,
@@ -146,6 +151,7 @@ interface CustomView {
   showTime: boolean;
   showRisks: boolean;
   showCharts: boolean;
+  showTeam: boolean;
 }
 
 // Estado para el modal de gráficos expandidos
@@ -234,7 +240,38 @@ const ProjectSummary = () => {
     showTime: true,
     showRisks: true,
     showCharts: true,
+    showTeam: true,
   });
+  
+  // Función para manejar el diálogo de ayuda
+  const handleOpenHelpDialog = (helpType: string) => {
+    let title = "";
+    let content = "";
+    
+    switch(helpType) {
+      case 'hoursHelp':
+        title = "Información sobre Horas";
+        content = "Las horas registradas indican el tiempo total dedicado al proyecto por todo el equipo. Se dividen en horas facturables (que se cobran directamente al cliente) y horas no facturables (trabajo interno).";
+        break;
+      case 'costHelp':
+        title = "Información sobre Costos";
+        content = "El costo actual muestra los gastos acumulados en relación al presupuesto. Se calcula multiplicando las horas trabajadas por la tarifa correspondiente a cada rol en el proyecto.";
+        break;
+      case 'teamHelp':
+        title = "Información sobre el Equipo";
+        content = "Muestra el personal asignado al proyecto y cómo se distribuye el tiempo entre los distintos roles.";
+        break;
+      default:
+        title = "Ayuda";
+        content = "Seleccione un elemento específico para obtener más información.";
+    }
+    
+    setShowHelp({
+      isOpen: true,
+      title,
+      content
+    });
+  };
   const [expandedChart, setExpandedChart] = useState<ExpandedChartState>({
     isOpen: false,
     title: "",
@@ -1030,10 +1067,325 @@ const ProjectSummary = () => {
               
               <TabsContent value="overview" className="pt-4">
                 {/* Información general y estado del proyecto */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 lg:auto-rows-fr">
-                  {/* Monitoreo de Desviaciones - Ocupa 6 columnas */}
+                {/* Principales métricas del proyecto - Vista estilo dashboard */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  {/* Horas Registradas KPI */}
+                  {customView.showTime && (
+                    <AnimatedCard delay={200}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
+                        <CardContent className="p-6">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-primary font-medium">
+                                <Clock className="h-4 w-4 mr-2" />
+                                <span>Horas Registradas</span>
+                              </div>
+                              <InfoCircle 
+                                className="h-4 w-4 text-muted-foreground cursor-help" 
+                                onClick={() => handleOpenHelpDialog('hoursHelp')}
+                              />
+                            </div>
+                            
+                            <div className="flex items-baseline">
+                              <span className="text-3xl font-bold">{totalHours.toFixed(1)}</span>
+                              <span className="text-xs text-muted-foreground ml-1">h</span>
+                            </div>
+                            
+                            <div className="flex items-center text-xs text-muted-foreground">
+                              <span className="inline-flex items-center mr-2 text-blue-600">
+                                <span className="w-2 h-2 rounded-full bg-blue-600 mr-1"></span>
+                                {billableHours.toFixed(1)} facturables
+                              </span>
+                              <span className="inline-flex items-center text-neutral-500">
+                                <span className="w-2 h-2 rounded-full bg-neutral-400 mr-1"></span>
+                                {nonBillableHours.toFixed(1)} no facturables
+                              </span>
+                            </div>
+                            
+                            <Separator className="my-2" />
+                            
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground">En {timeEntries?.length || 0} registros</span>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 px-2"
+                                onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Registrar
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+                  )}
+                  
+                  {/* Costo Actual KPI */}
                   {customView.showFinances && (
-                    <AnimatedCard delay={400} className="lg:col-span-6">
+                    <AnimatedCard delay={300}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
+                        <CardContent className="p-6">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-primary font-medium">
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                <span>Costo Actual</span>
+                              </div>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`${
+                                        (costSummary?.percentageUsed || 0) > 100 ? "bg-red-50 text-red-600 border-red-200" :
+                                        (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                        "bg-green-50 text-green-600 border-green-200"
+                                      }`}
+                                    >
+                                      {Math.round(costSummary?.percentageUsed || 0)}%
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Porcentaje del presupuesto utilizado</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            
+                            <div className="flex items-baseline">
+                              <span className="text-3xl font-bold">{formatCurrency(costSummary?.actualCost || 0, true)}</span>
+                            </div>
+                            
+                            <div className="flex items-center text-xs">
+                              <span className="text-muted-foreground">de {formatCurrency(costSummary?.estimatedCost || 0, true)} presupuestados</span>
+                            </div>
+                            
+                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                              <div 
+                                className={`h-full rounded-full ${
+                                  (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
+                                  (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
+                                  "bg-primary"
+                                }`}
+                                style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
+                              ></div>
+                            </div>
+                            
+                            <Separator className="my-2" />
+                            
+                            <div className="flex items-center text-xs">
+                              {costSummary && costSummary.variance >= 0 ? (
+                                <div className="flex items-center text-green-600">
+                                  <TrendingDown className="h-3 w-3 mr-1" />
+                                  <span>{formatCurrency(costSummary.variance)} ahorrado</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center text-red-600">
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                  <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} excedido</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+                  )}
+                  
+                  {/* Personal Asignado KPI */}
+                  {customView.showTeam && (
+                    <AnimatedCard delay={400}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
+                        <CardContent className="p-6">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-primary font-medium">
+                                <Users className="h-4 w-4 mr-2" />
+                                <span>Personal Asignado</span>
+                              </div>
+                              <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                                {new Set(timeEntries?.map(e => e.personnelId) || []).size}
+                              </Badge>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Array.from(new Set(timeEntries?.map(e => e.personnelId) || [])).slice(0, 5).map((personnelId, idx) => {
+                                const person = personnel?.find(p => p.id === personnelId);
+                                const role = person ? roles?.find(r => r.id === person.roleId) : null;
+                                return (
+                                  <Badge 
+                                    key={idx} 
+                                    variant="outline" 
+                                    className="bg-blue-50/50 border-blue-100 text-blue-700"
+                                  >
+                                    {person?.name || 'Desconocido'}
+                                  </Badge>
+                                );
+                              })}
+                              {new Set(timeEntries?.map(e => e.personnelId) || []).size > 5 && (
+                                <Badge variant="outline" className="bg-muted">
+                                  +{new Set(timeEntries?.map(e => e.personnelId) || []).size - 5} más
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            {timeEntries && timeEntries.length > 0 && (
+                              <div className="flex flex-col space-y-1 mt-1">
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>Rol</span>
+                                  <span>Horas</span>
+                                </div>
+                                {Object.entries(
+                                  timeEntries.reduce((acc, entry) => {
+                                    const person = personnel?.find(p => p.id === entry.personnelId);
+                                    const role = person ? roles?.find(r => r.id === person.roleId) : null;
+                                    const roleName = role?.name || 'Sin rol';
+                                    
+                                    if (!acc[roleName]) acc[roleName] = 0;
+                                    acc[roleName] += entry.hours || 0;
+                                    return acc;
+                                  }, {} as Record<string, number>)
+                                )
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 3)
+                                .map(([role, hours], idx) => (
+                                  <div key={idx} className="flex justify-between items-center text-xs">
+                                    <span>{role}</span>
+                                    <span className="font-medium">{hours.toFixed(1)}h</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            <Separator className="my-2" />
+                            
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground">
+                                {Math.round((projectMetrics?.hoursPerDay || 0) * 10) / 10} h/día promedio
+                              </span>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 px-2"
+                                onClick={() => setExpandedChart({
+                                  isOpen: true,
+                                  title: "Distribución de Horas por Personal",
+                                  type: "personnelBar"
+                                })}
+                              >
+                                <BarChart2 className="h-3 w-3 mr-1" />
+                                Ver detalle
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+                  )}
+                  
+                  {/* Tiempo Restante KPI */}
+                  {customView.showTime && (
+                    <AnimatedCard delay={500}>
+                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
+                        <CardContent className="p-6">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-primary font-medium">
+                                <CalendarClock className="h-4 w-4 mr-2" />
+                                <span>Tiempo Restante</span>
+                              </div>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`${
+                                        isNaN(projectMetrics?.progressPercentage) ? "bg-neutral-50 text-neutral-600 border-neutral-200" :
+                                        projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? 
+                                          "bg-red-50 text-red-600 border-red-200" :
+                                        projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? 
+                                          "bg-green-50 text-green-600 border-green-200" :
+                                          "bg-blue-50 text-blue-600 border-blue-200"
+                                      }`}
+                                    >
+                                      {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Porcentaje de progreso real</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            
+                            <div className="flex items-baseline">
+                              <span className="text-3xl font-bold">{Math.max(0, (projectMetrics?.daysTotal || 0) - (projectMetrics?.daysElapsed || 0))}</span>
+                              <span className="text-xs text-muted-foreground ml-1">días</span>
+                            </div>
+                            
+                            <div className="flex items-center text-xs">
+                              <span className="text-muted-foreground">
+                                {projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días transcurridos
+                              </span>
+                            </div>
+                            
+                            <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                              {/* Barra de tiempo transcurrido */}
+                              <div 
+                                className="absolute h-full bg-blue-500"
+                                style={{ width: `${Math.min(Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100), 100)}%` }}
+                              ></div>
+                              
+                              {/* Marcador de progreso */}
+                              <div 
+                                className="absolute top-1/2 w-1 h-3 bg-primary -translate-y-1/2 z-10"
+                                style={{ 
+                                  left: `${Math.min(isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0), 100)}%`,
+                                }}
+                              ></div>
+                            </div>
+                            
+                            <Separator className="my-2" />
+                            
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="flex items-center">
+                                {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
+                                  <span className="flex items-center text-red-600">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    <span>{Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% retraso</span>
+                                  </span>
+                                ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
+                                  <span className="flex items-center text-green-600">
+                                    <ThumbsUp className="h-3 w-3 mr-1" />
+                                    <span>{Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% adelanto</span>
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center text-blue-600">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    <span>En tiempo</span>
+                                  </span>
+                                )}
+                              </span>
+                              {project?.expectedEndDate && (
+                                <span className="text-muted-foreground">
+                                  Fin: {formatDate(project.expectedEndDate, "short")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AnimatedCard>
+                  )}
+                </div>
+                
+                {/* Sección principal - Monitoreo y Análisis */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                  {/* Monitoreo de Desviaciones - Panel detallado */}
+                  {customView.showFinances && (
+                    <AnimatedCard delay={600} className="lg:col-span-6">
                       <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
                         <CardHeader className="pb-3 border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
@@ -1049,291 +1401,309 @@ const ProjectSummary = () => {
                         <CardContent className="pt-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Desviación de Costos */}
-                            <div className={`p-4 rounded-lg border ${
-                              costSummary?.percentageUsed > 100 ? 'bg-red-50 border-red-200' :
-                              costSummary?.percentageUsed > 90 ? 'bg-amber-50 border-amber-200' :
-                              costSummary?.percentageUsed > 80 ? 'bg-yellow-50 border-yellow-200' : 
-                              'bg-green-50 border-green-200'
-                            }`}>
+                            <div className="p-4 bg-card rounded-lg border">
                               <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold text-sm">Costos</h4>
+                                <h4 className="font-semibold text-sm flex items-center">
+                                  <DollarSign className="h-4 w-4 mr-1 text-primary" />
+                                  Costos
+                                </h4>
                                 <Badge variant={
-                                  costSummary?.percentageUsed > 100 ? "destructive" :
-                                  costSummary?.percentageUsed > 90 ? "outline" : "secondary"
-                                }>
+                                  (costSummary?.percentageUsed || 0) > 100 ? "destructive" :
+                                  (costSummary?.percentageUsed || 0) > 90 ? "outline" : "secondary"
+                                } className="font-normal text-xs">
                                   {Math.round(costSummary?.percentageUsed || 0)}% utilizado
                                 </Badge>
                               </div>
                               
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-sm font-medium">Estimado:</span>
-                                <span className="text-sm">{formatCurrency(costSummary?.estimatedCost || 0)}</span>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 mb-3">
-                                <span className="text-sm font-medium">Actual:</span>
-                                <span className="text-sm">{formatCurrency(costSummary?.actualCost || 0)}</span>
-                              </div>
-                              
-                              <Progress 
-                                value={costSummary?.percentageUsed || 0} 
-                                max={120}
-                                className={`h-2 ${
-                                  (costSummary?.percentageUsed || 0) > 100 ? "bg-red-100" :
-                                  (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-100" :
-                                  (costSummary?.percentageUsed || 0) > 80 ? "bg-yellow-100" : "bg-green-100"
-                                }`}
-                              />
-                              
-                              <div className="flex items-center justify-between text-xs mt-1">
-                                <span>0%</span>
-                                <span>50%</span>
-                                <span>100%</span>
-                              </div>
-                              
-                              <div className="mt-3 text-sm flex items-center">
-                                {costSummary && costSummary.variance >= 0 ? (
-                                  <div className="flex items-center text-green-600 font-medium">
-                                    <Smile className="h-4 w-4 mr-1" />
-                                    <span>{formatCurrency(costSummary.variance)} por debajo del presupuesto</span>
+                              <div className="space-y-4 mt-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-muted/30 p-2 rounded">
+                                    <span className="text-xs text-muted-foreground block">Estimado</span>
+                                    <span className="font-medium">{formatCurrency(costSummary?.estimatedCost || 0)}</span>
                                   </div>
-                                ) : (
-                                  <div className="flex items-center text-red-600 font-medium">
-                                    <AlertTriangle className="h-4 w-4 mr-1" />
-                                    <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} por encima del presupuesto</span>
+                                  <div className="bg-muted/30 p-2 rounded">
+                                    <span className="text-xs text-muted-foreground block">Actual</span>
+                                    <span className="font-medium">{formatCurrency(costSummary?.actualCost || 0)}</span>
                                   </div>
-                                )}
+                                </div>
+                                
+                                <div>
+                                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                    <span>0%</span>
+                                    <span>50%</span>
+                                    <span>100%</span>
+                                  </div>
+                                  <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full ${
+                                        (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
+                                        (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
+                                        "bg-primary"
+                                      }`}
+                                      style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center mt-1">
+                                  {costSummary && costSummary.variance >= 0 ? (
+                                    <div className="flex items-center text-green-600 text-sm">
+                                      <TrendingDown className="h-4 w-4 mr-1" />
+                                      <span>{formatCurrency(costSummary.variance)} por debajo del presupuesto</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center text-red-600 text-sm">
+                                      <TrendingUp className="h-4 w-4 mr-1" />
+                                      <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} por encima del presupuesto</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             
                             {/* Desviación de Tiempo */}
-                            <div className={`p-4 rounded-lg border ${
-                              projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 15) ? 
-                                'bg-red-50 border-red-200' :
-                              projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 5) ? 
-                                'bg-amber-50 border-amber-200' :
-                                'bg-green-50 border-green-200'
-                            }`}>
+                            <div className="p-4 bg-card rounded-lg border">
                               <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold text-sm">Tiempo</h4>
+                                <h4 className="font-semibold text-sm flex items-center">
+                                  <Clock className="h-4 w-4 mr-1 text-primary" />
+                                  Tiempo
+                                </h4>
                                 <Badge variant={
                                   projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 15) ? 
                                     "destructive" :
                                   projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 5) ? 
                                     "outline" : "secondary"
-                                }>
+                                } className="font-normal text-xs">
                                   {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado
                                 </Badge>
                               </div>
                               
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-sm font-medium">Transcurrido:</span>
-                                <span className="text-sm">{projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días ({Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}%)</span>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 mb-3">
-                                <span className="text-sm font-medium">Horas totales:</span>
-                                <span className="text-sm">{totalHours.toFixed(1)} horas ({billableHours.toFixed(1)} facturables)</span>
-                              </div>
-                              
-                              <div className="relative h-2 rounded-full bg-gray-200 mb-1">
-                                {/* Barra de tiempo transcurrido */}
-                                <div 
-                                  className="absolute h-full bg-blue-500 rounded-full"
-                                  style={{ width: `${Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}%` }}
-                                ></div>
+                              <div className="space-y-4 mt-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="bg-muted/30 p-2 rounded">
+                                    <span className="text-xs text-muted-foreground block">Transcurrido</span>
+                                    <span className="font-medium">{projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días</span>
+                                  </div>
+                                  <div className="bg-muted/30 p-2 rounded">
+                                    <span className="text-xs text-muted-foreground block">Progreso real</span>
+                                    <span className="font-medium">{isNaN(projectMetrics?.progressPercentage) ? "0" : Math.round(projectMetrics?.progressPercentage || 0)}%</span>
+                                  </div>
+                                </div>
                                 
-                                {/* Marcador de progreso */}
-                                <div 
-                                  className="absolute top-0 w-1 h-4 bg-primary -mt-1 rounded-full"
-                                  style={{ 
-                                    left: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%`,
-                                    transform: 'translateX(-50%)'
-                                  }}
-                                ></div>
+                                <div>
+                                  <div className="relative h-2 rounded-full bg-muted/30 mb-1">
+                                    {/* Barra de tiempo transcurrido */}
+                                    <div 
+                                      className="absolute h-full bg-blue-500 rounded-full"
+                                      style={{ width: `${Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}%` }}
+                                    ></div>
+                                    
+                                    {/* Marcador de progreso */}
+                                    <div 
+                                      className="absolute top-0 w-1 h-4 bg-primary -mt-1 z-10 rounded-full"
+                                      style={{ 
+                                        left: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%`,
+                                        transform: 'translateX(-50%)'
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span className="text-blue-600">Tiempo transcurrido</span>
+                                    <span className="text-primary">Progreso real</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center mt-1">
+                                  {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
+                                    <div className="flex items-center text-red-600 text-sm">
+                                      <AlertTriangle className="h-4 w-4 mr-1" />
+                                      <span>Proyecto retrasado ({Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% de desviación)</span>
+                                    </div>
+                                  ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
+                                    <div className="flex items-center text-green-600 text-sm">
+                                      <ThumbsUp className="h-4 w-4 mr-1" />
+                                      <span>Proyecto adelantado ({Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% de ventaja)</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center text-blue-600 text-sm">
+                                      <CheckCircle className="h-4 w-4 mr-1" />
+                                      <span>Proyecto alineado con la planificación</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              
-                              <div className="flex items-center justify-between text-xs mt-1 mb-3">
-                                <span className="text-blue-600">Tiempo transcurrido</span>
-                                <span className="text-primary">Progreso real</span>
-                              </div>
-                              
-                              {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
-                                <div className="flex items-center text-red-600 text-sm font-medium">
-                                  <AlertTriangle className="h-4 w-4 mr-1" />
-                                  <span>Proyecto retrasado ({Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% de desviación)</span>
-                                </div>
-                              ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
-                                <div className="flex items-center text-green-600 text-sm font-medium">
-                                  <ThumbsUp className="h-4 w-4 mr-1" />
-                                  <span>Proyecto adelantado ({Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% de ventaja)</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center text-blue-600 text-sm font-medium">
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  <span>Proyecto alineado con la planificación</span>
-                                </div>
-                              )}
                             </div>
                           </div>
                         </CardContent>
                       </Card>
                     </AnimatedCard>
                   )}
-
-                  {/* Información Financiera - Ocupa 4 columnas */}
+                  
+                  {/* Monitoreo de Riesgos */}
                   {customView.showFinances && (
-                    <AnimatedCard delay={500} className="lg:col-span-4">
+                    <AnimatedCard delay={700} className="lg:col-span-6">
                       <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="pb-3 border-b">
+                        <CardHeader className="border-b">
                           <CardTitle className="text-lg font-medium flex items-center">
                             <div className="mr-3 p-2 rounded-full bg-primary/10">
-                              <DollarSign className="h-5 w-5 text-primary" />
+                              <AlertCircle className="h-5 w-5 text-primary" />
                             </div>
-                            Información Financiera
+                            Monitoreo de Riesgos
                           </CardTitle>
+                          <CardDescription>
+                            Alertas tempranas y factores críticos
+                          </CardDescription>
                         </CardHeader>
-                        <CardContent className="pt-4">
-                          <div className="space-y-4">
-                            <div className="flex flex-col">
-                              <span className="text-sm text-muted-foreground mb-1">Costo estimado:</span>
-                              <span className="text-xl font-bold">
-                                {formatCurrency(costSummary?.estimatedCost || 0)}
-                              </span>
+                        <CardContent className="pt-6">
+                          <div className="space-y-6">
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Presupuesto</p>
+                              <div className="relative pt-1">
+                                <div className="flex mb-2 items-center justify-between">
+                                  <div>
+                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
+                                      Presupuesto utilizado
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs font-semibold inline-block">
+                                      {Math.round(costSummary?.percentageUsed || 0)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
+                                  <div 
+                                    style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }} 
+                                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                                      (costSummary?.percentageUsed || 0) > 90 ? "bg-red-500" : "bg-primary"
+                                    }`}
+                                  ></div>
+                                </div>
+                                <div className="flex items-center">
+                                  {(costSummary?.percentageUsed || 0) <= 25 ? (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" /> Bajo
+                                    </Badge>
+                                  ) : (costSummary?.percentageUsed || 0) <= 90 ? (
+                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                      <AlertCircle className="h-3 w-3 mr-1" /> Medio
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                      <AlertTriangle className="h-3 w-3 mr-1" /> Alto
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    Nivel de riesgo presupuestario
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm text-muted-foreground mb-1">Costo actual:</span>
-                              <span className="text-xl font-bold">
-                                {formatCurrency(costSummary?.actualCost || 0)}
-                              </span>
+                            
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium">Tiempo</p>
+                              <div className="relative pt-1">
+                                <div className="flex mb-2 items-center justify-between">
+                                  <div>
+                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
+                                      Progreso del proyecto
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs font-semibold inline-block">
+                                      {isNaN(projectMetrics?.progressPercentage) ? "0" : Math.round(projectMetrics?.progressPercentage || 0)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
+                                  <div 
+                                    style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%` }} 
+                                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
+                                  ></div>
+                                </div>
+                                <div className="flex items-center">
+                                  {projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10 ? (
+                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                      <AlertTriangle className="h-3 w-3 mr-1" /> Alto
+                                    </Badge>
+                                  ) : projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 5 ? (
+                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                      <AlertCircle className="h-3 w-3 mr-1" /> Medio
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                      <CheckCircle className="h-3 w-3 mr-1" /> Bajo
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    Nivel de riesgo en cronograma
+                                  </span>
+                                </div>
+                              </div>
                             </div>
+                            
                             <Separator />
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Variación:</span>
-                              <div className="flex items-center">
-                                {costSummary && costSummary.variance >= 0 ? (
-                                  <>
-                                    <TrendingDown className="h-4 w-4 mr-1 text-green-500" />
-                                    <span className="text-green-500 font-medium">
-                                      {formatCurrency(costSummary.variance)} ahorrado
-                                    </span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
-                                    <span className="text-red-500 font-medium">
-                                      {formatCurrency(Math.abs(costSummary?.variance || 0))} extra
-                                    </span>
-                                  </>
+                            
+                            <div className="space-y-2">
+                              <h3 className="text-sm font-medium">Alertas activas</h3>
+                              <ul className="space-y-2">
+                                {/* Renderizar todas las alertas basadas en el estado actual*/}
+                                {costSummary && costSummary.percentageUsed > 90 && (
+                                  <li className="flex items-start">
+                                    <AlertTriangle className="h-4 w-4 mr-2 text-red-500 mt-0.5" />
+                                    <div>
+                                      <p className="text-sm">Presupuesto casi agotado ({Math.round(costSummary.percentageUsed)}%)</p>
+                                      <p className="text-xs text-muted-foreground">Se recomienda evaluar si es necesario ampliar el presupuesto.</p>
+                                    </div>
+                                  </li>
                                 )}
-                              </div>
+                                
+                                {projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10 && (
+                                  <li className="flex items-start">
+                                    <AlertTriangle className="h-4 w-4 mr-2 text-red-500 mt-0.5" />
+                                    <div>
+                                      <p className="text-sm">Progreso retrasado respecto al tiempo transcurrido</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Tiempo transcurrido: {Math.round((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100)}%, 
+                                        Progreso: {Math.round(projectMetrics.progressPercentage)}%.
+                                      </p>
+                                    </div>
+                                  </li>
+                                )}
+                                
+                                {billableHours < totalHours * 0.7 && totalHours > 0 && (
+                                  <li className="flex items-start">
+                                    <AlertCircle className="h-4 w-4 mr-2 text-amber-500 mt-0.5" />
+                                    <div>
+                                      <p className="text-sm">Alto porcentaje de horas no facturables ({Math.round((nonBillableHours/totalHours)*100)}%)</p>
+                                      <p className="text-xs text-muted-foreground">Considere revisar la distribución de las actividades.</p>
+                                    </div>
+                                  </li>
+                                )}
+                                
+                                {/* Si no hay alertas, mostrar mensaje positivo */}
+                                {(!costSummary || costSummary.percentageUsed <= 90) && 
+                                (!projectMetrics || projectMetrics.progressPercentage >= ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) &&
+                                (billableHours >= totalHours * 0.7 || totalHours === 0) && (
+                                  <li className="flex items-start">
+                                    <CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
+                                    <div>
+                                      <p className="text-sm">No hay alertas activas</p>
+                                      <p className="text-xs text-muted-foreground">El proyecto está avanzando según lo planificado.</p>
+                                    </div>
+                                  </li>
+                                )}
+                              </ul>
                             </div>
-                            <div className="pt-2">
-                              <div className="flex justify-between mb-2">
-                                <span className="text-sm text-muted-foreground">Presupuesto utilizado:</span>
-                                <span className="font-medium">
-                                  {Math.round(costSummary?.percentageUsed || 0)}%
-                                </span>
-                              </div>
-                              <Progress 
-                                value={costSummary?.percentageUsed || 0} 
-                                className={
-                                  (costSummary?.percentageUsed || 0) > 100
-                                    ? "bg-red-100 text-red-500"
-                                    : (costSummary?.percentageUsed || 0) > 90
-                                    ? "bg-yellow-100 text-yellow-500"
-                                    : "bg-primary/20"
-                                }
-                              />
-                              {(costSummary?.percentageUsed || 0) > 100 && (
-                                <div className="flex items-center mt-2 text-red-500 text-xs">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
-                                  <span>Presupuesto excedido</span>
-                                </div>
-                              )}
-                              {(costSummary?.percentageUsed || 0) > 90 && (costSummary?.percentageUsed || 0) <= 100 && (
-                                <div className="flex items-center mt-2 text-yellow-500 text-xs">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
-                                  <span>Presupuesto a punto de agotarse</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                        <CardFooter className="pt-0 border-t mt-4">
-                          <Button 
-                            variant="outline" 
-                            className="w-full"
-                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                          >
-                            <Clock className="mr-2 h-4 w-4" />
-                            Ver Registro de Horas
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    </AnimatedCard>
-                  )}
 
-                  {/* Resumen de Horas - Ocupa 4 columnas */}
-                  {customView.showTime && (
-                    <AnimatedCard delay={600} className="lg:col-span-4">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="pb-3 border-b">
-                          <CardTitle className="text-lg font-medium flex items-center">
-                            <div className="mr-3 p-2 rounded-full bg-primary/10">
-                              <Clock className="h-5 w-5 text-primary" />
-                            </div>
-                            Resumen de Horas
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Total horas registradas:</span>
-                              <span className="font-bold">
-                                {totalHours.toFixed(1)} horas
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Horas facturables:</span>
-                              <span>
-                                {billableHours.toFixed(1)} horas
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Horas no facturables:</span>
-                              <span>
-                                {nonBillableHours.toFixed(1)} horas
-                              </span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Total registros:</span>
-                              <span>{timeEntries?.length || 0} registros</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Personal involucrado:</span>
-                              <span>
-                                {new Set(timeEntries?.map(e => e.personnelId) || []).size} personas
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Promedio diario:</span>
-                              <span>
-                                {isNaN(projectMetrics?.hoursPerDay) ? "0.0" : projectMetrics?.hoursPerDay.toFixed(1)} h/día
-                              </span>
+                            <div className="flex justify-end">
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4 mr-2" />
+                                Ver plan de mitigación
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
-                        <CardFooter className="pt-0 border-t mt-4">
-                          <Button 
-                            className="w-full"
-                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                          >
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Registrar Nuevas Horas
-                          </Button>
-                        </CardFooter>
                       </Card>
                     </AnimatedCard>
                   )}
