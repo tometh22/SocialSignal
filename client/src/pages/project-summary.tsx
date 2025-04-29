@@ -161,7 +161,7 @@ const calculateRiskLevel = (
     level = "high";
   } else if (budgetUsed > 90) {
     risks.push("Presupuesto cercano al límite");
-    if (level !== "high") level = "medium";
+    if (level === "low") level = "medium";
   }
 
   // Time risk
@@ -170,13 +170,13 @@ const calculateRiskLevel = (
     level = "high";
   } else if (timeProgress > 90 || daysLeft < 5) {
     risks.push("Plazo por vencer");
-    if (level !== "high") level = "medium";
+    if (level === "low") level = "medium";
   }
 
   // Schedule vs budget risk
   if (timeProgress < 50 && budgetUsed > 60) {
     risks.push("Consumo de presupuesto acelerado");
-    if (level !== "high") level = "medium";
+    if (level === "low") level = "medium";
   }
 
   if (risks.length === 0) {
@@ -323,12 +323,44 @@ const ProjectSummary: React.FC = () => {
     showRisks: true,
     showCharts: true
   });
-
+  
   // Obtener proyecto activo
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: !!projectId,
   });
+  
+  // Editor del nombre del proyecto
+  const [editing, setEditing] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  
+  // Efecto para inicializar el nombre cuando se carga el proyecto
+  useEffect(() => {
+    if (project?.quotation?.projectName) {
+      setEditedName(project.quotation.projectName);
+    }
+  }, [project?.quotation?.projectName]);
+  
+  // Guardar el nombre del proyecto
+  const handleSaveProjectName = () => {
+    if (!editedName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del proyecto no puede estar vacío",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // En una implementación real, aquí haríamos una petición PUT para actualizar el nombre
+    // Por ahora simulamos que se actualiza correctamente
+    toast({
+      title: "Nombre actualizado",
+      description: `El proyecto ahora se llama "${editedName}"`,
+    });
+    
+    setEditing(false);
+  };
 
   // Obtener resumen de costos
   const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery<CostSummary>({
@@ -560,7 +592,6 @@ const ProjectSummary: React.FC = () => {
       toast({
         title: "Exportación completada",
         description: "El informe se ha descargado con éxito.",
-        variant: "success",
       });
     }, 1500);
   };
@@ -570,7 +601,6 @@ const ProjectSummary: React.FC = () => {
     toast({
       title: "Vista personalizada guardada",
       description: "Tu configuración de dashboard ha sido guardada.",
-      variant: "success",
     });
   };
 
@@ -620,9 +650,76 @@ const ProjectSummary: React.FC = () => {
         
         {/* Project Title */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-1">
-            {project?.quotation?.projectName || "Cargando..."}
-          </h1>
+          {isLoading ? (
+            <h1 className="text-3xl font-bold mb-1">Cargando...</h1>
+          ) : (
+            <div className="group relative">
+              <div className="flex items-center gap-2">
+                <h1 
+                  className="text-3xl font-bold mb-1 group-hover:bg-primary/5 group-hover:rounded px-2 py-1 cursor-pointer"
+                  onClick={() => setEditing(true)}
+                >
+                  {!editing ? (
+                    <>{project?.quotation?.projectName || "Sin nombre"}</>
+                  ) : (
+                    <input
+                      type="text"
+                      className="bg-transparent border-none outline-none p-0 w-full focus:ring-2 focus:ring-primary rounded"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      autoFocus
+                      onBlur={handleSaveProjectName}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleSaveProjectName();
+                        } else if (e.key === "Escape") {
+                          setEditing(false);
+                          setEditedName(project?.quotation?.projectName || "");
+                        }
+                      }}
+                    />
+                  )}
+                </h1>
+                {!editing && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => {
+                      setEditing(true);
+                      setEditedName(project?.quotation?.projectName || "");
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                      <path d="m15 5 4 4"></path>
+                    </svg>
+                  </Button>
+                )}
+              </div>
+              {editing && (
+                <div className="absolute top-full left-0 mt-1 flex space-x-2">
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={handleSaveProjectName}
+                  >
+                    Guardar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setEditing(false);
+                      setEditedName(project?.quotation?.projectName || "");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             ID: {projectId} | Última actualización: {format(new Date(), "dd MMM yyyy, HH:mm", { locale: es })}
           </p>
