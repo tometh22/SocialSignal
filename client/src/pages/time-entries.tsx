@@ -1,53 +1,18 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO, differenceInDays, isAfter, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { es } from "date-fns/locale";
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
+import { queryClient, apiRequest } from "../lib/queryClient";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// import { DatePicker } from "@/components/ui/date-picker";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Form,
   FormControl,
@@ -57,27 +22,86 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Calendar,
-  MoreVertical,
-  Plus,
-  PlusCircle,
-  Loader2,
-  FileSpreadsheet,
-  List,
-  XCircle,
-  CheckCircle,
+import { toast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
+import { 
+  CalendarIcon, 
+  Loader2, 
+  ArrowLeft, 
+  PlusCircle, 
+  Trash2,
+  CheckCircle2,
   Clock,
+  X,
+  ChevronDown,
+  Filter,
   ClipboardList,
-  ArrowLeft,
+  Calendar as CalendarSquare,
+  BarChart3,
+  Clock3,
+  DollarSign,
+  FolderKanban,
+  MoreHorizontal,
+  Timer,
+  UserCircle2,
+  UserCheck,
+  Users2,
+  AlertCircle,
+  FileText,
+  ExternalLink,
+  Search,
+  ClipboardCheck
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { format, parseISO, differenceInDays, isAfter, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { es } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// Interfaces
+// Interfaces de datos
 interface Personnel {
   id: number;
   name: string;
@@ -133,98 +157,6 @@ interface Client {
   contactPhone: string | null;
 }
 
-// Componente DaySummary
-const DaySummary = ({
-  date,
-  entries,
-  personnel,
-  onEditEntry,
-  onDeleteEntry,
-}: {
-  date: Date;
-  entries: TimeEntry[];
-  personnel: Personnel[];
-  onEditEntry?: (entry: TimeEntry) => void;
-  onDeleteEntry?: (entry: TimeEntry) => void;
-}) => {
-  const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
-  const formattedDate = format(date, "EEEE, d 'de' MMMM 'de' yyyy", {
-    locale: es,
-  });
-
-  return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-medium capitalize">{formattedDate}</h3>
-        <div className="text-sm font-medium">
-          Total: {totalHours} {totalHours === 1 ? "hora" : "horas"}
-        </div>
-      </div>
-      <div className="space-y-3">
-        {entries.map((entry) => {
-          const person = personnel.find((p) => p.id === entry.personnelId);
-          return (
-            <div
-              key={entry.id}
-              className="p-3 border rounded-md bg-card relative"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-medium mb-1">{person?.name}</div>
-                  <div className="text-sm text-muted-foreground mb-1">
-                    {entry.hours} {entry.hours === 1 ? "hora" : "horas"}
-                    {entry.billable && (
-                      <span className="ml-2 text-green-600 font-medium">
-                        (Facturable)
-                      </span>
-                    )}
-                  </div>
-                  {entry.description && (
-                    <div className="text-sm mt-2">{entry.description}</div>
-                  )}
-                </div>
-                <div className="flex space-x-1">
-                  {entry.approved ? (
-                    <div className="text-green-600 flex items-center text-sm">
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Aprobado
-                    </div>
-                  ) : (
-                    <div className="text-amber-600 flex items-center text-sm">
-                      <Clock className="h-4 w-4 mr-1" />
-                      Pendiente
-                    </div>
-                  )}
-                  {onEditEntry && onDeleteEntry && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEditEntry(entry)}>
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => onDeleteEntry(entry)}
-                        >
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
 // Esquema del formulario
 const formSchema = z.object({
   personnelId: z.number({
@@ -240,7 +172,97 @@ const formSchema = z.object({
   billable: z.boolean().default(true),
 });
 
-// Componente de formulario de registro de tiempo
+// Componentes personalizados
+const ProjectStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  switch (status) {
+    case "active":
+      return <Badge className="bg-green-500 hover:bg-green-600">Activo</Badge>;
+    case "completed":
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Completado</Badge>;
+    case "cancelled":
+      return <Badge className="bg-red-500 hover:bg-red-600">Cancelado</Badge>;
+    case "on-hold":
+      return <Badge className="bg-amber-500 hover:bg-amber-600">En Pausa</Badge>;
+    default:
+      return <Badge>{status}</Badge>;
+  }
+};
+
+// Este componente ha sido eliminado de la aplicación ya que no se necesita más la funcionalidad de aprobación
+
+const PersonAvatar: React.FC<{ name: string }> = ({ name }) => {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
+
+  return (
+    <Avatar className="h-8 w-8">
+      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+};
+
+const DaySummary: React.FC<{
+  date: Date;
+  entries: TimeEntry[];
+  personnel: Personnel[] | undefined;
+}> = ({ date, entries, personnel }) => {
+  const dateStr = format(date, "yyyy-MM-dd");
+  const dayEntries = entries.filter(
+    (entry) => entry.date.substring(0, 10) === dateStr
+  );
+  const totalHours = dayEntries.reduce((sum, entry) => sum + entry.hours, 0);
+
+  if (dayEntries.length === 0) return null;
+
+  return (
+    <div className="space-y-2 mb-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium">
+          {format(date, "EEEE dd 'de' MMMM", { locale: es })}
+        </h4>
+        <Badge variant="outline" className="font-normal">
+          {totalHours} {totalHours === 1 ? "hora" : "horas"}
+        </Badge>
+      </div>
+      <div className="space-y-2">
+        {dayEntries.map((entry) => {
+          const person = personnel?.find((p) => p.id === entry.personnelId);
+          return (
+            <div
+              key={entry.id}
+              className="flex items-center justify-between bg-muted/30 p-2 rounded-md"
+            >
+              <div className="flex items-center space-x-2">
+                <PersonAvatar name={person?.name || "Usuario"} />
+                <div>
+                  <div className="font-medium text-sm">{person?.name}</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                    {entry.description || "Sin descripción"}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="text-sm font-medium">{entry.hours} h</div>
+                {!entry.billable && (
+                  <Badge variant="outline" className="h-5 text-xs">
+                    No facturable
+                  </Badge>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const TimeRegistrationForm: React.FC<{
   personnel: Personnel[] | undefined;
   projectId: number;
@@ -249,9 +271,6 @@ const TimeRegistrationForm: React.FC<{
   isLoading: boolean;
   updateLocalEntries: (entry: TimeEntry) => void;
 }> = ({ personnel, projectId, onSuccess, onCancel, isLoading, updateLocalEntries }) => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
   // Configuración del formulario
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -266,13 +285,10 @@ const TimeRegistrationForm: React.FC<{
   const createTimeEntryMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
       // Convertir fecha a formato ISO String para que el servidor la procese correctamente
-      return apiRequest("/api/time-entries", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          projectId,
-          date: data.date.toISOString(),
-        }),
+      return apiRequest("/api/time-entries", "POST", {
+        ...data,
+        projectId,
+        date: data.date.toISOString(),
       });
     },
     onSuccess: (newEntry) => {
@@ -282,14 +298,14 @@ const TimeRegistrationForm: React.FC<{
       updateLocalEntries(newEntry);
       
       // Actualizamos la caché de forma optimista
-      queryClient.setQueryData(["/api/time-entries", projectId], (oldData: TimeEntry[] = []) => {
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
         console.log("Actualizando caché con nueva entrada:", newEntry);
         return [...oldData, newEntry];
       });
       
       // Forzamos una recarga completa de los datos para asegurar sincronización total
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/time-entries", projectId] });
+        queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       }, 300);
       
       toast({
@@ -348,9 +364,12 @@ const TimeRegistrationForm: React.FC<{
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {personnel?.map((person) => (
-                        <SelectItem key={person.id} value={person.id.toString()}>
-                          {person.name}
+                      {personnel?.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()} className="py-3">
+                          <div className="flex items-center gap-2">
+                            <PersonAvatar name={p.name} />
+                            <span>{p.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -366,54 +385,109 @@ const TimeRegistrationForm: React.FC<{
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Fecha</FormLabel>
-                  <Controller
-                    name="date"
-                    control={form.control}
-                    render={({ field }) => (
-                      <div className="grid gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
                         <Button
-                          id="date"
                           variant={"outline"}
-                          className={`w-full justify-start text-left font-normal h-11 ${
-                            !field.value && "text-muted-foreground"
-                          }`}
-                          onClick={() => {}}
-                          type="button"
+                          className={
+                            "w-full h-11 pl-3 text-left font-normal flex justify-between items-center"
+                          }
                         >
-                          <Calendar className="mr-2 h-4 w-4" />
                           {field.value ? (
-                            format(field.value, "PPP", { locale: es })
+                            <span>
+                              {format(field.value, "EEEE, dd MMM yyyy", { locale: es })}
+                            </span>
                           ) : (
-                            <span>Selecciona una fecha</span>
+                            <span>Seleccionar fecha</span>
                           )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <div className="bg-muted/30 p-2 border-b flex items-center justify-center">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                          Esta semana
                         </Button>
                       </div>
-                    )}
-                  />
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        locale={es}
+                        className="rounded-md border"
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6">
             <FormField
               control={form.control}
               name="hours"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Horas</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Número de horas"
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      max="24"
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      value={field.value}
-                    />
-                  </FormControl>
+                  <FormLabel>Horas trabajadas</FormLabel>
+                  <div className="flex flex-col space-y-2">
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          max="24"
+                          className="h-11 pl-8"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        />
+                      </FormControl>
+                      <Clock className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                    </div>
+
+                    {/* Presets para móvil */}
+                    <div className="md:hidden flex items-center justify-start">
+                      <span className="text-xs text-muted-foreground mr-2">Presets:</span>
+                      <div className="flex gap-1">
+                        {[0.5, 1, 2, 4, 8].map((value) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 w-7 text-xs font-normal p-0"
+                            onClick={() => field.onChange(value)}
+                          >
+                            {value}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Presets para desktop */}
+                    <div className="hidden md:flex items-center border rounded bg-muted/40 px-3 h-11 space-x-2 text-sm">
+                      <span className="text-muted-foreground">Presets:</span>
+                      <div className="flex gap-1">
+                        {[0.5, 1, 2, 4, 8].map((value) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-8 text-xs font-normal"
+                            onClick={() => field.onChange(value)}
+                          >
+                            {value}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -423,16 +497,39 @@ const TimeRegistrationForm: React.FC<{
               control={form.control}
               name="billable"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-end space-x-2 mt-8">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Facturable</FormLabel>
+                <FormItem className="flex flex-col">
+                  <FormLabel>Tipo de horas</FormLabel>
+                  <div className="flex items-center space-x-4 h-11">
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "billable")}
+                      defaultValue={field.value ? "billable" : "non-billable"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Tipo de horas" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="billable">
+                          <div className="flex items-center">
+                            <DollarSign className="mr-2 h-4 w-4 text-green-600" />
+                            <span>Facturable</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="non-billable">
+                          <div className="flex items-center">
+                            <Clock className="mr-2 h-4 w-4 text-amber-600" />
+                            <span>No facturable</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                  <FormDescription className="text-xs mt-1">
+                    <strong>Facturable:</strong> Horas que se cobran al cliente.
+                    <br />
+                    <strong>No facturable:</strong> Trabajo interno que no se cobra al cliente.
+                  </FormDescription>
                 </FormItem>
               )}
             />
@@ -443,28 +540,45 @@ const TimeRegistrationForm: React.FC<{
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Descripción</FormLabel>
+                <FormLabel>Descripción del trabajo realizado</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Descripción del trabajo realizado"
-                    className="resize-none"
+                    placeholder="Describe las tareas realizadas, resultados o cualquier información relevante..."
+                    className="min-h-[100px] resize-none"
                     {...field}
                     value={field.value || ""}
                   />
                 </FormControl>
+                <FormDescription>
+                  Esta información ayudará al equipo a entender el contexto de las horas registradas.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <div className="flex justify-end space-x-4">
-          <Button variant="outline" onClick={onCancel} type="button">
+        <div className="flex justify-end space-x-2 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isPending}
+          >
             Cancelar
           </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar
+          <Button type="submit" disabled={isPending} className="min-w-[120px]">
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Registrar Horas
+              </>
+            )}
           </Button>
         </div>
       </form>
@@ -473,319 +587,599 @@ const TimeRegistrationForm: React.FC<{
 };
 
 // Componente principal
-const TimeEntries = () => {
-  const { projectId } = useParams();
-  const [_, navigate] = useLocation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+const TimeEntries: React.FC = () => {
+  const [, setLocation] = useLocation();
+  const params = useParams();
+  const projectId = parseInt(params.projectId || "0");
   
-  // Estados locales
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null);
+  const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [search, setSearch] = useState("");
+  
+  // Estado local para actualización en tiempo real
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
+  
+  // Función para actualizar estado local, pasada a componentes hijos
+  const updateLocalEntries = (entry: TimeEntry) => {
+    setLocalTimeEntries(prev => [...prev, entry]);
+  };
+  
 
-  // Queries
-  const { data: project, isLoading: isLoadingProject } = useQuery({
-    queryKey: ["/api/projects", projectId],
-    queryFn: () => apiRequest(`/api/projects/${projectId}`),
+
+  // Obtener proyecto activo
+  const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
+    queryKey: ["/api/active-projects", projectId],
     enabled: !!projectId,
   });
 
-  const { data: client } = useQuery({
-    queryKey: ["/api/clients", project?.quotation?.clientId],
-    queryFn: () =>
-      apiRequest(`/api/clients/${project?.quotation?.clientId}`),
-    enabled: !!project?.quotation?.clientId,
-  });
-
-  const { data: timeEntries = [], isLoading: isLoadingEntries } = useQuery({
-    queryKey: ["/api/time-entries", projectId],
-    queryFn: () => apiRequest(`/api/time-entries?projectId=${projectId}`),
-    enabled: !!projectId,
-  });
-
-  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery({
+  // Obtener personal
+  const { data: personnel, isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
-    queryFn: () => apiRequest("/api/personnel"),
   });
 
-  // Mutations
-  const deleteTimeEntryMutation = useMutation({
-    mutationFn: (entryId: number) =>
-      apiRequest(`/api/time-entries/${entryId}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      toast({
-        title: "Registro eliminado",
-        description: "El registro de horas ha sido eliminado correctamente.",
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/time-entries", projectId],
-      });
-      setDeleteDialogOpen(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description:
-          "No se pudo eliminar el registro. Por favor, intente nuevamente.",
-        variant: "destructive",
-      });
-      console.error("Error al eliminar el registro:", error);
-    },
+  // Obtener roles
+  const { data: roles } = useQuery<Role[]>({
+    queryKey: ["/api/roles"],
   });
 
-  // Effect para actualizar entradas locales cuando cambian las entradas del servidor
+  // Obtener clientes
+  const { data: clients } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  // Obtener registros de tiempo
+  const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
+    queryKey: [`/api/time-entries/project/${projectId}`],
+    enabled: !!projectId,
+  });
+  
+  // Sincronizar estado local con datos del servidor
   useEffect(() => {
-    if (timeEntries.length > 0) {
+    if (timeEntries) {
+      console.log("Actualizando estado local con datos del servidor:", timeEntries);
       setLocalTimeEntries(timeEntries);
     }
   }, [timeEntries]);
 
-  // Funciones
-  const isLoading =
-    isLoadingProject || isLoadingEntries || isLoadingPersonnel;
+  // Filtrar entradas según pestaña activa y búsqueda
+  const filteredEntries = React.useMemo(() => {
+    // Usar el estado local de registros de tiempo para actualización en tiempo real
+    const entries = localTimeEntries || [];
+    
+    let filtered = entries;
+    
+    // Filtrar por pestaña
+    switch (activeTab) {
+      case "billable":
+        filtered = filtered.filter(entry => entry.billable);
+        break;
+      case "non-billable":
+        filtered = filtered.filter(entry => !entry.billable);
+        break;
+      // El caso "all" no necesita filtro
+    }
+    
+    // Filtrar por búsqueda
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(entry => {
+        const personName = personnel?.find(p => p.id === entry.personnelId)?.name?.toLowerCase() || "";
+        const description = entry.description?.toLowerCase() || "";
+        return personName.includes(searchLower) || description.includes(searchLower);
+      });
+    }
+    
+    // Ordenar por fecha (más reciente primero)
+    return [...filtered].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [localTimeEntries, activeTab, search, personnel]);
+
+  // Mutación para eliminar entrada de tiempo
+  const deleteTimeEntryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/time-entries/${id}`, "DELETE");
+    },
+    onSuccess: () => {
+      // Actualizar el estado local también para reflejar cambios inmediatamente
+      if (entryToDelete) {
+        setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryToDelete));
+      }
+      
+      // Actualizar caché de TanStack Query
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        return oldData.filter(entry => entry.id !== entryToDelete);
+      });
+      
+      // Invalidar consulta para asegurar sincronización completa
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      
+      toast({
+        title: "Registro eliminado",
+        description: "El registro de horas ha sido eliminado con éxito",
+      });
+      
+      setDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      console.error("Error deleting time entry:", error);
+      toast({
+        title: "Error al eliminar",
+        description: error.message || "Ha ocurrido un error al eliminar el registro",
+        variant: "destructive",
+      });
+    },
+  });
 
   const confirmDelete = () => {
     if (entryToDelete) {
-      deleteTimeEntryMutation.mutate(entryToDelete.id);
+      deleteTimeEntryMutation.mutate(entryToDelete);
     }
   };
 
-  const handleEditEntry = (entry: TimeEntry) => {
-    // TODO: Implementar edición de entradas
-    toast({
-      title: "Función en desarrollo",
-      description: "La edición de registros estará disponible próximamente.",
-    });
+  // Funciones de utilidad
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "N/A";
+    return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
-  const handleDeleteEntry = (entry: TimeEntry) => {
-    setEntryToDelete(entry);
-    setDeleteDialogOpen(true);
+  const getTotalHours = () => {
+    if (!filteredEntries) return 0;
+    return filteredEntries.reduce((sum, entry) => sum + entry.hours, 0);
   };
 
-  const updateLocalEntries = (entry: TimeEntry) => {
-    setLocalTimeEntries((prev) => [...prev, entry]);
+  const getTotalBillableHours = () => {
+    if (!filteredEntries) return 0;
+    return filteredEntries
+      .filter(entry => entry.billable)
+      .reduce((sum, entry) => sum + entry.hours, 0);
   };
 
-  // Agrupación de entradas por fecha
+  // Calcular progreso del proyecto
+  const calculateProjectProgress = () => {
+    if (!project || !project.startDate) return 0;
+    
+    const start = new Date(project.startDate);
+    const end = project.expectedEndDate ? new Date(project.expectedEndDate) : addDays(start, 30);
+    const today = new Date();
+    
+    if (isAfter(today, end)) return 100;
+    
+    const totalDays = differenceInDays(end, start) || 1;
+    const daysElapsed = differenceInDays(today, start);
+    
+    return Math.min(Math.round((daysElapsed / totalDays) * 100), 100);
+  };
+
+  // Agrupar entradas por fecha para la vista calendario
   const groupEntriesByDate = () => {
-    const entriesMap = new Map<string, TimeEntry[]>();
+    if (!localTimeEntries || localTimeEntries.length === 0) return new Map();
     
-    localTimeEntries.forEach((entry) => {
-      const dateStr = entry.date.split("T")[0];
-      if (!entriesMap.has(dateStr)) {
-        entriesMap.set(dateStr, []);
+    const grouped = new Map<string, TimeEntry[]>();
+    
+    filteredEntries.forEach(entry => {
+      const dateKey = entry.date.substring(0, 10); // YYYY-MM-DD
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
       }
-      entriesMap.get(dateStr)?.push(entry);
+      grouped.get(dateKey)!.push(entry);
     });
     
-    return entriesMap;
+    return grouped;
   };
 
-  // Calcular el total de horas del proyecto
-  const totalHours = localTimeEntries.reduce(
-    (sum, entry) => sum + entry.hours,
-    0
-  );
+  // Estado de carga
+  const isLoading = 
+    isLoadingProject || 
+    isLoadingPersonnel || 
+    isLoadingTimeEntries || 
+    deleteTimeEntryMutation.isPending;
 
-  // Calcular el total de horas por persona
-  const hoursByPerson = localTimeEntries.reduce((acc, entry) => {
-    const personnelId = entry.personnelId;
-    acc[personnelId] = (acc[personnelId] || 0) + entry.hours;
-    return acc;
-  }, {} as Record<number, number>);
+  const getRoleNameById = (roleId: number) => {
+    return roles?.find(role => role.id === roleId)?.name || "Rol desconocido";
+  };
 
-  return (
-    <div className="container py-6 max-w-7xl">
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  const getClientNameById = (clientId: number) => {
+    return clients?.find(client => client.id === clientId)?.name || "Cliente desconocido";
+  };
+
+  // Manejo de errores
+  if (!projectId) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex justify-center items-center h-[400px]">
+          <Card className="w-[600px]">
+            <CardHeader className="text-center">
+              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-2" />
+              <CardTitle>Error de navegación</CardTitle>
+              <CardDescription>
+                No se ha especificado un proyecto válido para el registro de horas.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="flex justify-center">
+              <Button onClick={() => setLocation("/active-projects")}>
+                Ver Proyectos Activos
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
+      </div>
+    );
+  }
+
+  // Componente principal
+  return (
+    <div className="container mx-auto py-6 max-w-6xl">
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver a Proyectos
+        </Button>
+        <h1 className="text-3xl font-bold ml-4">Registro de Horas</h1>
+      </div>
+
+      {isLoadingProject ? (
+        <div className="flex justify-center items-center h-[300px]">
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Cargando datos del proyecto...</p>
+          </div>
+        </div>
+      ) : !project ? (
+        <Card>
+          <CardHeader className="text-center">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+            <CardTitle>Proyecto no encontrado</CardTitle>
+            <CardDescription>
+              El proyecto especificado no existe o no está disponible en el sistema.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => setLocation("/active-projects")}>
+              Ver todos los proyectos
+            </Button>
+          </CardFooter>
+        </Card>
       ) : (
         <>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/active-projects")}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">
-                  Registro de Horas: {project?.quotation?.projectName}
-                </h1>
-                <p className="text-muted-foreground">
-                  Cliente: {client?.name || "Cargando..."}
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Nuevo Registro
-            </Button>
-          </div>
-
-          <div className="grid gap-6 mb-6 md:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total de Horas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {totalHours} {totalHours === 1 ? "hora" : "horas"}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Personal Involucrado
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {Object.keys(hoursByPerson).length}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Estado del Proyecto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold capitalize">
-                  {project?.status}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-6 mb-8 md:grid-cols-4">
-            <Card className="md:col-span-3">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Registro de Tiempo</CardTitle>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={viewMode === "calendar" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("calendar")}
-                      className="h-8"
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Vista Calendario
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="h-8"
-                    >
-                      <List className="mr-2 h-4 w-4" />
-                      Vista Lista
-                    </Button>
+          <Card className="mb-6 overflow-hidden">
+            <div className="bg-primary/5 border-b">
+              <div className="flex flex-wrap md:flex-nowrap items-start md:items-center justify-between p-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold">
+                      {project.quotation && project.quotation.projectName 
+                        ? project.quotation.projectName 
+                        : "Proyecto sin nombre"}
+                    </h2>
+                    <ProjectStatusBadge status={project.status} />
+                  </div>
+                  <div className="text-muted-foreground">
+                    <span className="inline-flex items-center">
+                      <Users2 className="h-4 w-4 mr-1" />
+                      Cliente: {project.quotation && project.quotation.clientId 
+                        ? getClientNameById(project.quotation.clientId) 
+                        : "Sin cliente asignado"}
+                    </span>
+                    <span className="mx-2">|</span>
+                    <span className="inline-flex items-center">
+                      <FolderKanban className="h-4 w-4 mr-1" />
+                      Tipo: {project.quotation && project.quotation.projectType 
+                        ? project.quotation.projectType.toUpperCase() 
+                        : "No especificado"}
+                    </span>
                   </div>
                 </div>
+                <div className="flex mt-4 md:mt-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mr-2"
+                    onClick={() => setLocation(`/project-summary/${project.id}`)}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Ver análisis
+                  </Button>
+                  <Button size="sm" onClick={() => setDialogOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Registrar Horas
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Progreso del Proyecto</h3>
+                    <div className="space-y-2">
+                      <Progress value={calculateProjectProgress()} className="h-2" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Inicio: {formatDate(project.startDate)}</span>
+                        <span>Fin: {formatDate(project.expectedEndDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex space-x-8">
+                    <div>
+                      <h3 className="text-sm font-medium mb-1">Seguimiento</h3>
+                      <div className="flex items-center text-sm">
+                        <CalendarSquare className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span className="capitalize">{project.trackingFrequency}</span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-sm font-medium mb-1">Presupuesto</h3>
+                      <div className="flex items-center text-sm">
+                        <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <span>
+                          ${project.quotation && typeof project.quotation.totalAmount === 'number' 
+                            ? project.quotation.totalAmount.toFixed(2) 
+                            : "0.00"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {project.notes && (
+                    <div>
+                      <h3 className="text-sm font-medium mb-1">Notas</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {project.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium">Resumen de horas</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="text-xs text-muted-foreground mb-1">Total Horas</h4>
+                          <p className="text-2xl font-bold">{getTotalHours().toFixed(1)}</p>
+                        </div>
+                        <Timer className="h-8 w-8 text-primary/70" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="text-xs text-muted-foreground mb-1">Horas Facturables</h4>
+                          <p className="text-2xl font-bold">{getTotalBillableHours().toFixed(1)}</p>
+                        </div>
+                        <DollarSign className="h-8 w-8 text-green-500/70" />
+                      </div>
+                    </div>
+                    
+                    {localTimeEntries && localTimeEntries.length > 0 && (
+                      <>
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="text-xs text-muted-foreground mb-1">Total Registros</h4>
+                              <p className="text-2xl font-bold">
+                                {localTimeEntries.length}
+                              </p>
+                            </div>
+                            <ClipboardCheck className="h-8 w-8 text-blue-500/70" />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <Card className="flex-1">
+              <CardHeader className="py-4 px-6">
+                <Tabs
+                  defaultValue="all"
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium">Registros de tiempo</h3>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={viewMode === "list" ? "default" : "outline"}
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setViewMode("list")}
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        <span className="sr-only">Vista Lista</span>
+                      </Button>
+                      <Button
+                        variant={viewMode === "calendar" ? "default" : "outline"}
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setViewMode("calendar")}
+                      >
+                        <CalendarSquare className="h-4 w-4" />
+                        <span className="sr-only">Vista Calendario</span>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <TabsList className="grid grid-cols-3 w-full md:w-auto">
+                      <TabsTrigger value="all">Todos</TabsTrigger>
+                      <TabsTrigger value="billable">Facturables</TabsTrigger>
+                      <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
+                    </TabsList>
+                    <div className="hidden md:flex items-center relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Buscar en registros..."
+                        className="w-[280px] pl-9 h-9"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="md:hidden relative mb-4">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Buscar en registros..."
+                      className="w-full pl-9"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                </Tabs>
               </CardHeader>
-              <CardContent>
-                {viewMode === "list" ? (
-                  // Vista de lista con scroll
-                  <div className="border rounded-md overflow-auto" style={{ maxHeight: "700px" }}>
+              <CardContent className="p-0" style={{ maxHeight: "750px", overflowY: "auto" }}>
+                {isLoadingTimeEntries ? (
+                  <div className="flex justify-center items-center h-[300px]">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredEntries.length === 0 ? (
+                  <div className="flex flex-col justify-center items-center h-[300px] text-center px-4">
+                    <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-medium">No hay registros de horas</h3>
+                    <p className="text-muted-foreground mt-2 max-w-md">
+                      {search 
+                        ? "No se encontraron registros que coincidan con tu búsqueda."
+                        : activeTab !== "all"
+                          ? `No hay registros de horas en la categoría seleccionada.`
+                          : "No se han registrado horas para este proyecto todavía."}
+                    </p>
+                    <Button
+                      className="mt-6"
+                      onClick={() => setDialogOpen(true)}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Registrar Horas
+                    </Button>
+                  </div>
+                ) : viewMode === "list" ? (
+                  // Nuevo enfoque con altura fija y scroll nativo del navegador
+                  <div className="border rounded-md overflow-auto" style={{ maxHeight: "800px" }}>
                     <Table>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                           <TableRow>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Personal</TableHead>
                             <TableHead>Horas</TableHead>
-                            <TableHead>Descripción</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="w-[80px]">Acciones</TableHead>
+                            <TableHead className="hidden md:table-cell">Descripción</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {localTimeEntries.map((entry) => {
-                          const person = personnel.find(
-                            (p) => p.id === entry.personnelId
-                          );
-                          return (
-                            <TableRow key={entry.id}>
-                              <TableCell>
-                                {format(new Date(entry.date), "dd/MM/yyyy")}
-                              </TableCell>
-                              <TableCell>{person?.name}</TableCell>
-                              <TableCell>
-                                {entry.hours}{" "}
-                                {entry.billable && (
-                                  <span className="text-xs text-green-600 font-medium">
-                                    (Facturable)
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {entry.description || "-"}
-                              </TableCell>
-                              <TableCell>
-                                {entry.approved ? (
-                                  <div className="flex items-center text-green-600">
-                                    <CheckCircle className="mr-1 h-4 w-4" />
-                                    <span>Aprobado</span>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEntries.map((entry) => {
+                            const person = personnel?.find(p => p.id === entry.personnelId);
+                            return (
+                              <TableRow key={entry.id}>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span>{formatDate(entry.date)}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(entry.date), "EEEE", { locale: es })}
+                                    </span>
                                   </div>
-                                ) : (
-                                  <div className="flex items-center text-amber-600">
-                                    <Clock className="mr-1 h-4 w-4" />
-                                    <span>Pendiente</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <PersonAvatar name={person?.name || "Usuario"} />
+                                    <div>
+                                      <div className="font-medium">{person?.name}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {getRoleNameById(person?.roleId || 0)}
+                                      </div>
+                                    </div>
                                   </div>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <span className="sr-only">
-                                        Abrir menú
-                                      </span>
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      onClick={() => handleEditEntry(entry)}
-                                    >
-                                      Editar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={() => handleDeleteEntry(entry)}
-                                    >
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center">
+                                    <span className="font-medium">{entry.hours}</span>
+                                    {!entry.billable ? (
+                                      <Badge variant="outline" className="ml-2 text-xs">
+                                        No facturable
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="ml-2 text-xs bg-green-100 text-green-800 hover:bg-green-200">
+                                        Facturable
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="max-w-[200px] truncate hidden md:table-cell">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger className="cursor-help">
+                                        <span className="truncate block max-w-[250px]">
+                                          {entry.description || "-"}
+                                        </span>
+                                      </TooltipTrigger>
+                                      {entry.description && (
+                                        <TooltipContent className="max-w-[300px] p-4">
+                                          <p>{entry.description}</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  {entry.billable ? (
+                                    <div className="flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-green-600" />
+                                      <span className="text-sm">Facturable</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-amber-600" />
+                                      <span className="text-sm">No facturable</span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Opciones</span>
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                      <DropdownMenuItem 
+                                        onClick={() => {
+                                          setEntryToDelete(entry.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        className="text-red-600"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Eliminar registro
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
                   </div>
                 ) : (
-                  // Vista de calendario con scroll
                   <div className="p-6 space-y-6">
-                    <ScrollArea className="h-[650px] pr-4">
+                    <div className="pr-4 overflow-auto" style={{ maxHeight: "800px" }}>
                       {groupEntriesByDate().size > 0 ? (
                         Array.from(groupEntriesByDate().entries())
                           .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
@@ -795,8 +1189,6 @@ const TimeEntries = () => {
                               date={new Date(dateStr)}
                               entries={entries}
                               personnel={personnel}
-                              onEditEntry={handleEditEntry}
-                              onDeleteEntry={handleDeleteEntry}
                             />
                           ))
                       ) : (
@@ -804,7 +1196,7 @@ const TimeEntries = () => {
                           No hay registros para mostrar en el calendario
                         </div>
                       )}
-                    </ScrollArea>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -817,12 +1209,12 @@ const TimeEntries = () => {
               <DialogHeader>
                 <DialogTitle>Nuevo Registro de Horas</DialogTitle>
                 <DialogDescription>
-                  Registra el tiempo trabajado en el proyecto {project?.quotation?.projectName || "seleccionado"}
+                  Registra el tiempo trabajado en el proyecto {project.quotation?.projectName || "seleccionado"}
                 </DialogDescription>
               </DialogHeader>
               <TimeRegistrationForm
                 personnel={personnel}
-                projectId={Number(projectId)}
+                projectId={projectId}
                 onSuccess={() => {
                   // Retrasamos un poco el cierre del diálogo para asegurar que se muestre el registro
                   setTimeout(() => {
@@ -866,6 +1258,8 @@ const TimeEntries = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+
         </>
       )}
     </div>
