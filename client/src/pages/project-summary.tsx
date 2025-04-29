@@ -79,7 +79,9 @@ import {
   Clock3,
   UserCheck,
   Bell,
-  Info as InfoIcon
+  Info as InfoIcon,
+  X as XIcon,
+  Expand as ExpandIcon
 } from "lucide-react";
 import { format, subDays, differenceInDays, differenceInBusinessDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -309,11 +311,53 @@ const RiskBadge: React.FC<{
   );
 };
 
+// Modal para gráficos expandidos
+const ChartModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}> = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg w-[90vw] h-[90vh] flex flex-col max-w-6xl">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-xl font-bold">{title}</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full"
+          >
+            <XIcon className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex-1 p-4 overflow-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Componente principal
 const ProjectSummary: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
   const projectId = parseInt(params.projectId || "0");
+  
+  // Modal de gráficos
+  const [expandedChart, setExpandedChart] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: 'personnelBar' | 'billablePie' | 'timelineTrend' | null;
+  }>({
+    isOpen: false,
+    title: "",
+    type: null
+  });
   
   // Tabs y filtros
   const [activeTab, setActiveTab] = useState("overview");
@@ -657,6 +701,227 @@ const ProjectSummary: React.FC = () => {
     isLoadingCostSummary || 
     isLoadingTimeEntries ||
     isLoadingPersonnel;
+    
+  // Renderizar el gráfico expandido en el modal
+  const renderExpandedChart = () => {
+    if (!expandedChart.isOpen || !expandedChart.type) return null;
+    
+    switch (expandedChart.type) {
+      case 'personnelBar':
+        return (
+          <div className="h-[80vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={timeByPersonnelData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                barSize={60}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis 
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  height={60}
+                  tick={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    dy: 10
+                  }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  width={80}
+                  tick={{
+                    fontSize: 14
+                  }}
+                />
+                <RechartsTooltip 
+                  formatter={(value, name, entry) => {
+                    if (name === "hours") {
+                      return [`${value} horas`, "Horas"];
+                    } else if (name === "cost") {
+                      return [formatCurrency(value as number), "Costo"];
+                    }
+                    return [value, name];
+                  }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-4 rounded-md shadow-md border border-gray-200">
+                          <p className="font-bold mb-2 text-lg">{data.name}</p>
+                          <p className="text-sm text-gray-600 mb-3">
+                            <span className="font-medium">Rol:</span> {data.role}
+                          </p>
+                          <p className="text-sm mb-2">
+                            <span className="font-medium">Horas:</span> {data.hours}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium">Costo:</span> {formatCurrency(data.cost)}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend 
+                  iconType="circle"
+                  wrapperStyle={{
+                    paddingTop: 20,
+                    fontSize: 14
+                  }}
+                />
+                <Bar 
+                  dataKey="hours" 
+                  fill="#4f46e5" 
+                  name="Horas"
+                  radius={[4, 4, 0, 0]}
+                  animationDuration={1500}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'billablePie':
+        return (
+          <div className="h-[80vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={billableVsNonBillableData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={true}
+                  outerRadius={250}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, value, percent }) => 
+                    `${name}: ${value} horas (${(percent * 100).toFixed(0)}%)`
+                  }
+                  animationDuration={1500}
+                  animationBegin={300}
+                >
+                  {billableVsNonBillableData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={index === 0 ? "#4f46e5" : "#f97316"} 
+                    />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  formatter={(value) => [`${value} horas`, "Horas"]}
+                  contentStyle={{ 
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+                    padding: '10px',
+                    fontSize: '14px'
+                  }}
+                />
+                <Legend 
+                  iconType="circle"
+                  wrapperStyle={{
+                    paddingTop: 20,
+                    fontSize: 14
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      case 'timelineTrend':
+        return (
+          <div className="h-[80vh]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={timeEntriesByDateData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis 
+                  dataKey="date"
+                  axisLine={false}
+                  tickLine={false}
+                  padding={{ left: 30, right: 30 }}
+                  height={60}
+                  tick={{
+                    fontSize: 14,
+                    dy: 10
+                  }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  yAxisId="left"
+                  width={80}
+                  tick={{
+                    fontSize: 14
+                  }}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  orientation="right"
+                  yAxisId="right"
+                  width={80}
+                  tick={{
+                    fontSize: 14
+                  }}
+                />
+                <RechartsTooltip 
+                  formatter={(value, name) => {
+                    if (name === "hours") return [`${value} horas`, "Horas"];
+                    if (name === "cost") return [formatCurrency(value as number), "Costo"];
+                    return [value, name];
+                  }}
+                  contentStyle={{ 
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+                    padding: '10px',
+                    fontSize: '14px'
+                  }}
+                />
+                <Legend 
+                  iconType="circle"
+                  wrapperStyle={{
+                    paddingTop: 20,
+                    fontSize: 14
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="hours"
+                  stroke="#4f46e5"
+                  name="Horas"
+                  strokeWidth={3}
+                  dot={{ r: 6, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                  activeDot={{ r: 8, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
+                  yAxisId="left"
+                  animationDuration={1500}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="cost"
+                  stroke="#f59e0b"
+                  name="Costo"
+                  strokeWidth={3}
+                  dot={{ r: 6, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
+                  activeDot={{ r: 8, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
+                  yAxisId="right"
+                  animationDuration={1500}
+                  animationBegin={300}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   if (!projectId) {
     return (
@@ -680,6 +945,15 @@ const ProjectSummary: React.FC = () => {
 
   return (
     <ScrollArea className="flex-1 h-[calc(100vh-4rem)]">
+      {/* Modal para gráficos expandidos */}
+      <ChartModal 
+        isOpen={expandedChart.isOpen}
+        onClose={() => setExpandedChart({ isOpen: false, title: "", type: null })}
+        title={expandedChart.title}
+      >
+        {renderExpandedChart()}
+      </ChartModal>
+      
       <div className="container mx-auto px-6 py-6 pb-24 max-w-[1200px]">
         {/* Header navigation */}
         <div className="mb-4">
