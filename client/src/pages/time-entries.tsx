@@ -269,7 +269,8 @@ const TimeRegistrationForm: React.FC<{
   onSuccess: () => void;
   onCancel: () => void;
   isLoading: boolean;
-}> = ({ personnel, projectId, onSuccess, onCancel, isLoading }) => {
+  updateLocalEntries: (entry: TimeEntry) => void;
+}> = ({ personnel, projectId, onSuccess, onCancel, isLoading, updateLocalEntries }) => {
   // Configuración del formulario
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -294,7 +295,7 @@ const TimeRegistrationForm: React.FC<{
       console.log("Añadiendo nueva entrada inmediatamente:", newEntry);
       
       // IMPORTANTE: Actualizar el estado local directamente para mostrar inmediatamente
-      setLocalTimeEntries(prev => [...prev, newEntry]);
+      updateLocalEntries(newEntry);
       
       // Actualizamos la caché de forma optimista
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
@@ -600,6 +601,11 @@ const TimeEntries: React.FC = () => {
   
   // Estado local para actualización en tiempo real
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
+  
+  // Función para actualizar estado local, pasada a componentes hijos
+  const updateLocalEntries = (entry: TimeEntry) => {
+    setLocalTimeEntries(prev => [...prev, entry]);
+  };
   
 
 
@@ -1216,6 +1222,7 @@ const TimeEntries: React.FC = () => {
                 }}
                 onCancel={() => setDialogOpen(false)}
                 isLoading={isLoading}
+                updateLocalEntries={updateLocalEntries}
               />
             </DialogContent>
           </Dialog>
