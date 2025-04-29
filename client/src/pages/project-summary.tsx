@@ -235,7 +235,7 @@ const ProjectSummary = () => {
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [customView, setCustomView] = useState<CustomView>({
-    showKpi: true,
+    showKpi: false,  // Cambiamos a false para no mostrar las tarjetas superiores duplicadas
     showFinances: true,
     showTime: true,
     showRisks: true,
