@@ -67,7 +67,7 @@ import {
   TrendingUp,
   Calendar,
   CalendarDays,
-  BarChart as ChartBarIcon,
+  BarChart2 as ChartBarIcon,
   LayoutDashboard,
   ClipboardList,
   Sliders,
@@ -1047,7 +1047,7 @@ const ProjectSummary = () => {
                     onValueChange={setTimeFilter}
                   >
                     <SelectTrigger className="w-[160px] h-9 border-muted">
-                      <CalendarRange className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
                       <SelectValue placeholder="Período" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1068,7 +1068,7 @@ const ProjectSummary = () => {
                       <span>Detallado</span>
                     </ToggleGroupItem>
                     <ToggleGroupItem value="hours" className="px-3 text-xs">
-                      <BarChart className="h-4 w-4 mr-1.5" />
+                      <BarChart2 className="h-4 w-4 mr-1.5" />
                       <span>Comparativo</span>
                     </ToggleGroupItem>
                   </ToggleGroup>
@@ -1130,7 +1130,7 @@ const ProjectSummary = () => {
                     className="h-9 gap-1.5" 
                     onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
                   >
-                    <ClockPlus className="h-4 w-4" />
+                    <PlusCircle className="h-4 w-4" />
                     <span>Registrar Horas</span>
                   </Button>
                 </div>
