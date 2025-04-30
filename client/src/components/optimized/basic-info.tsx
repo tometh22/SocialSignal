@@ -44,19 +44,29 @@ const OptimizedBasicInfo: React.FC = () => {
             const selectedClient = clients?.find(client => client.id === parseInt(value));
             updateClient(selectedClient || null);
           }}
-          disabled={isLoadingClients}
         >
           <SelectTrigger id="client" className="w-full">
             <SelectValue placeholder="Seleccionar cliente" />
           </SelectTrigger>
           <SelectContent>
-            {clients?.map((client) => (
-              <SelectItem key={client.id} value={String(client.id)}>
-                {client.name}
-              </SelectItem>
-            ))}
+            {isLoadingClients ? (
+              <SelectItem value="loading" disabled>Cargando clientes...</SelectItem>
+            ) : clients && clients.length > 0 ? (
+              clients.map((client) => (
+                <SelectItem key={client.id} value={String(client.id)}>
+                  {client.name}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem value="no-clients" disabled>No hay clientes disponibles</SelectItem>
+            )}
           </SelectContent>
         </Select>
+        <div className="text-xs text-blue-600 mt-1">
+          <a href="/clients/new" target="_blank" className="hover:underline">
+            + Crear nuevo cliente
+          </a>
+        </div>
       </div>
 
       {/* Nombre del Proyecto */}
