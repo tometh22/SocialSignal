@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery } from '@tanstack/react-query';
 import { Client } from '@shared/schema';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { queryClient } from '@/lib/queryClient';
 
 const OptimizedBasicInfo: React.FC = () => {
   const {
@@ -22,12 +23,29 @@ const OptimizedBasicInfo: React.FC = () => {
     staleTime: 30000, // 30 segundos
     retry: 3,
     refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 
   // Consultar tipos de proyecto
   const { data: projectTypes, isLoading: isLoadingProjectTypes } = useQuery<{value: string, label: string}[]>({
     queryKey: ['/api/options/project-types'],
+    staleTime: 30000,
+    retry: 3,
   });
+  
+  // Botón para forzar la recarga de datos
+  const handleRefreshClients = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+  }, []);
+  
+  // Efecto para cargar datos automáticamente al montar
+  React.useEffect(() => {
+    // Forzar carga inicial si es necesario
+    if (!clients && !isLoadingClients) {
+      handleRefreshClients();
+    }
+  }, [clients, isLoadingClients, handleRefreshClients]);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -70,10 +88,22 @@ const OptimizedBasicInfo: React.FC = () => {
             </SelectContent>
           </Select>
         )}
-        <div className="text-xs text-blue-600 mt-1">
-          <a href="/clients/new" target="_blank" className="hover:underline">
+        <div className="flex items-center justify-between text-xs mt-1">
+          <a href="/clients/new" target="_blank" className="text-blue-600 hover:underline">
             + Crear nuevo cliente
           </a>
+          {!isLoadingClients && (
+            <button 
+              type="button" 
+              onClick={handleRefreshClients}
+              className="text-gray-500 hover:text-blue-600 flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Actualizar lista
+            </button>
+          )}
         </div>
       </div>
 

@@ -7,6 +7,13 @@ export const queryClient = new QueryClient({
       staleTime: 1000 * 60 * 5, // 5 minutos
       retry: 3,
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Backoff exponencial
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 2,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 8000),
     },
   },
 });
@@ -50,12 +57,29 @@ export const apiRequest = async (
   }
 };
 
+// Función para asegurar que las URLs sean absolutas
+const getAbsoluteUrl = (url: string) => {
+  // Si la URL ya es absoluta, la devolvemos sin cambios
+  if (url.startsWith('http')) {
+    return url;
+  }
+
+  // Obtenemos la URL base del servidor
+  const baseUrl = window.location.origin;
+  
+  // Nos aseguramos de que la URL comience con /
+  const normalizedUrl = url.startsWith('/') ? url : `/${url}`;
+  
+  return `${baseUrl}${normalizedUrl}`;
+};
+
 // Función por defecto para consultas
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
-  const url = queryKey[0];
+  const relativeUrl = queryKey[0];
+  const url = getAbsoluteUrl(relativeUrl);
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
   
   try {
     console.log(`Fetching data from: ${url}`);
@@ -64,7 +88,9 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      },
+      // Asegura que se envíen las cookies y credenciales
+      credentials: 'same-origin'
     });
     
     clearTimeout(timeoutId);
