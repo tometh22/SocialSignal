@@ -21,9 +21,14 @@ import {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
-  const { data: quotations, isLoading, refetch } = useQuery<Quotation[]>({
+  const { data: quotations, isLoading, refetch, error } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
+    retry: 3,
+    staleTime: 30000,
   });
+
+  // Log para depuración
+  console.log("Estado de carga:", { isLoading, error, quotationsLength: quotations?.length });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -152,7 +157,18 @@ export default function ManageQuotes() {
                 </div>
               </div>
 
-              {isLoading ? (
+              {error ? (
+                <div className="text-center py-8 text-red-500">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                  <h3 className="text-lg font-medium mb-2">Error al cargar las cotizaciones</h3>
+                  <p className="text-sm text-slate-600 mb-4">
+                    Hubo un problema al obtener las cotizaciones. Por favor intenta de nuevo.
+                  </p>
+                  <Button onClick={() => refetch()} variant="outline" size="sm">
+                    Reintentar
+                  </Button>
+                </div>
+              ) : isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader variant="gradient" size="md" text="Cargando cotizaciones" />
                 </div>

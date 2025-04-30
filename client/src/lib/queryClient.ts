@@ -1,7 +1,15 @@
 import { QueryClient } from "@tanstack/react-query";
 
 // Crear una instancia de QueryClient para ser usada en toda la aplicación
-export const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      retry: 3,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Backoff exponencial
+    },
+  },
+});
 
 // Función para hacer peticiones a la API
 export const apiRequest = async (
@@ -45,11 +53,21 @@ export const apiRequest = async (
 // Función por defecto para consultas
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   const url = queryKey[0];
-  const response = await fetch(url);
   
-  if (!response.ok) {
-    throw new Error(`Error en la petición: ${response.status}`);
+  try {
+    console.log(`Fetching data from: ${url}`);
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Error en la petición a ${url}: ${response.status} - ${response.statusText}`);
+      throw new Error(`Error en la petición: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Data successfully retrieved from ${url}`);
+    return data;
+  } catch (error) {
+    console.error(`Failed to fetch data from ${url}:`, error);
+    throw error;
   }
-  
-  return response.json();
 };
