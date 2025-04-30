@@ -137,7 +137,7 @@ const ProjectSummary = () => {
 
   // Consultas de datos
   const { data: project, isLoading: isLoadingProject } = useQuery({
-    queryKey: ['/api/active-projects', parsedProjectId],
+    queryKey: [`/api/active-projects/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
@@ -181,13 +181,14 @@ const ProjectSummary = () => {
         }
       };
       
-      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
+      queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
       
       await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
         projectName: newName
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
       
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
@@ -567,8 +568,23 @@ const ProjectSummary = () => {
     );
   }
 
-  // Valor calculado para días restantes
-  const daysRemaining = Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed);
+  // Valor calculado para días restantes basado en la fecha de cierre
+  const daysRemaining = useMemo(() => {
+    if (!project?.expectedEndDate) {
+      console.log("No hay fecha de cierre esperada");
+      return 0;
+    }
+    console.log("Fecha de cierre esperada:", project.expectedEndDate);
+    
+    const today = new Date();
+    const endDate = new Date(project.expectedEndDate);
+    
+    // Calculamos la diferencia en días entre hoy y la fecha de cierre
+    const differenceInTime = endDate.getTime() - today.getTime();
+    const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
+    
+    return Math.max(0, differenceInDays);
+  }, [project]);
 
   return (
     <div className="container mx-auto px-4 py-6 h-screen overflow-y-auto">
