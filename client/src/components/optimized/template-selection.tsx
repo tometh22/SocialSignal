@@ -30,6 +30,8 @@ const OptimizedTemplateSelection: React.FC = () => {
     complexityAdjustment,
     totalAmount
   } = useOptimizedQuote();
+  
+  const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('list');
@@ -681,7 +683,7 @@ const OptimizedTemplateSelection: React.FC = () => {
               
               // Mostrar un mensaje indicando que se debe ir a la pestaña de detalles
               toast({
-                title: "Plantilla seleccionada",
+                title: "Opción personalizada seleccionada",
                 description: "Ahora puedes configurar los detalles y ajustes en la siguiente pestaña.",
                 duration: 3000
               });
