@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 
 interface ComplexityFactorsCardProps {
@@ -42,7 +43,8 @@ export function ComplexityFactorsCard({
         <CardDescription>Selecciona los factores para calcular el precio final</CardDescription>
       </CardHeader>
       <CardContent className="pb-0">
-        <div className="space-y-6">
+        <ScrollArea className="h-[500px] pr-4">
+          <div className="space-y-6">
           {/* Tipo de análisis */}
           <div className="space-y-2">
             <Label className="font-medium text-blue-800 flex items-center">
@@ -241,6 +243,7 @@ export function ComplexityFactorsCard({
             Los cambios se aplican automáticamente al precio al seleccionar una opción.
           </div>
         </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );
