@@ -54,22 +54,16 @@ const OptimizedTemplateSelection: React.FC = () => {
     }
     updateComplexity(templateComplexity);
     
-    // Si no se han establecido los factores de complejidad, poner valores por defecto
-    if (!quotationData.analysisType) {
-      updateAnalysisType('standard');
-    }
+    // SIEMPRE establecer los factores de complejidad con valores por defecto o los actuales
+    updateAnalysisType(quotationData.analysisType || 'standard');
+    updateMentionsVolume(quotationData.mentionsVolume || 'medium');
+    updateCountriesCovered(quotationData.countriesCovered || '1');
+    updateClientEngagement(quotationData.clientEngagement || 'medium');
     
-    if (!quotationData.mentionsVolume) {
-      updateMentionsVolume('medium');
-    }
+    // Forzar la visualización de la pestaña "details" al seleccionar una plantilla
+    setSelectedTab('details');
     
-    if (!quotationData.countriesCovered) {
-      updateCountriesCovered('1');
-    }
-    
-    if (!quotationData.clientEngagement) {
-      updateClientEngagement('medium');
-    }
+    console.log(`✅ Seleccionando plantilla: ${template.name}`);
   };
 
   // Obtener color para niveles de complejidad
