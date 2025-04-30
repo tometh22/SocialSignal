@@ -1,20 +1,36 @@
 import { QueryClient } from "@tanstack/react-query";
 
+// Sistema extremo para limitar agresivamente las peticiones y prevenir loops infinitos
+// Creamos un contador de peticiones para detectar y prevenir loops
+const requestCounts = new Map<string, {count: number, timestamp: number}>();
+const RATE_LIMIT_WINDOW = 10000; // 10 segundos
+const RATE_LIMIT_MAX = 3; // Máximo 3 peticiones por endpoint en la ventana de tiempo
+
+// Limpieza periódica del contador (cada 30 segundos)
+setInterval(() => {
+  const now = Date.now();
+  requestCounts.forEach((value, key) => {
+    if (now - value.timestamp > RATE_LIMIT_WINDOW) {
+      requestCounts.delete(key);
+    }
+  });
+}, 30000);
+
 // Crear una instancia de QueryClient para ser usada en toda la aplicación
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos
-      retry: 2,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000), // Backoff exponencial
-      refetchOnMount: true,
-      refetchOnWindowFocus: false, // Desactivamos esto para evitar demasiadas peticiones
-      refetchOnReconnect: false, // Desactivamos esto para evitar demasiadas peticiones
+      staleTime: 1000 * 60 * 10, // 10 minutos - Muy agresivo para evitar refrescos
+      retry: 1, // Solo un reintento
+      retryDelay: 3000, // Delay fijo de 3 segundos
+      refetchOnMount: false, // No refrescar al montar
+      refetchOnWindowFocus: false, // No refrescar al enfocar ventana
+      refetchOnReconnect: false, // No refrescar al reconectar
       refetchInterval: false, // Sin refresco automático
+      refetchIntervalInBackground: false, // Sin refresco en segundo plano
     },
     mutations: {
-      retry: 1,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
+      retry: 0, // Sin reintentos para mutaciones
     },
   },
 });
@@ -88,10 +104,52 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   const url = getAbsoluteUrl(relativeUrl);
   
   try {
-    // 1. Verificar caché en memoria primero
+    // ----- SISTEMA ANTI-BUCLE -----
+    // Verificar y actualizar el contador de peticiones
     const now = Date.now();
-    const cachedResponse = responseCache.get(url);
+    const urlKey = url.replace(/\d+$/, '*'); // Normalización para URLs con IDs
     
+    let requestData = requestCounts.get(urlKey);
+    if (!requestData) {
+      requestData = { count: 0, timestamp: now };
+      requestCounts.set(urlKey, requestData);
+    } else if (now - requestData.timestamp > RATE_LIMIT_WINDOW) {
+      // Si han pasado más de 10 segundos, reiniciar el contador
+      requestData.count = 0;
+      requestData.timestamp = now;
+    }
+    
+    // Incrementar el contador
+    requestData.count++;
+    
+    // Verificar límite de tasa
+    if (requestData.count > RATE_LIMIT_MAX) {
+      console.warn(`Rate limit alcanzado para ${urlKey}. Se omitirá la petición.`);
+      
+      // Buscar en caché primero
+      const cachedResponse = responseCache.get(url);
+      if (cachedResponse) {
+        return cachedResponse.data;
+      }
+      
+      // Si no hay caché, devolvemos un objeto vacío o array según la URL
+      // para evitar errores en la interfaz pero sin hacer peticiones innecesarias
+      if (url.includes('/api/quotations/')) {
+        return {}; // Objeto vacío para detalles
+      } else if (url.includes('/api/quotation-team/')) {
+        return []; // Array vacío para listas
+      } else if (url.includes('/api/clients/')) {
+        return {}; // Objeto vacío para detalles de cliente
+      } else if (url.includes('/api/templates/')) {
+        return {}; // Objeto vacío para detalles de plantilla
+      } else {
+        return [];  // Por defecto, devolver array vacío
+      }
+    }
+    
+    // ----- SISTEMA DE CACHÉ -----
+    // 1. Verificar caché en memoria primero
+    const cachedResponse = responseCache.get(url);
     if (cachedResponse && now - cachedResponse.timestamp < CACHE_LIFETIME) {
       // Si hay caché válida, la usamos inmediatamente
       return cachedResponse.data;
@@ -134,15 +192,7 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
           throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
         }
         
-        // Intentar verificar conectividad general del servidor
-        if (url.includes('/api/') && !url.includes('/api/ping')) {
-          try {
-            await fetch(getAbsoluteUrl('/api/ping'), { method: 'GET', cache: 'no-store' });
-          } catch {
-            // Si el ping también falla, es problema general de conexión
-          }
-        }
-        
+        // No intentamos verificar conectividad para evitar más peticiones
         throw error;
       } finally {
         // Siempre eliminar la petición del mapa cuando termina
@@ -156,10 +206,18 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
     return requestPromise;
   } catch (error) {
     // Como último recurso, si hay un error general, intentar devolver caché expirada si existe
-    const expiredCache = responseCache.get(url);
-    if (expiredCache) {
-      return expiredCache.data;
+    const cachedResponse = responseCache.get(url);
+    if (cachedResponse) {
+      return cachedResponse.data;
     }
-    throw error;
+    
+    // Si no hay caché, devolvemos un objeto vacío o array según la URL
+    if (url.includes('/api/quotations/')) {
+      return {}; // Objeto vacío para detalles
+    } else if (url.includes('/api/quotation-team/')) {
+      return []; // Array vacío para listas
+    } else {
+      return [];  // Por defecto, devolver array vacío
+    }
   }
 };
