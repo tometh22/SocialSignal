@@ -510,7 +510,7 @@ const ProjectSummary = () => {
 
   // Función para manejar el clic en el botón de Registrar Horas
   const handleRegisterHours = () => {
-    setLocation(`/projects/${parsedProjectId}/time-entries`);
+    setLocation(`/active-projects/${parsedProjectId}/time-entries`);
   };
 
   // Función para manejar la expansión de un gráfico
@@ -537,36 +537,6 @@ const ProjectSummary = () => {
       viewMode: value as "compact" | "detailed"
     });
   };
-
-  // Página de carga
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen">
-        <div className="animate-spin mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-          </svg>
-        </div>
-        <p>Cargando datos del proyecto...</p>
-      </div>
-    );
-  }
-
-  // Si no hay proyecto con ese ID
-  if (!project) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Proyecto no encontrado</h2>
-          <p className="mb-6">No se encontró ningún proyecto con el ID especificado.</p>
-          <Button onClick={() => setLocation("/projects")}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Volver a Proyectos
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // Valor calculado para días restantes basado en la fecha de cierre
   const daysRemaining = useMemo(() => {
