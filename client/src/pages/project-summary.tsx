@@ -141,20 +141,20 @@ const ProjectSummary = () => {
     enabled: !!parsedProjectId,
   });
 
-  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery({
+  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
     queryKey: [`/api/time-entries/project/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
-  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery<Role[]>({
     queryKey: ['/api/roles'],
   });
 
-  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery({
+  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
     queryKey: ['/api/personnel'],
   });
 
-  const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery({
+  const { data: costSummary = {}, isLoading: isLoadingCostSummary } = useQuery<CostSummary>({
     queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
     enabled: !!parsedProjectId,
   });
