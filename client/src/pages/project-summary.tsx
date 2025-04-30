@@ -593,79 +593,84 @@ const ProjectSummary = () => {
   const daysRemaining = Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed);
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Breadcrumbs - Navegación */}
-      <Breadcrumb
-        items={[
-          { label: "Inicio", href: "/" },
-          { label: "Proyectos", href: "/projects" },
-          { label: project.quotation?.projectName || "Proyecto" }
-        ]}
-      />
-      
-      {/* Header - Acciones y filtros */}
-      <HeaderActions
-        projectName={project.quotation?.projectName || ""}
-        status={project.status || ""}
-        projectId={project.id}
-        timeFilter={dashboardState.timeFilter}
-        viewMode={dashboardState.viewMode}
-        onTimeFilterChange={handleTimeFilterChange}
-        onViewModeChange={handleViewModeChange}
-        onRegisterHours={handleRegisterHours}
-        onSettingsClick={() => handleOpenHelpDialog('default')}
-        onSaveProjectName={handleSaveProjectName}
-      />
-      
-      {/* KPI Ribbon - Los 3 KPIs críticos */}
-      {dashboardState.showSections.kpi && (
-        <KpiRibbon
-          totalHours={totalHours}
-          billableHours={billableHours}
-          nonBillableHours={nonBillableHours}
-          costData={{
-            actualCost: costSummary?.actualCost || 0,
-            estimatedCost: costSummary?.estimatedCost || 0,
-            percentageUsed: costSummary?.percentageUsed || 0
-          }}
-          timeData={{
-            daysRemaining,
-            daysTotal: projectMetrics.daysTotal,
-            progressPercentage: projectMetrics.progressPercentage
-          }}
-          onHelpClick={handleOpenHelpDialog}
+    <div className="flex flex-col h-screen overflow-hidden">
+      <div className="container mx-auto px-4 py-4 flex-shrink-0">
+        {/* Breadcrumbs - Navegación */}
+        <Breadcrumb
+          items={[
+            { label: "Inicio", href: "/" },
+            { label: "Proyectos", href: "/projects" },
+            { label: project.quotation?.projectName || "Proyecto" }
+          ]}
         />
-      )}
-      
-      {/* Deviation Section - Desviaciones y Riesgos */}
-      {dashboardState.showSections.deviations && (
-        <DeviationSection
-          costVariance={costSummary?.variance || 0}
-          scheduleVariance={scheduleVariance}
-          riskMetrics={riskIndicators}
-          onHelpClick={handleOpenHelpDialog}
-          showRisks={dashboardState.viewMode === "detailed"}
-        />
-      )}
-      
-      {/* Team Section - Equipo asignado */}
-      {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
-        <TeamSection
-          teamMembers={timeByPersonnelData}
-          onHelpClick={handleOpenHelpDialog}
-        />
-      )}
-      
-      {/* Charts Section - Gráficos */}
-      {dashboardState.showSections.charts && (
-        <ChartsSection
-          timeByPersonnelData={timeByPersonnelData}
-          billableDistributionData={billableDistributionData}
-          timeAndCostData={timeAndCostTrendData}
-          onChartExpand={handleExpandChart}
+        
+        {/* Header - Acciones y filtros */}
+        <HeaderActions
+          projectName={project.quotation?.projectName || ""}
+          status={project.status || ""}
+          projectId={project.id}
+          timeFilter={dashboardState.timeFilter}
+          viewMode={dashboardState.viewMode}
+          onTimeFilterChange={handleTimeFilterChange}
+          onViewModeChange={handleViewModeChange}
           onRegisterHours={handleRegisterHours}
+          onSettingsClick={() => handleOpenHelpDialog('default')}
+          onSaveProjectName={handleSaveProjectName}
         />
-      )}
+      </div>
+      
+      {/* Contenedor con scroll vertical */}
+      <div className="container mx-auto px-4 pb-6 flex-grow overflow-y-auto">
+        {/* KPI Ribbon - Los 3 KPIs críticos */}
+        {dashboardState.showSections.kpi && (
+          <KpiRibbon
+            totalHours={totalHours}
+            billableHours={billableHours}
+            nonBillableHours={nonBillableHours}
+            costData={{
+              actualCost: costSummary?.actualCost || 0,
+              estimatedCost: costSummary?.estimatedCost || 0,
+              percentageUsed: costSummary?.percentageUsed || 0
+            }}
+            timeData={{
+              daysRemaining,
+              daysTotal: projectMetrics.daysTotal,
+              progressPercentage: projectMetrics.progressPercentage
+            }}
+            onHelpClick={handleOpenHelpDialog}
+          />
+        )}
+        
+        {/* Deviation Section - Desviaciones y Riesgos */}
+        {dashboardState.showSections.deviations && (
+          <DeviationSection
+            costVariance={costSummary?.variance || 0}
+            scheduleVariance={scheduleVariance}
+            riskMetrics={riskIndicators}
+            onHelpClick={handleOpenHelpDialog}
+            showRisks={dashboardState.viewMode === "detailed"}
+          />
+        )}
+        
+        {/* Team Section - Equipo asignado */}
+        {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
+          <TeamSection
+            teamMembers={timeByPersonnelData}
+            onHelpClick={handleOpenHelpDialog}
+          />
+        )}
+        
+        {/* Charts Section - Gráficos */}
+        {dashboardState.showSections.charts && (
+          <ChartsSection
+            timeByPersonnelData={timeByPersonnelData}
+            billableDistributionData={billableDistributionData}
+            timeAndCostData={timeAndCostTrendData}
+            onChartExpand={handleExpandChart}
+            onRegisterHours={handleRegisterHours}
+          />
+        )}
+      </div>
       
       {/* Modal para gráficos expandidos */}
       <ChartModal
