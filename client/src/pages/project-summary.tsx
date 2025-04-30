@@ -117,7 +117,8 @@ import {
   PolarRadiusAxis, 
   Radar,
   PieChart,
-  LineChart 
+  LineChart,
+  BarChart
 } from 'recharts';
 import { Tooltip as RechartsTooltip } from 'recharts';
 import { apiRequest } from "@/lib/queryClient";
