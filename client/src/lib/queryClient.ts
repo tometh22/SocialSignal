@@ -54,9 +54,20 @@ export const apiRequest = async (
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   const url = queryKey[0];
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+  
   try {
     console.log(`Fetching data from: ${url}`);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       console.error(`Error en la petición a ${url}: ${response.status} - ${response.statusText}`);
@@ -66,7 +77,14 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
     const data = await response.json();
     console.log(`Data successfully retrieved from ${url}`);
     return data;
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      console.error(`Request timeout for ${url}`);
+      throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
+    }
+    
     console.error(`Failed to fetch data from ${url}:`, error);
     throw error;
   }

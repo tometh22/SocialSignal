@@ -19,6 +19,9 @@ const OptimizedBasicInfo: React.FC = () => {
   // Consultar lista de clientes
   const { data: clients, isLoading: isLoadingClients } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
+    staleTime: 30000, // 30 segundos
+    retry: 3,
+    refetchOnWindowFocus: true,
   });
 
   // Consultar tipos de proyecto
@@ -38,30 +41,35 @@ const OptimizedBasicInfo: React.FC = () => {
       {/* Cliente */}
       <div className="space-y-3">
         <Label htmlFor="client">Cliente <span className="text-red-500">*</span></Label>
-        <Select
-          value={quotationData.client ? String(quotationData.client.id) : ''}
-          onValueChange={(value) => {
-            const selectedClient = clients?.find(client => client.id === parseInt(value));
-            updateClient(selectedClient || null);
-          }}
-        >
-          <SelectTrigger id="client" className="w-full">
-            <SelectValue placeholder="Seleccionar cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            {isLoadingClients ? (
-              <SelectItem value="loading" disabled>Cargando clientes...</SelectItem>
-            ) : clients && clients.length > 0 ? (
-              clients.map((client) => (
-                <SelectItem key={client.id} value={String(client.id)}>
-                  {client.name}
-                </SelectItem>
-              ))
-            ) : (
-              <SelectItem value="no-clients" disabled>No hay clientes disponibles</SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        {isLoadingClients ? (
+          <div className="py-2 px-4 border rounded-md flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+            <span>Cargando clientes...</span>
+          </div>
+        ) : (
+          <Select
+            value={quotationData.client ? String(quotationData.client.id) : ''}
+            onValueChange={(value) => {
+              const selectedClient = clients?.find(client => client.id === parseInt(value));
+              updateClient(selectedClient || null);
+            }}
+          >
+            <SelectTrigger id="client" className="w-full">
+              <SelectValue placeholder="Seleccionar cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients && clients.length > 0 ? (
+                clients.map((client) => (
+                  <SelectItem key={client.id} value={String(client.id)}>
+                    {client.name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="no-clients" disabled>No hay clientes disponibles</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        )}
         <div className="text-xs text-blue-600 mt-1">
           <a href="/clients/new" target="_blank" className="hover:underline">
             + Crear nuevo cliente
