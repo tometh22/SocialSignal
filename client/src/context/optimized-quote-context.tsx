@@ -749,14 +749,31 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       const quotationId = quotation.id;
       console.log(`ID de cotización creada: ${quotationId}`);
       
-      // Usar el primer ID de personal como default
-      const defaultPersonId = 39;
-      
       // Guardar cada miembro del equipo
       for (const member of quotationData.teamMembers) {
+        // Si no hay personnelId, buscar uno apropiado según el rol
+        let actualPersonnelId = member.personnelId;
+        
+        if (!actualPersonnelId && availablePersonnel && availablePersonnel.length > 0) {
+          // Buscar personal que coincida con el rol
+          const matchingPersonnel = availablePersonnel.filter(p => p.roleId === member.roleId);
+          
+          if (matchingPersonnel.length > 0) {
+            // Elegir uno al azar de los que coinciden con el rol
+            const randomIndex = Math.floor(Math.random() * matchingPersonnel.length);
+            actualPersonnelId = matchingPersonnel[randomIndex].id;
+            console.log(`Asignando personal automáticamente: ${matchingPersonnel[randomIndex].name}`);
+          } else {
+            // Si no hay coincidencia, usar cualquier personal disponible
+            const randomIndex = Math.floor(Math.random() * availablePersonnel.length);
+            actualPersonnelId = availablePersonnel[randomIndex].id;
+            console.log(`No hay personal para el rol ${member.roleId}. Usando: ${availablePersonnel[randomIndex].name}`);
+          }
+        }
+        
         const memberPayload = {
           quotationId: quotationId,
-          personnelId: member.personnelId || defaultPersonId,
+          personnelId: actualPersonnelId || 39, // Usar 39 sólo como última opción
           hours: member.hours,
           rate: member.rate,
           cost: member.hours * member.rate
