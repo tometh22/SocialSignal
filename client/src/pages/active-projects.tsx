@@ -311,7 +311,7 @@ const ActiveProjects: React.FC = () => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setLocation(`/project-summary/${project.id}`)}
+                                      onClick={() => setLocation(`/projects/${project.id}`)}
                                     >
                                       <FileText className="h-4 w-4" />
                                       <span className="sr-only">Ver Detalles</span>
@@ -347,7 +347,7 @@ const ActiveProjects: React.FC = () => {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setLocation(`/project-summary/${project.id}`)}
+                                      onClick={() => setLocation(`/projects/${project.id}`)}
                                     >
                                       <LineChart className="h-4 w-4" />
                                       <span className="sr-only">Estadísticas</span>

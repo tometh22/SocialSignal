@@ -136,7 +136,7 @@ const ProjectSummary = () => {
   });
 
   // Consultas de datos
-  const { data: project, isLoading: isLoadingProject } = useQuery({
+  const { data: project = {}, isLoading: isLoadingProject } = useQuery<ActiveProject>({
     queryKey: [`/api/active-projects/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
@@ -584,13 +584,37 @@ const ProjectSummary = () => {
     return Math.max(0, differenceInDays);
   }, [project]);
 
+  // Estado de carga
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-20 flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-lg text-gray-600">Cargando datos del proyecto...</p>
+      </div>
+    );
+  }
+
+  // Verificar si el proyecto existe
+  if (!project) {
+    return (
+      <div className="container mx-auto py-20 flex flex-col items-center justify-center">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-4">
+          <p className="text-red-700">No se encontró el proyecto solicitado.</p>
+        </div>
+        <Button onClick={() => setLocation('/active-projects')} className="mt-4">
+          Volver a proyectos
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 h-screen overflow-y-auto">
       {/* Breadcrumbs - Navegación */}
       <Breadcrumb
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Proyectos", href: "/projects" },
+          { label: "Proyectos", href: "/active-projects" },
           { label: project.quotation?.projectName || "Proyecto" }
         ]}
       />
