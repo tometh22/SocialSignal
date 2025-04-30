@@ -300,8 +300,9 @@ const ProjectSummary = () => {
       const today = new Date();
       
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      // Calculamos los días transcurridos pero nos aseguramos de no superar los días totales
       const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const validElapsedDays = Math.max(0, elapsedDays);
+      const validElapsedDays = Math.min(totalDays, Math.max(0, elapsedDays));
       
       let progressPercentage = (validElapsedDays / totalDays) * 100;
       progressPercentage = Math.min(progressPercentage, 100);
@@ -570,7 +571,7 @@ const ProjectSummary = () => {
   const daysRemaining = Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed);
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 h-screen overflow-y-auto">
       {/* Breadcrumbs - Navegación */}
       <Breadcrumb
         items={[

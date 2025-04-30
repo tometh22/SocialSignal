@@ -155,9 +155,9 @@ export const KpiRibbon = ({
             <CardContent className="p-6">
               <div className="flex justify-between items-end">
                 <div>
-                  <div className="text-3xl font-bold text-amber-700">{daysRemaining}</div>
+                  <div className="text-3xl font-bold text-amber-700">{isNaN(daysRemaining) ? 0 : daysRemaining}</div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    días de {daysTotal} totales
+                    días de {isNaN(daysTotal) ? 0 : daysTotal} totales
                   </div>
                 </div>
                 <Button

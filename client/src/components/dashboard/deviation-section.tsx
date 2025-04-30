@@ -232,7 +232,12 @@ export const DeviationSection = ({
                           {activeAlerts} alerta{activeAlerts > 1 ? 's' : ''} activa{activeAlerts > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-red-200 text-red-700 hover:bg-red-100">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 text-xs border-red-200 text-red-700 hover:bg-red-100"
+                        onClick={() => onHelpClick('alertsHelp')}
+                      >
                         Ver detalles
                       </Button>
                     </div>
