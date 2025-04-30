@@ -293,16 +293,39 @@ const ProjectSummary = () => {
     }
     
     try {
+      // Asegurarse de que las fechas son objetos Date válidos
       const startDate = new Date(project.startDate);
+      
+      // Si no hay fecha de fin establecida, usar 30 días desde hoy
       const endDate = project.expectedEndDate 
         ? new Date(project.expectedEndDate) 
         : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+      
       const today = new Date();
       
-      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      // Validamos que las fechas sean válidas
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.error("Fechas inválidas en el proyecto", { 
+          startDate: project.startDate, 
+          expectedEndDate: project.expectedEndDate
+        });
+        
+        return {
+          hoursPerDay: 0,
+          progressPercentage: 0,
+          plannedHours: 0,
+          actualHours: totalHours,
+          daysElapsed: 0,
+          daysTotal: 30,  // Valor por defecto si hay fechas inválidas
+        };
+      }
+      
+      // Cálculo de días totales y transcurridos
+      const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
       const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const validElapsedDays = Math.max(0, elapsedDays);
       
+      // Asegurarse de que el porcentaje no exceda el 100%
       let progressPercentage = (validElapsedDays / totalDays) * 100;
       progressPercentage = Math.min(progressPercentage, 100);
       
@@ -325,7 +348,7 @@ const ProjectSummary = () => {
         plannedHours: 0,
         actualHours: totalHours,
         daysElapsed: 0,
-        daysTotal: 0,
+        daysTotal: 30,  // Valor por defecto si hay error
       };
     }
   }, [project, timeEntries, totalHours]);

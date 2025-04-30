@@ -155,9 +155,11 @@ export const KpiRibbon = ({
             <CardContent className="p-6">
               <div className="flex justify-between items-end">
                 <div>
-                  <div className="text-3xl font-bold text-amber-700">{daysRemaining}</div>
+                  <div className="text-3xl font-bold text-amber-700">
+                    {isNaN(daysRemaining) ? 0 : daysRemaining}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    días de {daysTotal} totales
+                    días de {isNaN(daysTotal) ? 0 : daysTotal} totales
                   </div>
                 </div>
                 <Button
@@ -172,12 +174,12 @@ export const KpiRibbon = ({
               </div>
               <div className="mt-4">
                 <div className="text-xs text-muted-foreground mb-1">
-                  {Math.round(progressPercentage)}% completado
+                  {isNaN(progressPercentage) ? 0 : Math.round(progressPercentage)}% completado
                 </div>
                 <div className="h-2 w-full bg-amber-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-amber-500 transition-all duration-500"
-                    style={{ width: `${progressPercentage}%` }}
+                    style={{ width: `${isNaN(progressPercentage) ? 0 : progressPercentage}%` }}
                   ></div>
                 </div>
               </div>
