@@ -5,14 +5,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutos
-      gcTime: 1000 * 60 * 10, // 10 minutos (equivalente a cacheTime en v5)
       retry: 2,
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000), // Backoff exponencial
-      refetchOnMount: "always",
+      refetchOnMount: true,
       refetchOnWindowFocus: false, // Desactivamos esto para evitar demasiadas peticiones
       refetchOnReconnect: false, // Desactivamos esto para evitar demasiadas peticiones
       refetchInterval: false, // Sin refresco automático
-      refetchIntervalInBackground: false,
     },
     mutations: {
       retry: 1,
@@ -81,76 +79,87 @@ const getAbsoluteUrl = (url: string) => {
 const responseCache = new Map<string, {data: any, timestamp: number}>();
 const CACHE_LIFETIME = 30000; // 30 segundos de caché en memoria
 
+// Sistema de bloqueo para evitar múltiples peticiones simultáneas a la misma URL
+const pendingRequests = new Map<string, Promise<any>>();
+
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
+  // Normalizamos la URL para cache coherente
   const relativeUrl = queryKey[0];
   const url = getAbsoluteUrl(relativeUrl);
   
-  // Verificar caché primero
-  const now = Date.now();
-  const cachedResponse = responseCache.get(url);
-  
-  if (cachedResponse && now - cachedResponse.timestamp < CACHE_LIFETIME) {
-    // console.log(`Using cached data for ${url} (Age: ${now - cachedResponse.timestamp}ms)`);
-    return cachedResponse.data;
-  }
-  
-  // Si no hay caché o está expirada, hacer petición
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
-  
   try {
-    console.log(`Fetching data from: ${url}`);
+    // 1. Verificar caché en memoria primero
+    const now = Date.now();
+    const cachedResponse = responseCache.get(url);
     
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Cache-Control': 'max-age=30', // Permitir caché HTTP de 30 segundos
-      },
-      // Asegura que se envíen las cookies y credenciales
-      credentials: 'same-origin'
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.error(`Error en la petición a ${url}: ${response.status} - ${response.statusText}`);
-      throw new Error(`Error en la petición: ${response.status}`);
+    if (cachedResponse && now - cachedResponse.timestamp < CACHE_LIFETIME) {
+      // Si hay caché válida, la usamos inmediatamente
+      return cachedResponse.data;
     }
     
-    const data = await response.json();
-    console.log(`Data successfully retrieved from ${url}`);
-    
-    // Guardar en caché
-    responseCache.set(url, {data, timestamp: now});
-    
-    return data;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    
-    if (error.name === 'AbortError') {
-      console.error(`Request timeout for ${url}`);
-      throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
+    // 2. Verificar si hay una petición pendiente para la misma URL
+    if (pendingRequests.has(url)) {
+      // Si ya hay una petición en curso, esperar su resultado
+      return pendingRequests.get(url);
     }
     
-    // Intento de recuperación para errores de API
-    if (url.includes('/api/') && !url.includes('/api/ping')) {
-      console.error(`Error al cargar datos desde ${url}:`, error);
-      
-      // Verificar conectividad del servidor
+    // 3. No hay caché ni petición pendiente, hacemos la petición
+    const requestPromise = (async () => {
       try {
-        const pingResponse = await fetch(getAbsoluteUrl('/api/ping'), { 
-          method: 'GET',
-          cache: 'no-store' 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
+        
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'Cache-Control': 'max-age=30', // Permitir caché HTTP de 30 segundos
+          },
+          credentials: 'same-origin'
         });
         
-        if (pingResponse.ok) {
-          console.log("Servidor responde a ping, pero falló la solicitud específica");
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Error en la petición: ${response.status}`);
         }
-      } catch (e) {
-        console.error("El servidor no responde. Posible problema de conectividad general");
+        
+        const data = await response.json();
+        
+        // Guardar en caché
+        responseCache.set(url, {data, timestamp: now});
+        
+        return data;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
+        }
+        
+        // Intentar verificar conectividad general del servidor
+        if (url.includes('/api/') && !url.includes('/api/ping')) {
+          try {
+            await fetch(getAbsoluteUrl('/api/ping'), { method: 'GET', cache: 'no-store' });
+          } catch {
+            // Si el ping también falla, es problema general de conexión
+          }
+        }
+        
+        throw error;
+      } finally {
+        // Siempre eliminar la petición del mapa cuando termina
+        pendingRequests.delete(url);
       }
-    }
+    })();
     
+    // Registrar la petición en curso
+    pendingRequests.set(url, requestPromise);
+    
+    return requestPromise;
+  } catch (error) {
+    // Como último recurso, si hay un error general, intentar devolver caché expirada si existe
+    const expiredCache = responseCache.get(url);
+    if (expiredCache) {
+      return expiredCache.data;
+    }
     throw error;
   }
 };
