@@ -23,12 +23,14 @@ const HelpDialog: React.FC<HelpDialogProps> = ({
   content,
 }) => {
   // Procesar el contenido para manejar saltos de línea
-  const formattedContent = content.split("\n").map((line, index) => (
-    <React.Fragment key={index}>
-      {line}
-      <br />
-    </React.Fragment>
-  ));
+  const formattedContent = React.useMemo(() => {
+    return content.split("\n").map((line, index) => (
+      <React.Fragment key={index}>
+        {line}
+        <br />
+      </React.Fragment>
+    ));
+  }, [content]);
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

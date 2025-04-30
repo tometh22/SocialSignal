@@ -571,10 +571,8 @@ const ProjectSummary = () => {
   // Valor calculado para días restantes basado en la fecha de cierre
   const daysRemaining = useMemo(() => {
     if (!project?.expectedEndDate) {
-      console.log("No hay fecha de cierre esperada");
       return 0;
     }
-    console.log("Fecha de cierre esperada:", project.expectedEndDate);
     
     const today = new Date();
     const endDate = new Date(project.expectedEndDate);
