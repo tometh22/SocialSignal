@@ -19,6 +19,11 @@ import {
 import { reinitializeDatabase } from "./reinit-data";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Endpoint de ping para verificar que el servidor responde
+  app.get("/api/ping", (_, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+  
   // Clients routes
   app.get("/api/clients", async (_, res) => {
     const clients = await storage.getClients();
