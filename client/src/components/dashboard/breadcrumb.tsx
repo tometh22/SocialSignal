@@ -11,24 +11,28 @@ export const Breadcrumb = ({ items }: BreadcrumbProps) => {
 
   return (
     <div className="flex items-center text-sm text-muted-foreground mb-4">
-      {items.map((item, index) => (
-        <React.Fragment key={index}>
-          {index === 0 && (
-            <Home className="h-4 w-4 mr-2" />
-          )}
-          {index > 0 && <ChevronRight className="h-4 w-4 mx-2" />}
-          {item.href ? (
-            <button
-              className="hover:text-foreground transition-colors"
-              onClick={() => item.href && setLocation(item.href)}
-            >
-              {item.label}
-            </button>
-          ) : (
-            <span className="text-foreground font-medium">{item.label}</span>
-          )}
-        </React.Fragment>
-      ))}
+      {items.map((item, index) => {
+        const isFirst = index === 0;
+        const isNotFirst = index > 0;
+        const hasHref = !!item.href;
+        
+        return (
+          <React.Fragment key={index}>
+            {isFirst && <Home className="h-4 w-4 mr-2" />}
+            {isNotFirst && <ChevronRight className="h-4 w-4 mx-2" />}
+            {hasHref ? (
+              <button
+                className="hover:text-foreground transition-colors"
+                onClick={() => item.href && setLocation(item.href)}
+              >
+                {item.label}
+              </button>
+            ) : (
+              <span className="text-foreground font-medium">{item.label}</span>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 };
