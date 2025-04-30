@@ -1,133 +1,26 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
-import { 
-  ToggleGroup, 
-  ToggleGroupItem 
-} from "@/components/ui/toggle-group";
-import { KpiCard } from "@/components/project/kpi-card";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-
-// Lucide icons
-import { 
-  ArrowLeft, 
-  Loader2, 
-  AlertTriangle,
-  TrendingDown,
-  TrendingUp,
-  Calendar,
-  CalendarDays,
-  AlertCircle as InfoCircle,
-  BarChart2 as ChartBarIcon,
-  LayoutDashboard,
-  ClipboardList,
-  Sliders,
-  Clock,
-  User, // Cambiado de Users a User para evitar conflictos
-  Edit2,
-  DollarSign,
-  Plus,
-  ExternalLink,
-  Info,
-  PlusCircle,
-  BarChart2,
-  FileText,
-  BarChart3,
-  PieChart as PieChartIcon,
-  LineChart as LineChartIcon,
-  Target,
-  AlertCircle,
-  Settings,
-  Zap,
-  Eye,
-  CheckCircle,
-  Award,
-  Activity,
-  ThumbsUp,
-  ArrowUpDown,
-  Lightbulb,
-  Smile
-} from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { 
-  Bar, 
-  Pie, 
-  Cell, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Legend, 
-  ResponsiveContainer, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis, 
-  Radar,
-  PieChart,
-  LineChart,
-  BarChart
-} from 'recharts';
-import { Tooltip as RechartsTooltip } from 'recharts';
 import { apiRequest } from "@/lib/queryClient";
 import ChartModal from "@/components/project/chart-modal";
-import { formatCurrency } from "@/lib/formatters";
-import { ExpandIcon } from "@/components/ui/icons";
-import AnimatedCard from "@/components/ui/animated-card";
 import HelpDialog from "@/components/project/help-dialog";
 
+// Componentes del dashboard
+import {
+  Breadcrumb,
+  KpiRibbon,
+  DeviationSection,
+  TeamSection,
+  ChartsSection,
+  HeaderActions
+} from "@/components/dashboard";
+
+// Tipos e interfaces
 interface CostSummary {
   estimatedCost: number;
   actualCost: number;
@@ -186,21 +79,11 @@ interface Role {
   hourlyRate: number;
 }
 
-// Estado de visualización
-interface CustomView {
-  showKpi: boolean;
-  showFinances: boolean;
-  showTime: boolean;
-  showRisks: boolean;
-  showCharts: boolean;
-  showTeam: boolean;
-}
-
 // Estado para el modal de gráficos expandidos
 interface ExpandedChartState {
   isOpen: boolean;
   title: string;
-  type: "personnelBar" | "billablePie" | "timeTrend" | null;
+  type: "personnelBar" | "billablePie" | "timeTrend" | "costTimeline" | null;
 }
 
 // Estado para el modal de ayuda
@@ -210,98 +93,113 @@ interface HelpState {
   content: string;
 }
 
-// Componente para mostrar el estado del proyecto
-const StatusBadge = ({ status }: { status?: string }) => {
-  // Si no hay estado, mostrar un estado por defecto
-  if (!status) {
-    return (
-      <Badge className="bg-gray-100 text-gray-700">
-        No definido
-      </Badge>
-    );
-  }
-  
-  // Colores según estado
-  let bgColor = "bg-gray-100";
-  let textColor = "text-gray-700";
-  let displayText = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-  
-  switch (status.toLowerCase()) {
-    case 'active':
-    case 'activo':
-      bgColor = "bg-green-100";
-      textColor = "text-green-700";
-      displayText = "Activo";
-      break;
-    case 'completed':
-    case 'completado':
-      bgColor = "bg-blue-100";
-      textColor = "text-blue-700";
-      displayText = "Completado";
-      break;
-    case 'paused':
-    case 'pausado':
-      bgColor = "bg-amber-100";
-      textColor = "text-amber-700";
-      displayText = "Pausado";
-      break;
-    case 'cancelled':
-    case 'cancelado':
-      bgColor = "bg-red-100";
-      textColor = "text-red-700";
-      displayText = "Cancelado";
-      break;
-    case 'pending':
-    case 'pendiente':
-      bgColor = "bg-purple-100";
-      textColor = "text-purple-700";
-      displayText = "Pendiente";
-      break;
-  }
-  
-  return (
-    <Badge className={`${bgColor} ${textColor}`}>
-      {displayText}
-    </Badge>
-  );
-};
+// Estado principal del dashboard
+interface DashboardState {
+  timeFilter: string;
+  viewMode: "compact" | "detailed";
+  showSections: {
+    kpi: boolean;
+    deviations: boolean;
+    team: boolean;
+    charts: boolean;
+  };
+}
 
 const ProjectSummary = () => {
   const { projectId } = useParams();
   const parsedProjectId = projectId ? parseInt(projectId) : null;
   const [, setLocation] = useLocation();
 
-  // Estados
-  const [timeFilter, setTimeFilter] = useState("all");
-  const [chartType, setChartType] = useState("bar");
-  const [editing, setEditing] = useState(false);
-  const [editedName, setEditedName] = useState("");
-  const [customView, setCustomView] = useState<CustomView>({
-    showKpi: true,  // Mostramos las KPIs en el ribbon horizontal
-    showFinances: true,
-    showTime: true,
-    showRisks: true,
-    showCharts: true,
-    showTeam: true,
+  // Estados del dashboard
+  const [dashboardState, setDashboardState] = useState<DashboardState>({
+    timeFilter: "all",
+    viewMode: "detailed",
+    showSections: {
+      kpi: true,
+      deviations: true,
+      team: true,
+      charts: true
+    }
+  });
+
+  // Estados para diálogos y modales
+  const [expandedChart, setExpandedChart] = useState<ExpandedChartState>({
+    isOpen: false,
+    title: "",
+    type: null
   });
   
-  // Referencia para la barra de filtros fija
-  const filterBarRef = useRef<HTMLDivElement>(null);
-  const [isFilterBarSticky, setIsFilterBarSticky] = useState(false);
-  
-  // Efecto para manejar la barra de filtros fija
-  useEffect(() => {
-    const handleScroll = () => {
-      if (filterBarRef.current) {
-        const rect = filterBarRef.current.getBoundingClientRect();
-        setIsFilterBarSticky(rect.top <= 0);
-      }
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-  
+  const [showHelp, setShowHelp] = useState<HelpState>({
+    isOpen: false,
+    title: "",
+    content: ""
+  });
+
+  // Consultas de datos
+  const { data: project, isLoading: isLoadingProject } = useQuery({
+    queryKey: ['/api/active-projects', parsedProjectId],
+    enabled: !!parsedProjectId,
+  });
+
+  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery({
+    queryKey: [`/api/time-entries/project/${parsedProjectId}`],
+    enabled: !!parsedProjectId,
+  });
+
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
+    queryKey: ['/api/roles'],
+  });
+
+  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery({
+    queryKey: ['/api/personnel'],
+  });
+
+  const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery({
+    queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
+    enabled: !!parsedProjectId,
+  });
+
+  // Estado de carga general
+  const isLoading = 
+    isLoadingProject || 
+    isLoadingTimeEntries || 
+    isLoadingRoles || 
+    isLoadingPersonnel || 
+    isLoadingCostSummary;
+
+  // Función para actualizar el nombre del proyecto
+  const handleSaveProjectName = async (newName: string) => {
+    if (!project || !parsedProjectId) return;
+
+    try {
+      // Optimistic update
+      const updatedProject = {
+        ...project,
+        quotation: {
+          ...project.quotation,
+          projectName: newName
+        }
+      };
+      
+      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
+      
+      await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
+        projectName: newName
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      
+    } catch (error) {
+      console.error("Error al actualizar el nombre del proyecto:", error);
+    }
+  };
+
+  // Función para formatear fechas
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "No definida";
+    return format(new Date(dateString), "dd MMM yyyy", { locale: es });
+  };
+
   // Función para manejar el diálogo de ayuda
   const handleOpenHelpDialog = (helpType: string) => {
     let title = "";
@@ -309,28 +207,32 @@ const ProjectSummary = () => {
     
     switch(helpType) {
       case 'hoursHelp':
-        title = "Información sobre Horas";
-        content = "Las horas registradas indican el tiempo total dedicado al proyecto por todo el equipo. Se dividen en horas facturables (que se cobran directamente al cliente) y horas no facturables (trabajo interno).";
+        title = "Información sobre Horas Registradas";
+        content = "Las horas registradas indican el tiempo total dedicado al proyecto por todo el equipo. Se dividen en horas facturables (que se cobran directamente al cliente) y horas no facturables (trabajo interno). Esta métrica es crucial para entender la inversión de tiempo en el proyecto.";
         break;
       case 'costHelp':
-        title = "Información sobre Costos";
-        content = "El costo actual muestra los gastos acumulados en relación al presupuesto. Se calcula multiplicando las horas trabajadas por la tarifa correspondiente a cada rol en el proyecto.";
+        title = "Información sobre Costo vs Presupuesto";
+        content = "Este indicador muestra los gastos acumulados en relación al presupuesto total asignado. Se calcula multiplicando las horas trabajadas por la tarifa correspondiente a cada rol. Un valor cercano al 100% indica que se está agotando el presupuesto disponible.";
+        break;
+      case 'timeHelp':
+        title = "Información sobre Tiempo Restante";
+        content = "Muestra los días que quedan hasta la fecha de finalización estimada. Esta métrica ayuda a planificar los recursos necesarios en el tiempo restante del proyecto y a evaluar si se cumplirá con los plazos establecidos.";
+        break;
+      case 'deviationHelp':
+        title = "Información sobre Desviaciones";
+        content = "Este panel muestra las desviaciones en costos y tiempo respecto a lo planificado. Una desviación positiva en costos indica que se está gastando más de lo presupuestado, mientras que una desviación positiva en tiempo indica que el proyecto podría retrasarse.";
+        break;
+      case 'riskHelp':
+        title = "Información sobre Indicadores de Riesgo";
+        content = "Estos indicadores evalúan la probabilidad de que el proyecto exceda su presupuesto o plazo. Se calculan basándose en las tendencias actuales de gasto y avance, y ayudan a anticipar problemas potenciales que requieran atención.";
         break;
       case 'teamHelp':
-        title = "Información sobre el Equipo";
-        content = "Muestra el personal asignado al proyecto y cómo se distribuye el tiempo entre los distintos roles.";
-        break;
-      case 'progressHelp':
-        title = "Información sobre Progreso";
-        content = "Muestra el avance del proyecto según los días transcurridos desde su inicio en relación a la fecha estimada de finalización. Este indicador ayuda a entender si el proyecto va según lo planeado.";
-        break;
-      case 'varianceHelp':
-        title = "Información sobre Varianza";
-        content = "La varianza de costos indica la diferencia porcentual entre el costo actual y el costo estimado originalmente. Un valor positivo significa que se está gastando más de lo presupuestado.";
+        title = "Información sobre Equipo Asignado";
+        content = "Muestra el personal asignado al proyecto y cómo se distribuye el tiempo entre los distintos roles. Esta información es útil para gestionar la carga de trabajo del equipo y para asegurar que se cuenta con los recursos adecuados.";
         break;
       default:
-        title = "Ayuda";
-        content = "Seleccione un elemento específico para obtener más información.";
+        title = "Configuración del Dashboard";
+        content = "Aquí puedes personalizar qué secciones del dashboard deseas visualizar y ajustar el modo de visualización según tus preferencias.";
     }
     
     setShowHelp({
@@ -339,100 +241,15 @@ const ProjectSummary = () => {
       content
     });
   };
-  const [expandedChart, setExpandedChart] = useState<ExpandedChartState>({
-    isOpen: false,
-    title: "",
-    type: null
-  });
-  const [showHelp, setShowHelp] = useState<HelpState>({
-    isOpen: false,
-    title: "",
-    content: ""
-  });
-  const [activeTab, setActiveTab] = useState("overview");
-
-  // Obtener datos del proyecto
-  const { data: project, isLoading } = useQuery({
-    queryKey: ['/api/active-projects', parsedProjectId],
-    enabled: !!parsedProjectId,
-  });
-
-  // Obtener registros de tiempo del proyecto
-  const { data: timeEntries = [] } = useQuery({
-    queryKey: [`/api/time-entries/project/${parsedProjectId}`],
-    enabled: !!parsedProjectId,
-  });
-
-  // Obtener roles
-  const { data: roles = [] } = useQuery({
-    queryKey: ['/api/roles'],
-  });
-
-  // Obtener personal
-  const { data: personnel = [] } = useQuery({
-    queryKey: ['/api/personnel'],
-  });
-
-  // Obtener resumen de costos
-  const { data: costSummary } = useQuery({
-    queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
-    enabled: !!parsedProjectId,
-  });
-
-  // Formatear fechas
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "No definida";
-    return format(new Date(dateString), "dd MMM yyyy", { locale: es });
-  };
-
-  // Actualizar el nombre del proyecto
-  const handleSaveProjectName = async () => {
-    if (!project || !parsedProjectId || !editedName.trim()) {
-      setEditing(false);
-      return;
-    }
-
-    try {
-      // Optimistic update: actualiza la UI inmediatamente
-      const oldProjectName = project.quotation?.projectName || "";
-      
-      // Actualizar inmediatamente la UI antes de la petición API
-      const updatedProject = {
-        ...project,
-        quotation: {
-          ...project.quotation,
-          projectName: editedName.trim()
-        }
-      };
-      
-      // Usa la función queryClient.setQueryData para actualizar el caché inmediatamente
-      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
-      
-      // Luego realiza la petición API
-      await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
-        projectName: editedName.trim()
-      });
-      
-      // Finalmente, invalida las consultas para asegurarte de que los datos están frescos
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects', parsedProjectId] });
-      
-      setEditing(false);
-    } catch (error) {
-      console.error("Error al actualizar el nombre del proyecto:", error);
-      setEditing(false);
-      // Podría agregarse una alerta o notificación para el usuario
-    }
-  };
 
   // Filtrar entradas de tiempo según el filtro seleccionado
   const filteredTimeEntries = useMemo(() => {
-    if (!timeEntries || !timeEntries.length) return [];
+    if (!timeEntries?.length) return [];
     
     const now = new Date();
     let filterDate = new Date();
     
-    switch (timeFilter) {
+    switch (dashboardState.timeFilter) {
       case "week":
         filterDate.setDate(now.getDate() - 7);
         break;
@@ -447,9 +264,9 @@ const ProjectSummary = () => {
     }
     
     return timeEntries.filter(entry => new Date(entry.date) >= filterDate);
-  }, [timeEntries, timeFilter]);
+  }, [timeEntries, dashboardState.timeFilter]);
 
-  // Calcular totales de horas
+  // Cálculos derivados
   const totalHours = useMemo(() => {
     return filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
   }, [filteredTimeEntries]);
@@ -462,7 +279,7 @@ const ProjectSummary = () => {
     return filteredTimeEntries.filter(entry => !entry.billable).reduce((sum, entry) => sum + entry.hours, 0);
   }, [filteredTimeEntries]);
 
-  // Calcular métricas del proyecto
+  // Métricas del proyecto
   const projectMetrics: ProjectMetrics = useMemo(() => {
     if (!project || !timeEntries) {
       return {
@@ -477,139 +294,191 @@ const ProjectSummary = () => {
     
     try {
       const startDate = new Date(project.startDate);
-      // Si no hay fecha esperada de fin, usar fecha actual + 30 días como estimación
-      const endDate = project.expectedEndDate ? new Date(project.expectedEndDate) : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+      const endDate = project.expectedEndDate 
+        ? new Date(project.expectedEndDate) 
+        : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
       const today = new Date();
       
-      const daysTotal = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const daysElapsed = Math.max(0, Math.ceil((Math.min(today.getTime(), endDate.getTime()) - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const validElapsedDays = Math.max(0, elapsedDays);
       
-      // Para simplificar, estimamos las horas planificadas proporcionalmente al costo
-      const plannedHours = costSummary?.estimatedCost ? Math.round(costSummary.estimatedCost / 100) : 100; 
+      let progressPercentage = (validElapsedDays / totalDays) * 100;
+      progressPercentage = Math.min(progressPercentage, 100);
       
-      const progressPercentage = Math.min(100, Math.max(0, (daysElapsed / daysTotal) * 100));
-      const hoursPerDay = daysElapsed > 0 ? totalHours / daysElapsed : 0;
+      const plannedHours = totalDays * 8;
+      const hoursPerDay = validElapsedDays > 0 ? totalHours / validElapsedDays : 0;
       
       return {
-        hoursPerDay: isNaN(hoursPerDay) ? 0 : hoursPerDay,
-        progressPercentage: isNaN(progressPercentage) ? 0 : progressPercentage,
+        hoursPerDay,
+        progressPercentage,
         plannedHours,
         actualHours: totalHours,
-        daysElapsed: isNaN(daysElapsed) ? 0 : daysElapsed,
-        daysTotal: isNaN(daysTotal) ? 30 : daysTotal,
+        daysElapsed: validElapsedDays,
+        daysTotal: totalDays,
       };
     } catch (error) {
-      console.error("Error al calcular métricas:", error);
+      console.error("Error calculando métricas del proyecto:", error);
       return {
         hoursPerDay: 0,
         progressPercentage: 0,
-        plannedHours: 100,
+        plannedHours: 0,
         actualHours: totalHours,
         daysElapsed: 0,
-        daysTotal: 30,
+        daysTotal: 0,
       };
     }
-  }, [project, timeEntries, totalHours, costSummary]);
+  }, [project, timeEntries, totalHours]);
 
-  // Preparar datos para los gráficos
+  // Datos para indicadores de riesgo
+  const riskIndicators = useMemo(() => {
+    if (!costSummary || !projectMetrics) {
+      return {
+        budgetRisk: 0,
+        scheduleRisk: 0,
+        activeAlerts: 0
+      };
+    }
+    
+    // Riesgo de presupuesto (basado en la tendencia actual y la varianza)
+    let budgetRisk = costSummary.percentageUsed > projectMetrics.progressPercentage 
+      ? Math.min(100, (costSummary.percentageUsed / projectMetrics.progressPercentage) * 70)
+      : Math.min(70, (costSummary.percentageUsed / 100) * 70);
+    
+    if (costSummary.variance > 10) budgetRisk += 15;
+    else if (costSummary.variance > 5) budgetRisk += 10;
+    
+    // Riesgo de cronograma (basado en el progreso vs tiempo transcurrido)
+    let scheduleRisk = 0;
+    if (projectMetrics.daysElapsed > 0 && projectMetrics.daysTotal > 0) {
+      const idealProgress = (projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100;
+      const progressDifference = idealProgress - projectMetrics.progressPercentage;
+      
+      scheduleRisk = progressDifference > 0 
+        ? Math.min(100, (progressDifference / 20) * 100)
+        : 0;
+    }
+    
+    // Alertas activas
+    let activeAlerts = 0;
+    if (budgetRisk >= 75) activeAlerts++;
+    if (scheduleRisk >= 75) activeAlerts++;
+    if (costSummary.variance > 10) activeAlerts++;
+    
+    return {
+      budgetRisk: Math.round(budgetRisk),
+      scheduleRisk: Math.round(scheduleRisk),
+      activeAlerts
+    };
+  }, [costSummary, projectMetrics]);
+
+  // Datos para gráficos
   const timeByPersonnelData = useMemo(() => {
-    if (!filteredTimeEntries.length || !personnel.length || !roles.length) return [];
+    if (!filteredTimeEntries.length || !personnel.length) return [];
     
-    const personnelSummary: Record<number, { name: string, hours: number, role: string, cost: number }> = {};
-    
+    const timeByPerson: Record<number, number> = {};
     filteredTimeEntries.forEach(entry => {
-      const person = personnel.find(p => p.id === entry.personnelId);
-      if (!person) return;
-      
-      const role = roles.find(r => r.id === person.roleId);
-      if (!role) return;
-      
-      if (!personnelSummary[person.id]) {
-        personnelSummary[person.id] = {
-          name: person.name,
-          hours: 0,
-          role: role.name,
-          cost: 0
-        };
+      if (!timeByPerson[entry.personnelId]) {
+        timeByPerson[entry.personnelId] = 0;
       }
-      
-      personnelSummary[person.id].hours += entry.hours;
-      personnelSummary[person.id].cost += entry.hours * role.hourlyRate;
+      timeByPerson[entry.personnelId] += entry.hours;
     });
     
-    return Object.values(personnelSummary);
+    return Object.keys(timeByPerson).map(personId => {
+      const personInfo = personnel.find(p => p.id === parseInt(personId));
+      let role = "No asignado";
+      
+      if (personInfo && personInfo.roleId) {
+        const roleInfo = roles.find(r => r.id === personInfo.roleId);
+        if (roleInfo) {
+          role = roleInfo.name;
+        }
+      }
+      
+      return {
+        id: parseInt(personId),
+        name: personInfo ? personInfo.name : `Persona ${personId}`,
+        hours: timeByPerson[parseInt(personId)],
+        role
+      };
+    }).sort((a, b) => b.hours - a.hours);
   }, [filteredTimeEntries, personnel, roles]);
 
-  const billabilityData = useMemo(() => {
-    return [
-      { name: 'Facturable', value: billableHours, color: '#4f46e5' },
-      { name: 'No Facturable', value: nonBillableHours, color: '#f97316' }
-    ];
-  }, [billableHours, nonBillableHours]);
-
-  const billableVsNonBillableData = useMemo(() => {
-    return [
-      { name: 'Facturable', value: billableHours },
-      { name: 'No Facturable', value: nonBillableHours }
-    ];
-  }, [billableHours, nonBillableHours]);
-
-  const timeEntriesByDateData = useMemo(() => {
-    if (!filteredTimeEntries.length || !personnel.length || !roles.length) return [];
+  const billableDistributionData = useMemo(() => {
+    if (!filteredTimeEntries.length) return [];
     
-    const dateMap: Record<string, { date: string, hours: number, cost: number }> = {};
+    return [
+      { name: "Facturable", value: billableHours },
+      { name: "No Facturable", value: nonBillableHours }
+    ].filter(item => item.value > 0);
+  }, [billableHours, nonBillableHours]);
+
+  const timeAndCostTrendData = useMemo(() => {
+    if (!timeEntries.length) return [];
+    
+    // Agrupar por semana para tener una vista más clara
+    const entriesByWeek: Record<string, { 
+      date: string, 
+      hours: number, 
+      cost: number,
+      totalHours: number,
+      totalCost: number
+    }> = {};
+    
+    let totalHoursAccumulated = 0;
+    let totalCostAccumulated = 0;
     
     // Ordenar las entradas por fecha
-    const sortedEntries = [...filteredTimeEntries].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+    const sortedEntries = [...timeEntries].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     
     sortedEntries.forEach(entry => {
-      const dateStr = format(new Date(entry.date), "dd/MM/yyyy");
-      const person = personnel.find(p => p.id === entry.personnelId);
-      if (!person) return;
+      const entryDate = new Date(entry.date);
+      const weekStart = new Date(entryDate);
+      weekStart.setDate(entryDate.getDate() - entryDate.getDay());
+      const weekKey = format(weekStart, 'yyyy-MM-dd');
       
-      const role = roles.find(r => r.id === person.roleId);
-      if (!role) return;
+      const personInfo = personnel.find(p => p.id === entry.personnelId);
+      const roleInfo = personInfo?.roleId 
+        ? roles.find(r => r.id === personInfo.roleId) 
+        : null;
+      const hourlyRate = roleInfo?.hourlyRate || 0;
+      const entryCost = entry.hours * hourlyRate;
       
-      if (!dateMap[dateStr]) {
-        dateMap[dateStr] = {
-          date: dateStr,
-          hours: 0,
-          cost: 0
+      totalHoursAccumulated += entry.hours;
+      totalCostAccumulated += entryCost;
+      
+      if (!entriesByWeek[weekKey]) {
+        entriesByWeek[weekKey] = { 
+          date: format(weekStart, 'dd MMM', { locale: es }), 
+          hours: 0, 
+          cost: 0,
+          totalHours: 0,
+          totalCost: 0
         };
       }
       
-      dateMap[dateStr].hours += entry.hours;
-      dateMap[dateStr].cost += entry.hours * role.hourlyRate;
+      entriesByWeek[weekKey].hours += entry.hours;
+      entriesByWeek[weekKey].cost += entryCost;
+      entriesByWeek[weekKey].totalHours = totalHoursAccumulated;
+      entriesByWeek[weekKey].totalCost = totalCostAccumulated;
     });
     
-    return Object.values(dateMap);
-  }, [filteredTimeEntries, personnel, roles]);
+    return Object.values(entriesByWeek);
+  }, [timeEntries, personnel, roles]);
 
-  // Datos para gráfico radar (ejemplo)
-  const radarData = [
-    { subject: 'Cumplimiento', A: 120, B: 110, fullMark: 150 },
-    { subject: 'Calidad', A: 98, B: 130, fullMark: 150 },
-    { subject: 'Eficiencia', A: 86, B: 130, fullMark: 150 },
-    { subject: 'Costo', A: 99, B: 100, fullMark: 150 },
-    { subject: 'Tiempo', A: 85, B: 90, fullMark: 150 },
-    { subject: 'Valor', A: 65, B: 85, fullMark: 150 },
-  ];
+  // Calcular desviación de tiempo
+  const scheduleVariance = useMemo(() => {
+    if (!projectMetrics.daysTotal || !projectMetrics.daysElapsed) return 0;
+    
+    const idealProgress = (projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100;
+    const actualProgress = projectMetrics.progressPercentage;
+    
+    return idealProgress - actualProgress;
+  }, [projectMetrics]);
 
-  // Roles info para el tooltip de ayuda
-  const rolesInfo = useMemo(() => {
-    return roles || [];
-  }, [roles]);
-
-  // Actualizar el nombre cuando cambia el proyecto
-  useEffect(() => {
-    if (project && project.quotation) {
-      setEditedName(project.quotation.projectName || "");
-    }
-  }, [project]);
-
-  // Renderizar el gráfico expandido en el modal
+  // Renderizar gráfico expandido en el modal
   const renderExpandedChart = () => {
     if (!expandedChart.isOpen || !expandedChart.type) return null;
     
@@ -617,214 +486,19 @@ const ProjectSummary = () => {
       case 'personnelBar':
         return (
           <div className="h-[80vh]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={timeByPersonnelData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                barSize={60}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  height={60}
-                  tick={{
-                    fontSize: 14,
-                    dy: 10
-                  }}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  width={80}
-                  tick={{
-                    fontSize: 14
-                  }}
-                />
-                <RechartsTooltip 
-                  formatter={(value, name, props) => {
-                    const data = props.payload;
-                    if (data) {
-                      return [
-                        <div key={`tooltip-${name}`} className="space-y-2">
-                          <p className="text-base mb-1">
-                            <span className="font-medium">Nombre:</span> {data.name}
-                          </p>
-                          <p className="text-base mb-1">
-                            <span className="font-medium">Rol:</span> {data.role}
-                          </p>
-                          <p className="text-base mb-1">
-                            <span className="font-medium">Horas:</span> {data.hours}
-                          </p>
-                          <p className="text-base">
-                            <span className="font-medium">Costo:</span> {formatCurrency(data.cost)}
-                          </p>
-                        </div>
-                      ];
-                    }
-                    return null;
-                  }}
-                  contentStyle={{ 
-                    borderRadius: '8px',
-                    border: '1px solid rgba(0, 0, 0, 0.1)',
-                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
-                    padding: '16px',
-                    fontSize: '14px'
-                  }}
-                />
-                <Legend 
-                  iconType="circle"
-                  wrapperStyle={{
-                    paddingTop: 20,
-                    fontSize: 14
-                  }}
-                />
-                <Bar 
-                  dataKey="hours" 
-                  fill="#4f46e5" 
-                  name="Horas"
-                  radius={[4, 4, 0, 0]}
-                  animationDuration={1500}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {/* Contenido del gráfico expandido */}
           </div>
         );
       case 'billablePie':
         return (
           <div className="h-[80vh]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={billabilityData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={100}
-                  outerRadius={180}
-                  paddingAngle={5}
-                  dataKey="value"
-                  nameKey="name"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: "#555", strokeWidth: 1, strokeDasharray: "3 3" }}
-                  animationDuration={1500}
-                >
-                  {billabilityData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.color} 
-                    />
-                  ))}
-                </Pie>
-                <RechartsTooltip 
-                  formatter={(value, name) => [
-                    `${value.toFixed(1)} horas (${((value / totalHours) * 100).toFixed(1)}%)`, 
-                    name
-                  ]}
-                  contentStyle={{ 
-                    borderRadius: '8px',
-                    border: '1px solid rgba(0, 0, 0, 0.1)',
-                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
-                    padding: '16px',
-                    fontSize: '14px'
-                  }}
-                />
-                <Legend 
-                  iconType="circle"
-                  wrapperStyle={{
-                    paddingTop: 20,
-                    fontSize: 14
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {/* Contenido del gráfico expandido */}
           </div>
         );
-      case 'timeTrend':
+      case 'costTimeline':
         return (
           <div className="h-[80vh]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={timeEntriesByDateData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="date"
-                  axisLine={false}
-                  tickLine={false}
-                  padding={{ left: 30, right: 30 }}
-                  height={60}
-                  tick={{
-                    fontSize: 14,
-                    dy: 10
-                  }}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  yAxisId="left"
-                  width={80}
-                  tick={{
-                    fontSize: 14
-                  }}
-                />
-                <YAxis 
-                  axisLine={false}
-                  tickLine={false}
-                  orientation="right"
-                  yAxisId="right"
-                  width={80}
-                  tick={{
-                    fontSize: 14
-                  }}
-                />
-                <RechartsTooltip 
-                  formatter={(value, name) => {
-                    if (name === "hours") return [`${value} horas`, "Horas"];
-                    if (name === "cost") return [formatCurrency(value as number), "Costo"];
-                    return [value, name];
-                  }}
-                  contentStyle={{ 
-                    borderRadius: '8px',
-                    border: '1px solid rgba(0, 0, 0, 0.1)',
-                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
-                    padding: '10px',
-                    fontSize: '14px'
-                  }}
-                />
-                <Legend 
-                  iconType="circle"
-                  wrapperStyle={{
-                    paddingTop: 20,
-                    fontSize: 14
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="hours"
-                  stroke="#4f46e5"
-                  name="Horas"
-                  strokeWidth={3}
-                  dot={{ r: 6, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
-                  activeDot={{ r: 8, fill: "#4f46e5", strokeWidth: 2, stroke: "#ffffff" }}
-                  yAxisId="left"
-                  animationDuration={1500}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="cost"
-                  stroke="#f59e0b"
-                  name="Costo"
-                  strokeWidth={3}
-                  dot={{ r: 6, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
-                  activeDot={{ r: 8, fill: "#f59e0b", strokeWidth: 2, stroke: "#ffffff" }}
-                  yAxisId="right"
-                  animationDuration={1500}
-                  animationBegin={300}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {/* Contenido del gráfico expandido */}
           </div>
         );
       default:
@@ -832,30 +506,146 @@ const ProjectSummary = () => {
     }
   };
 
-  if (!projectId) {
+  // Función para manejar el clic en el botón de Registrar Horas
+  const handleRegisterHours = () => {
+    setLocation(`/projects/${parsedProjectId}/time-entries`);
+  };
+
+  // Función para manejar la expansión de un gráfico
+  const handleExpandChart = (type: string, title: string) => {
+    setExpandedChart({
+      isOpen: true,
+      title,
+      type: type as any
+    });
+  };
+
+  // Función para actualizar el filtro de tiempo
+  const handleTimeFilterChange = (value: string) => {
+    setDashboardState({
+      ...dashboardState,
+      timeFilter: value
+    });
+  };
+
+  // Función para actualizar el modo de visualización
+  const handleViewModeChange = (value: string) => {
+    setDashboardState({
+      ...dashboardState,
+      viewMode: value as "compact" | "detailed"
+    });
+  };
+
+  // Página de carga
+  if (isLoading) {
     return (
-      <div className="container mx-auto py-6 px-6">
-        <div className="flex justify-center items-center h-[400px]">
-          <Card className="w-[600px]">
-            <CardHeader>
-              <CardTitle>Error</CardTitle>
-              <CardDescription>No se ha especificado un proyecto</CardDescription>
-            </CardHeader>
-            <CardFooter>
-              <Button onClick={() => setLocation("/active-projects")}>
-                Ver Proyectos
-              </Button>
-            </CardFooter>
-          </Card>
+      <div className="flex flex-col items-center justify-center h-screen">
+        <div className="animate-spin mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+          </svg>
+        </div>
+        <p>Cargando datos del proyecto...</p>
+      </div>
+    );
+  }
+
+  // Si no hay proyecto con ese ID
+  if (!project) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Proyecto no encontrado</h2>
+          <p className="mb-6">No se encontró ningún proyecto con el ID especificado.</p>
+          <Button onClick={() => setLocation("/projects")}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Volver a Proyectos
+          </Button>
         </div>
       </div>
     );
   }
 
+  // Valor calculado para días restantes
+  const daysRemaining = Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed);
+
   return (
-    <ScrollArea className="flex-1 h-[calc(100vh-4rem)]">
+    <div className="container mx-auto px-4 py-6">
+      {/* Breadcrumbs - Navegación */}
+      <Breadcrumb
+        items={[
+          { label: "Inicio", href: "/" },
+          { label: "Proyectos", href: "/projects" },
+          { label: project.quotation?.projectName || "Proyecto" }
+        ]}
+      />
+      
+      {/* Header - Acciones y filtros */}
+      <HeaderActions
+        projectName={project.quotation?.projectName || ""}
+        status={project.status || ""}
+        projectId={project.id}
+        timeFilter={dashboardState.timeFilter}
+        viewMode={dashboardState.viewMode}
+        onTimeFilterChange={handleTimeFilterChange}
+        onViewModeChange={handleViewModeChange}
+        onRegisterHours={handleRegisterHours}
+        onSettingsClick={() => handleOpenHelpDialog('default')}
+        onSaveProjectName={handleSaveProjectName}
+      />
+      
+      {/* KPI Ribbon - Los 3 KPIs críticos */}
+      {dashboardState.showSections.kpi && (
+        <KpiRibbon
+          totalHours={totalHours}
+          billableHours={billableHours}
+          nonBillableHours={nonBillableHours}
+          costData={{
+            actualCost: costSummary?.actualCost || 0,
+            estimatedCost: costSummary?.estimatedCost || 0,
+            percentageUsed: costSummary?.percentageUsed || 0
+          }}
+          timeData={{
+            daysRemaining,
+            daysTotal: projectMetrics.daysTotal,
+            progressPercentage: projectMetrics.progressPercentage
+          }}
+          onHelpClick={handleOpenHelpDialog}
+        />
+      )}
+      
+      {/* Deviation Section - Desviaciones y Riesgos */}
+      {dashboardState.showSections.deviations && (
+        <DeviationSection
+          costVariance={costSummary?.variance || 0}
+          scheduleVariance={scheduleVariance}
+          riskMetrics={riskIndicators}
+          onHelpClick={handleOpenHelpDialog}
+          showRisks={dashboardState.viewMode === "detailed"}
+        />
+      )}
+      
+      {/* Team Section - Equipo asignado */}
+      {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
+        <TeamSection
+          teamMembers={timeByPersonnelData}
+          onHelpClick={handleOpenHelpDialog}
+        />
+      )}
+      
+      {/* Charts Section - Gráficos */}
+      {dashboardState.showSections.charts && (
+        <ChartsSection
+          timeByPersonnelData={timeByPersonnelData}
+          billableDistributionData={billableDistributionData}
+          timeAndCostData={timeAndCostTrendData}
+          onChartExpand={handleExpandChart}
+          onRegisterHours={handleRegisterHours}
+        />
+      )}
+      
       {/* Modal para gráficos expandidos */}
-      <ChartModal 
+      <ChartModal
         isOpen={expandedChart.isOpen}
         onClose={() => setExpandedChart({ isOpen: false, title: "", type: null })}
         title={expandedChart.title}
@@ -863,1956 +653,14 @@ const ProjectSummary = () => {
         {renderExpandedChart()}
       </ChartModal>
       
-      {/* Modal de ayuda */}
-      <HelpDialog 
+      {/* Diálogo de ayuda */}
+      <HelpDialog
         isOpen={showHelp.isOpen}
-        onClose={() => setShowHelp({ isOpen: false, title: "", content: "" })}
+        onClose={() => setShowHelp({ ...showHelp, isOpen: false })}
         title={showHelp.title}
         content={showHelp.content}
       />
-      
-      <div className="container mx-auto py-4 px-4 sm:px-6 max-w-[1200px]">
-        {/* Barra de navegación superior */}
-        <div className="mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setLocation("/active-projects")}
-            className="px-2 py-1 h-auto"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Proyectos
-          </Button>
-        </div>
-        
-        {/* Barra de filtros fija */}
-        <div 
-          ref={filterBarRef}
-          className={cn(
-            "bg-background transition-all duration-200 z-20",
-            isFilterBarSticky 
-              ? "fixed top-0 left-0 right-0 shadow-md py-4 px-6" 
-              : "relative mb-6 pb-4 border-b"
-          )}
-        >
-          <div className={cn(
-            "max-w-[1200px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4",
-            isFilterBarSticky ? "container" : ""
-          )}>
-            <div className="flex-1">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  {editing ? (
-                    <Input
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      className="max-w-md"
-                      onBlur={handleSaveProjectName}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveProjectName()}
-                      autoFocus
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{project?.quotation?.projectName || "Proyecto sin nombre"}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditedName(project?.quotation?.projectName || "");
-                          setEditing(true);
-                        }}
-                        className="h-6 w-6"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                </h1>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={project?.status} />
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    {formatCurrency(project?.quotation?.totalAmount || 0)}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <ToggleGroup type="multiple" variant="outline" className="justify-end">
-                <ToggleGroupItem 
-                  value="kpi" 
-                  aria-label="Mostrar KPIs" 
-                  className={cn("text-xs h-8", customView.showKpi ? "bg-primary text-primary-foreground" : "")}
-                  onClick={() => setCustomView(prev => ({ ...prev, showKpi: !prev.showKpi }))}
-                >
-                  <Activity className="h-3.5 w-3.5 mr-1" />
-                  KPIs
-                </ToggleGroupItem>
-                <ToggleGroupItem 
-                  value="finances" 
-                  aria-label="Mostrar finanzas"
-                  className={cn("text-xs h-8", customView.showFinances ? "bg-primary text-primary-foreground" : "")}
-                  onClick={() => setCustomView(prev => ({ ...prev, showFinances: !prev.showFinances }))}
-                >
-                  <DollarSign className="h-3.5 w-3.5 mr-1" />
-                  Finanzas
-                </ToggleGroupItem>
-                <ToggleGroupItem 
-                  value="charts" 
-                  aria-label="Mostrar gráficos"
-                  className={cn("text-xs h-8", customView.showCharts ? "bg-primary text-primary-foreground" : "")}
-                  onClick={() => setCustomView(prev => ({ ...prev, showCharts: !prev.showCharts }))}
-                >
-                  <BarChart2 className="h-3.5 w-3.5 mr-1" />
-                  Gráficos
-                </ToggleGroupItem>
-              </ToggleGroup>
-              
-              <Select
-                value={timeFilter}
-                onValueChange={setTimeFilter}
-              >
-                <SelectTrigger className="h-8 text-xs w-[120px]">
-                  <Calendar className="h-3.5 w-3.5 mr-1" />
-                  <SelectValue placeholder="Periodo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todo el periodo</SelectItem>
-                  <SelectItem value="week">Última semana</SelectItem>
-                  <SelectItem value="month">Último mes</SelectItem>
-                  <SelectItem value="quarter">Último trimestre</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-        
-        {/* KPI Ribbon - Métricas horizontales */}
-        {customView.showKpi && (
-          <div className="mb-8 mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* KPI: Progreso del proyecto */}
-              <KpiCard
-                variant="ribbon"
-                title="Progreso"
-                value={`${Math.round(projectMetrics.progressPercentage)}%`}
-                icon={<Activity className="h-4 w-4" />}
-                color="blue"
-                progress={projectMetrics.progressPercentage}
-                description={`${projectMetrics.daysElapsed} de ${projectMetrics.daysTotal} días`}
-                helpTip="Información sobre el progreso"
-                onHelpClick={() => handleOpenHelpDialog('progressHelp')}
-              />
-              
-              {/* KPI: Horas registradas */}
-              <KpiCard
-                variant="ribbon"
-                title="Horas"
-                value={`${totalHours}`}
-                icon={<Clock className="h-4 w-4" />}
-                color="green"
-                progress={(totalHours / projectMetrics.plannedHours) * 100}
-                description={`${billableHours} facturables / ${nonBillableHours} no fact.`}
-                helpTip="Información sobre horas"
-                onHelpClick={() => handleOpenHelpDialog('hoursHelp')}
-              />
-              
-              {/* KPI: Presupuesto */}
-              <KpiCard
-                variant="ribbon"
-                title="Presupuesto"
-                value={formatCurrency(costSummary?.actualCost || 0)}
-                icon={<DollarSign className="h-4 w-4" />}
-                color={costSummary?.percentageUsed > 90 ? "red" : costSummary?.percentageUsed > 70 ? "amber" : "green"}
-                progress={costSummary?.percentageUsed || 0}
-                description={`${costSummary?.percentageUsed.toFixed(1)}% del total estimado`}
-                helpTip="Información sobre costos"
-                onHelpClick={() => handleOpenHelpDialog('costHelp')}
-              />
-              
-              {/* KPI: Varianza de costos */}
-              <KpiCard
-                variant="ribbon"
-                title="Varianza"
-                value={`${costSummary?.variance.toFixed(1)}%`}
-                icon={costSummary?.variance > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                color={costSummary?.variance > 10 ? "red" : costSummary?.variance > 5 ? "amber" : "green"}
-                description={`${formatCurrency(costSummary?.actualCost - costSummary?.estimatedCost || 0)}`}
-              />
-              
-              {/* KPI: Personal */}
-              <KpiCard
-                variant="ribbon"
-                title="Equipo"
-                value={`${personnel?.length || 0}`}
-                icon={<User className="h-4 w-4" />}
-                color="purple"
-                description="Personas asignadas"
-                helpTip="Información sobre el equipo"
-                onHelpClick={() => handleOpenHelpDialog('teamHelp')}
-              />
-            </div>
-          </div>
-        )}
-        
-        {/* Project Title */}
-        <div className="mb-6">
-          {isLoading ? (
-            <h1 className="text-3xl font-bold mb-1">Cargando...</h1>
-          ) : (
-            <div className="group relative">
-              <div className="flex items-center gap-2">
-                <h1 
-                  className="text-3xl font-bold mb-1 group-hover:bg-primary/5 group-hover:rounded px-2 py-1 cursor-pointer"
-                  onClick={() => setEditing(true)}
-                >
-                  {!editing ? (
-                    <>{project?.quotation?.projectName || "Sin nombre"}</>
-                  ) : (
-                    <input
-                      type="text"
-                      className="bg-transparent border-none outline-none p-0 w-full focus:ring-2 focus:ring-primary rounded"
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      autoFocus
-                      onBlur={handleSaveProjectName}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleSaveProjectName();
-                        } else if (e.key === "Escape") {
-                          setEditing(false);
-                          setEditedName(project?.quotation?.projectName || "");
-                        }
-                      }}
-                    />
-                  )}
-                </h1>
-                {!editing && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => {
-                      setEditing(true);
-                      setEditedName(project?.quotation?.projectName || "");
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                      <path d="m15 5 4 4"></path>
-                    </svg>
-                  </Button>
-                )}
-              </div>
-              {editing && (
-                <div className="absolute top-full left-0 mt-1 flex space-x-2">
-                  <Button 
-                    variant="default" 
-                    size="sm"
-                    onClick={handleSaveProjectName}
-                  >
-                    Guardar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setEditing(false);
-                      setEditedName(project?.quotation?.projectName || "");
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">
-            ID: {projectId} | Última actualización: {format(new Date(), "dd MMM yyyy, HH:mm", { locale: es })}
-          </p>
-        </div>
-        
-        {/* Controls */}
-        <div className="flex justify-between items-center mb-6">
-          <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Todo el periodo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todo el periodo</SelectItem>
-              <SelectItem value="week">Última semana</SelectItem>
-              <SelectItem value="month">Último mes</SelectItem>
-              <SelectItem value="quarter">Último trimestre</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <div className="flex gap-2">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Personalizar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Personaliza tu dashboard</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Selecciona qué componentes deseas mostrar en el resumen del proyecto.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Target className="h-4 w-4 text-primary" />
-                      <span>Métricas principales (KPIs)</span>
-                    </div>
-                    <Switch 
-                      checked={customView.showKpi} 
-                      onCheckedChange={(checked) => 
-                        setCustomView({...customView, showKpi: checked})}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <DollarSign className="h-4 w-4 text-primary" />
-                      <span>Información financiera</span>
-                    </div>
-                    <Switch 
-                      checked={customView.showFinances} 
-                      onCheckedChange={(checked) => 
-                        setCustomView({...customView, showFinances: checked})}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span>Registro de tiempo</span>
-                    </div>
-                    <Switch 
-                      checked={customView.showTime} 
-                      onCheckedChange={(checked) => 
-                        setCustomView({...customView, showTime: checked})}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="h-4 w-4 text-primary" />
-                      <span>Análisis de riesgos</span>
-                    </div>
-                    <Switch 
-                      checked={customView.showRisks} 
-                      onCheckedChange={(checked) => 
-                        setCustomView({...customView, showRisks: checked})}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <span>Gráficos y visualizaciones</span>
-                    </div>
-                    <Switch 
-                      checked={customView.showCharts} 
-                      onCheckedChange={(checked) => 
-                        setCustomView({...customView, showCharts: checked})}
-                    />
-                  </div>
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction>Guardar</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            
-            <Button variant="default" size="sm" onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}>
-              <Clock className="h-4 w-4 mr-2" />
-              Registrar Horas
-            </Button>
-          </div>
-        </div>
-        
-        {isLoading ? (
-          <div className="flex items-center justify-center h-[400px]">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          </div>
-        ) : (
-          <>
-            {/* Barra de filtros y acciones fijas */}
-            <div className="sticky top-20 z-10 bg-white dark:bg-background/60 backdrop-blur-sm pb-4 border-b mb-8">
-              <div className="flex flex-wrap gap-3 items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Select 
-                    value={timeFilter} 
-                    onValueChange={setTimeFilter}
-                  >
-                    <SelectTrigger className="w-[160px] h-9 border-muted">
-                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <SelectValue placeholder="Período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todo el período</SelectItem>
-                      <SelectItem value="week">Última semana</SelectItem>
-                      <SelectItem value="month">Último mes</SelectItem>
-                      <SelectItem value="quarter">Último trimestre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <ToggleGroup type="single" value={activeTab} onValueChange={(val) => val && setActiveTab(val)}>
-                    <ToggleGroupItem value="overview" className="px-3 text-xs">
-                      <LayoutDashboard className="h-4 w-4 mr-1.5" />
-                      <span>KPI</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="financial" className="px-3 text-xs">
-                      <DollarSign className="h-4 w-4 mr-1.5" />
-                      <span>Detallado</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="hours" className="px-3 text-xs">
-                      <BarChart2 className="h-4 w-4 mr-1.5" />
-                      <span>Comparativo</span>
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-9 text-xs">
-                        <Sliders className="mr-1.5 h-4 w-4" />
-                        Personalizar
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Personalizar Panel</DialogTitle>
-                        <DialogDescription>
-                          Configura qué componentes quieres visualizar
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-5">
-                        {/* Opciones de personalización */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="p-1.5 bg-primary/5 rounded-md">
-                              <LayoutDashboard className="h-4 w-4 text-primary" />
-                            </div>
-                            <span>Tarjetas KPI</span>
-                          </div>
-                          <Switch 
-                            checked={customView.showKpi} 
-                            onCheckedChange={(checked) => 
-                              setCustomView({...customView, showKpi: checked})}
-                            className="data-[state=checked]:bg-primary"
-                          />
-                        </div>
-                        <Separator />
-                        {/* Más opciones... */}
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setCustomView({
-                          showKpi: true,
-                          showFinances: true,
-                          showTime: true,
-                          showRisks: true,
-                          showCharts: true,
-                          showTeam: true,
-                        })}>
-                          Restablecer
-                        </Button>
-                        <DialogClose asChild>
-                          <Button>Aplicar</Button>
-                        </DialogClose>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                  
-                  <Button 
-                    className="h-9 gap-1.5" 
-                    onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    <span>Registrar Horas</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            {/* KPI Cards en ribbon horizontal con los 3 indicadores críticos */}
-            {customView.showKpi && (
-              <div className="mb-10">
-                <h3 className="text-lg font-medium mb-4 text-gray-700 flex items-center">
-                  <LayoutDashboard className="h-5 w-5 mr-2 text-primary/70" />
-                  Indicadores Clave de Rendimiento
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="col-span-1">
-                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
-                      <CardHeader className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-background p-4 pb-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900/30">
-                              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <h4 className="font-medium">Horas Registradas</h4>
-                          </div>
-                          <Info 
-                            className="h-4 w-4 text-muted-foreground cursor-help" 
-                            onClick={() => handleOpenHelpDialog('hoursHelp')}
-                          />
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-5 pt-4">
-                        <div className="flex items-baseline mb-2">
-                          <span className="text-3xl font-bold tracking-tight">{totalHours.toFixed(1)}</span>
-                          <span className="text-sm text-muted-foreground ml-1">h</span>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                            <div className="flex h-full">
-                              <div 
-                                className="h-full bg-blue-500"
-                                style={{ width: `${(billableHours / Math.max(totalHours, 1)) * 100}%` }}
-                              ></div>
-                              <div 
-                                className="h-full bg-neutral-400"
-                                style={{ width: `${(nonBillableHours / Math.max(totalHours, 1)) * 100}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-0.5 text-blue-600">
-                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                              <span className="ml-1 font-medium">{billableHours.toFixed(1)}h</span>
-                              <span className="ml-0.5 text-muted-foreground">facturables</span>
-                            </div>
-                            <div className="flex items-center gap-0.5 text-neutral-600">
-                              <span className="w-2 h-2 rounded-full bg-neutral-400"></span>
-                              <span className="ml-1 font-medium">{nonBillableHours.toFixed(1)}h</span>
-                              <span className="ml-0.5 text-muted-foreground">no facturables</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-6">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="w-full justify-center border-blue-200 bg-blue-50/50 hover:bg-blue-100 text-blue-700 hover:text-blue-800"
-                            onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
-                          >
-                            <Plus className="h-3 w-3 mr-1.5" />
-                            Registrar Horas
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  
-                  <div className="col-span-1">
-                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
-                      <CardHeader className={cn(
-                        "p-4 pb-2 bg-gradient-to-r",
-                        (costSummary?.percentageUsed || 0) > 100 
-                          ? "from-red-50 to-white dark:from-red-950/20 dark:to-background" 
-                          : (costSummary?.percentageUsed || 0) > 90 
-                            ? "from-amber-50 to-white dark:from-amber-950/20 dark:to-background" 
-                            : "from-green-50 to-white dark:from-green-950/20 dark:to-background"
-                      )}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "p-2 rounded-md",
-                              (costSummary?.percentageUsed || 0) > 100 
-                                ? "bg-red-100 dark:bg-red-900/30" 
-                                : (costSummary?.percentageUsed || 0) > 90 
-                                  ? "bg-amber-100 dark:bg-amber-900/30" 
-                                  : "bg-green-100 dark:bg-green-900/30"
-                            )}>
-                              <DollarSign className={cn(
-                                "h-5 w-5",
-                                (costSummary?.percentageUsed || 0) > 100 
-                                  ? "text-red-600 dark:text-red-400" 
-                                  : (costSummary?.percentageUsed || 0) > 90 
-                                    ? "text-amber-600 dark:text-amber-400" 
-                                    : "text-green-600 dark:text-green-400"
-                              )} />
-                            </div>
-                            <h4 className="font-medium">Costo vs Presupuesto</h4>
-                          </div>
-                          <Badge 
-                            variant="outline" 
-                            className={`${
-                              (costSummary?.percentageUsed || 0) > 100 ? "bg-red-50 text-red-600 border-red-200" :
-                              (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-50 text-amber-600 border-amber-200" :
-                              "bg-green-50 text-green-600 border-green-200"
-                            }`}
-                          >
-                            {Math.round(costSummary?.percentageUsed || 0)}%
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-5 pt-4">
-                        <div className="flex items-baseline mb-1">
-                          <span className="text-3xl font-bold tracking-tight">{formatCurrency(costSummary?.actualCost || 0, true)}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          de {formatCurrency(costSummary?.estimatedCost || 0, true)} presupuestados
-                        </div>
-                        
-                        <div className="mt-3 mb-4">
-                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full ${
-                                (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
-                                (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
-                                "bg-green-500"
-                              }`}
-                              style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex justify-between items-center mt-4">
-                          <div className="flex items-center text-xs gap-1">
-                            {costSummary && costSummary.variance >= 0 ? (
-                              <div className="flex items-center bg-green-50 text-green-700 px-2 py-1 rounded-md">
-                                <TrendingDown className="h-3.5 w-3.5 mr-1" />
-                                <span>{formatCurrency(costSummary.variance)} ahorrado</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center bg-red-50 text-red-700 px-2 py-1 rounded-md">
-                                <TrendingUp className="h-3.5 w-3.5 mr-1" />
-                                <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} excedido</span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setActiveTab("financial")}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Detalles
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  
-                  <div className="col-span-1">
-                    <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-[240px]">
-                      <CardHeader className="bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-background p-4 pb-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-md bg-amber-100 dark:bg-amber-900/30">
-                              <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            </div>
-                            <h4 className="font-medium">Tiempo Restante</h4>
-                          </div>
-                          <div className="text-xs font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
-                            {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-5 pt-4">
-                        <div className="flex items-baseline mb-1">
-                          <span className="text-3xl font-bold tracking-tight">
-                            {projectMetrics ? Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed) : 0}
-                          </span>
-                          <span className="text-sm text-muted-foreground ml-1">días restantes</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          <CalendarDays className="h-3.5 w-3.5" />
-                          <span>de {projectMetrics?.daysTotal || 0} días totales</span>
-                        </div>
-                        
-                        <div className="mt-3 mb-2">
-                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full bg-amber-500"
-                              style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.min(projectMetrics?.progressPercentage || 0, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col space-y-2 mt-3">
-                          <div className="grid grid-cols-2 text-xs gap-2">
-                            <div className="flex flex-col border border-slate-100 rounded p-1.5">
-                              <span className="text-muted-foreground">Inicio</span>
-                              <span className="font-medium">{formatDate(project?.startDate || "")}</span>
-                            </div>
-                            <div className="flex flex-col border border-slate-100 rounded p-1.5">
-                              <span className="text-muted-foreground">Fin estimado</span>
-                              <span className="font-medium">{formatDate(project?.expectedEndDate || "")}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Tabs de navegación para el contenido */}
-            <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full max-w-md mb-4">
-                <TabsTrigger value="overview" className="flex-1">Vista general</TabsTrigger>
-                <TabsTrigger value="financial" className="flex-1">Finanzas</TabsTrigger>
-                <TabsTrigger value="hours" className="flex-1">Registro de horas</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="pt-4">
-                {/* Información general y estado del proyecto */}
-                {/* Principales métricas del proyecto - Vista estilo dashboard */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  {/* Horas Registradas KPI */}
-                  {customView.showTime && (
-                    <AnimatedCard delay={200}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardContent className="p-6">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-primary font-medium">
-                                <Clock className="h-4 w-4 mr-2" />
-                                <span>Horas Registradas</span>
-                              </div>
-                              <InfoCircle 
-                                className="h-4 w-4 text-muted-foreground cursor-help" 
-                                onClick={() => handleOpenHelpDialog('hoursHelp')}
-                              />
-                            </div>
-                            
-                            <div className="flex items-baseline">
-                              <span className="text-3xl font-bold">{totalHours.toFixed(1)}</span>
-                              <span className="text-xs text-muted-foreground ml-1">h</span>
-                            </div>
-                            
-                            <div className="flex items-center text-xs text-muted-foreground">
-                              <span className="inline-flex items-center mr-2 text-blue-600">
-                                <span className="w-2 h-2 rounded-full bg-blue-600 mr-1"></span>
-                                {billableHours.toFixed(1)} facturables
-                              </span>
-                              <span className="inline-flex items-center text-neutral-500">
-                                <span className="w-2 h-2 rounded-full bg-neutral-400 mr-1"></span>
-                                {nonBillableHours.toFixed(1)} no facturables
-                              </span>
-                            </div>
-                            
-                            <Separator className="my-2" />
-                            
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-muted-foreground">En {timeEntries?.length || 0} registros</span>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-7 px-2"
-                                onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Registrar
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                  
-                  {/* Costo Actual KPI */}
-                  {customView.showFinances && (
-                    <AnimatedCard delay={300}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardContent className="p-6">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-primary font-medium">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                <span>Costo Actual</span>
-                              </div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`${
-                                        (costSummary?.percentageUsed || 0) > 100 ? "bg-red-50 text-red-600 border-red-200" :
-                                        (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-50 text-amber-600 border-amber-200" :
-                                        "bg-green-50 text-green-600 border-green-200"
-                                      }`}
-                                    >
-                                      {Math.round(costSummary?.percentageUsed || 0)}%
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Porcentaje del presupuesto utilizado</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            
-                            <div className="flex items-baseline">
-                              <span className="text-3xl font-bold">{formatCurrency(costSummary?.actualCost || 0, true)}</span>
-                            </div>
-                            
-                            <div className="flex items-center text-xs">
-                              <span className="text-muted-foreground">de {formatCurrency(costSummary?.estimatedCost || 0, true)} presupuestados</span>
-                            </div>
-                            
-                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-                              <div 
-                                className={`h-full rounded-full ${
-                                  (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
-                                  (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
-                                  "bg-primary"
-                                }`}
-                                style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
-                              ></div>
-                            </div>
-                            
-                            <Separator className="my-2" />
-                            
-                            <div className="flex items-center text-xs">
-                              {costSummary && costSummary.variance >= 0 ? (
-                                <div className="flex items-center text-green-600">
-                                  <TrendingDown className="h-3 w-3 mr-1" />
-                                  <span>{formatCurrency(costSummary.variance)} ahorrado</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center text-red-600">
-                                  <TrendingUp className="h-3 w-3 mr-1" />
-                                  <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} excedido</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                  
-                  {/* Personal Asignado KPI */}
-                  {customView.showTeam && (
-                    <AnimatedCard delay={400}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardContent className="p-6">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-primary font-medium">
-                                <User className="h-4 w-4 mr-2" />
-                                <span>Personal Asignado</span>
-                              </div>
-                              <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
-                                {new Set(timeEntries?.map(e => e.personnelId) || []).size}
-                              </Badge>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {Array.from(new Set(timeEntries?.map(e => e.personnelId) || [])).slice(0, 5).map((personnelId, idx) => {
-                                const person = personnel?.find(p => p.id === personnelId);
-                                const role = person ? roles?.find(r => r.id === person.roleId) : null;
-                                return (
-                                  <Badge 
-                                    key={idx} 
-                                    variant="outline" 
-                                    className="bg-blue-50/50 border-blue-100 text-blue-700"
-                                  >
-                                    {person?.name || 'Desconocido'}
-                                  </Badge>
-                                );
-                              })}
-                              {new Set(timeEntries?.map(e => e.personnelId) || []).size > 5 && (
-                                <Badge variant="outline" className="bg-muted">
-                                  +{new Set(timeEntries?.map(e => e.personnelId) || []).size - 5} más
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            {timeEntries && timeEntries.length > 0 && (
-                              <div className="flex flex-col space-y-1 mt-1">
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                  <span>Rol</span>
-                                  <span>Horas</span>
-                                </div>
-                                {Object.entries(
-                                  timeEntries.reduce((acc, entry) => {
-                                    const person = personnel?.find(p => p.id === entry.personnelId);
-                                    const role = person ? roles?.find(r => r.id === person.roleId) : null;
-                                    const roleName = role?.name || 'Sin rol';
-                                    
-                                    if (!acc[roleName]) acc[roleName] = 0;
-                                    acc[roleName] += entry.hours || 0;
-                                    return acc;
-                                  }, {} as Record<string, number>)
-                                )
-                                .sort((a, b) => b[1] - a[1])
-                                .slice(0, 3)
-                                .map(([role, hours], idx) => (
-                                  <div key={idx} className="flex justify-between items-center text-xs">
-                                    <span>{role}</span>
-                                    <span className="font-medium">{hours.toFixed(1)}h</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            <Separator className="my-2" />
-                            
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="text-muted-foreground">
-                                {Math.round((projectMetrics?.hoursPerDay || 0) * 10) / 10} h/día promedio
-                              </span>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-7 px-2"
-                                onClick={() => setExpandedChart({
-                                  isOpen: true,
-                                  title: "Distribución de Horas por Personal",
-                                  type: "personnelBar"
-                                })}
-                              >
-                                <BarChart2 className="h-3 w-3 mr-1" />
-                                Ver detalle
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                  
-                  {/* Tiempo Restante KPI */}
-                  {customView.showTime && (
-                    <AnimatedCard delay={500}>
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardContent className="p-6">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center text-primary font-medium">
-                                <Calendar className="h-4 w-4 mr-2" />
-                                <span>Tiempo Restante</span>
-                              </div>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`${
-                                        isNaN(projectMetrics?.progressPercentage) ? "bg-neutral-50 text-neutral-600 border-neutral-200" :
-                                        projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? 
-                                          "bg-red-50 text-red-600 border-red-200" :
-                                        projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? 
-                                          "bg-green-50 text-green-600 border-green-200" :
-                                          "bg-blue-50 text-blue-600 border-blue-200"
-                                      }`}
-                                    >
-                                      {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Porcentaje de progreso real</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            
-                            <div className="flex items-baseline">
-                              <span className="text-3xl font-bold">{Math.max(0, (projectMetrics?.daysTotal || 0) - (projectMetrics?.daysElapsed || 0))}</span>
-                              <span className="text-xs text-muted-foreground ml-1">días</span>
-                            </div>
-                            
-                            <div className="flex items-center text-xs">
-                              <span className="text-muted-foreground">
-                                {projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días transcurridos
-                              </span>
-                            </div>
-                            
-                            <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-                              {/* Barra de tiempo transcurrido */}
-                              <div 
-                                className="absolute h-full bg-blue-500"
-                                style={{ width: `${Math.min(Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100), 100)}%` }}
-                              ></div>
-                              
-                              {/* Marcador de progreso */}
-                              <div 
-                                className="absolute top-1/2 w-1 h-3 bg-primary -translate-y-1/2 z-10"
-                                style={{ 
-                                  left: `${Math.min(isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0), 100)}%`,
-                                }}
-                              ></div>
-                            </div>
-                            
-                            <Separator className="my-2" />
-                            
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="flex items-center">
-                                {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
-                                  <span className="flex items-center text-red-600">
-                                    <AlertTriangle className="h-3 w-3 mr-1" />
-                                    <span>{Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% retraso</span>
-                                  </span>
-                                ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
-                                  <span className="flex items-center text-green-600">
-                                    <ThumbsUp className="h-3 w-3 mr-1" />
-                                    <span>{Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% adelanto</span>
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center text-blue-600">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    <span>En tiempo</span>
-                                  </span>
-                                )}
-                              </span>
-                              {project?.expectedEndDate && (
-                                <span className="text-muted-foreground">
-                                  Fin: {formatDate(project.expectedEndDate, "short")}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                </div>
-                
-                {/* Sección principal - Monitoreo y Análisis */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-                  {/* Monitoreo de Desviaciones - Panel detallado */}
-                  {customView.showFinances && (
-                    <AnimatedCard delay={600} className="lg:col-span-6">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="pb-3 border-b">
-                          <CardTitle className="text-lg font-medium flex items-center">
-                            <div className="mr-3 p-2 rounded-full bg-primary/10">
-                              <ArrowUpDown className="h-5 w-5 text-primary" />
-                            </div>
-                            Monitoreo de Desviaciones
-                          </CardTitle>
-                          <CardDescription>
-                            Control de desviaciones en costos y tiempo
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Desviación de Costos */}
-                            <div className="p-4 bg-card rounded-lg border">
-                              <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold text-sm flex items-center">
-                                  <DollarSign className="h-4 w-4 mr-1 text-primary" />
-                                  Costos
-                                </h4>
-                                <Badge variant={
-                                  (costSummary?.percentageUsed || 0) > 100 ? "destructive" :
-                                  (costSummary?.percentageUsed || 0) > 90 ? "outline" : "secondary"
-                                } className="font-normal text-xs">
-                                  {Math.round(costSummary?.percentageUsed || 0)}% utilizado
-                                </Badge>
-                              </div>
-                              
-                              <div className="space-y-4 mt-3">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-muted/30 p-2 rounded">
-                                    <span className="text-xs text-muted-foreground block">Estimado</span>
-                                    <span className="font-medium">{formatCurrency(costSummary?.estimatedCost || 0)}</span>
-                                  </div>
-                                  <div className="bg-muted/30 p-2 rounded">
-                                    <span className="text-xs text-muted-foreground block">Actual</span>
-                                    <span className="font-medium">{formatCurrency(costSummary?.actualCost || 0)}</span>
-                                  </div>
-                                </div>
-                                
-                                <div>
-                                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                    <span>0%</span>
-                                    <span>50%</span>
-                                    <span>100%</span>
-                                  </div>
-                                  <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full ${
-                                        (costSummary?.percentageUsed || 0) > 100 ? "bg-red-500" :
-                                        (costSummary?.percentageUsed || 0) > 90 ? "bg-amber-500" :
-                                        "bg-primary"
-                                      }`}
-                                      style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }}
-                                    ></div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center mt-1">
-                                  {costSummary && costSummary.variance >= 0 ? (
-                                    <div className="flex items-center text-green-600 text-sm">
-                                      <TrendingDown className="h-4 w-4 mr-1" />
-                                      <span>{formatCurrency(costSummary.variance)} por debajo del presupuesto</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center text-red-600 text-sm">
-                                      <TrendingUp className="h-4 w-4 mr-1" />
-                                      <span>{formatCurrency(Math.abs(costSummary?.variance || 0))} por encima del presupuesto</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Desviación de Tiempo */}
-                            <div className="p-4 bg-card rounded-lg border">
-                              <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold text-sm flex items-center">
-                                  <Clock className="h-4 w-4 mr-1 text-primary" />
-                                  Tiempo
-                                </h4>
-                                <Badge variant={
-                                  projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 15) ? 
-                                    "destructive" :
-                                  projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 5) ? 
-                                    "outline" : "secondary"
-                                } className="font-normal text-xs">
-                                  {isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}% completado
-                                </Badge>
-                              </div>
-                              
-                              <div className="space-y-4 mt-3">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="bg-muted/30 p-2 rounded">
-                                    <span className="text-xs text-muted-foreground block">Transcurrido</span>
-                                    <span className="font-medium">{projectMetrics?.daysElapsed || 0} de {projectMetrics?.daysTotal || 0} días</span>
-                                  </div>
-                                  <div className="bg-muted/30 p-2 rounded">
-                                    <span className="text-xs text-muted-foreground block">Progreso real</span>
-                                    <span className="font-medium">{isNaN(projectMetrics?.progressPercentage) ? "0" : Math.round(projectMetrics?.progressPercentage || 0)}%</span>
-                                  </div>
-                                </div>
-                                
-                                <div>
-                                  <div className="relative h-2 rounded-full bg-muted/30 mb-1">
-                                    {/* Barra de tiempo transcurrido */}
-                                    <div 
-                                      className="absolute h-full bg-blue-500 rounded-full"
-                                      style={{ width: `${Math.round((projectMetrics?.daysElapsed || 0) / Math.max(1, (projectMetrics?.daysTotal || 1)) * 100)}%` }}
-                                    ></div>
-                                    
-                                    {/* Marcador de progreso */}
-                                    <div 
-                                      className="absolute top-0 w-1 h-4 bg-primary -mt-1 z-10 rounded-full"
-                                      style={{ 
-                                        left: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%`,
-                                        transform: 'translateX(-50%)'
-                                      }}
-                                    ></div>
-                                  </div>
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span className="text-blue-600">Tiempo transcurrido</span>
-                                    <span className="text-primary">Progreso real</span>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center mt-1">
-                                  {projectMetrics && (projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) ? (
-                                    <div className="flex items-center text-red-600 text-sm">
-                                      <AlertTriangle className="h-4 w-4 mr-1" />
-                                      <span>Proyecto retrasado ({Math.round(((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - projectMetrics.progressPercentage)}% de desviación)</span>
-                                    </div>
-                                  ) : projectMetrics && (projectMetrics.progressPercentage > ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) + 10) ? (
-                                    <div className="flex items-center text-green-600 text-sm">
-                                      <ThumbsUp className="h-4 w-4 mr-1" />
-                                      <span>Proyecto adelantado ({Math.round(projectMetrics.progressPercentage - ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100))}% de ventaja)</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center text-blue-600 text-sm">
-                                      <CheckCircle className="h-4 w-4 mr-1" />
-                                      <span>Proyecto alineado con la planificación</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                  
-                  {/* Monitoreo de Riesgos */}
-                  {customView.showFinances && (
-                    <AnimatedCard delay={700} className="lg:col-span-6">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="border-b">
-                          <CardTitle className="text-lg font-medium flex items-center">
-                            <div className="mr-3 p-2 rounded-full bg-primary/10">
-                              <AlertCircle className="h-5 w-5 text-primary" />
-                            </div>
-                            Monitoreo de Riesgos
-                          </CardTitle>
-                          <CardDescription>
-                            Alertas tempranas y factores críticos
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                          <div className="space-y-6">
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Presupuesto</p>
-                              <div className="relative pt-1">
-                                <div className="flex mb-2 items-center justify-between">
-                                  <div>
-                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
-                                      Presupuesto utilizado
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-xs font-semibold inline-block">
-                                      {Math.round(costSummary?.percentageUsed || 0)}%
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
-                                  <div 
-                                    style={{ width: `${Math.min(costSummary?.percentageUsed || 0, 100)}%` }} 
-                                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
-                                      (costSummary?.percentageUsed || 0) > 90 ? "bg-red-500" : "bg-primary"
-                                    }`}
-                                  ></div>
-                                </div>
-                                <div className="flex items-center">
-                                  {(costSummary?.percentageUsed || 0) <= 25 ? (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      <CheckCircle className="h-3 w-3 mr-1" /> Bajo
-                                    </Badge>
-                                  ) : (costSummary?.percentageUsed || 0) <= 90 ? (
-                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                      <AlertCircle className="h-3 w-3 mr-1" /> Medio
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                      <AlertTriangle className="h-3 w-3 mr-1" /> Alto
-                                    </Badge>
-                                  )}
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    Nivel de riesgo presupuestario
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Tiempo</p>
-                              <div className="relative pt-1">
-                                <div className="flex mb-2 items-center justify-between">
-                                  <div>
-                                    <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary bg-primary/10">
-                                      Progreso del proyecto
-                                    </span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-xs font-semibold inline-block">
-                                      {isNaN(projectMetrics?.progressPercentage) ? "0" : Math.round(projectMetrics?.progressPercentage || 0)}%
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-primary/10">
-                                  <div 
-                                    style={{ width: `${isNaN(projectMetrics?.progressPercentage) ? 0 : Math.round(projectMetrics?.progressPercentage || 0)}%` }} 
-                                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
-                                  ></div>
-                                </div>
-                                <div className="flex items-center">
-                                  {projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10 ? (
-                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                      <AlertTriangle className="h-3 w-3 mr-1" /> Alto
-                                    </Badge>
-                                  ) : projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 5 ? (
-                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                      <AlertCircle className="h-3 w-3 mr-1" /> Medio
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                      <CheckCircle className="h-3 w-3 mr-1" /> Bajo
-                                    </Badge>
-                                  )}
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    Nivel de riesgo en cronograma
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                              <h3 className="text-sm font-medium">Alertas activas</h3>
-                              <ul className="space-y-2">
-                                {/* Renderizar todas las alertas basadas en el estado actual*/}
-                                {costSummary && costSummary.percentageUsed > 90 && (
-                                  <li className="flex items-start">
-                                    <AlertTriangle className="h-4 w-4 mr-2 text-red-500 mt-0.5" />
-                                    <div>
-                                      <p className="text-sm">Presupuesto casi agotado ({Math.round(costSummary.percentageUsed)}%)</p>
-                                      <p className="text-xs text-muted-foreground">Se recomienda evaluar si es necesario ampliar el presupuesto.</p>
-                                    </div>
-                                  </li>
-                                )}
-                                
-                                {projectMetrics && projectMetrics.progressPercentage < ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10 && (
-                                  <li className="flex items-start">
-                                    <AlertTriangle className="h-4 w-4 mr-2 text-red-500 mt-0.5" />
-                                    <div>
-                                      <p className="text-sm">Progreso retrasado respecto al tiempo transcurrido</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Tiempo transcurrido: {Math.round((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100)}%, 
-                                        Progreso: {Math.round(projectMetrics.progressPercentage)}%.
-                                      </p>
-                                    </div>
-                                  </li>
-                                )}
-                                
-                                {billableHours < totalHours * 0.7 && totalHours > 0 && (
-                                  <li className="flex items-start">
-                                    <AlertCircle className="h-4 w-4 mr-2 text-amber-500 mt-0.5" />
-                                    <div>
-                                      <p className="text-sm">Alto porcentaje de horas no facturables ({Math.round((nonBillableHours/totalHours)*100)}%)</p>
-                                      <p className="text-xs text-muted-foreground">Considere revisar la distribución de las actividades.</p>
-                                    </div>
-                                  </li>
-                                )}
-                                
-                                {/* Si no hay alertas, mostrar mensaje positivo */}
-                                {(!costSummary || costSummary.percentageUsed <= 90) && 
-                                (!projectMetrics || projectMetrics.progressPercentage >= ((projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100) - 10) &&
-                                (billableHours >= totalHours * 0.7 || totalHours === 0) && (
-                                  <li className="flex items-start">
-                                    <CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5" />
-                                    <div>
-                                      <p className="text-sm">No hay alertas activas</p>
-                                      <p className="text-xs text-muted-foreground">El proyecto está avanzando según lo planificado.</p>
-                                    </div>
-                                  </li>
-                                )}
-                              </ul>
-                            </div>
-
-                            <div className="flex justify-end">
-                              <Button variant="outline" size="sm">
-                                <Eye className="h-4 w-4 mr-2" />
-                                Ver plan de mitigación
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </AnimatedCard>
-                  )}
-                </div>
-
-                {/* Sección de Gráficos y Visualizaciones */}
-                <h2 className="text-xl font-semibold mt-8 mb-4 flex items-center">
-                  <BarChart3 className="h-5 w-5 mr-2" />
-                  Análisis y visualizaciones
-                </h2>
-                
-                {customView.showCharts && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-                    {/* Distribución de Horas por Personal - Ocupa 6 columnas */}
-                    <AnimatedCard delay={700} className="lg:col-span-6">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="border-b">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg font-medium flex items-center">
-                                <BarChart3 className="h-5 w-5 mr-2 text-primary" />
-                                Distribución de Horas por Personal
-                              </CardTitle>
-                              <CardDescription>
-                                Desglose del tiempo registrado por cada persona
-                              </CardDescription>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => setExpandedChart({
-                                isOpen: true,
-                                title: "Distribución de Horas por Personal",
-                                type: "personnelBar"
-                              })}
-                            >
-                              <ExpandIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                          <div className="h-[300px]"> {/* Altura fija para el gráfico */}
-                            {timeByPersonnelData.length === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <Clock className="h-10 w-10 mb-2" />
-                                <p>No hay datos disponibles</p>
-                              </div>
-                            ) : chartType === "bar" ? (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                  data={timeByPersonnelData}
-                                  margin={{ top: 5, right: 30, left: 20, bottom: 40 }}
-                                  barSize={chartType === "bar" ? 30 : 10}
-                                >
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                  <XAxis 
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={70}
-                                    tick={{
-                                      fontSize: 12
-                                    }}
-                                  />
-                                  <YAxis 
-                                    axisLine={false}
-                                    tickLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    formatter={(value, name, props) => {
-                                      const data = props.payload;
-                                      if (data) {
-                                        return [
-                                          <div key={`tooltip-${name}`} className="space-y-1">
-                                            <p className="text-sm mb-1">
-                                              <span className="font-medium">Nombre:</span> {data.name}
-                                            </p>
-                                            <p className="text-sm mb-1">
-                                              <span className="font-medium">Rol:</span> {data.role}
-                                            </p>
-                                            <p className="text-sm mb-1">
-                                              <span className="font-medium">Horas:</span> {data.hours}
-                                            </p>
-                                            <p className="text-sm">
-                                              <span className="font-medium">Costo:</span> {formatCurrency(data.cost)}
-                                            </p>
-                                          </div>
-                                        ];
-                                      }
-                                      return null;
-                                    }}
-                                  />
-                                  <Legend iconType="circle" />
-                                  <Bar 
-                                    dataKey="hours" 
-                                    fill="#4f46e5" 
-                                    name="Horas"
-                                    radius={[4, 4, 0, 0]}
-                                    animationDuration={1500}
-                                  />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            ) : chartType === "line" ? (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart
-                                  data={timeByPersonnelData}
-                                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                                >
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                  <XAxis 
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                  />
-                                  <YAxis 
-                                    axisLine={false}
-                                    tickLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    formatter={(value) => [`${value} horas`, "Horas"]}
-                                    contentStyle={{ 
-                                      borderRadius: '8px',
-                                      border: '1px solid rgba(0, 0, 0, 0.1)',
-                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
-                                    }}
-                                  />
-                                  <Legend />
-                                  <Line 
-                                    type="monotone" 
-                                    dataKey="hours" 
-                                    stroke="#4f46e5" 
-                                    activeDot={{ r: 8 }}
-                                    name="Horas"
-                                  />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            ) : (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <RadarChart 
-                                  cx="50%" 
-                                  cy="50%" 
-                                  outerRadius="80%" 
-                                  data={timeByPersonnelData}
-                                >
-                                  <PolarGrid />
-                                  <PolarAngleAxis dataKey="name" />
-                                  <PolarRadiusAxis />
-                                  <Radar 
-                                    name="Horas" 
-                                    dataKey="hours" 
-                                    stroke="#4f46e5" 
-                                    fill="#4f46e5" 
-                                    fillOpacity={0.6}
-                                  />
-                                  <RechartsTooltip />
-                                  <Legend />
-                                </RadarChart>
-                              </ResponsiveContainer>
-                            )}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-3 pb-3 flex justify-between">
-                          <TooltipProvider>
-                            <div className="flex space-x-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="outline"
-                                    size="sm" 
-                                    onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                                  >
-                                    <PlusCircle className="h-4 w-4 mr-1" />
-                                    Registrar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Registrar horas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setShowHelp({
-                                        isOpen: true,
-                                        title: "Información sobre Roles",
-                                        content: "El costo por hora se calcula según el rol del personal: \n\n" +
-                                          rolesInfo.map(role => `- ${role.name}: ${formatCurrency(role.hourlyRate)}/hora`).join("\n")
-                                      });
-                                    }}
-                                  >
-                                    <HelpCircleIcon className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Ayuda sobre roles</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                          
-                          <TooltipProvider>
-                            <div className="flex space-x-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant={chartType === "bar" ? "default" : "outline"} 
-                                    size="sm"
-                                    onClick={() => setChartType("bar")}
-                                  >
-                                    <BarChart3 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Gráfico de barras</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant={chartType === "line" ? "default" : "outline"} 
-                                    size="sm"
-                                    onClick={() => setChartType("line")}
-                                  >
-                                    <LineChartIcon className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Gráfico de línea</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant={chartType === "radar" ? "default" : "outline"} 
-                                    size="sm"
-                                    onClick={() => setChartType("radar")}
-                                  >
-                                    <Zap className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Gráfico radar</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </CardFooter>
-                      </Card>
-                    </AnimatedCard>
-
-                    {/* Horas Facturables vs No Facturables - Ocupa 6 columnas */}
-                    <AnimatedCard delay={800} className="lg:col-span-6">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="border-b">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg font-medium flex items-center">
-                                <PieChartIcon className="h-5 w-5 mr-2 text-primary" />
-                                Horas Facturables vs No Facturables
-                              </CardTitle>
-                              <CardDescription>
-                                Distribución de horas por tipo de facturación
-                              </CardDescription>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => setExpandedChart({
-                                isOpen: true,
-                                title: "Horas Facturables vs No Facturables",
-                                type: "billablePie"
-                              })}
-                            >
-                              <ExpandIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                          <div className="h-[300px] flex items-center justify-center">
-                            {billableHours + nonBillableHours === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <Clock className="h-10 w-10 mb-2" />
-                                <p>No hay datos disponibles</p>
-                              </div>
-                            ) : (
-                              <div className="w-full h-full relative">
-                                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10 pointer-events-none">
-                                  <p className="text-2xl font-bold">{totalHours.toFixed(1)}</p>
-                                  <p className="text-sm text-muted-foreground">Horas totales</p>
-                                </div>
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <PieChart>
-                                    <Pie
-                                      data={billabilityData}
-                                      cx="50%"
-                                      cy="50%"
-                                      innerRadius={70}
-                                      outerRadius={90}
-                                      paddingAngle={2}
-                                      dataKey="value"
-                                      nameKey="name"
-                                      animationDuration={1500}
-                                    >
-                                      {billabilityData.map((entry, index) => (
-                                        <Cell 
-                                          key={`cell-${index}`} 
-                                          fill={entry.color} 
-                                          stroke={entry.color}
-                                        />
-                                      ))}
-                                    </Pie>
-                                    <RechartsTooltip 
-                                      formatter={(value, name) => [
-                                        `${value.toFixed(1)} horas (${((value / totalHours) * 100).toFixed(1)}%)`, 
-                                        name
-                                      ]}
-                                      contentStyle={{ 
-                                        borderRadius: '8px',
-                                        border: '1px solid rgba(0, 0, 0, 0.1)',
-                                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
-                                      }}
-                                    />
-                                    <Legend 
-                                      verticalAlign="bottom" 
-                                      align="center"
-                                      layout="horizontal"
-                                      iconType="circle"
-                                    />
-                                  </PieChart>
-                                </ResponsiveContainer>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-3 pb-3 flex justify-between">
-                          <TooltipProvider>
-                            <div className="flex space-x-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="outline"
-                                    size="sm" 
-                                    onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                                  >
-                                    <PlusCircle className="h-4 w-4 mr-1" />
-                                    Registrar
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Registrar horas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setShowHelp({
-                                        isOpen: true,
-                                        title: "Horas Facturables vs No Facturables",
-                                        content: "• Las horas facturables son aquellas que se cobran al cliente según lo acordado en el contrato.\n\n" +
-                                          "• Las horas no facturables son trabajo interno que no se cobra al cliente, como reuniones internas, capacitación o trabajo administrativo."
-                                      });
-                                    }}
-                                  >
-                                    <HelpCircleIcon className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>¿Qué significa esto?</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </CardFooter>
-                      </Card>
-                    </AnimatedCard>
-                  </div>
-                )}
-                
-                {/* Sección de gráficos adicionales */}
-                {customView.showCharts && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 mt-6">
-                    {/* Evolución de Tiempo y Costo - Ocupa 8 columnas */}
-                    <AnimatedCard delay={900} className="lg:col-span-8">
-                      <Card className="shadow-sm hover:shadow-md transition-shadow h-full">
-                        <CardHeader className="border-b">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg font-medium flex items-center">
-                                <LineChartIcon className="h-5 w-5 mr-2 text-primary" />
-                                Evolución de Tiempo y Costo
-                              </CardTitle>
-                              <CardDescription>
-                                Progresión temporal de horas y costos del proyecto
-                              </CardDescription>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => setExpandedChart({
-                                isOpen: true,
-                                title: "Evolución de Tiempo y Costo",
-                                type: "timeTrend"
-                              })}
-                            >
-                              <ExpandIcon className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                          <div className="h-[300px]">
-                            {timeEntriesByDateData.length === 0 ? (
-                              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                <Clock className="h-10 w-10 mb-2" />
-                                <p>No hay datos disponibles</p>
-                              </div>
-                            ) : (
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart
-                                  data={timeEntriesByDateData}
-                                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                                >
-                                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                  <XAxis 
-                                    dataKey="date"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{
-                                      fontSize: 11
-                                    }}
-                                  />
-                                  <YAxis 
-                                    yAxisId="left"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{
-                                      fontSize: 11
-                                    }}
-                                  />
-                                  <YAxis 
-                                    yAxisId="right"
-                                    orientation="right"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{
-                                      fontSize: 11
-                                    }}
-                                  />
-                                  <RechartsTooltip 
-                                    formatter={(value, name) => {
-                                      if (name === "hours") return [`${value} horas`, "Horas"];
-                                      if (name === "cost") return [formatCurrency(value as number), "Costo"];
-                                      return [value, name];
-                                    }}
-                                    contentStyle={{ 
-                                      borderRadius: '8px',
-                                      border: '1px solid rgba(0, 0, 0, 0.1)',
-                                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
-                                    }}
-                                  />
-                                  <Legend iconType="circle" />
-                                  <Line
-                                    type="monotone"
-                                    dataKey="hours"
-                                    stroke="#4f46e5"
-                                    strokeWidth={2}
-                                    yAxisId="left"
-                                    name="Horas"
-                                    dot={{ r: 3, fill: "#4f46e5", strokeWidth: 1, stroke: "#ffffff" }}
-                                    activeDot={{ r: 5, fill: "#4f46e5", strokeWidth: 1, stroke: "#ffffff" }}
-                                    animationDuration={1500}
-                                  />
-                                  <Line
-                                    type="monotone"
-                                    dataKey="cost"
-                                    stroke="#f59e0b"
-                                    strokeWidth={2}
-                                    yAxisId="right"
-                                    name="Costo"
-                                    dot={{ r: 3, fill: "#f59e0b", strokeWidth: 1, stroke: "#ffffff" }}
-                                    activeDot={{ r: 5, fill: "#f59e0b", strokeWidth: 1, stroke: "#ffffff" }}
-                                    animationDuration={1500}
-                                    animationBegin={300}
-                                  />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            )}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-3 pb-3 flex justify-start">
-                          <TooltipProvider>
-                            <div className="flex space-x-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="outline"
-                                    size="sm" 
-                                    onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                                  >
-                                    <Clock className="h-4 w-4 mr-1" />
-                                    Ver Registros
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Ver registro de horas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TooltipProvider>
-                        </CardFooter>
-                      </Card>
-                    </AnimatedCard>
-
-                    {/* Comentado el Monitoreo de factores de riesgo duplicado */}
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="financial">
-                <h2 className="text-xl font-bold">Información Financiera Detallada</h2>
-                <p className="text-muted-foreground">Detalles financieros del proyecto, presupuesto, gastos y análisis de costos</p>
-                
-                <div className="bg-muted/30 p-6 rounded-lg text-center mt-6">
-                  <Award className="h-16 w-16 text-primary/40 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Módulo en desarrollo</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    La vista detallada de finanzas estará disponible próximamente. Por favor regresa más tarde.
-                  </p>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="hours">
-                <h2 className="text-xl font-bold">Detalle de Horas Registradas</h2>
-                <p className="text-muted-foreground">Registro detallado de las horas trabajadas por cada miembro del equipo</p>
-                
-                <div className="bg-muted/30 p-6 rounded-lg text-center mt-6">
-                  <Clock className="h-16 w-16 text-primary/40 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Módulo en desarrollo</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    La vista detallada de horas estará disponible próximamente. Por favor regresa más tarde.
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </div>
-    </ScrollArea>
-  );
-};
-
-// Define la interfaz para el componente TeamIcon (renombrado para evitar conflictos)
-const TeamIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-};
-
-// Define la interfaz para el componente HelpCircleIcon
-const HelpCircleIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <path d="M12 17h.01" />
-    </svg>
+    </div>
   );
 };
 
