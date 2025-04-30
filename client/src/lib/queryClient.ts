@@ -5,15 +5,18 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutos
-      retry: 3,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Backoff exponencial
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
+      gcTime: 1000 * 60 * 10, // 10 minutos (equivalente a cacheTime en v5)
+      retry: 2,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000), // Backoff exponencial
+      refetchOnMount: "always",
+      refetchOnWindowFocus: false, // Desactivamos esto para evitar demasiadas peticiones
+      refetchOnReconnect: false, // Desactivamos esto para evitar demasiadas peticiones
+      refetchInterval: false, // Sin refresco automático
+      refetchIntervalInBackground: false,
     },
     mutations: {
-      retry: 2,
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 8000),
+      retry: 1,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 3000),
     },
   },
 });
@@ -74,20 +77,34 @@ const getAbsoluteUrl = (url: string) => {
 };
 
 // Función por defecto para consultas
+// Cache de memoria interna para evitar solicitudes repetidas
+const responseCache = new Map<string, {data: any, timestamp: number}>();
+const CACHE_LIFETIME = 30000; // 30 segundos de caché en memoria
+
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   const relativeUrl = queryKey[0];
   const url = getAbsoluteUrl(relativeUrl);
   
+  // Verificar caché primero
+  const now = Date.now();
+  const cachedResponse = responseCache.get(url);
+  
+  if (cachedResponse && now - cachedResponse.timestamp < CACHE_LIFETIME) {
+    // console.log(`Using cached data for ${url} (Age: ${now - cachedResponse.timestamp}ms)`);
+    return cachedResponse.data;
+  }
+  
+  // Si no hay caché o está expirada, hacer petición
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
   
   try {
     console.log(`Fetching data from: ${url}`);
+    
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Cache-Control': 'max-age=30', // Permitir caché HTTP de 30 segundos
       },
       // Asegura que se envíen las cookies y credenciales
       credentials: 'same-origin'
@@ -103,10 +120,8 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
     const data = await response.json();
     console.log(`Data successfully retrieved from ${url}`);
     
-    // Si estamos solicitando clientes, añadir registro para depuración
-    if (url.includes('/api/clients')) {
-      console.log(`Clientes cargados correctamente: ${data?.length || 0} registros`);
-    }
+    // Guardar en caché
+    responseCache.set(url, {data, timestamp: now});
     
     return data;
   } catch (error: any) {
@@ -117,18 +132,23 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
       throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
     }
     
-    // Si es una solicitud de clientes, añadir más información
-    if (url.includes('/api/clients')) {
-      console.error(`Error al cargar clientes desde ${url}:`, error);
-      // Intentar hacer ping al servidor para ver si está respondiendo en general
+    // Intento de recuperación para errores de API
+    if (url.includes('/api/') && !url.includes('/api/ping')) {
+      console.error(`Error al cargar datos desde ${url}:`, error);
+      
+      // Verificar conectividad del servidor
       try {
-        await fetch(getAbsoluteUrl('/api/ping'), { method: 'GET' });
-        console.log("Servidor responde a ping, pero falló la carga de clientes");
+        const pingResponse = await fetch(getAbsoluteUrl('/api/ping'), { 
+          method: 'GET',
+          cache: 'no-store' 
+        });
+        
+        if (pingResponse.ok) {
+          console.log("Servidor responde a ping, pero falló la solicitud específica");
+        }
       } catch (e) {
-        console.error("El servidor no responde incluso a un simple ping");
+        console.error("El servidor no responde. Posible problema de conectividad general");
       }
-    } else {
-      console.error(`Failed to fetch data from ${url}:`, error);
     }
     
     throw error;
