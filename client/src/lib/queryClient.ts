@@ -79,7 +79,7 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   const url = getAbsoluteUrl(relativeUrl);
   
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
   
   try {
     console.log(`Fetching data from: ${url}`);
@@ -102,6 +102,12 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
     
     const data = await response.json();
     console.log(`Data successfully retrieved from ${url}`);
+    
+    // Si estamos solicitando clientes, añadir registro para depuración
+    if (url.includes('/api/clients')) {
+      console.log(`Clientes cargados correctamente: ${data?.length || 0} registros`);
+    }
+    
     return data;
   } catch (error: any) {
     clearTimeout(timeoutId);
@@ -111,7 +117,20 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
       throw new Error(`La petición a ${url} ha excedido el tiempo de espera`);
     }
     
-    console.error(`Failed to fetch data from ${url}:`, error);
+    // Si es una solicitud de clientes, añadir más información
+    if (url.includes('/api/clients')) {
+      console.error(`Error al cargar clientes desde ${url}:`, error);
+      // Intentar hacer ping al servidor para ver si está respondiendo en general
+      try {
+        await fetch(getAbsoluteUrl('/api/ping'), { method: 'GET' });
+        console.log("Servidor responde a ping, pero falló la carga de clientes");
+      } catch (e) {
+        console.error("El servidor no responde incluso a un simple ping");
+      }
+    } else {
+      console.error(`Failed to fetch data from ${url}:`, error);
+    }
+    
     throw error;
   }
 };

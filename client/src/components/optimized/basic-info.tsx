@@ -18,13 +18,15 @@ const OptimizedBasicInfo: React.FC = () => {
   } = useOptimizedQuote();
 
   // Consultar lista de clientes
-  const { data: clients, isLoading: isLoadingClients } = useQuery<Client[]>({
+  const { data: clients, isLoading: isLoadingClients, isError: isClientsError } = useQuery<Client[]>({
     queryKey: ['/api/clients'],
-    staleTime: 30000, // 30 segundos
+    staleTime: 5000, // 5 segundos
     retry: 3,
-    refetchOnWindowFocus: true,
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000),
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: true,
+    refetchInterval: false,
   });
 
   // Consultar tipos de proyecto
@@ -43,9 +45,19 @@ const OptimizedBasicInfo: React.FC = () => {
   React.useEffect(() => {
     // Forzar carga inicial si es necesario
     if (!clients && !isLoadingClients) {
+      console.log("Forzando carga de clientes...");
       handleRefreshClients();
     }
-  }, [clients, isLoadingClients, handleRefreshClients]);
+    
+    // Si hay error, reintentar automáticamente después de 2 segundos
+    if (isClientsError) {
+      const timer = setTimeout(() => {
+        console.log("Reintentando cargar clientes después de error...");
+        handleRefreshClients();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [clients, isLoadingClients, isClientsError, handleRefreshClients]);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -63,6 +75,22 @@ const OptimizedBasicInfo: React.FC = () => {
           <div className="py-2 px-4 border rounded-md flex items-center space-x-2 text-sm text-muted-foreground">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
             <span>Cargando clientes...</span>
+          </div>
+        ) : isClientsError ? (
+          <div className="py-2 px-4 border border-red-200 bg-red-50 rounded-md flex items-center space-x-2 text-sm text-red-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>Error al cargar clientes. 
+              <button 
+                onClick={handleRefreshClients} 
+                className="underline ml-1 font-medium"
+              >
+                Reintentar
+              </button>
+            </span>
           </div>
         ) : (
           <Select
