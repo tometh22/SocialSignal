@@ -136,25 +136,25 @@ const ProjectSummary = () => {
   });
 
   // Consultas de datos
-  const { data: project = {}, isLoading: isLoadingProject } = useQuery<ActiveProject>({
-    queryKey: [`/api/active-projects/${parsedProjectId}`],
+  const { data: project, isLoading: isLoadingProject } = useQuery({
+    queryKey: ['/api/active-projects', parsedProjectId],
     enabled: !!parsedProjectId,
   });
 
-  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
+  const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery({
     queryKey: [`/api/time-entries/project/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
-  const { data: roles = [], isLoading: isLoadingRoles } = useQuery<Role[]>({
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
     queryKey: ['/api/roles'],
   });
 
-  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
+  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery({
     queryKey: ['/api/personnel'],
   });
 
-  const { data: costSummary = {}, isLoading: isLoadingCostSummary } = useQuery<CostSummary>({
+  const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery({
     queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
     enabled: !!parsedProjectId,
   });
@@ -181,14 +181,13 @@ const ProjectSummary = () => {
         }
       };
       
-      queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
+      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
       
       await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
         projectName: newName
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
       
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
@@ -301,9 +300,8 @@ const ProjectSummary = () => {
       const today = new Date();
       
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      // Calculamos los días transcurridos pero nos aseguramos de no superar los días totales
       const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const validElapsedDays = Math.min(totalDays, Math.max(0, elapsedDays));
+      const validElapsedDays = Math.max(0, elapsedDays);
       
       let progressPercentage = (validElapsedDays / totalDays) * 100;
       progressPercentage = Math.min(progressPercentage, 100);
@@ -510,7 +508,7 @@ const ProjectSummary = () => {
 
   // Función para manejar el clic en el botón de Registrar Horas
   const handleRegisterHours = () => {
-    setLocation(`/active-projects/${parsedProjectId}/time-entries`);
+    setLocation(`/projects/${parsedProjectId}/time-entries`);
   };
 
   // Función para manejar la expansión de un gráfico
@@ -538,53 +536,46 @@ const ProjectSummary = () => {
     });
   };
 
-  // Valor calculado para días restantes basado en la fecha de cierre
-  const daysRemaining = useMemo(() => {
-    if (!project?.expectedEndDate) {
-      return 0;
-    }
-    
-    const today = new Date();
-    const endDate = new Date(project.expectedEndDate);
-    
-    // Calculamos la diferencia en días entre hoy y la fecha de cierre
-    const differenceInTime = endDate.getTime() - today.getTime();
-    const differenceInDays = Math.ceil(differenceInTime / (1000 * 3600 * 24));
-    
-    return Math.max(0, differenceInDays);
-  }, [project]);
-
-  // Estado de carga
+  // Página de carga
   if (isLoading) {
     return (
-      <div className="container mx-auto py-20 flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-lg text-gray-600">Cargando datos del proyecto...</p>
+      <div className="flex flex-col items-center justify-center h-screen">
+        <div className="animate-spin mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+          </svg>
+        </div>
+        <p>Cargando datos del proyecto...</p>
       </div>
     );
   }
 
-  // Verificar si el proyecto existe
+  // Si no hay proyecto con ese ID
   if (!project) {
     return (
-      <div className="container mx-auto py-20 flex flex-col items-center justify-center">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-4">
-          <p className="text-red-700">No se encontró el proyecto solicitado.</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Proyecto no encontrado</h2>
+          <p className="mb-6">No se encontró ningún proyecto con el ID especificado.</p>
+          <Button onClick={() => setLocation("/projects")}>
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Volver a Proyectos
+          </Button>
         </div>
-        <Button onClick={() => setLocation('/active-projects')} className="mt-4">
-          Volver a proyectos
-        </Button>
       </div>
     );
   }
 
+  // Valor calculado para días restantes
+  const daysRemaining = Math.max(0, projectMetrics.daysTotal - projectMetrics.daysElapsed);
+
   return (
-    <div className="container mx-auto px-4 py-6 h-screen overflow-y-auto">
+    <div className="container mx-auto px-4 py-6">
       {/* Breadcrumbs - Navegación */}
       <Breadcrumb
         items={[
           { label: "Inicio", href: "/" },
-          { label: "Proyectos", href: "/active-projects" },
+          { label: "Proyectos", href: "/projects" },
           { label: project.quotation?.projectName || "Proyecto" }
         ]}
       />

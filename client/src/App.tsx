@@ -47,7 +47,6 @@ function App() {
           <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
           <Route path="/time-entries/project/:projectId" component={TimeEntries} />
           <Route path="/project-summary/:projectId" component={ProjectSummary} />
-          <Route path="/projects/:projectId" component={ProjectSummary} />
           <Route component={NotFound} />
         </Switch>
       </div>

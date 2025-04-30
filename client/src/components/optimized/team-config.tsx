@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Personnel, Role } from '@shared/schema';
-import { AlertCircle, Plus, Trash, UserPlus, Users, RefreshCw } from 'lucide-react';
+import { AlertCircle, Plus, Trash, UserPlus, Users } from 'lucide-react';
 
 const OptimizedTeamConfig: React.FC = () => {
   const {
@@ -274,7 +274,7 @@ const OptimizedTeamConfig: React.FC = () => {
                       <SelectValue placeholder="Seleccionar personal" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">Sin asignar (automático)</SelectItem>
+                      <SelectItem value="0">Sin asignar</SelectItem>
                       {filteredPersonnel?.map(person => (
                         <SelectItem key={person.id} value={String(person.id)}>
                           {person.name}

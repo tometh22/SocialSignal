@@ -14,7 +14,6 @@ import { Check, Search, FileText, BarChart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ComplexityFactorsCard } from './complexity-factors-card';
-import { useToast } from '@/hooks/use-toast';
 
 const OptimizedTemplateSelection: React.FC = () => {
   const {
@@ -30,8 +29,6 @@ const OptimizedTemplateSelection: React.FC = () => {
     complexityAdjustment,
     totalAmount
   } = useOptimizedQuote();
-  
-  const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('list');
@@ -57,16 +54,22 @@ const OptimizedTemplateSelection: React.FC = () => {
     }
     updateComplexity(templateComplexity);
     
-    // SIEMPRE establecer los factores de complejidad con valores por defecto o los actuales
-    updateAnalysisType(quotationData.analysisType || 'standard');
-    updateMentionsVolume(quotationData.mentionsVolume || 'medium');
-    updateCountriesCovered(quotationData.countriesCovered || '1');
-    updateClientEngagement(quotationData.clientEngagement || 'medium');
+    // Si no se han establecido los factores de complejidad, poner valores por defecto
+    if (!quotationData.analysisType) {
+      updateAnalysisType('standard');
+    }
     
-    // Forzar la visualización de la pestaña "details" al seleccionar una plantilla
-    setSelectedTab('details');
+    if (!quotationData.mentionsVolume) {
+      updateMentionsVolume('medium');
+    }
     
-    console.log(`✅ Seleccionando plantilla: ${template.name}`);
+    if (!quotationData.countriesCovered) {
+      updateCountriesCovered('1');
+    }
+    
+    if (!quotationData.clientEngagement) {
+      updateClientEngagement('medium');
+    }
   };
 
   // Obtener color para niveles de complejidad
@@ -681,12 +684,8 @@ const OptimizedTemplateSelection: React.FC = () => {
               // Marcar como personalizado (usar null para representar "Sin plantilla")
               updateTemplate(null);
               
-              // Mostrar un mensaje indicando que se debe ir a la pestaña de detalles
-              toast({
-                title: "Opción personalizada seleccionada",
-                description: "Ahora puedes configurar los detalles y ajustes en la siguiente pestaña.",
-                duration: 3000
-              });
+              // Ir siempre a la pestaña de detalles
+              setTimeout(() => setSelectedTab('details'), 50);
             }}
           >
             <CardHeader className="pb-2">

@@ -65,19 +65,9 @@ const OptimizedQuoteContent: React.FC = () => {
     }
     
     if (currentStep === 2) {
-      // Asegurarse de que los factores de complejidad estén configurados
-      if (!quotationData.analysisType || !quotationData.mentionsVolume || 
-          !quotationData.countriesCovered || !quotationData.clientEngagement || 
-          !quotationData.complexity) {
-        toast({
-          title: "Configuración de complejidad requerida",
-          description: "Por favor, configura todos los factores de complejidad antes de continuar",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // En este paso, ahora usamos la opción "DirectComplexitySelection" que establece template = null
+      // y configura directamente los factores de complejidad, así que debemos aceptar siempre
       
-      // Información de debug
       console.log("Paso 2: Factores de complejidad configurados directamente.");
       console.log("Análisis:", quotationData.analysisType);
       console.log("Menciones:", quotationData.mentionsVolume);
@@ -88,6 +78,7 @@ const OptimizedQuoteContent: React.FC = () => {
       // Asegurémonos de que teamMembers esté inicializado
       quotationData.teamMembers = quotationData.teamMembers || [];
       
+      // Siempre permitir continuar con este nuevo enfoque
       return true;
     }
     
