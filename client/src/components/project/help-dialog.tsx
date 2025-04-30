@@ -22,8 +22,9 @@ const HelpDialog: React.FC<HelpDialogProps> = ({
   title,
   content,
 }) => {
-  // Procesar el contenido para manejar saltos de línea
+  // Procesar el contenido para manejar saltos de línea (si el contenido existe)
   const formattedContent = React.useMemo(() => {
+    if (!content) return null;
     return content.split("\n").map((line, index) => (
       <React.Fragment key={index}>
         {line}
