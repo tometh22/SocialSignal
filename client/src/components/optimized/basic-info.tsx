@@ -27,15 +27,15 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      <div className="bg-blue-600 text-white px-4 py-2 rounded mb-4 flex items-center">
-        <span className="text-sm">Ingresa la información básica para comenzar la cotización</span>
+      <div className="bg-blue-600 text-white px-4 py-2 mb-4">
+        <span>Ingresa la información básica para comenzar la cotización</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4">
         <div>
-          <h4 className="text-sm font-medium mb-2">Selección de Cliente</h4>
-          <div className="mb-4">
-            <Label htmlFor="client" className="text-xs mb-1 block">
+          <h4 className="font-medium mb-2">Selección de Cliente</h4>
+          <div>
+            <Label htmlFor="client">
               Cliente <span className="text-red-500">*</span>
             </Label>
             <Select
@@ -61,9 +61,9 @@ const OptimizedBasicInfo: React.FC = () => {
         </div>
         
         <div>
-          <h4 className="text-sm font-medium mb-2">Datos del Proyecto</h4>
-          <div className="mb-4">
-            <Label htmlFor="project-name" className="text-xs mb-1 block">
+          <h4 className="font-medium mb-2">Datos del Proyecto</h4>
+          <div className="mb-2">
+            <Label htmlFor="project-name">
               Nombre del Proyecto <span className="text-red-500">*</span>
             </Label>
             <Input
@@ -73,8 +73,8 @@ const OptimizedBasicInfo: React.FC = () => {
               onChange={(e) => updateProjectName(e.target.value)}
             />
           </div>
-          <div className="mb-4">
-            <Label htmlFor="project-type" className="text-xs mb-1 block">
+          <div>
+            <Label htmlFor="project-type">
               Tipo de Proyecto
             </Label>
             <Select
@@ -97,9 +97,9 @@ const OptimizedBasicInfo: React.FC = () => {
         </div>
         
         <div>
-          <h4 className="text-sm font-medium mb-2">Duración y Planificación</h4>
-          <div className="mb-4">
-            <Label htmlFor="project-duration" className="text-xs mb-1 block">
+          <h4 className="font-medium mb-2">Duración y Planificación</h4>
+          <div>
+            <Label htmlFor="project-duration">
               Duración Estimada
             </Label>
             <Select
@@ -119,9 +119,9 @@ const OptimizedBasicInfo: React.FC = () => {
         </div>
       </div>
       
-      <div className="mt-4 bg-slate-50 border border-slate-200 p-4 rounded">
-        <p className="font-medium text-sm mb-2">Completa la información requerida para continuar</p>
-        <ul className="text-xs space-y-1 list-disc pl-5">
+      <div className="mt-4 bg-gray-100 border border-gray-200 p-4">
+        <p className="font-medium mb-2">Completa la información requerida para continuar</p>
+        <ul className="text-sm list-disc pl-5">
           <li>El cliente es obligatorio para poder generar la cotización.</li>
           <li>El nombre del proyecto debe ser descriptivo y específico.</li>
           <li>El tipo y duración del proyecto ayudan a calcular costos y plazos.</li>

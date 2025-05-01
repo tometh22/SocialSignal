@@ -133,51 +133,39 @@ const OptimizedQuoteContent: React.FC = () => {
   };
 
   return (
-    <div className="w-full min-h-screen">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-slate-800">Nueva Cotización Optimizada</h1>
-        <p className="text-sm text-slate-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
-      </div>
+    <div>
+      <h1 className="text-xl font-bold">Nueva Cotización Optimizada</h1>
+      <p className="text-sm text-gray-500 mb-4">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
       
-      {/* Indicador de paso actual en formato texto */}
-      <div className="mb-2 text-sm text-blue-600">
-        Paso {currentStep} de 4: {
-          currentStep === 1 ? "Información Básica" :
-          currentStep === 2 ? "Plantilla" :
-          currentStep === 3 ? "Equipo" :
-          "Revisión"
-        }
-      </div>
+      <p className="text-sm text-blue-600 mb-2">Paso {currentStep} de 4: Información Básica</p>
       
-      {/* Pasos */}
-      <div className="grid grid-cols-4 gap-1 mb-5">
+      <div className="grid grid-cols-4 gap-1 mb-4">
         <div 
-          className={`text-center py-2 text-sm ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
           onClick={() => currentStep >= 1 && goToStep(1)}
         >
           1. Información
         </div>
         <div 
-          className={`text-center py-2 text-sm ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
           onClick={() => currentStep >= 2 && goToStep(2)}
         >
           2. Plantilla
         </div>
         <div 
-          className={`text-center py-2 text-sm ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
           onClick={() => currentStep >= 3 && goToStep(3)}
         >
           3. Equipo
         </div>
         <div 
-          className={`text-center py-2 text-sm ${currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
           onClick={() => currentStep >= 4 && goToStep(4)}
         >
           4. Revisión
         </div>
       </div>
       
-      {/* Contenedor principal */}
       <div className="mb-20">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <OptimizedTemplateSelection />}
@@ -185,16 +173,14 @@ const OptimizedQuoteContent: React.FC = () => {
         {currentStep === 4 && <OptimizedFinancialReview />}
       </div>
       
-      {/* Botones de navegación (fijos en la parte inferior) - mantenemos el formato original */}
-      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-slate-200 py-3 px-8 z-50 shadow-md">
-        <div className="flex justify-between w-full">
+      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-gray-200 py-3 px-6 z-10">
+        <div className="flex justify-between">
           <Button
             variant="outline"
             onClick={previousStep}
             disabled={currentStep === 1}
-            className="flex items-center"
           >
-            <ChevronLeft className="mr-1.5 h-4 w-4" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             Anterior
           </Button>
           
@@ -203,27 +189,26 @@ const OptimizedQuoteContent: React.FC = () => {
               variant="outline"
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center"
             >
-              <Save className="mr-1.5 h-4 w-4" />
+              <Save className="mr-1 h-4 w-4" />
               Guardar Borrador
             </Button>
             
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Siguiente
-                <ChevronRight className="ml-1.5 h-4 w-4" />
+                <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             ) : (
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <Check className="mr-1.5 h-4 w-4" />
+                <Check className="mr-1 h-4 w-4" />
                 Finalizar Cotización
               </Button>
             )}
