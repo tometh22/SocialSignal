@@ -146,7 +146,7 @@ export default function Sidebar() {
               <img 
                 src="/images/epicaldigital_logo.jpeg" 
                 alt="Epical Digital" 
-                className="h-10 w-auto rounded"
+                className="h-10 w-auto rounded shadow-md"
               />
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
@@ -161,7 +161,7 @@ export default function Sidebar() {
             {/* General */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Principal
                 </h3>
               </div>
@@ -170,12 +170,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Cotizaciones */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Cotizaciones
                 </h3>
               </div>
@@ -187,7 +187,7 @@ export default function Sidebar() {
             {/* Proyectos */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Proyectos
                 </h3>
               </div>
@@ -196,12 +196,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Datos */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Datos e Informes
                 </h3>
               </div>
@@ -210,12 +210,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Sistema */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Sistema
                 </h3>
               </div>
@@ -227,34 +227,34 @@ export default function Sidebar() {
             {/* Actividad Reciente */}
             <div className="mt-6">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Actividad Reciente
                 </h3>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="flex items-center text-sm text-slate-600 mb-2">
-                  <Activity className="h-4 w-4 mr-2 text-primary" />
+              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                <div className="flex items-center text-sm text-slate-300 mb-2">
+                  <Activity className="h-4 w-4 mr-2 text-blue-400" />
                   <span>2 cotizaciones pendientes</span>
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-400">
                   Última actualización: hace 20 min
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex-shrink-0 p-4 border-t">
+          <div className="flex-shrink-0 p-4 border-t border-slate-700">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-primary flex items-center justify-center text-white font-medium text-sm">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-lg">
                   JS
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-slate-700">Jane Smith</p>
-                <p className="text-xs text-slate-500">Administrador</p>
+                <p className="text-sm font-medium text-slate-200">Jane Smith</p>
+                <p className="text-xs text-slate-400">Administrador</p>
               </div>
-              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8">
+              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 text-slate-400 hover:text-white">
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
@@ -270,7 +270,7 @@ export default function Sidebar() {
               <img 
                 src="/images/epicaldigital_logo.jpeg" 
                 alt="Epical Digital" 
-                className="h-10 w-auto rounded"
+                className="h-10 w-auto rounded shadow-md"
               />
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
@@ -285,7 +285,7 @@ export default function Sidebar() {
             {/* General */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Principal
                 </h3>
               </div>
@@ -294,12 +294,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Cotizaciones */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Cotizaciones
                 </h3>
               </div>
@@ -311,7 +311,7 @@ export default function Sidebar() {
             {/* Proyectos */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Proyectos
                 </h3>
               </div>
@@ -320,12 +320,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Datos */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Datos e Informes
                 </h3>
               </div>
@@ -334,12 +334,12 @@ export default function Sidebar() {
               </nav>
             </div>
             
-            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700 my-4 mx-1"></div>
             
             {/* Sistema */}
             <div className="mb-4">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Sistema
                 </h3>
               </div>
@@ -351,34 +351,34 @@ export default function Sidebar() {
             {/* Actividad Reciente */}
             <div className="mt-6">
               <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Actividad Reciente
                 </h3>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="flex items-center text-sm text-slate-600 mb-2">
-                  <Activity className="h-4 w-4 mr-2 text-primary" />
+              <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+                <div className="flex items-center text-sm text-slate-300 mb-2">
+                  <Activity className="h-4 w-4 mr-2 text-blue-400" />
                   <span>2 cotizaciones pendientes</span>
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-400">
                   Última actualización: hace 20 min
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex-shrink-0 p-4 border-t">
+          <div className="flex-shrink-0 p-4 border-t border-slate-700">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-primary flex items-center justify-center text-white font-medium text-sm">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-lg">
                   JS
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-slate-700">Jane Smith</p>
-                <p className="text-xs text-slate-500">Administrador</p>
+                <p className="text-sm font-medium text-slate-200">Jane Smith</p>
+                <p className="text-xs text-slate-400">Administrador</p>
               </div>
-              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8">
+              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 text-slate-400 hover:text-white">
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
