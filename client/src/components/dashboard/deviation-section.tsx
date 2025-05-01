@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Card,
@@ -19,6 +19,7 @@ import {
   Gauge,
   Timer
 } from 'lucide-react';
+import AlertDetailsDialog from '../project/alert-details-dialog';
 
 interface DeviationSectionProps {
   costVariance: number;
@@ -40,6 +41,73 @@ export const DeviationSection = ({
   showRisks = true
 }: DeviationSectionProps) => {
   const { budgetRisk, scheduleRisk, activeAlerts } = riskMetrics;
+  
+  // Estado para controlar la visibilidad del diálogo de alertas
+  const [showAlertDetails, setShowAlertDetails] = useState(false);
+  
+  // Generamos los detalles de alertas basándonos en las métricas de riesgo
+  const alertDetails = React.useMemo(() => {
+    const alerts = [];
+    
+    // Alerta de riesgo de presupuesto
+    if (budgetRisk >= 75) {
+      alerts.push({
+        type: 'budget',
+        title: 'Riesgo Alto de Sobrecosto',
+        description: 'El proyecto está utilizando recursos económicos a un ritmo más rápido de lo planificado, lo que podría resultar en un sobrecosto significativo.',
+        severity: 'high',
+        value: `${budgetRisk.toFixed(0)}% de probabilidad de exceder el presupuesto`
+      });
+    } else if (budgetRisk >= 50) {
+      alerts.push({
+        type: 'budget',
+        title: 'Riesgo Medio de Sobrecosto',
+        description: 'El consumo de presupuesto está ligeramente por encima de lo esperado para el progreso actual.',
+        severity: 'medium',
+        value: `${budgetRisk.toFixed(0)}% de probabilidad de exceder el presupuesto`
+      });
+    }
+    
+    // Alerta de riesgo de cronograma
+    if (scheduleRisk >= 75) {
+      alerts.push({
+        type: 'schedule',
+        title: 'Alto Riesgo de Retraso',
+        description: 'El progreso actual del proyecto está significativamente detrás de lo planeado. Se recomienda revisar el plan de trabajo.',
+        severity: 'high',
+        value: `${scheduleRisk.toFixed(0)}% de probabilidad de retraso en la entrega`
+      });
+    } else if (scheduleRisk >= 50) {
+      alerts.push({
+        type: 'schedule',
+        title: 'Riesgo Medio de Retraso',
+        description: 'El progreso del proyecto está ligeramente por debajo de lo esperado según el cronograma.',
+        severity: 'medium',
+        value: `${scheduleRisk.toFixed(0)}% de probabilidad de retraso en la entrega`
+      });
+    }
+    
+    // Alerta de varianza de costo
+    if (costVariance > 10) {
+      alerts.push({
+        type: 'variance',
+        title: 'Desviación Significativa de Costos',
+        description: 'El costo actual supera considerablemente el presupuesto planificado. Revisar asignación de recursos y horas facturables.',
+        severity: 'high',
+        value: `+${costVariance.toFixed(1)}% sobre lo presupuestado`
+      });
+    } else if (costVariance > 5) {
+      alerts.push({
+        type: 'variance',
+        title: 'Desviación Moderada de Costos',
+        description: 'El costo actual está por encima del presupuesto planificado, pero aún dentro de límites manejables.',
+        severity: 'medium',
+        value: `+${costVariance.toFixed(1)}% sobre lo presupuestado`
+      });
+    }
+    
+    return alerts;
+  }, [budgetRisk, scheduleRisk, costVariance]);
 
   return (
     <div className="mb-8">
@@ -232,7 +300,12 @@ export const DeviationSection = ({
                           {activeAlerts} alerta{activeAlerts > 1 ? 's' : ''} activa{activeAlerts > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-red-200 text-red-700 hover:bg-red-100">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 text-xs border-red-200 text-red-700 hover:bg-red-100"
+                        onClick={() => setShowAlertDetails(true)}
+                      >
                         Ver detalles
                       </Button>
                     </div>
@@ -243,6 +316,13 @@ export const DeviationSection = ({
           </motion.div>
         )}
       </div>
+      
+      {/* Diálogo de detalles de alertas */}
+      <AlertDetailsDialog 
+        isOpen={showAlertDetails}
+        onClose={() => setShowAlertDetails(false)}
+        alerts={alertDetails}
+      />
     </div>
   );
 };
