@@ -158,8 +158,11 @@ export default function Sidebar() {
           {/* Header with logo and title */}
           <div className="flex items-center h-24 px-6 border-b border-blue-900/20 bg-gradient-to-r from-slate-900 to-slate-900/90">
             <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-lg border border-blue-500/30 text-white font-bold text-xl">
-                ED
+              <div className="relative flex items-center justify-center h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-lg border border-blue-500/30 overflow-hidden">
+                <div className="absolute inset-0 opacity-20 bg-grid-pattern"></div>
+                <div className="relative z-10 flex items-center justify-center w-full h-full">
+                  <span className="text-white font-bold text-2xl select-none tracking-tighter">ED</span>
+                </div>
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
