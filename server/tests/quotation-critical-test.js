@@ -1,6 +1,8 @@
 /**
  * Test unitario para verificar los cálculos de alerta del sistema de cotización
  * 
+ * Para ejecutar este test: node server/tests/quotation-critical-test.js
+ * 
  * Este script simula una cotización en estado crítico para verificar que las
  * alertas y cálculos de riesgo funcionen correctamente.
  */

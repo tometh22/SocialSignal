@@ -21,6 +21,15 @@ import {
 } from 'lucide-react';
 import AlertDetailsDialog from '../project/alert-details-dialog';
 
+// Definición de interfaz compatible con el diálogo de alertas
+interface AlertDetail {
+  type: 'budget' | 'schedule' | 'variance';
+  title: string;
+  description: string;
+  severity: 'high' | 'medium' | 'low';
+  value: string | number;
+}
+
 interface DeviationSectionProps {
   costVariance: number;
   scheduleVariance: number;
@@ -47,7 +56,7 @@ export const DeviationSection = ({
   
   // Generamos los detalles de alertas basándonos en las métricas de riesgo
   const alertDetails = React.useMemo(() => {
-    const alerts = [];
+    const alerts: AlertDetail[] = [];
     
     // Alerta de riesgo de presupuesto
     if (budgetRisk >= 75) {
