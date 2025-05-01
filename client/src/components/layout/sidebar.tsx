@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import logoImage from "../../../src/assets/epicaldigital_logo.jpeg";
@@ -8,16 +8,13 @@ import {
   PlusCircle,
   List,
   Users,
-  History,
   Settings,
   Menu,
   X,
-  Home,
   BarChart,
   ChevronRight,
   Activity,
   PieChart,
-  LineChart,
   ClipboardList,
   LogOut
 } from "lucide-react";
@@ -25,18 +22,6 @@ import {
 export default function Sidebar() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [time, setTime] = useState(new Date());
-  
-  // Actualizar tiempo cada minuto
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTime(new Date());
-    }, 60000);
-    
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
 
   // Elementos de navegación organizados por categorías
   const navCategories = {
@@ -81,45 +66,35 @@ export default function Sidebar() {
         href={item.href}
         onClick={mobile ? handleNavigation : undefined}
         className={cn(
-          "group flex items-center px-4 py-3 my-1 text-sm font-medium rounded-lg transition-all duration-300",
+          "group flex items-center px-4 py-3 my-1.5 text-sm font-medium rounded-lg transition-all duration-300",
           isActive 
-            ? "bg-gradient-to-r from-blue-900/70 to-slate-800 text-blue-300 shadow-md" 
-            : "text-slate-300 hover:bg-slate-800/70 hover:text-white",
-          item.highlight && !isActive && "bg-gradient-to-r from-blue-900/20 to-slate-800/20"
+            ? "bg-blue-600/90 text-white shadow-md" 
+            : "text-slate-300 hover:bg-slate-800/90 hover:text-white",
+          item.highlight && !isActive && "bg-slate-800/40 border border-blue-800/30"
         )}
       >
         <div className={cn(
           "flex items-center justify-center w-9 h-9 rounded-lg mr-3 transition-all duration-300",
           isActive 
-            ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30 scale-110" 
-            : "bg-slate-800 text-slate-400 group-hover:text-blue-300 group-hover:bg-slate-700 transform group-hover:scale-110"
+            ? "bg-white/10 text-white backdrop-blur-sm" 
+            : "bg-slate-800 text-slate-400 group-hover:text-white"
         )}>
-          <Icon className={cn(
-            "h-5 w-5 transition-transform duration-300",
-            !isActive && "group-hover:rotate-3"
-          )} />
+          <Icon className="h-5 w-5" />
         </div>
-        <span>{item.label}</span>
+        <span className="font-semibold">{item.label}</span>
         {item.highlight && !isActive && (
-          <Badge variant="outline" className="ml-auto border-blue-500 text-blue-400 text-xs px-2 py-0 animate-pulse">
+          <Badge variant="outline" className="ml-auto bg-blue-900/30 border-blue-500/50 text-blue-300 text-xs px-2 py-0">
             Nuevo
           </Badge>
         )}
         {isActive && (
-          <ChevronRight className="ml-auto h-4 w-4 text-blue-400 animate-pulse" />
+          <ChevronRight className="ml-auto h-4 w-4 text-white/70" />
         )}
       </Link>
     );
   };
 
-  // Formateador de tiempo
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-ES', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false
-    });
-  };
+
 
   return (
     <>
@@ -177,21 +152,7 @@ export default function Sidebar() {
 
           {/* Main navigation */}
           <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-            {/* Fecha y hora actual */}
-            <div className="mb-6 px-2">
-              <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="text-xs text-slate-400">
-                  {time.toLocaleDateString('es-ES', { 
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long' 
-                  })}
-                </div>
-                <div className="text-sm font-mono text-blue-400">
-                  {formatTime(time)}
-                </div>
-              </div>
-            </div>
+
             
             {/* General */}
             <div className="mb-4">
@@ -266,10 +227,10 @@ export default function Sidebar() {
                   Actividad Reciente
                 </h3>
               </div>
-              <div className="bg-slate-800/70 rounded-lg p-3 border border-slate-700/50 shadow-inner">
-                <div className="flex items-center text-sm text-slate-300 mb-2">
+              <div className="bg-blue-950/30 rounded-lg p-4 border border-blue-900/30 shadow-inner">
+                <div className="flex items-center text-sm text-white mb-2">
                   <Activity className="h-4 w-4 mr-2 text-blue-400" />
-                  <span>2 cotizaciones pendientes</span>
+                  <span className="font-medium">2 cotizaciones pendientes</span>
                 </div>
                 <div className="text-xs text-slate-400">
                   Última actualización: hace 20 min
@@ -279,10 +240,10 @@ export default function Sidebar() {
           </div>
 
           {/* User profile section */}
-          <div className="flex-shrink-0 p-4 border-t border-blue-900/20 bg-gradient-to-b from-slate-900/50 to-slate-900">
+          <div className="flex-shrink-0 p-4 border-t border-blue-900/30 bg-gradient-to-b from-slate-900/50 to-slate-900">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-lg ring-2 ring-blue-600/20">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-900 flex items-center justify-center text-white font-semibold text-sm shadow-lg border border-blue-500/20">
                   JS
                 </div>
               </div>
@@ -290,7 +251,7 @@ export default function Sidebar() {
                 <p className="text-sm font-medium text-slate-200">Jane Smith</p>
                 <p className="text-xs text-slate-400">Administrador</p>
               </div>
-              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full">
+              <Button variant="outline" size="icon" className="ml-auto h-8 w-8 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800 hover:border-blue-700 rounded-full">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
