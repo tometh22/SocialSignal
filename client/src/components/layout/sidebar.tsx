@@ -24,14 +24,34 @@ export default function Sidebar() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Elementos de navegación organizados por categorías
+  const navCategories = {
+    general: [
+      { href: "/", label: "Dashboard", icon: BarChart }
+    ],
+    cotizaciones: [
+      { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: false },
+      { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List }
+    ],
+    proyectos: [
+      { href: "/active-projects", label: "Proyectos Activos", icon: ClipboardList, highlight: true }
+    ],
+    datos: [
+      { href: "/clients", label: "Clientes", icon: Users },
+      { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart }
+    ],
+    sistema: [
+      { href: "/admin", label: "Panel Admin", icon: Settings }
+    ]
+  };
+  
+  // Lista plana para compatibilidad con navegación móvil
   const navigationItems = [
-    { href: "/", label: "Dashboard", icon: BarChart },
-    { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: false },
-    { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List },
-    { href: "/active-projects", label: "Proyectos Activos", icon: ClipboardList, highlight: true },
-    { href: "/clients", label: "Clientes", icon: Users },
-    { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart },
-    { href: "/admin", label: "Panel Admin", icon: Settings },
+    ...navCategories.general,
+    ...navCategories.cotizaciones,
+    ...navCategories.proyectos,
+    ...navCategories.datos,
+    ...navCategories.sistema
   ];
 
   // Toggle mobile menu
@@ -125,18 +145,74 @@ export default function Sidebar() {
           </div>
 
           <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6">
-            <div className="mb-6">
+            {/* General */}
+            <div className="mb-4">
               <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Menú Principal
+                  Principal
                 </h3>
               </div>
               <nav className="space-y-1">
-                {navigationItems.map((item) => renderNavLink(item, true))}
+                {navCategories.general.map((item) => renderNavLink(item, true))}
               </nav>
             </div>
             
-            <div>
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Cotizaciones */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Cotizaciones
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.cotizaciones.map((item) => renderNavLink(item, true))}
+              </nav>
+            </div>
+            
+            {/* Proyectos */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Proyectos
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.proyectos.map((item) => renderNavLink(item, true))}
+              </nav>
+            </div>
+            
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Datos */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Datos e Informes
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.datos.map((item) => renderNavLink(item, true))}
+              </nav>
+            </div>
+            
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Sistema */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Sistema
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.sistema.map((item) => renderNavLink(item, true))}
+              </nav>
+            </div>
+            
+            {/* Actividad Reciente */}
+            <div className="mt-6">
               <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Actividad Reciente
@@ -183,18 +259,74 @@ export default function Sidebar() {
           </div>
 
           <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6">
-            <div className="mb-6">
+            {/* General */}
+            <div className="mb-4">
               <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Menú Principal
+                  Principal
                 </h3>
               </div>
               <nav className="space-y-1">
-                {navigationItems.map((item) => renderNavLink(item))}
+                {navCategories.general.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div>
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Cotizaciones */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Cotizaciones
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.cotizaciones.map((item) => renderNavLink(item))}
+              </nav>
+            </div>
+            
+            {/* Proyectos */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Proyectos
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.proyectos.map((item) => renderNavLink(item))}
+              </nav>
+            </div>
+            
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Datos */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Datos e Informes
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.datos.map((item) => renderNavLink(item))}
+              </nav>
+            </div>
+            
+            <div className="h-px bg-slate-200 my-4 mx-1"></div>
+            
+            {/* Sistema */}
+            <div className="mb-4">
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Sistema
+                </h3>
+              </div>
+              <nav className="space-y-1">
+                {navCategories.sistema.map((item) => renderNavLink(item))}
+              </nav>
+            </div>
+            
+            {/* Actividad Reciente */}
+            <div className="mt-6">
               <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   Actividad Reciente
