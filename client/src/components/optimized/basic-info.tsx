@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { Client } from '@shared/schema';
-import { Card, CardContent } from '@/components/ui/card';
 import { Info } from 'lucide-react';
 
 const OptimizedBasicInfo: React.FC = () => {
@@ -29,24 +28,25 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      {/* Header informativo */}
-      <div className="bg-blue-600 text-white px-4 py-2 rounded-lg mb-6">
+      {/* Header con instrucciones */}
+      <div className="bg-blue-600 text-white px-4 py-2 rounded mb-6">
         <div className="flex items-center">
-          <Info className="h-5 w-5 mr-2" />
-          <span className="font-medium">Ingresa la información básica para comenzar la cotización</span>
+          <Info className="h-4 w-4 mr-2" />
+          <span className="font-medium text-sm">Ingresa la información básica para comenzar la cotización</span>
         </div>
       </div>
       
+      {/* Secciones en 3 columnas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Sección Cliente */}
+        {/* Columna 1: Cliente */}
         <div>
-          <h4 className="font-semibold text-slate-700 mb-3">
+          <h4 className="text-sm font-semibold text-slate-700 mb-3">
             Selección de Cliente
           </h4>
           
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="client">
+            <div>
+              <Label htmlFor="client" className="text-xs font-medium text-slate-600 mb-1 block">
                 Cliente <span className="text-red-500">*</span>
               </Label>
               <Select
@@ -57,7 +57,7 @@ const OptimizedBasicInfo: React.FC = () => {
                 }}
                 disabled={isLoadingClients}
               >
-                <SelectTrigger id="client" className="w-full">
+                <SelectTrigger id="client">
                   <SelectValue placeholder="Seleccionar cliente" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
@@ -72,15 +72,15 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
         </div>
         
-        {/* Nombre y Tipo */}
+        {/* Columna 2: Datos del Proyecto */}
         <div>
-          <h4 className="font-semibold text-slate-700 mb-3">
+          <h4 className="text-sm font-semibold text-slate-700 mb-3">
             Datos del Proyecto
           </h4>
           
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="project-name">
+            <div>
+              <Label htmlFor="project-name" className="text-xs font-medium text-slate-600 mb-1 block">
                 Nombre del Proyecto <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -91,8 +91,8 @@ const OptimizedBasicInfo: React.FC = () => {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="project-type">
+            <div>
+              <Label htmlFor="project-type" className="text-xs font-medium text-slate-600 mb-1 block">
                 Tipo de Proyecto
               </Label>
               <Select
@@ -115,15 +115,15 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
         </div>
         
-        {/* Duración */}
+        {/* Columna 3: Duración */}
         <div>
-          <h4 className="font-semibold text-slate-700 mb-3">
+          <h4 className="text-sm font-semibold text-slate-700 mb-3">
             Duración y Planificación
           </h4>
           
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="project-duration">
+            <div>
+              <Label htmlFor="project-duration" className="text-xs font-medium text-slate-600 mb-1 block">
                 Duración Estimada
               </Label>
               <Select
@@ -144,47 +144,10 @@ const OptimizedBasicInfo: React.FC = () => {
         </div>
       </div>
       
-      {/* Información del cliente */}
-      {quotationData.client && (
-        <div className="mt-6">
-          <Card className="bg-slate-50 border-slate-200">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h5 className="text-sm font-semibold text-slate-700 mb-1">Nombre del Cliente</h5>
-                  <p className="text-slate-600">{quotationData.client.name}</p>
-                </div>
-                
-                {quotationData.client.contactName && (
-                  <div>
-                    <h5 className="text-sm font-semibold text-slate-700 mb-1">Contacto</h5>
-                    <p className="text-slate-600">{quotationData.client.contactName}</p>
-                  </div>
-                )}
-                
-                {quotationData.client.contactEmail && (
-                  <div>
-                    <h5 className="text-sm font-semibold text-slate-700 mb-1">Email</h5>
-                    <p className="text-slate-600">{quotationData.client.contactEmail}</p>
-                  </div>
-                )}
-                
-                {quotationData.client.contactPhone && (
-                  <div>
-                    <h5 className="text-sm font-semibold text-slate-700 mb-1">Teléfono</h5>
-                    <p className="text-slate-600">{quotationData.client.contactPhone}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      
-      {/* Instrucciones */}
-      <div className="mt-6 p-4 bg-slate-800 text-white rounded-lg">
-        <p className="font-medium mb-2">Completa la información requerida para continuar</p>
-        <ul className="text-sm text-slate-300 space-y-1 list-disc pl-5">
+      {/* Información e instrucciones */}
+      <div className="mt-6 bg-gray-100 border border-gray-200 rounded p-4">
+        <p className="font-medium text-sm text-gray-700 mb-2">Completa la información requerida para continuar</p>
+        <ul className="text-xs text-gray-600 space-y-1 list-disc pl-5">
           <li>El cliente es obligatorio para poder generar la cotización.</li>
           <li>El nombre del proyecto debe ser descriptivo y específico.</li>
           <li>El tipo y duración del proyecto ayudan a calcular costos y plazos.</li>

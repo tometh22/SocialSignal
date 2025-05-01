@@ -132,65 +132,40 @@ const OptimizedQuoteContent: React.FC = () => {
     }
   };
 
-  // Tabs para mostrar los pasos del flujo
   return (
     <div className="w-full min-h-screen">
-      {/* Encabezado con título */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Nueva Cotización Optimizada</h1>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-slate-800">Nueva Cotización Optimizada</h1>
         <p className="text-sm text-slate-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
       </div>
       
-      {/* Indicador de paso actual */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-blue-600 font-medium">
-          Paso {currentStep} de 4: {
-            currentStep === 1 ? "Información Básica" :
-            currentStep === 2 ? "Selección de Plantilla" :
-            currentStep === 3 ? "Configuración de Equipo" :
-            "Revisión y Ajustes"
-          }
-        </div>
+      {/* Indicador de paso actual en formato texto */}
+      <div className="mb-2 text-sm text-blue-600">
+        Paso {currentStep} de 4: Información Básica
       </div>
       
-      {/* Navegación de pasos */}
-      <div className="flex space-x-1 mb-6">
+      {/* Stepper horizontal - mostramos los pasos como se veían originalmente */}
+      <div className="w-full grid grid-cols-4 gap-1 mb-6">
         <div 
-          className={`flex-1 py-2 text-center text-sm rounded-md border cursor-pointer transition-all
-            ${currentStep === 1 
-              ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' 
-              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
+          className={`text-center py-2 text-sm transition-all ${currentStep === 1 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 1 && goToStep(1)}
         >
           1. Información
         </div>
         <div 
-          className={`flex-1 py-2 text-center text-sm rounded-md border cursor-pointer transition-all
-            ${currentStep === 2 
-              ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' 
-              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
+          className={`text-center py-2 text-sm transition-all ${currentStep === 2 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 2 && goToStep(2)}
         >
           2. Plantilla
         </div>
         <div 
-          className={`flex-1 py-2 text-center text-sm rounded-md border cursor-pointer transition-all
-            ${currentStep === 3 
-              ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' 
-              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
+          className={`text-center py-2 text-sm transition-all ${currentStep === 3 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 3 && goToStep(3)}
         >
           3. Equipo
         </div>
         <div 
-          className={`flex-1 py-2 text-center text-sm rounded-md border cursor-pointer transition-all
-            ${currentStep === 4 
-              ? 'bg-blue-50 border-blue-500 text-blue-700 font-medium' 
-              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
+          className={`text-center py-2 text-sm transition-all ${currentStep === 4 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 4 && goToStep(4)}
         >
           4. Revisión
@@ -205,9 +180,9 @@ const OptimizedQuoteContent: React.FC = () => {
         {currentStep === 4 && <OptimizedFinancialReview />}
       </div>
       
-      {/* Botones de navegación (fijos en la parte inferior) */}
+      {/* Botones de navegación (fijos en la parte inferior) - mantenemos el formato original */}
       <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-slate-200 py-3 px-8 z-50 shadow-md">
-        <div className="max-w-6xl mx-auto flex justify-between w-full">
+        <div className="flex justify-between w-full">
           <Button
             variant="outline"
             onClick={previousStep}
@@ -218,7 +193,7 @@ const OptimizedQuoteContent: React.FC = () => {
             Anterior
           </Button>
           
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Button
               variant="outline"
               onClick={handleSave}
