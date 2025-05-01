@@ -19,7 +19,7 @@ import { useEffect } from "react";
 function App() {
   // Set document title
   useEffect(() => {
-    document.title = "Sistema de Cotización de Escucha Social";
+    document.title = "Sistema de Gestión | Epical";
   }, []);
 
   return (

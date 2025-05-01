@@ -168,9 +168,9 @@ export default function Sidebar() {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
-                  Sistema de Cotización
+                  Sistema de Gestión
                 </h1>
-                <p className="text-xs text-slate-400">Epical Digital</p>
+                <p className="text-xs text-slate-400">Epical</p>
               </div>
             </div>
           </div>
