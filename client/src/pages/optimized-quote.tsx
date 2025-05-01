@@ -132,40 +132,37 @@ const OptimizedQuoteContent: React.FC = () => {
     }
   };
 
+  // Tabs para mostrar los pasos del flujo
   return (
-    <div>
-      <h1 className="text-xl font-bold">Nueva Cotización Optimizada</h1>
-      <p className="text-sm text-gray-500 mb-4">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
-      
-      <p className="text-sm text-blue-600 mb-2">Paso {currentStep} de 4: Información Básica</p>
-      
-      <div className="grid grid-cols-4 gap-1 mb-4">
-        <div 
-          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
-          onClick={() => currentStep >= 1 && goToStep(1)}
-        >
-          1. Información
-        </div>
-        <div 
-          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
-          onClick={() => currentStep >= 2 && goToStep(2)}
-        >
-          2. Plantilla
-        </div>
-        <div 
-          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
-          onClick={() => currentStep >= 3 && goToStep(3)}
-        >
-          3. Equipo
-        </div>
-        <div 
-          className={`text-center py-2 text-sm cursor-pointer ${currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
-          onClick={() => currentStep >= 4 && goToStep(4)}
-        >
-          4. Revisión
-        </div>
+    <div className="pl-4 pr-8 py-6 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
+        <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
       </div>
       
+      {/* Navegación de pasos */}
+      <Tabs 
+        value={currentStep.toString()} 
+        onValueChange={(value) => goToStep(parseInt(value))}
+        className="mb-6"
+      >
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="1" disabled={currentStep < 1}>
+            1. Información Básica
+          </TabsTrigger>
+          <TabsTrigger value="2" disabled={currentStep < 2}>
+            2. Selección de Plantilla
+          </TabsTrigger>
+          <TabsTrigger value="3" disabled={currentStep < 3}>
+            3. Configuración de Equipo
+          </TabsTrigger>
+          <TabsTrigger value="4" disabled={currentStep < 4}>
+            4. Revisión y Ajustes
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      
+      {/* Contenedor principal */}
       <div className="mb-20">
         {currentStep === 1 && <OptimizedBasicInfo />}
         {currentStep === 2 && <OptimizedTemplateSelection />}
@@ -173,12 +170,14 @@ const OptimizedQuoteContent: React.FC = () => {
         {currentStep === 4 && <OptimizedFinancialReview />}
       </div>
       
-      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-gray-200 py-3 px-6 z-10">
-        <div className="flex justify-between">
+      {/* Botones de navegación (fijos en la parte inferior) */}
+      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-neutral-200 py-3 px-8 z-50 shadow-md">
+        <div className="max-w-4xl mx-auto flex justify-between w-full">
           <Button
             variant="outline"
             onClick={previousStep}
             disabled={currentStep === 1}
+            className="flex items-center"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             Anterior
@@ -189,6 +188,7 @@ const OptimizedQuoteContent: React.FC = () => {
               variant="outline"
               onClick={handleSave}
               disabled={isSaving}
+              className="flex items-center"
             >
               <Save className="mr-1 h-4 w-4" />
               Guardar Borrador
@@ -197,7 +197,7 @@ const OptimizedQuoteContent: React.FC = () => {
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Siguiente
                 <ChevronRight className="ml-1 h-4 w-4" />
@@ -206,7 +206,7 @@ const OptimizedQuoteContent: React.FC = () => {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center bg-green-600 hover:bg-green-700 text-white"
               >
                 <Check className="mr-1 h-4 w-4" />
                 Finalizar Cotización
