@@ -134,81 +134,132 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="pl-4 pr-8 py-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
-        <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+    <div className="w-full min-h-screen flex flex-col">
+      {/* Encabezado con título y progreso */}
+      <div className="bg-white border-b border-slate-200 py-4 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">Nueva Cotización Optimizada</h1>
+              <p className="text-sm text-slate-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+            </div>
+            <div className="text-sm text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-md border border-blue-100 flex items-center">
+              Paso {currentStep} de 4: {
+                currentStep === 1 ? "Información Básica" :
+                currentStep === 2 ? "Selección de Plantilla" :
+                currentStep === 3 ? "Configuración de Equipo" :
+                "Revisión y Ajustes"
+              }
+            </div>
+          </div>
+          
+          {/* Barra de progreso */}
+          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-blue-600 to-blue-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${(currentStep / 4) * 100}%` }}
+            ></div>
+          </div>
+          
+          {/* Pasos como pills */}
+          <div className="flex justify-between mt-2">
+            <div 
+              className={`px-3 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all
+                ${currentStep >= 1 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              onClick={() => currentStep >= 1 && goToStep(1)}
+            >
+              1. Información
+            </div>
+            <div 
+              className={`px-3 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all
+                ${currentStep >= 2 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              onClick={() => currentStep >= 2 && goToStep(2)}
+            >
+              2. Plantilla
+            </div>
+            <div 
+              className={`px-3 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all
+                ${currentStep >= 3 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              onClick={() => currentStep >= 3 && goToStep(3)}
+            >
+              3. Equipo
+            </div>
+            <div 
+              className={`px-3 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all
+                ${currentStep >= 4 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              onClick={() => currentStep >= 4 && goToStep(4)}
+            >
+              4. Revisión
+            </div>
+          </div>
+        </div>
       </div>
       
-      {/* Navegación de pasos */}
-      <Tabs 
-        value={currentStep.toString()} 
-        onValueChange={(value) => goToStep(parseInt(value))}
-        className="mb-6"
-      >
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="1" disabled={currentStep < 1}>
-            1. Información Básica
-          </TabsTrigger>
-          <TabsTrigger value="2" disabled={currentStep < 2}>
-            2. Selección de Plantilla
-          </TabsTrigger>
-          <TabsTrigger value="3" disabled={currentStep < 3}>
-            3. Configuración de Equipo
-          </TabsTrigger>
-          <TabsTrigger value="4" disabled={currentStep < 4}>
-            4. Revisión y Ajustes
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      
       {/* Contenedor principal */}
-      <div className="mb-20">
-        {currentStep === 1 && <OptimizedBasicInfo />}
-        {currentStep === 2 && <OptimizedTemplateSelection />}
-        {currentStep === 3 && <OptimizedTeamConfig />}
-        {currentStep === 4 && <OptimizedFinancialReview />}
+      <div className="flex-grow bg-slate-50">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <Card className="border-0 shadow">
+            <div className="p-6">
+              {currentStep === 1 && <OptimizedBasicInfo />}
+              {currentStep === 2 && <OptimizedTemplateSelection />}
+              {currentStep === 3 && <OptimizedTeamConfig />}
+              {currentStep === 4 && <OptimizedFinancialReview />}
+            </div>
+          </Card>
+        </div>
       </div>
       
       {/* Botones de navegación (fijos en la parte inferior) */}
-      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-neutral-200 py-3 px-8 z-50 shadow-md">
-        <div className="max-w-4xl mx-auto flex justify-between w-full">
+      <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-3 px-6 z-50 shadow-lg">
+        <div className="max-w-6xl mx-auto flex justify-between w-full">
           <Button
             variant="outline"
             onClick={previousStep}
             disabled={currentStep === 1}
-            className="flex items-center"
+            className="flex items-center border-slate-300 hover:bg-slate-100 hover:text-slate-800 transition-all"
           >
-            <ChevronLeft className="mr-1 h-4 w-4" />
+            <ChevronLeft className="mr-1.5 h-4 w-4" />
             Anterior
           </Button>
           
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center"
+              className="flex items-center border-slate-300 hover:bg-slate-100 hover:text-slate-800 transition-all"
             >
-              <Save className="mr-1 h-4 w-4" />
+              <Save className="mr-1.5 h-4 w-4" />
               Guardar Borrador
             </Button>
             
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 transition-all"
               >
                 Siguiente
-                <ChevronRight className="ml-1 h-4 w-4" />
+                <ChevronRight className="ml-1.5 h-4 w-4" />
               </Button>
             ) : (
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center bg-green-600 hover:bg-green-700 text-white"
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 transition-all"
               >
-                <Check className="mr-1 h-4 w-4" />
+                <Check className="mr-1.5 h-4 w-4" />
                 Finalizar Cotización
               </Button>
             )}
