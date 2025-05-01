@@ -134,61 +134,96 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="pl-4 pr-8 py-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900">Nueva Cotización Optimizada</h1>
-        <p className="text-neutral-500">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+    <div className="flex flex-col h-full">
+      {/* Encabezado con gradiente moderno */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-6 mb-6 shadow-md">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold">Nueva Cotización Optimizada</h1>
+          <p className="text-blue-100 mt-2">Crea una nueva cotización con nuestro flujo optimizado de 4 pasos.</p>
+        </div>
       </div>
       
-      {/* Navegación de pasos */}
-      <Tabs 
-        value={currentStep.toString()} 
-        onValueChange={(value) => goToStep(parseInt(value))}
-        className="mb-6"
-      >
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="1" disabled={currentStep < 1}>
-            1. Información Básica
-          </TabsTrigger>
-          <TabsTrigger value="2" disabled={currentStep < 2}>
-            2. Selección de Plantilla
-          </TabsTrigger>
-          <TabsTrigger value="3" disabled={currentStep < 3}>
-            3. Configuración de Equipo
-          </TabsTrigger>
-          <TabsTrigger value="4" disabled={currentStep < 4}>
-            4. Revisión y Ajustes
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      
-      {/* Contenedor principal */}
-      <div className="mb-20">
-        {currentStep === 1 && <OptimizedBasicInfo />}
-        {currentStep === 2 && <OptimizedTemplateSelection />}
-        {currentStep === 3 && <OptimizedTeamConfig />}
-        {currentStep === 4 && <OptimizedFinancialReview />}
+      <div className="px-8 pb-24 flex-grow max-w-7xl mx-auto w-full">
+        {/* Navegación de pasos mejorada */}
+        <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+          <Tabs 
+            value={currentStep.toString()} 
+            onValueChange={(value) => goToStep(parseInt(value))}
+            className="w-full"
+          >
+            <TabsList className="grid grid-cols-4 w-full h-14 bg-slate-50 p-1 rounded">
+              <TabsTrigger 
+                value="1" 
+                disabled={currentStep < 1}
+                className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-md transition-all"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium">Paso 1</span>
+                  <span className="text-xs mt-0.5">Información Básica</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="2" 
+                disabled={currentStep < 2}
+                className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-md transition-all"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium">Paso 2</span>
+                  <span className="text-xs mt-0.5">Selección de Plantilla</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="3" 
+                disabled={currentStep < 3}
+                className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-md transition-all"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium">Paso 3</span>
+                  <span className="text-xs mt-0.5">Configuración de Equipo</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="4" 
+                disabled={currentStep < 4}
+                className="data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600 rounded-md transition-all"
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium">Paso 4</span>
+                  <span className="text-xs mt-0.5">Revisión y Ajustes</span>
+                </div>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        
+        {/* Contenedor principal con sombra y bordes más elegantes */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-20">
+          {currentStep === 1 && <OptimizedBasicInfo />}
+          {currentStep === 2 && <OptimizedTemplateSelection />}
+          {currentStep === 3 && <OptimizedTeamConfig />}
+          {currentStep === 4 && <OptimizedFinancialReview />}
+        </div>
       </div>
       
       {/* Botones de navegación (fijos en la parte inferior) */}
-      <div className="fixed bottom-0 left-80 right-0 bg-white border-t border-neutral-200 py-3 px-8 z-50 shadow-md">
-        <div className="max-w-4xl mx-auto flex justify-between w-full">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4 px-8 z-50 shadow-lg">
+        <div className="max-w-7xl mx-auto flex justify-between w-full">
           <Button
             variant="outline"
             onClick={previousStep}
             disabled={currentStep === 1}
-            className="flex items-center"
+            className="flex items-center transition-all hover:bg-slate-100"
           >
             <ChevronLeft className="mr-1 h-4 w-4" />
             Anterior
           </Button>
           
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center"
+              className="flex items-center transition-all hover:bg-slate-100"
             >
               <Save className="mr-1 h-4 w-4" />
               Guardar Borrador
@@ -197,7 +232,7 @@ const OptimizedQuoteContent: React.FC = () => {
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 transition-all"
               >
                 Siguiente
                 <ChevronRight className="ml-1 h-4 w-4" />
@@ -206,7 +241,7 @@ const OptimizedQuoteContent: React.FC = () => {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center bg-green-600 hover:bg-green-700 text-white"
+                className="flex items-center bg-green-600 hover:bg-green-700 text-white px-5 transition-all"
               >
                 <Check className="mr-1 h-4 w-4" />
                 Finalizar Cotización
