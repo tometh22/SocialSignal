@@ -141,31 +141,36 @@ const OptimizedQuoteContent: React.FC = () => {
       
       {/* Indicador de paso actual en formato texto */}
       <div className="mb-2 text-sm text-blue-600">
-        Paso {currentStep} de 4: Información Básica
+        Paso {currentStep} de 4: {
+          currentStep === 1 ? "Información Básica" :
+          currentStep === 2 ? "Plantilla" :
+          currentStep === 3 ? "Equipo" :
+          "Revisión"
+        }
       </div>
       
-      {/* Stepper horizontal - mostramos los pasos como se veían originalmente */}
-      <div className="w-full grid grid-cols-4 gap-1 mb-6">
+      {/* Pasos */}
+      <div className="grid grid-cols-4 gap-1 mb-5">
         <div 
-          className={`text-center py-2 text-sm transition-all ${currentStep === 1 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 1 && goToStep(1)}
         >
           1. Información
         </div>
         <div 
-          className={`text-center py-2 text-sm transition-all ${currentStep === 2 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 2 && goToStep(2)}
         >
           2. Plantilla
         </div>
         <div 
-          className={`text-center py-2 text-sm transition-all ${currentStep === 3 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 3 && goToStep(3)}
         >
           3. Equipo
         </div>
         <div 
-          className={`text-center py-2 text-sm transition-all ${currentStep === 4 ? 'bg-blue-600 text-white font-medium' : 'bg-slate-100 text-slate-600'}`}
+          className={`text-center py-2 text-sm ${currentStep === 4 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
           onClick={() => currentStep >= 4 && goToStep(4)}
         >
           4. Revisión
