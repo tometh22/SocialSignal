@@ -153,3 +153,31 @@
 .progress-indicator .step {
   transition: all 0.3s ease;
 }
+
+/* Estilos personalizados para scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-slate-700::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 9999px;
+}
+
+.scrollbar-track-slate-900::-webkit-scrollbar-track {
+  background-color: #0f172a;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
