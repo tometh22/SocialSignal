@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import logoImage from "../../../src/assets/epicaldigital_logo.jpeg";
 import {
   PlusCircle,
   List,
@@ -160,7 +161,7 @@ export default function Sidebar() {
             <div className="flex items-center space-x-3">
               <div className="flex items-center justify-center h-12 w-12 bg-white rounded-lg shadow-lg border border-blue-500/20 overflow-hidden">
                 <img 
-                  src="/images/epicaldigital_logo.jpeg" 
+                  src={logoImage} 
                   alt="Epical Digital" 
                   className="h-full w-full object-cover"
                 />
