@@ -2,14 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sistema Layout - Contenedores consistentes */
+.container-fluid {
+  width: 100%;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container-sm {
+  width: 100%;
+  max-width: 640px;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container-md {
+  width: 100%;
+  max-width: 768px;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container-lg {
+  width: 100%;
+  max-width: 1024px;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.container-xl {
+  width: 100%;
+  max-width: 1280px;
+  padding-right: var(--spacing-container, 1rem);
+  padding-left: var(--spacing-container, 1rem);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+/* Espaciado consistente - variables para usar en todo el proyecto */
+:root {
+  /* Espaciado base */
+  --spacing-xs: 0.25rem;   /* 4px */
+  --spacing-sm: 0.5rem;    /* 8px */
+  --spacing-md: 1rem;      /* 16px */
+  --spacing-lg: 1.5rem;    /* 24px */
+  --spacing-xl: 2rem;      /* 32px */
+  --spacing-2xl: 3rem;     /* 48px */
+  --spacing-3xl: 4rem;     /* 64px */
+  
+  /* Espaciados para contenedores */
+  --spacing-container: var(--spacing-md);
+  --spacing-section: var(--spacing-2xl);
+  
+  /* Espaciados para elementos de interfaz */
+  --spacing-card: var(--spacing-md);
+  --spacing-form: var(--spacing-lg);
+  --spacing-button: var(--spacing-sm);
+  
+  /* Grid gaps */
+  --gap-xs: 0.5rem;    /* 8px */
+  --gap-sm: 1rem;      /* 16px */
+  --gap-md: 1.5rem;    /* 24px */
+  --gap-lg: 2rem;      /* 32px */
+  --gap-xl: 3rem;      /* 48px */
+}
+
 /* Estilos para el asistente de cotización */
 .wizard-container {
   max-width: 1200px;
   margin: 0 auto;
+  padding: var(--spacing-md);
 }
 
 .card-select {
   transition: all 0.2s ease-in-out;
+  padding: var(--spacing-md);
+  border-radius: var(--radius);
 }
 
 .card-select:hover {
@@ -114,6 +199,58 @@
   * {
     @apply border-border;
   }
+
+  /* Sistema tipográfico basado en escala modular */
+  :root {
+    --font-family-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-family-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    
+    /* Escala modular con ratio 1.2 (minor third) */
+    --font-size-xs: 0.75rem;     /* 12px */
+    --font-size-sm: 0.875rem;    /* 14px */
+    --font-size-base: 1rem;      /* 16px */
+    --font-size-lg: 1.125rem;    /* 18px */
+    --font-size-xl: 1.25rem;     /* 20px */
+    --font-size-2xl: 1.5rem;     /* 24px */
+    --font-size-3xl: 1.75rem;    /* 28px */
+    --font-size-4xl: 2.25rem;    /* 36px */
+    --font-size-5xl: 3rem;       /* 48px */
+    
+    /* Peso de fuente */
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    
+    /* Line heights */
+    --line-height-none: 1;
+    --line-height-tight: 1.25;
+    --line-height-snug: 1.375;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.625;
+    --line-height-loose: 2;
+    
+    /* Tracking (letter spacing) */
+    --tracking-tighter: -0.05em;
+    --tracking-tight: -0.025em;
+    --tracking-normal: 0em;
+    --tracking-wide: 0.025em;
+    --tracking-wider: 0.05em;
+    --tracking-widest: 0.1em;
+  }
+  
+  /* Configuración base del documento */
+  html {
+    font-size: 16px; /* Aseguramos que el tamaño base sea 16px para cálculos consistentes */
+    height: auto !important;
+    min-height: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  
   body {
     @apply bg-secondary text-foreground font-sans antialiased;
     overflow-y: auto !important; 
@@ -122,15 +259,9 @@
     height: auto !important;
     min-height: 100%;
     position: relative;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  html {
-    height: auto !important;
-    min-height: 100%;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    font-size: 14px;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    font-family: var(--font-family-sans);
   }
   
   #root {
@@ -139,45 +270,142 @@
     overflow: visible !important;
   }
   
-  /* Ajustes para tamaños de componentes */
+  /* Sistema de headings mejorado */
   h1, .h1 {
-    font-size: 1.75rem;
-    line-height: 2.25rem;
+    font-size: var(--font-size-4xl);
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-bold);
+    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    letter-spacing: var(--tracking-tight);
   }
   
   h2, .h2 {
-    font-size: 1.5rem;
-    line-height: 2rem;
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-semibold);
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    letter-spacing: var(--tracking-tight);
   }
   
   h3, .h3 {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-snug);
+    font-weight: var(--font-weight-semibold);
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  h4, .h4 {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-snug);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  h5, .h5 {
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-normal);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  h6, .h6 {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  
+  /* Clases de texto con propósito específico */
+  .text-display {
+    font-size: var(--font-size-5xl);
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: var(--tracking-tight);
+  }
+  
+  .text-title {
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-tight);
+    font-weight: var(--font-weight-bold);
+  }
+  
+  .text-heading {
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-snug);
+    font-weight: var(--font-weight-semibold);
+  }
+  
+  .text-subheading {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-snug);
+    font-weight: var(--font-weight-medium);
   }
   
   .text-lg {
-    font-size: 1.125rem;
-    line-height: 1.5rem;
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-normal);
   }
   
   .text-base {
-    font-size: 1rem;
-    line-height: 1.5rem;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
   }
   
   .text-sm {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
   }
   
   .text-xs {
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-normal);
+  }
+  
+  .text-caption {
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-normal);
+    letter-spacing: var(--tracking-wide);
+  }
+  
+  .text-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+  
+  /* Mejora para la legibilidad en párrafos */
+  p {
+    margin-bottom: var(--spacing-md);
+    max-width: 70ch; /* Mejora la legibilidad limitando el ancho */
   }
   
   /* Fix para el problema de scroll en los contenedores */
   .overflow-hidden {
     overflow: auto !important;
+  }
+  
+  /* Clases de Texto Especiales */
+  .text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .text-pretty {
+    text-wrap: pretty;
   }
 }
 
@@ -239,4 +467,132 @@
     linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
   background-size: 4px 4px;
+}
+
+/* Utilidades para layout y espaciado */
+.section {
+  padding-top: var(--spacing-2xl);
+  padding-bottom: var(--spacing-2xl);
+}
+
+.section-sm {
+  padding-top: var(--spacing-xl);
+  padding-bottom: var(--spacing-xl);
+}
+
+.section-lg {
+  padding-top: var(--spacing-3xl);
+  padding-bottom: var(--spacing-3xl);
+}
+
+/* Márgenes consistentes */
+.mb-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.mt-section {
+  margin-top: var(--spacing-2xl);
+}
+
+/* Layouts específicos */
+.form-layout {
+  display: grid;
+  gap: var(--gap-md);
+}
+
+.form-group {
+  display: grid;
+  gap: var(--gap-xs);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--gap-md);
+}
+
+.split-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--gap-lg);
+}
+
+@media (min-width: 768px) {
+  .split-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1024px) {
+  .split-layout-1-2 {
+    grid-template-columns: 1fr 2fr;
+  }
+  
+  .split-layout-2-1 {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+/* Utilidades de Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Mejoras de sombras */
+.shadow-soft {
+  box-shadow: 
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-strong {
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-inner-soft {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Animaciones sutiles */
+.hover-lift {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
