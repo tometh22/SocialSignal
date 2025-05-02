@@ -48,33 +48,41 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Panel Principal</h2>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+    <div className="flex flex-col flex-1 overflow-hidden bg-[#F7F8FA]">
+      {/* Header superior mejorado */}
+      <div className="py-6 px-8 bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="text-2xl font-bold text-neutral-900">Sistema de Cotización de Escucha Social</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900">Sistema de Cotización de Escucha Social</h1>
+              <p className="text-sm text-neutral-500 mt-1">Gestiona y da seguimiento a todas tus cotizaciones</p>
+            </div>
             <Link href="/new-quote">
-              <Button className="mt-4 sm:mt-0">
+              <Button className="mt-4 sm:mt-0 h-10 px-4 transition-all duration-150 shadow-sm bg-blue-600 hover:bg-blue-700">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Crear Nueva Cotización
               </Button>
             </Link>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Pendientes</CardTitle>
-                <CardDescription>Cotizaciones en espera de revisión</CardDescription>
+        </div>
+      </div>
+      
+      {/* Contenido principal */}
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* KPIs con diseño mejorado */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
+              <CardHeader className="pb-2 pt-5">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <Clock className="h-5 w-5 text-yellow-500 inline mr-2" />
+                  Pendientes
+                </CardTitle>
+                <CardDescription className="text-sm">Cotizaciones en espera de revisión</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="flex items-center">
-                  <Clock className="h-8 w-8 text-yellow-500 mr-3" />
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-neutral-900">
                     {isLoading ? (
                       <span className="inline-flex items-center">
                         <Loader variant="dots" size="sm" />
@@ -85,15 +93,17 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Aprobadas</CardTitle>
-                <CardDescription>Cotizaciones aceptadas por clientes</CardDescription>
+            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
+              <CardHeader className="pb-2 pt-5">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <CheckCircle className="h-5 w-5 text-green-500 inline mr-2" />
+                  Aprobadas
+                </CardTitle>
+                <CardDescription className="text-sm">Cotizaciones aceptadas por clientes</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="flex items-center">
-                  <CheckCircle className="h-8 w-8 text-green-500 mr-3" />
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-neutral-900">
                     {isLoading ? (
                       <span className="inline-flex items-center">
                         <Loader variant="dots" size="sm" />
@@ -104,15 +114,17 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Rechazadas</CardTitle>
-                <CardDescription>Cotizaciones rechazadas por clientes</CardDescription>
+            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
+              <CardHeader className="pb-2 pt-5">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <AlertCircle className="h-5 w-5 text-red-500 inline mr-2" />
+                  Rechazadas
+                </CardTitle>
+                <CardDescription className="text-sm">Cotizaciones rechazadas por clientes</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="flex items-center">
-                  <AlertCircle className="h-8 w-8 text-red-500 mr-3" />
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-neutral-900">
                     {isLoading ? (
                       <span className="inline-flex items-center">
                         <Loader variant="dots" size="sm" />
@@ -123,15 +135,17 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">En Negociación</CardTitle>
-                <CardDescription>Cotizaciones en proceso de negociación</CardDescription>
+            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
+              <CardHeader className="pb-2 pt-5">
+                <CardTitle className="text-lg font-medium flex items-center">
+                  <FileText className="h-5 w-5 text-blue-500 inline mr-2" />
+                  En Negociación
+                </CardTitle>
+                <CardDescription className="text-sm">Cotizaciones en proceso de negociación</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="flex items-center">
-                  <FileText className="h-8 w-8 text-blue-500 mr-3" />
-                  <span className="text-3xl font-bold">
+                  <span className="text-3xl font-bold text-neutral-900">
                     {isLoading ? (
                       <span className="inline-flex items-center">
                         <Loader variant="dots" size="sm" />
@@ -143,12 +157,20 @@ export default function Dashboard() {
             </Card>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Cotizaciones Recientes</CardTitle>
-              <CardDescription>Las 5 cotizaciones creadas más recientemente</CardDescription>
+          {/* Tabla de cotizaciones mejorada */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Cotizaciones Recientes</CardTitle>
+                  <CardDescription className="mt-1">Las 5 cotizaciones creadas más recientemente</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="h-9 bg-white">
+                  Ver Todas las Cotizaciones
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader variant="dots" size="md" text="Cargando cotizaciones recientes" />

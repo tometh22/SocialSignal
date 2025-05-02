@@ -66,29 +66,29 @@ export default function Sidebar() {
         href={item.href}
         onClick={mobile ? handleNavigation : undefined}
         className={cn(
-          "group flex items-center px-4 py-3 my-1.5 text-sm font-medium transition-all duration-300",
+          "group flex items-center px-4 py-3 my-2 text-sm font-medium rounded-md transition-all duration-150",
           isActive 
-            ? "text-white border-l-4 border-[#2F80ED] bg-[#2F4050]" 
-            : "text-slate-300 hover:bg-slate-800/90 hover:text-white border-l-4 border-transparent",
+            ? "text-white bg-gradient-to-r from-blue-600/20 to-blue-700/10 border-l-4 border-blue-500 shadow-inner" 
+            : "text-slate-300 hover:bg-slate-800/70 hover:text-white border-l-4 border-transparent hover:border-blue-900",
           item.highlight && !isActive && "bg-slate-800/40 border-blue-800/30"
         )}
       >
         <div className={cn(
-          "flex items-center justify-center w-9 h-9 mr-3 transition-all duration-300",
+          "flex items-center justify-center w-9 h-9 mr-3 transition-all duration-150",
           isActive 
-            ? "text-white" 
-            : "text-slate-400 group-hover:text-white"
+            ? "text-blue-400" 
+            : "text-slate-400 group-hover:text-blue-300"
         )}>
           <Icon className="h-5 w-5" />
         </div>
-        <span className="font-semibold">{item.label}</span>
+        <span className="font-medium">{item.label}</span>
         {item.highlight && !isActive && (
           <Badge variant="outline" className="ml-auto bg-blue-900/30 border-blue-500/50 text-blue-300 text-xs px-2 py-0">
             Nuevo
           </Badge>
         )}
         {isActive && (
-          <ChevronRight className="ml-auto h-4 w-4 text-white/70" />
+          <ChevronRight className="ml-auto h-4 w-4 text-blue-400" />
         )}
       </Link>
     );
@@ -125,15 +125,15 @@ export default function Sidebar() {
       {/* Sidebar for mobile & desktop (unified for consistency) */}
       <div
         className={cn(
-          "sidebar w-[280px] bg-[#1F2937] text-white transform transition-transform duration-500 ease-in-out",
+          "sidebar w-[280px] bg-[#1F2937] text-white transform transition-transform duration-300 ease-in-out",
           "lg:translate-x-0 lg:static lg:block",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header con logo y título alineado al diseño */}
-          <div className="flex items-center h-16 px-6 border-b border-blue-900/20 bg-[#1F2937]">
-            <div className="flex items-center space-x-3 mt-4">
+          {/* Header con logo y título perfectamente alineado */}
+          <div className="flex items-center justify-start h-[72px] px-6 border-b border-gray-700/50 bg-[#1F2937]">
+            <div className="flex items-center space-x-3">
               <div className="flex items-center justify-center h-10 w-10 bg-white rounded-md shadow-md overflow-hidden">
                 <img 
                   src={logoImage} 
