@@ -17,33 +17,9 @@ import Sidebar from "@/components/layout/sidebar";
 import { useEffect } from "react";
 
 function App() {
-  // Set document title and fix styling
+  // Set document title
   useEffect(() => {
     document.title = "Sistema de Gestión | Epical";
-    
-    // Aplicar estilos directamente al documento para eliminar espacios
-    document.documentElement.style.margin = '0';
-    document.documentElement.style.padding = '0';
-    document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.height = '100vh';
-    document.documentElement.style.width = '100%';
-    
-    // Estilos para el body
-    document.body.style.margin = '0';
-    document.body.style.padding = '0';
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100vh';
-    document.body.style.width = '100%';
-    
-    // Aplicar también al contenedor principal
-    const rootElement = document.getElementById('root');
-    if (rootElement) {
-      rootElement.style.margin = '0';
-      rootElement.style.padding = '0';
-      rootElement.style.height = '100%';
-      rootElement.style.width = '100%';
-    }
-    
   }, []);
 
   return (

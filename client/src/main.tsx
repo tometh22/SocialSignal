@@ -1,5 +1,4 @@
-// Importamos el script de corrección para el espacio gris superior
-import "./head-fix.js";
+// Importaciones principales
 
 import React from "react";
 import ReactDOM from "react-dom/client";
