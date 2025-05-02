@@ -1,55 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" style="margin:0; padding:0; background:#1F2937; overflow:hidden; height:100vh;">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    
-    <!-- Estilos de reset básicos y fix para la franja superior -->
-    <style>
-      /* Reset básico para toda la página */
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 100vh !important;
-        width: 100% !important;
-        overflow: hidden !important;
-      }
-      
-      /* Colores de fondo específicos */
-      html {
-        background: #1F2937 !important; /* Color de la sidebar para llenar espacios */
-      }
-      
-      body {
-        position: relative !important;
-        background: #1F2937 !important; /* Color de la sidebar para llenar espacios */
-      }
-      
-      /* Asegurar que no haya espacios superiores */
-      *, *::before, *::after {
-        margin-top: 0 !important;
-        padding-top: 0 !important;
-        box-sizing: border-box !important;
-      }
-      
-      /* Contenedor principal sin margen superior */
-      #root {
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 100vh !important;
-        width: 100% !important;
-        overflow: hidden !important;
-        display: block !important;
-      }
-      
-      /* Ocultar el banner de Replit */
-      .replit-dev-banner-wrapper {
-        display: none !important;
-      }
-    </style>
   </head>
-  <body style="margin:0; padding:0; overflow:hidden; height:100vh; top:0; left:0; right:0; bottom:0;">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
+    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
   </body>
 </html>

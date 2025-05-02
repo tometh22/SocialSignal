@@ -66,29 +66,29 @@ export default function Sidebar() {
         href={item.href}
         onClick={mobile ? handleNavigation : undefined}
         className={cn(
-          "group flex items-center px-4 py-3 h-12 text-sm font-medium rounded-md transition-all duration-150",
+          "group flex items-center px-4 py-3 my-1.5 text-sm font-medium rounded-lg transition-all duration-300",
           isActive 
-            ? "text-white bg-gradient-to-r from-blue-600/20 to-blue-700/10 border-l-4 border-blue-500 shadow-inner" 
-            : "text-slate-300 hover:bg-slate-800/70 hover:text-white border-l-4 border-transparent hover:border-blue-900",
-          item.highlight && !isActive && "bg-slate-800/40 border-blue-800/30"
+            ? "bg-blue-600/90 text-white shadow-md" 
+            : "text-slate-300 hover:bg-slate-800/90 hover:text-white",
+          item.highlight && !isActive && "bg-slate-800/40 border border-blue-800/30"
         )}
       >
         <div className={cn(
-          "flex items-center justify-center w-9 h-9 mr-3 transition-all duration-150",
+          "flex items-center justify-center w-9 h-9 rounded-lg mr-3 transition-all duration-300",
           isActive 
-            ? "text-blue-400" 
-            : "text-slate-400 group-hover:text-blue-300"
+            ? "bg-white/10 text-white backdrop-blur-sm" 
+            : "bg-slate-800 text-slate-400 group-hover:text-white"
         )}>
           <Icon className="h-5 w-5" />
         </div>
-        <span className="font-medium">{item.label}</span>
+        <span className="font-semibold">{item.label}</span>
         {item.highlight && !isActive && (
           <Badge variant="outline" className="ml-auto bg-blue-900/30 border-blue-500/50 text-blue-300 text-xs px-2 py-0">
             Nuevo
           </Badge>
         )}
         {isActive && (
-          <ChevronRight className="ml-auto h-4 w-4 text-blue-400" />
+          <ChevronRight className="ml-auto h-4 w-4 text-white/70" />
         )}
       </Link>
     );
@@ -125,16 +125,16 @@ export default function Sidebar() {
       {/* Sidebar for mobile & desktop (unified for consistency) */}
       <div
         className={cn(
-          "sidebar w-[280px] bg-[#1F2937] text-white transform transition-transform duration-300 ease-in-out",
-          "lg:translate-x-0 lg:static lg:block",
+          "fixed inset-y-0 left-0 z-10 w-80 bg-gradient-to-b from-slate-900 to-slate-950 text-white transform transition-transform duration-500 ease-in-out shadow-xl",
+          "lg:shadow-blue-900/10 lg:translate-x-0 lg:static lg:block",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header con logo y título perfectamente alineado */}
-          <div className="flex items-center justify-start h-[72px] px-6 border-b border-gray-700/50 bg-[#1F2937]">
+          {/* Header with logo and title */}
+          <div className="flex items-center h-24 px-6 border-b border-blue-900/20 bg-gradient-to-r from-slate-900 to-slate-900/90">
             <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center h-10 w-10 bg-white rounded-md shadow-md overflow-hidden">
+              <div className="flex items-center justify-center h-12 w-12 bg-white rounded-lg shadow-lg border border-blue-500/20 overflow-hidden">
                 <img 
                   src={logoImage} 
                   alt="Epical Digital" 
@@ -142,7 +142,7 @@ export default function Sidebar() {
                 />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
                   Sistema de Gestión
                 </h1>
                 <p className="text-xs text-slate-400">Epical</p>
@@ -151,71 +151,71 @@ export default function Sidebar() {
           </div>
 
           {/* Main navigation */}
-          <div className="flex flex-col flex-grow overflow-y-auto px-4 py-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+          <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
 
             
             {/* General */}
-            <div className="mb-8">
-              <div className="px-3 mb-4">
+            <div className="mb-4">
+              <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Principal
                 </h3>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 {navCategories.general.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
+            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
             
             {/* Cotizaciones */}
-            <div className="mb-8">
-              <div className="px-3 mb-4">
+            <div className="mb-4">
+              <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Cotizaciones
                 </h3>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 {navCategories.cotizaciones.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
             {/* Proyectos */}
-            <div className="mb-8">
-              <div className="px-3 mb-4">
+            <div className="mb-4">
+              <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Proyectos
                 </h3>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 {navCategories.proyectos.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
+            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
             
             {/* Datos */}
-            <div className="mb-8">
-              <div className="px-3 mb-4">
+            <div className="mb-4">
+              <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Datos e Informes
                 </h3>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 {navCategories.datos.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
+            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
             
             {/* Sistema */}
-            <div className="mb-8">
-              <div className="px-3 mb-4">
+            <div className="mb-4">
+              <div className="px-3 mb-2">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Sistema
                 </h3>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-1">
                 {navCategories.sistema.map((item) => renderNavLink(item))}
               </nav>
             </div>

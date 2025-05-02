@@ -28,46 +28,24 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      <div className="flex items-center mb-4">
-        <div className="flex-shrink-0">
-          <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center text-sm mr-3 font-medium">1</span>
-        </div>
+      <div className="flex items-center space-x-2 mb-6">
+        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">1</div>
         <div>
-          <h2 className="section-title">Información Básica</h2>
-          <p className="body-text mt-1">
-            Datos principales del proyecto
+          <h2 className="text-xl font-semibold text-gray-800">Información Básica</h2>
+          <p className="text-sm text-gray-500">
+            Ingresa la información básica para comenzar la cotización.
           </p>
         </div>
       </div>
 
-      {/* Grid con columnas y gap según estándares - 24px de gap, 2 columnas */}
-      <div className="form-grid grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-6 wizard-step-transition">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
         {/* Cliente y Nombre del Proyecto */}
         <div className="space-y-6">
           {/* Cliente */}
-          <div className="form-group">
-            <Label htmlFor="client" className="label text-sm font-semibold flex items-center label-spacing">
+          <div className="space-y-2">
+            <Label htmlFor="client" className="text-sm font-medium flex items-center">
               Cliente <span className="text-red-500 ml-1">*</span>
             </Label>
-            
-            {/* Buscador rápido de clientes */}
-            <div className="mb-2 relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input 
-                type="text"
-                placeholder="Buscar cliente..."
-                className="w-full py-2 pl-10 pr-3 border border-gray-300 rounded-md input-field text-sm"
-                onChange={(e) => {
-                  // Implementación futura: filtrar clientes por nombre
-                  // Este campo es para demonstración visual de acuerdo a las especificaciones
-                }}
-              />
-            </div>
-            
             <Select
               value={quotationData.client ? String(quotationData.client.id) : ''}
               onValueChange={(value) => {
@@ -76,12 +54,12 @@ const OptimizedBasicInfo: React.FC = () => {
               }}
               disabled={isLoadingClients}
             >
-              <SelectTrigger id="client" className="input-field w-full bg-white rounded-md px-3 text-sm">
+              <SelectTrigger id="client" className="w-full bg-white rounded-md">
                 <SelectValue placeholder="Seleccionar cliente" />
               </SelectTrigger>
               <SelectContent>
                 {clients?.map((client) => (
-                  <SelectItem key={client.id} value={String(client.id)} className="text-sm">
+                  <SelectItem key={client.id} value={String(client.id)}>
                     {client.name}
                   </SelectItem>
                 ))}
@@ -90,8 +68,8 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Nombre del Proyecto */}
-          <div className="form-group">
-            <Label htmlFor="project-name" className="label text-sm font-semibold flex items-center label-spacing">
+          <div className="space-y-2">
+            <Label htmlFor="project-name" className="text-sm font-medium flex items-center">
               Nombre del Proyecto <span className="text-red-500 ml-1">*</span>
             </Label>
             <Input
@@ -99,7 +77,7 @@ const OptimizedBasicInfo: React.FC = () => {
               placeholder="Ej. Análisis de Mercado Q2 2023"
               value={quotationData.project.name}
               onChange={(e) => updateProjectName(e.target.value)}
-              className="input-field bg-white rounded-md px-3 text-sm"
+              className="bg-white rounded-md"
             />
           </div>
         </div>
@@ -107,19 +85,19 @@ const OptimizedBasicInfo: React.FC = () => {
         {/* Tipo y Duración */}
         <div className="space-y-6">
           {/* Tipo de Proyecto */}
-          <div className="form-group">
-            <Label htmlFor="project-type" className="label text-sm font-semibold label-spacing">Tipo de Proyecto</Label>
+          <div className="space-y-2">
+            <Label htmlFor="project-type" className="text-sm font-medium">Tipo de Proyecto</Label>
             <Select
               value={quotationData.project.type}
               onValueChange={updateProjectType}
               disabled={isLoadingProjectTypes}
             >
-              <SelectTrigger id="project-type" className="input-field w-full bg-white rounded-md px-3 text-sm">
+              <SelectTrigger id="project-type" className="w-full bg-white rounded-md">
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
               <SelectContent>
                 {projectTypes?.map((type) => (
-                  <SelectItem key={type.value} value={type.value} className="text-sm">
+                  <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>
                 ))}
@@ -128,59 +106,55 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Duración del Proyecto */}
-          <div className="form-group">
-            <Label htmlFor="project-duration" className="label text-sm font-semibold label-spacing">Duración del Proyecto</Label>
+          <div className="space-y-2">
+            <Label htmlFor="project-duration" className="text-sm font-medium">Duración del Proyecto</Label>
             <Select
               value={quotationData.project.duration}
               onValueChange={(value) => updateProjectDuration(value as any)}
             >
-              <SelectTrigger id="project-duration" className="input-field w-full bg-white rounded-md px-3 text-sm">
+              <SelectTrigger id="project-duration" className="w-full bg-white rounded-md">
                 <SelectValue placeholder="Seleccionar duración" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="short" className="text-sm">Corto (1-3 meses)</SelectItem>
-                <SelectItem value="medium" className="text-sm">Medio (3-6 meses)</SelectItem>
-                <SelectItem value="long" className="text-sm">Largo (6+ meses)</SelectItem>
+                <SelectItem value="short">Corto (1-3 meses)</SelectItem>
+                <SelectItem value="medium">Medio (3-6 meses)</SelectItem>
+                <SelectItem value="long">Largo (6+ meses)</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
 
-      {/* Información del cliente seleccionado - 32px de separación vertical */}
+      {/* Información del cliente seleccionado */}
       {quotationData.client && (
-        <Card className="mt-8 bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden">
-          <CardHeader className="pb-3 px-4 py-4">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <CardTitle className="text-base font-semibold text-gray-700">Cliente seleccionado</CardTitle>
-            </div>
+        <Card className="mt-8 bg-gradient-to-r from-slate-50 to-white border border-blue-100 shadow-sm overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full opacity-50"></div>
+          <CardHeader className="pb-2 relative z-10">
+            <CardTitle className="text-lg text-blue-800">Información del Cliente</CardTitle>
+            <CardDescription>Detalles del cliente seleccionado</CardDescription>
           </CardHeader>
-          <CardContent className="px-4 py-3">
+          <CardContent className="relative z-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
-                <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Nombre</p>
-                <p className="text-gray-900 font-semibold mt-1">{quotationData.client.name}</p>
+                <p className="font-medium text-gray-700 mb-1">Nombre</p>
+                <p className="text-gray-900">{quotationData.client.name}</p>
               </div>
               {quotationData.client.contactName && (
                 <div>
-                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Contacto</p>
-                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactName}</p>
+                  <p className="font-medium text-gray-700 mb-1">Contacto</p>
+                  <p className="text-gray-900">{quotationData.client.contactName}</p>
                 </div>
               )}
               {quotationData.client.contactEmail && (
                 <div>
-                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Email</p>
-                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactEmail}</p>
+                  <p className="font-medium text-gray-700 mb-1">Email</p>
+                  <p className="text-gray-900">{quotationData.client.contactEmail}</p>
                 </div>
               )}
               {quotationData.client.contactPhone && (
                 <div>
-                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Teléfono</p>
-                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactPhone}</p>
+                  <p className="font-medium text-gray-700 mb-1">Teléfono</p>
+                  <p className="text-gray-900">{quotationData.client.contactPhone}</p>
                 </div>
               )}
             </div>
