@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Check, Save } from 'lucide-react';
@@ -207,55 +207,55 @@ const OptimizedQuoteContent: React.FC = () => {
         {/* Nueva sección de ayuda y consejos */}
         {currentStep === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-14">
-            <Card className="bg-blue-50 border-blue-100">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-blue-700 text-md flex items-center">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden">
+              <div className="flex flex-col space-y-1.5 p-4">
+                <h3 className="text-blue-700 text-md flex items-center font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="16" x2="12" y2="12"></line>
                     <line x1="12" y1="8" x2="12.01" y2="8"></line>
                   </svg>
                   Consejo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h3>
+              </div>
+              <div className="p-4 pt-0">
                 <p className="text-sm text-blue-900">
                   Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización más precisa.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            <Card className="bg-blue-50 border-blue-100">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-blue-700 text-md flex items-center">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden">
+              <div className="flex flex-col space-y-1.5 p-4">
+                <h3 className="text-blue-700 text-md flex items-center font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                   </svg>
                   Recomendación
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h3>
+              </div>
+              <div className="p-4 pt-0">
                 <p className="text-sm text-blue-900">
                   Para proyectos de media o larga duración, te recomendamos incluir al menos un experto en análisis de datos.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            <Card className="bg-blue-50 border-blue-100">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-blue-700 text-md flex items-center">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden">
+              <div className="flex flex-col space-y-1.5 p-4">
+                <h3 className="text-blue-700 text-md flex items-center font-medium">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                   </svg>
                   Plantillas populares
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h3>
+              </div>
+              <div className="p-4 pt-0">
                 <p className="text-sm text-blue-900">
                   Las plantillas más utilizadas para este tipo de proyectos son "Informe Ejecutivo" y "Análisis de Tendencias".
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
       </div>
