@@ -70,6 +70,11 @@ const OptimizedTemplateSelection: React.FC = () => {
     if (!quotationData.clientEngagement) {
       updateClientEngagement('medium');
     }
+    
+    // Cambiar automáticamente a la pestaña "Detalles y Ajustes" después de seleccionar una plantilla
+    setTimeout(() => {
+      setSelectedTab('details');
+    }, 100);
   };
 
   // Obtener color para niveles de complejidad
