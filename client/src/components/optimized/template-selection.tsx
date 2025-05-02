@@ -251,26 +251,72 @@ const OptimizedTemplateSelection: React.FC = () => {
           </Card>
 
           {/* Selección de complejidad para el caso personalizado */}
-          <div className="space-y-3">
-            <Label>Nivel de Complejidad del Proyecto</Label>
-            <RadioGroup 
-              value={quotationData.complexity || 'medium'} 
-              onValueChange={(value) => updateComplexity(value as 'low' | 'medium' | 'high')}
-              className="flex flex-col space-y-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="low" id="complexity-custom-low" />
-                <Label htmlFor="complexity-custom-low" className="cursor-pointer">Baja - Proyecto simple con requisitos estándar</Label>
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium flex items-center text-blue-700">
+              <span className="bg-blue-100 p-1 rounded-full mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="9" y1="3" x2="9" y2="21"></line>
+                </svg>
+              </span>
+              Nivel de Complejidad del Proyecto
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div 
+                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'low' ? 'border-blue-400 bg-blue-50' : ''}`} 
+                onClick={() => updateComplexity('low')}
+              >
+                <input 
+                  type="radio" 
+                  id="complejidad-baja" 
+                  name="complejidad" 
+                  checked={quotationData.complexity === 'low'} 
+                  onChange={() => updateComplexity('low')}
+                  className="h-4 w-4 text-blue-600 mr-2" 
+                />
+                <label htmlFor="complejidad-baja" className="cursor-pointer">
+                  <div className="font-medium">Baja</div>
+                  <div className="text-xs text-neutral-500">Proyecto simple con requisitos estándar</div>
+                  <div className="text-xs text-blue-600 mt-1">+0%</div>
+                </label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="medium" id="complexity-custom-medium" />
-                <Label htmlFor="complexity-custom-medium" className="cursor-pointer">Media - Proyecto con algunas personalizaciones</Label>
+              <div 
+                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'medium' ? 'border-blue-400 bg-blue-50' : ''}`} 
+                onClick={() => updateComplexity('medium')}
+              >
+                <input 
+                  type="radio" 
+                  id="complejidad-media" 
+                  name="complejidad" 
+                  checked={quotationData.complexity === 'medium'} 
+                  onChange={() => updateComplexity('medium')}
+                  className="h-4 w-4 text-blue-600 mr-2" 
+                />
+                <label htmlFor="complejidad-media" className="cursor-pointer">
+                  <div className="font-medium">Media</div>
+                  <div className="text-xs text-neutral-500">Proyecto con algunas personalizaciones</div>
+                  <div className="text-xs text-blue-600 mt-1">+10%</div>
+                </label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="high" id="complexity-custom-high" />
-                <Label htmlFor="complexity-custom-high" className="cursor-pointer">Alta - Proyecto complejo con muchas personalizaciones</Label>
+              <div 
+                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'high' ? 'border-blue-400 bg-blue-50' : ''}`}
+                onClick={() => updateComplexity('high')}
+              >
+                <input 
+                  type="radio" 
+                  id="complejidad-alta" 
+                  name="complejidad" 
+                  checked={quotationData.complexity === 'high'} 
+                  onChange={() => updateComplexity('high')}
+                  className="h-4 w-4 text-blue-600 mr-2" 
+                />
+                <label htmlFor="complejidad-alta" className="cursor-pointer">
+                  <div className="font-medium">Alta</div>
+                  <div className="text-xs text-neutral-500">Proyecto complejo con muchas personalizaciones</div>
+                  <div className="text-xs text-blue-600 mt-1">+20%</div>
+                </label>
               </div>
-            </RadioGroup>
+            </div>
           </div>
           
           {/* Notas de personalización */}
@@ -390,27 +436,73 @@ const OptimizedTemplateSelection: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Selección de complejidad */}
-        <div className="space-y-3">
-          <Label>Nivel de Complejidad del Proyecto</Label>
-          <RadioGroup 
-            value={quotationData.complexity || 'medium'} 
-            onValueChange={(value) => updateComplexity(value as 'low' | 'medium' | 'high')}
-            className="flex flex-col space-y-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="low" id="complexity-low" />
-              <Label htmlFor="complexity-low" className="cursor-pointer">Baja - Proyecto simple con requisitos estándar</Label>
+        {/* Selección de complejidad con diseño mejorado */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium flex items-center text-blue-700">
+            <span className="bg-blue-100 p-1 rounded-full mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+              </svg>
+            </span>
+            Nivel de Complejidad del Proyecto
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div 
+              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'low' ? 'border-blue-400 bg-blue-50' : ''}`} 
+              onClick={() => updateComplexity('low')}
+            >
+              <input 
+                type="radio" 
+                id="complexity-low" 
+                name="complejidad" 
+                checked={quotationData.complexity === 'low'} 
+                onChange={() => updateComplexity('low')}
+                className="h-4 w-4 text-blue-600 mr-2" 
+              />
+              <label htmlFor="complexity-low" className="cursor-pointer">
+                <div className="font-medium">Baja</div>
+                <div className="text-xs text-neutral-500">Proyecto simple con requisitos estándar</div>
+                <div className="text-xs text-blue-600 mt-1">+0%</div>
+              </label>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="medium" id="complexity-medium" />
-              <Label htmlFor="complexity-medium" className="cursor-pointer">Media - Proyecto con algunas personalizaciones</Label>
+            <div 
+              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'medium' ? 'border-blue-400 bg-blue-50' : ''}`} 
+              onClick={() => updateComplexity('medium')}
+            >
+              <input 
+                type="radio" 
+                id="complexity-medium" 
+                name="complejidad" 
+                checked={quotationData.complexity === 'medium'} 
+                onChange={() => updateComplexity('medium')}
+                className="h-4 w-4 text-blue-600 mr-2" 
+              />
+              <label htmlFor="complexity-medium" className="cursor-pointer">
+                <div className="font-medium">Media</div>
+                <div className="text-xs text-neutral-500">Proyecto con algunas personalizaciones</div>
+                <div className="text-xs text-blue-600 mt-1">+10%</div>
+              </label>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="high" id="complexity-high" />
-              <Label htmlFor="complexity-high" className="cursor-pointer">Alta - Proyecto complejo con muchas personalizaciones</Label>
+            <div 
+              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'high' ? 'border-blue-400 bg-blue-50' : ''}`}
+              onClick={() => updateComplexity('high')}
+            >
+              <input 
+                type="radio" 
+                id="complexity-high" 
+                name="complejidad" 
+                checked={quotationData.complexity === 'high'} 
+                onChange={() => updateComplexity('high')}
+                className="h-4 w-4 text-blue-600 mr-2" 
+              />
+              <label htmlFor="complexity-high" className="cursor-pointer">
+                <div className="font-medium">Alta</div>
+                <div className="text-xs text-neutral-500">Proyecto complejo con muchas personalizaciones</div>
+                <div className="text-xs text-blue-600 mt-1">+20%</div>
+              </label>
             </div>
-          </RadioGroup>
+          </div>
         </div>
         
         {/* Tipo de análisis */}
@@ -792,64 +884,7 @@ const OptimizedTemplateSelection: React.FC = () => {
             {renderDetailsContent()}
           </div>
           
-          {/* Nivel de Complejidad del Proyecto - Ahora fuera del div para un mejor acceso */}
-          <div className="mt-8 border rounded-lg p-4 bg-white" id="nivel-complejidad">
-            <h3 className="text-lg font-medium mb-4 flex items-center text-blue-700">
-              <span className="bg-blue-100 p-1 rounded-full mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="9" y1="3" x2="9" y2="21"></line>
-                </svg>
-              </span>
-              Nivel de Complejidad del Proyecto
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('low')}>
-                <input type="radio" id="complejidad-baja" name="complejidad" 
-                  checked={quotationData.complexity === 'low'} 
-                  onChange={() => updateComplexity('low')}
-                  className="h-4 w-4 text-blue-600 mr-2" />
-                <label htmlFor="complejidad-baja" className="cursor-pointer">
-                  <div className="font-medium">Baja</div>
-                  <div className="text-xs text-neutral-500">Proyecto simple con requisitos estándar</div>
-                  <div className="text-xs text-blue-600 mt-1">+0%</div>
-                </label>
-              </div>
-              <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('medium')}>
-                <input type="radio" id="complejidad-media" name="complejidad" 
-                  checked={quotationData.complexity === 'medium'} 
-                  onChange={() => updateComplexity('medium')}
-                  className="h-4 w-4 text-blue-600 mr-2" />
-                <label htmlFor="complejidad-media" className="cursor-pointer">
-                  <div className="font-medium">Media</div>
-                  <div className="text-xs text-neutral-500">Proyecto complejo con algunos requisitos específicos</div>
-                  <div className="text-xs text-blue-600 mt-1">+10%</div>
-                </label>
-              </div>
-              <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('high')}>
-                <input type="radio" id="complejidad-alta" name="complejidad" 
-                  checked={quotationData.complexity === 'high'} 
-                  onChange={() => updateComplexity('high')}
-                  className="h-4 w-4 text-blue-600 mr-2" />
-                <label htmlFor="complejidad-alta" className="cursor-pointer">
-                  <div className="font-medium">Alta</div>
-                  <div className="text-xs text-neutral-500">Proyecto muy complejo con requisitos específicos</div>
-                  <div className="text-xs text-blue-600 mt-1">+20%</div>
-                </label>
-              </div>
-              <div className="flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer" onClick={() => updateComplexity('high')}>
-                <input type="radio" id="complejidad-alta-especial" name="complejidad" 
-                  checked={quotationData.complexity === 'high'} 
-                  onChange={() => updateComplexity('high')}
-                  className="h-4 w-4 text-blue-600 mr-2" />
-                <label htmlFor="complejidad-alta-especial" className="cursor-pointer">
-                  <div className="font-medium">Variable</div>
-                  <div className="text-xs text-neutral-500">Complejidad cambiante durante el desarrollo</div>
-                  <div className="text-xs text-blue-600 mt-1">+15%</div>
-                </label>
-              </div>
-            </div>
-          </div>
+
         </TabsContent>
       </Tabs>
     </div>
