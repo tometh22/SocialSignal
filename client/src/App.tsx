@@ -26,7 +26,7 @@ function App() {
     <div className="flex h-screen overflow-hidden bg-slate-100">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-        <main className="flex-1 p-0 lg:pl-0">
+        <main className="flex-1">
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/optimized-quote" component={OptimizedQuote} />

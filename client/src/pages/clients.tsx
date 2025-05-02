@@ -137,97 +137,101 @@ export default function Clients() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Clients</h2>
+        <h2 className="text-subheading text-neutral-900">Clientes</h2>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Client Management</CardTitle>
-              <Button onClick={openNewClientDialog}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add New Client
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="relative mb-6">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  placeholder="Search clients..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="container-xl fade-in">
+          <div className="section-sm">
+            <Card className="shadow-soft">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-heading">Gestión de Clientes</CardTitle>
+                <Button className="hover-lift" onClick={openNewClientDialog}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Añadir Nuevo Cliente
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="relative mb-6 form-group">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Input
+                      placeholder="Buscar clientes..."
+                      className="pl-10"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
 
-              {isLoading ? (
-                <div className="text-center py-8">Loading clients...</div>
-              ) : filteredClients.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-neutral-200">
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Client Name</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Contact Person</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Email</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Phone</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredClients.map((client) => (
-                        <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50">
-                          <td className="px-4 py-3 text-sm text-neutral-900">{client.name}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{client.contactName || "-"}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{client.contactEmail || "-"}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{client.contactPhone || "-"}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center space-x-2">
-                              <Button variant="outline" size="sm" onClick={() => openEditClientDialog(client)}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                            </div>
-                          </td>
+                {isLoading ? (
+                  <div className="text-center py-8">Cargando clientes...</div>
+                ) : filteredClients.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b border-neutral-200">
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Cliente</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Persona de Contacto</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Email</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Teléfono</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Acciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-neutral-500">
-                  {searchTerm
-                    ? "No clients match your search criteria."
-                    : "No clients found. Add your first client!"}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </thead>
+                      <tbody>
+                        {filteredClients.map((client) => (
+                          <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">{client.name}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactPhone || "-"}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Editar
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-neutral-500">
+                    {searchTerm
+                      ? "No hay clientes que coincidan con tu búsqueda."
+                      : "No se encontraron clientes. ¡Añade tu primer cliente!"}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Client" : "Add New Client"}</DialogTitle>
+            <DialogTitle className="text-heading">{isEditing ? "Editar Cliente" : "Añadir Nuevo Cliente"}</DialogTitle>
             <DialogDescription>
               {isEditing 
-                ? "Update the client information below."
-                : "Fill in the details to add a new client to the system."}
+                ? "Actualiza la información del cliente a continuación."
+                : "Completa los detalles para añadir un nuevo cliente al sistema."}
             </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="form-layout py-2">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Client Name</FormLabel>
+                  <FormItem className="form-group">
+                    <FormLabel className="text-label">Nombre del Cliente</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter client name" {...field} />
+                      <Input placeholder="Introduce el nombre del cliente" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -238,10 +242,10 @@ export default function Clients() {
                 control={form.control}
                 name="contactName"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contact Person</FormLabel>
+                  <FormItem className="form-group">
+                    <FormLabel className="text-label">Persona de Contacto</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter contact name" {...field} />
+                      <Input placeholder="Introduce el nombre de contacto" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -252,10 +256,10 @@ export default function Clients() {
                 control={form.control}
                 name="contactEmail"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
+                  <FormItem className="form-group">
+                    <FormLabel className="text-label">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter email address" {...field} />
+                      <Input placeholder="Introduce el email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -266,22 +270,22 @@ export default function Clients() {
                 control={form.control}
                 name="contactPhone"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                  <FormItem className="form-group">
+                    <FormLabel className="text-label">Teléfono</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter phone number" {...field} />
+                      <Input placeholder="Introduce el número de teléfono" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <DialogFooter>
+              <DialogFooter className="mt-4">
                 <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>
-                  Cancel
+                  Cancelar
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {isEditing ? "Update Client" : "Add Client"}
+                <Button type="submit" className="hover-lift" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {isEditing ? "Actualizar Cliente" : "Añadir Cliente"}
                 </Button>
               </DialogFooter>
             </form>
