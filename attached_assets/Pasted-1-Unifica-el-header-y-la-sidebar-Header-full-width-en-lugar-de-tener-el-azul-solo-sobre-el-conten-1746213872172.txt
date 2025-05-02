@@ -1,0 +1,35 @@
+1. Unifica el header y la sidebar
+
+Header full-width: en lugar de tener el azul solo sobre el contenido, haz que la barra superior (Nueva Cotización) abarque las dos columnas (sidebar + contenido).
+Grid layout: usa
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 64px 1fr;
+  height: 100vh;
+}
+.sidebar { grid-row: 1 / span 2; grid-column: 1; }
+.header  { grid-row: 1; grid-column: 1 / span 2; }
+.main    { grid-row: 2; grid-column: 2; }
+Así el header y la sidebar comparten origen y se sienten integrados.
+2. Elimina el gap blanco entre nav y contenido
+
+Sin separación: quita cualquier margin-left o padding excesivo en el contenedor de contenido. Debe empezar justo al lado de los 280 px de la sidebar.
+Alineación al pixel: asegúrate de que el borde izquierdo del panel de contenido (la tarjeta blanca) esté exactamente a 280 px del borde izquierdo de la pantalla.
+3. Usa sombras y bordes para “pegar” elementos
+
+Sombra compartida: aplica box-shadow: 0 2px 8px rgba(0,0,0,0.08) tanto al sidebar como al panel principal, para que parezcan dos piezas de un mismo mueble.
+Borde de separación opcional: si prefieres línea, un sutil border-left: 1px solid #E0E0E0 en la vista de contenido crea un diván visual sin despegar.
+4. Paleta coherente
+
+Mismo gris de fondo: usa background-color: #F7F8FA bajo sidebar + contenido (no solo en el contenido), para que parezcan un único lienzo.
+Activos con color: el azul primario #2F80ED que señalas en pasos o botones puede aparecer como barra lateral izquierda activa y como subrayado del nombre de la sección (“Información”), reforzando el vínculo.
+5. Alineación de tipografía y espacio
+
+Baseline common: revisa que los títulos del sidebar (“Dashboard”, “Nueva Cotización”) y los títulos del header (“Información Básica”) partan del mismo baseline: usan margin-top: 16px tras el header.
+Gutter estándar: iguala el gutter horizontal interior a 24px en ambos componentes, y no más.
+Resultado esperado:
+El header en azul “se extiende” detrás de la sidebar, creando un bloque único.
+No hay franjas blancas ni offsets: sidebar y contenido comparten fondo y sombra.
+Los acentos de color y la tipografía refuerzan que ambos paneles forman parte de un mismo layout.
+Con eso tu sidebar y la app a la derecha se verán cohesionados y profesionales.

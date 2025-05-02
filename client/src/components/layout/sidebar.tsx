@@ -66,18 +66,18 @@ export default function Sidebar() {
         href={item.href}
         onClick={mobile ? handleNavigation : undefined}
         className={cn(
-          "group flex items-center px-4 py-3 my-1.5 text-sm font-medium rounded-lg transition-all duration-300",
+          "group flex items-center px-4 py-3 my-1.5 text-sm font-medium transition-all duration-300",
           isActive 
-            ? "bg-blue-600/90 text-white shadow-md" 
-            : "text-slate-300 hover:bg-slate-800/90 hover:text-white",
-          item.highlight && !isActive && "bg-slate-800/40 border border-blue-800/30"
+            ? "text-white border-l-4 border-[#2F80ED] bg-[#2F4050]" 
+            : "text-slate-300 hover:bg-slate-800/90 hover:text-white border-l-4 border-transparent",
+          item.highlight && !isActive && "bg-slate-800/40 border-blue-800/30"
         )}
       >
         <div className={cn(
-          "flex items-center justify-center w-9 h-9 rounded-lg mr-3 transition-all duration-300",
+          "flex items-center justify-center w-9 h-9 mr-3 transition-all duration-300",
           isActive 
-            ? "bg-white/10 text-white backdrop-blur-sm" 
-            : "bg-slate-800 text-slate-400 group-hover:text-white"
+            ? "text-white" 
+            : "text-slate-400 group-hover:text-white"
         )}>
           <Icon className="h-5 w-5" />
         </div>
@@ -125,16 +125,16 @@ export default function Sidebar() {
       {/* Sidebar for mobile & desktop (unified for consistency) */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-10 w-80 bg-gradient-to-b from-slate-900 to-slate-950 text-white transform transition-transform duration-500 ease-in-out shadow-xl",
-          "lg:shadow-blue-900/10 lg:translate-x-0 lg:static lg:block",
+          "sidebar w-[280px] bg-[#1F2937] text-white transform transition-transform duration-500 ease-in-out",
+          "lg:translate-x-0 lg:static lg:block",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Header with logo and title */}
-          <div className="flex items-center h-24 px-6 border-b border-blue-900/20 bg-gradient-to-r from-slate-900 to-slate-900/90">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center h-12 w-12 bg-white rounded-lg shadow-lg border border-blue-500/20 overflow-hidden">
+          {/* Header con logo y título alineado al diseño */}
+          <div className="flex items-center h-16 px-6 border-b border-blue-900/20 bg-[#1F2937]">
+            <div className="flex items-center space-x-3 mt-4">
+              <div className="flex items-center justify-center h-10 w-10 bg-white rounded-md shadow-md overflow-hidden">
                 <img 
                   src={logoImage} 
                   alt="Epical Digital" 
@@ -142,7 +142,7 @@ export default function Sidebar() {
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
+                <h1 className="text-lg font-bold text-white">
                   Sistema de Gestión
                 </h1>
                 <p className="text-xs text-slate-400">Epical</p>
