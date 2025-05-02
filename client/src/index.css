@@ -108,90 +108,165 @@
   background-color: rgba(var(--color-primary-rgb), 0.05);
 }
 
-/* Variables de color */
+/* Sistema de colores armonizado */
 :root {
-  --color-primary: hsl(214.3 100% 48.6%);
-  --color-primary-rgb: 25, 118, 210;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
+  /* Colores base */
+  --color-primary-hue: 214.3;
+  --color-accent-hue: 224;
+  --color-success-hue: 142;
+  --color-warning-hue: 45;
+  --color-error-hue: 0;
+
+  /* Colores primarios */
+  --color-primary: hsl(var(--color-primary-hue) 80% 45%);
+  --color-primary-light: hsl(var(--color-primary-hue) 80% 65%);
+  --color-primary-dark: hsl(var(--color-primary-hue) 80% 35%);
+  --color-primary-contrast: hsl(var(--color-primary-hue) 15% 95%);
+  --color-primary-rgb: 38, 104, 171;
+  
+  /* Colores de acento */
+  --color-accent: hsl(var(--color-accent-hue) 70% 40%);
+  --color-accent-light: hsl(var(--color-accent-hue) 70% 60%);
+  --color-accent-dark: hsl(var(--color-accent-hue) 70% 30%);
+
+  /* Colores semánticos */
+  --color-success: hsl(var(--color-success-hue) 60% 45%);
+  --color-success-light: hsl(var(--color-success-hue) 60% 65%);
+  --color-success-dark: hsl(var(--color-success-hue) 60% 30%);
+  
+  --color-warning: hsl(var(--color-warning-hue) 80% 50%);
+  --color-warning-light: hsl(var(--color-warning-hue) 80% 65%);
+  --color-warning-dark: hsl(var(--color-warning-hue) 80% 35%);
+  
+  --color-error: hsl(var(--color-error-hue) 75% 50%);
+  --color-error-light: hsl(var(--color-error-hue) 75% 65%);
+  --color-error-dark: hsl(var(--color-error-hue) 75% 35%);
+  
+  /* Grises neutros */
+  --color-gray-50: hsl(210, 20%, 98%);
+  --color-gray-100: hsl(210, 16%, 93%);
+  --color-gray-200: hsl(210, 14%, 89%);
+  --color-gray-300: hsl(210, 12%, 83%);
+  --color-gray-400: hsl(210, 10%, 62%);
+  --color-gray-500: hsl(210, 8%, 45%);
+  --color-gray-600: hsl(210, 10%, 35%);
+  --color-gray-700: hsl(210, 12%, 25%);
+  --color-gray-800: hsl(210, 14%, 15%);
+  --color-gray-900: hsl(210, 16%, 8%);
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Tema claro armonizado */
+    --background: 210 15% 98%;
+    --foreground: 210 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 210 25% 20%;
  
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 210 25% 20%;
  
-    --primary: 214.3 100% 48.6%;  /* #1976d2 */
-    --primary-foreground: 210 40% 98%;
+    /* Color primario con menos saturación */
+    --primary: var(--color-primary-hue) 80% 45%;
+    --primary-foreground: 210 25% 98%;
  
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Fondos secundarios más suaves */
+    --secondary: 210 25% 96%;
+    --secondary-foreground: 210 25% 20%;
  
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 20% 92%;
+    --muted-foreground: 210 25% 45%;
  
-    --accent: 24 100% 50%;  /* #ff6d00 */
+    /* Color de acento armonizado */
+    --accent: var(--color-accent-hue) 70% 40%;
     --accent-foreground: 0 0% 100%;
  
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Colores semánticos más suaves */
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 210 25% 98%;
 
-    --success: 122.4 39.4% 49.2%;  /* #4caf50 */
+    --success: var(--color-success-hue) 60% 45%;
     --success-foreground: 0 0% 100%;
     
-    --warning: 36 100% 50%;  /* #ff9800 */
-    --warning-foreground: 0 0% 100%;
+    --warning: var(--color-warning-hue) 80% 50%;
+    --warning-foreground: 210 15% 20%;
     
-    --error: 4 90.2% 58.2%;  /* #f44336 */
+    --error: var(--color-error-hue) 75% 50%;
     --error-foreground: 0 0% 100%;
     
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 214.3 100% 48.6%;
+    --border: 210 15% 88%;
+    --input: 210 15% 88%;
+    --ring: var(--color-primary-hue) 80% 45%;
  
     --radius: 0.5rem;
     
-    --chart-1: 214.3 100% 48.6%;  /* #1976d2 */
-    --chart-2: 24 100% 50%;  /* #ff6d00 */
-    --chart-3: 122.4 39.4% 49.2%;  /* #4caf50 */
-    --chart-4: 36 100% 50%;  /* #ff9800 */
-    --chart-5: 4 90.2% 58.2%;  /* #f44336 */
+    /* Colores de gráficas armonizados */
+    --chart-1: var(--color-primary-hue) 80% 45%;
+    --chart-2: var(--color-accent-hue) 70% 40%;
+    --chart-3: var(--color-success-hue) 60% 45%;
+    --chart-4: var(--color-warning-hue) 80% 50%;
+    --chart-5: var(--color-error-hue) 75% 50%;
+
+    /* Variables para el sidebar */
+    --sidebar-background: 220 25% 15%;
+    --sidebar-foreground: 210 15% 90%;
+    --sidebar-primary: var(--color-primary-hue) 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: var(--color-accent-hue) 70% 50%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 15% 25%;
+    --sidebar-ring: 210 70% 70%;
   }
  
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Tema oscuro más suave */
+    --background: 220 25% 12%;
+    --foreground: 210 15% 90%;
  
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 25% 15%;
+    --card-foreground: 210 15% 90%;
  
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 25% 15%;
+    --popover-foreground: 210 15% 90%;
  
-    --primary: 214.3 100% 48.6%;  /* #1976d2 */
-    --primary-foreground: 210 40% 98%;
+    --primary: var(--color-primary-hue) 70% 55%;
+    --primary-foreground: 210 15% 98%;
  
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 20% 20%;
+    --secondary-foreground: 210 15% 90%;
  
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 15% 25%;
+    --muted-foreground: 210 15% 70%;
  
-    --accent: 24 100% 50%;  /* #ff6d00 */
+    --accent: var(--color-accent-hue) 70% 50%;
     --accent-foreground: 0 0% 100%;
  
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 40%;
+    --destructive-foreground: 210 15% 98%;
+
+    --success: var(--color-success-hue) 55% 40%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: var(--color-warning-hue) 75% 45%;
+    --warning-foreground: 0 0% 100%;
+    
+    --error: var(--color-error-hue) 70% 45%;
+    --error-foreground: 0 0% 100%;
  
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 210 70% 70%;
+
+    /* Variables para el sidebar en tema oscuro */
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 210 15% 90%;
+    --sidebar-primary: var(--color-primary-hue) 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: var(--color-accent-hue) 70% 50%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 15% 20%;
+    --sidebar-ring: 210 70% 70%;
   }
 }
  
