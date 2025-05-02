@@ -17,9 +17,22 @@ import Sidebar from "@/components/layout/sidebar";
 import { useEffect } from "react";
 
 function App() {
-  // Set document title
+  // Set document title and fix styling
   useEffect(() => {
     document.title = "Sistema de Gestión | Epical";
+    
+    // Eliminar cualquier margen/padding del HTML y body
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.height = '100vh';
+    document.documentElement.style.background = '#F7F8FA';
+    
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'auto';
+    document.body.style.height = '100vh';
+    document.body.style.background = '#F7F8FA';
   }, []);
 
   return (
