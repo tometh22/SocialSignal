@@ -50,15 +50,15 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-[#F7F8FA]">
       {/* Header superior mejorado */}
-      <div className="py-6 px-8 bg-white border-b border-neutral-200">
+      <div className="py-4 px-8 border-b border-neutral-200 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-neutral-900">Sistema de Cotización de Escucha Social</h1>
+              <h1 className="text-xl font-semibold text-neutral-800">Sistema de Cotización de Escucha Social</h1>
               <p className="text-sm text-neutral-500 mt-1">Gestiona y da seguimiento a todas tus cotizaciones</p>
             </div>
             <Link href="/new-quote">
-              <Button className="mt-4 sm:mt-0 h-10 px-4 transition-all duration-150 shadow-sm bg-blue-600 hover:bg-blue-700">
+              <Button className="mt-4 sm:mt-0 h-9 px-4 transition-all duration-150 shadow-sm bg-blue-600 hover:bg-blue-700">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Crear Nueva Cotización
               </Button>
@@ -68,146 +68,174 @@ export default function Dashboard() {
       </div>
       
       {/* Contenido principal */}
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
           {/* KPIs con diseño mejorado */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
-              <CardHeader className="pb-2 pt-5">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <Clock className="h-5 w-5 text-yellow-500 inline mr-2" />
-                  Pendientes
-                </CardTitle>
-                <CardDescription className="text-sm">Cotizaciones en espera de revisión</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center">
-                  <span className="text-3xl font-bold text-neutral-900">
-                    {isLoading ? (
-                      <span className="inline-flex items-center">
-                        <Loader variant="dots" size="sm" />
-                      </span>
-                    ) : statusCounts.pending}
-                  </span>
-                </div>
-              </CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="border-l-4 border-yellow-400 h-full flex flex-col">
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                    </div>
+                    <CardTitle className="text-base font-medium">
+                      Pendientes
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 px-5 pb-4 flex flex-col justify-between">
+                  <CardDescription className="text-xs text-neutral-500">Cotizaciones en espera de revisión</CardDescription>
+                  <div className="flex items-center mt-2">
+                    <span className="text-2xl font-bold text-neutral-900">
+                      {isLoading ? (
+                        <span className="inline-flex items-center">
+                          <Loader variant="dots" size="sm" />
+                        </span>
+                      ) : statusCounts.pending}
+                    </span>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
             
-            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
-              <CardHeader className="pb-2 pt-5">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <CheckCircle className="h-5 w-5 text-green-500 inline mr-2" />
-                  Aprobadas
-                </CardTitle>
-                <CardDescription className="text-sm">Cotizaciones aceptadas por clientes</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center">
-                  <span className="text-3xl font-bold text-neutral-900">
-                    {isLoading ? (
-                      <span className="inline-flex items-center">
-                        <Loader variant="dots" size="sm" />
-                      </span>
-                    ) : statusCounts.approved}
-                  </span>
-                </div>
-              </CardContent>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="border-l-4 border-green-400 h-full flex flex-col">
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    </div>
+                    <CardTitle className="text-base font-medium">
+                      Aprobadas
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 px-5 pb-4 flex flex-col justify-between">
+                  <CardDescription className="text-xs text-neutral-500">Cotizaciones aceptadas por clientes</CardDescription>
+                  <div className="flex items-center mt-2">
+                    <span className="text-2xl font-bold text-neutral-900">
+                      {isLoading ? (
+                        <span className="inline-flex items-center">
+                          <Loader variant="dots" size="sm" />
+                        </span>
+                      ) : statusCounts.approved}
+                    </span>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
             
-            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
-              <CardHeader className="pb-2 pt-5">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-500 inline mr-2" />
-                  Rechazadas
-                </CardTitle>
-                <CardDescription className="text-sm">Cotizaciones rechazadas por clientes</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center">
-                  <span className="text-3xl font-bold text-neutral-900">
-                    {isLoading ? (
-                      <span className="inline-flex items-center">
-                        <Loader variant="dots" size="sm" />
-                      </span>
-                    ) : statusCounts.rejected}
-                  </span>
-                </div>
-              </CardContent>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="border-l-4 border-red-400 h-full flex flex-col">
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    </div>
+                    <CardTitle className="text-base font-medium">
+                      Rechazadas
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 px-5 pb-4 flex flex-col justify-between">
+                  <CardDescription className="text-xs text-neutral-500">Cotizaciones rechazadas por clientes</CardDescription>
+                  <div className="flex items-center mt-2">
+                    <span className="text-2xl font-bold text-neutral-900">
+                      {isLoading ? (
+                        <span className="inline-flex items-center">
+                          <Loader variant="dots" size="sm" />
+                        </span>
+                      ) : statusCounts.rejected}
+                    </span>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
             
-            <Card className="border-0 shadow-sm hover:shadow transition-all duration-150">
-              <CardHeader className="pb-2 pt-5">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <FileText className="h-5 w-5 text-blue-500 inline mr-2" />
-                  En Negociación
-                </CardTitle>
-                <CardDescription className="text-sm">Cotizaciones en proceso de negociación</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center">
-                  <span className="text-3xl font-bold text-neutral-900">
-                    {isLoading ? (
-                      <span className="inline-flex items-center">
-                        <Loader variant="dots" size="sm" />
-                      </span>
-                    ) : statusCounts.inNegotiation}
-                  </span>
-                </div>
-              </CardContent>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="border-l-4 border-blue-400 h-full flex flex-col">
+                <CardHeader className="pb-2 pt-4 px-5">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <CardTitle className="text-base font-medium">
+                      En Negociación
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 px-5 pb-4 flex flex-col justify-between">
+                  <CardDescription className="text-xs text-neutral-500">Cotizaciones en proceso de negociación</CardDescription>
+                  <div className="flex items-center mt-2">
+                    <span className="text-2xl font-bold text-neutral-900">
+                      {isLoading ? (
+                        <span className="inline-flex items-center">
+                          <Loader variant="dots" size="sm" />
+                        </span>
+                      ) : statusCounts.inNegotiation}
+                    </span>
+                  </div>
+                </CardContent>
+              </div>
             </Card>
           </div>
           
           {/* Tabla de cotizaciones mejorada */}
           <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4 border-b">
+            <CardHeader className="pb-3 border-b px-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-xl">Cotizaciones Recientes</CardTitle>
-                  <CardDescription className="mt-1">Las 5 cotizaciones creadas más recientemente</CardDescription>
+                  <CardTitle className="text-lg font-medium">Cotizaciones Recientes</CardTitle>
+                  <CardDescription className="text-xs mt-1">Las 5 cotizaciones creadas más recientemente</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="h-9 bg-white">
+                <Button variant="outline" size="sm" className="h-8 px-3 text-xs font-medium bg-white">
                   Ver Todas las Cotizaciones
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="px-6 pt-4">
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader variant="dots" size="md" text="Cargando cotizaciones recientes" />
                 </div>
               ) : recentQuotations.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                <div className="overflow-x-auto -mx-2">
+                  <table className="w-full border-separate border-spacing-y-2">
                     <thead>
-                      <tr className="border-b border-neutral-200">
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Nombre del Proyecto</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Cliente</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Tipo de Análisis</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Creación</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Estado</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Total</th>
+                      <tr className="text-left">
+                        <th className="pl-6 pr-2 py-2 text-xs font-medium text-neutral-500">Nombre del Proyecto</th>
+                        <th className="px-2 py-2 text-xs font-medium text-neutral-500">Cliente</th>
+                        <th className="px-2 py-2 text-xs font-medium text-neutral-500">Tipo de Análisis</th>
+                        <th className="px-2 py-2 text-xs font-medium text-neutral-500">Creación</th>
+                        <th className="px-2 py-2 text-xs font-medium text-neutral-500">Estado</th>
+                        <th className="px-2 py-2 text-xs font-medium text-neutral-500 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {recentQuotations.map((quote) => (
-                        <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50">
-                          <td className="px-4 py-3 text-sm text-neutral-900">{quote.projectName}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">Cliente {quote.clientId}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{quote.analysisType}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">
+                        <tr key={quote.id} className="bg-white hover:bg-neutral-50 transition-colors duration-150 shadow-sm">
+                          <td className="pl-6 pr-2 py-3 text-sm font-medium text-neutral-900 rounded-l-md">{quote.projectName}</td>
+                          <td className="px-2 py-3 text-sm text-neutral-600">Cliente {quote.clientId}</td>
+                          <td className="px-2 py-3 text-sm text-neutral-600">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-neutral-100 text-xs font-medium text-neutral-700">
+                              {quote.analysisType}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3 text-sm text-neutral-600">
                             {new Date(quote.createdAt).toLocaleDateString()}
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                              ${quote.status === 'approved' ? 'bg-green-100 text-green-800' : ''}
-                              ${quote.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
-                              ${quote.status === 'rejected' ? 'bg-red-100 text-red-800' : ''}
-                              ${quote.status === 'in-negotiation' ? 'bg-blue-100 text-blue-800' : ''}
+                          <td className="px-2 py-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium
+                              ${quote.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' : ''}
+                              ${quote.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : ''}
+                              ${quote.status === 'rejected' ? 'bg-red-50 text-red-700 border border-red-200' : ''}
+                              ${quote.status === 'in-negotiation' ? 'bg-blue-50 text-blue-700 border border-blue-200' : ''}
                             `}>
                               {translateStatus(quote.status)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium text-neutral-900">
+                          <td className="px-6 py-3 text-sm font-semibold text-neutral-900 text-right rounded-r-md">
                             ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
@@ -216,14 +244,33 @@ export default function Dashboard() {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-4 text-neutral-500">No se encontraron cotizaciones. ¡Crea tu primera cotización!</div>
+                <div className="text-center py-10 px-8">
+                  <div className="inline-flex justify-center items-center w-16 h-16 rounded-full bg-neutral-100 mb-4">
+                    <FileText className="h-6 w-6 text-neutral-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-neutral-800 mb-2">No se encontraron cotizaciones</h3>
+                  <p className="text-neutral-500 mb-4 max-w-md mx-auto">Crea tu primera cotización para comenzar a gestionar tus proyectos de escucha social.</p>
+                  <Link href="/new-quote">
+                    <Button className="mt-2">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Crear Nueva Cotización
+                    </Button>
+                  </Link>
+                </div>
               )}
               
-              <div className="mt-4 flex justify-end">
-                <Link href="/manage-quotes">
-                  <Button variant="outline">Ver Todas las Cotizaciones</Button>
-                </Link>
-              </div>
+              {recentQuotations.length > 0 && (
+                <div className="mt-6 text-center">
+                  <Link href="/manage-quotes">
+                    <Button 
+                      variant="outline" 
+                      className="bg-white border-neutral-200 hover:bg-neutral-50 text-neutral-700 font-medium transition-all duration-150"
+                    >
+                      Ver Todas las Cotizaciones
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
