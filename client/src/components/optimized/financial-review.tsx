@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +18,24 @@ const OptimizedFinancialReview: React.FC = () => {
     markupAmount,
     totalAmount
   } = useOptimizedQuote();
+  
+  // Usar un efecto para ajustar estilos de scroll
+  useEffect(() => {
+    // Eliminar cualquier restricción de altura o overflow en los contenedores padres
+    const updateScrollStyles = () => {
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+      document.body.style.height = 'auto';
+    };
+    
+    updateScrollStyles();
+    window.addEventListener('resize', updateScrollStyles);
+    
+    return () => {
+      window.removeEventListener('resize', updateScrollStyles);
+    };
+  }, []);
 
   // Formatear moneda
   const formatCurrency = (amount: number) => {
