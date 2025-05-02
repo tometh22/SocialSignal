@@ -135,11 +135,11 @@ const OptimizedQuoteContent: React.FC = () => {
   // Tabs para mostrar los pasos del flujo
   return (
     <div className="flex flex-col">
-      {/* Header global que va con la clase header */}
-      <div className="header bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center">
+      {/* Header global que va con la clase header, posición sticky para eliminar espacio superior */}
+      <div className="header bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center h-16 sticky top-0 left-0 right-0 z-50 mt-0">
         <div className="max-w-[1440px] mx-auto w-full px-6 ml-[280px]">
-          <div className="flex items-center justify-between">
-            <h1 className="text-base font-medium">Nueva Cotización</h1>
+          <div className="flex items-center justify-between h-full">
+            <h1 className="text-base font-medium text-white">Nueva Cotización</h1>
             <p className="text-blue-100 text-xs opacity-80">4 pasos</p>
           </div>
         </div>

@@ -1,3 +1,6 @@
+// Importamos el script de corrección para el espacio gris superior
+import "./head-fix.js";
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
