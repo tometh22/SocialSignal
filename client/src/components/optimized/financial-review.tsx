@@ -62,7 +62,7 @@ const OptimizedFinancialReview: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-10 w-full">
       <div className="flex items-center space-x-2 mb-4">
         <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">4</div>
         <div>

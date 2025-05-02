@@ -134,7 +134,7 @@ const OptimizedQuoteContent: React.FC = () => {
 
   // Tabs para mostrar los pasos del flujo
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col bg-gray-50 pb-28">
       {/* Encabezado con gradiente moderno */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-6 shadow-md">
         <div className="max-w-7xl mx-auto">
@@ -197,7 +197,7 @@ const OptimizedQuoteContent: React.FC = () => {
         </div>
         
         {/* Contenedor principal con sombra y bordes más elegantes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-24">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-32 w-full">
           {currentStep === 1 && <OptimizedBasicInfo />}
           {currentStep === 2 && <OptimizedTemplateSelection />}
           {currentStep === 3 && <OptimizedTeamConfig />}
