@@ -28,24 +28,25 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      <div className="flex items-center mb-3">
+      <div className="flex items-center mb-5">
         <div className="flex-shrink-0">
-          <span className="bg-blue-100 text-blue-600 w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2 font-medium">1</span>
+          <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center text-sm mr-3 font-medium">1</span>
         </div>
         <div>
-          <h2 className="text-sm font-medium text-gray-800">Información Básica</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h2 className="text-xl font-bold text-gray-800">Información Básica</h2>
+          <p className="text-sm text-gray-600 mt-1">
             Datos principales del proyecto
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+      {/* Grid con columnas y gap según estándares - 24px de gap, 2 columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-6">
         {/* Cliente y Nombre del Proyecto */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Cliente */}
-          <div className="space-y-1.5">
-            <Label htmlFor="client" className="text-xs font-medium flex items-center">
+          <div className="space-y-2">
+            <Label htmlFor="client" className="text-sm font-semibold flex items-center">
               Cliente <span className="text-red-500 ml-1">*</span>
             </Label>
             <Select
@@ -56,12 +57,12 @@ const OptimizedBasicInfo: React.FC = () => {
               }}
               disabled={isLoadingClients}
             >
-              <SelectTrigger id="client" className="w-full bg-white rounded-md h-8 text-xs">
+              <SelectTrigger id="client" className="w-full bg-white rounded-md h-12 text-sm px-3">
                 <SelectValue placeholder="Seleccionar cliente" />
               </SelectTrigger>
               <SelectContent>
                 {clients?.map((client) => (
-                  <SelectItem key={client.id} value={String(client.id)} className="text-xs">
+                  <SelectItem key={client.id} value={String(client.id)} className="text-sm">
                     {client.name}
                   </SelectItem>
                 ))}
@@ -70,8 +71,8 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Nombre del Proyecto */}
-          <div className="space-y-1.5">
-            <Label htmlFor="project-name" className="text-xs font-medium flex items-center">
+          <div className="space-y-2">
+            <Label htmlFor="project-name" className="text-sm font-semibold flex items-center">
               Nombre del Proyecto <span className="text-red-500 ml-1">*</span>
             </Label>
             <Input
@@ -79,27 +80,27 @@ const OptimizedBasicInfo: React.FC = () => {
               placeholder="Ej. Análisis de Mercado Q2 2023"
               value={quotationData.project.name}
               onChange={(e) => updateProjectName(e.target.value)}
-              className="bg-white rounded-md h-8 text-xs"
+              className="bg-white rounded-md h-12 px-3 text-sm"
             />
           </div>
         </div>
 
         {/* Tipo y Duración */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Tipo de Proyecto */}
-          <div className="space-y-1.5">
-            <Label htmlFor="project-type" className="text-xs font-medium">Tipo de Proyecto</Label>
+          <div className="space-y-2">
+            <Label htmlFor="project-type" className="text-sm font-semibold">Tipo de Proyecto</Label>
             <Select
               value={quotationData.project.type}
               onValueChange={updateProjectType}
               disabled={isLoadingProjectTypes}
             >
-              <SelectTrigger id="project-type" className="w-full bg-white rounded-md h-8 text-xs">
+              <SelectTrigger id="project-type" className="w-full bg-white rounded-md h-12 text-sm px-3">
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
               <SelectContent>
                 {projectTypes?.map((type) => (
-                  <SelectItem key={type.value} value={type.value} className="text-xs">
+                  <SelectItem key={type.value} value={type.value} className="text-sm">
                     {type.label}
                   </SelectItem>
                 ))}
@@ -108,59 +109,59 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Duración del Proyecto */}
-          <div className="space-y-1.5">
-            <Label htmlFor="project-duration" className="text-xs font-medium">Duración del Proyecto</Label>
+          <div className="space-y-2">
+            <Label htmlFor="project-duration" className="text-sm font-semibold">Duración del Proyecto</Label>
             <Select
               value={quotationData.project.duration}
               onValueChange={(value) => updateProjectDuration(value as any)}
             >
-              <SelectTrigger id="project-duration" className="w-full bg-white rounded-md h-8 text-xs">
+              <SelectTrigger id="project-duration" className="w-full bg-white rounded-md h-12 text-sm px-3">
                 <SelectValue placeholder="Seleccionar duración" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="short" className="text-xs">Corto (1-3 meses)</SelectItem>
-                <SelectItem value="medium" className="text-xs">Medio (3-6 meses)</SelectItem>
-                <SelectItem value="long" className="text-xs">Largo (6+ meses)</SelectItem>
+                <SelectItem value="short" className="text-sm">Corto (1-3 meses)</SelectItem>
+                <SelectItem value="medium" className="text-sm">Medio (3-6 meses)</SelectItem>
+                <SelectItem value="long" className="text-sm">Largo (6+ meses)</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
 
-      {/* Información del cliente seleccionado */}
+      {/* Información del cliente seleccionado - 32px de separación vertical */}
       {quotationData.client && (
-        <Card className="mt-5 bg-white border border-gray-100 shadow-sm overflow-hidden">
-          <CardHeader className="pb-2 px-3 py-2">
+        <Card className="mt-8 bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden">
+          <CardHeader className="pb-3 px-4 py-4">
             <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
-              <CardTitle className="text-xs font-medium text-gray-700">Cliente seleccionado</CardTitle>
+              <CardTitle className="text-base font-semibold text-gray-700">Cliente seleccionado</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-3 py-2">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <CardContent className="px-4 py-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
-                <p className="text-gray-500 text-[10px] uppercase tracking-wide">Nombre</p>
-                <p className="text-gray-900 font-medium">{quotationData.client.name}</p>
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Nombre</p>
+                <p className="text-gray-900 font-semibold mt-1">{quotationData.client.name}</p>
               </div>
               {quotationData.client.contactName && (
                 <div>
-                  <p className="text-gray-500 text-[10px] uppercase tracking-wide">Contacto</p>
-                  <p className="text-gray-900 font-medium">{quotationData.client.contactName}</p>
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Contacto</p>
+                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactName}</p>
                 </div>
               )}
               {quotationData.client.contactEmail && (
                 <div>
-                  <p className="text-gray-500 text-[10px] uppercase tracking-wide">Email</p>
-                  <p className="text-gray-900 font-medium">{quotationData.client.contactEmail}</p>
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Email</p>
+                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactEmail}</p>
                 </div>
               )}
               {quotationData.client.contactPhone && (
                 <div>
-                  <p className="text-gray-500 text-[10px] uppercase tracking-wide">Teléfono</p>
-                  <p className="text-gray-900 font-medium">{quotationData.client.contactPhone}</p>
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide">Teléfono</p>
+                  <p className="text-gray-900 font-semibold mt-1">{quotationData.client.contactPhone}</p>
                 </div>
               )}
             </div>
