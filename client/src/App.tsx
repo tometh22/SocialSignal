@@ -76,9 +76,22 @@ function App() {
   }, []);
 
   return (
-    <div className="layout h-screen overflow-hidden bg-[#F7F8FA]">
+    // Cambiamos el fondo a azul para eliminar la franja gris superior
+    <div className="layout h-screen overflow-hidden bg-[#3B82F6]">
+      {/* Barra superior azul fija que cubre la franja gris */}
+      <div 
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '28px',
+          background: 'linear-gradient(90deg, #3B82F6, #2563EB)',
+          zIndex: 9999
+        }}
+      />
       <Sidebar />
-      <main className="main overflow-y-auto overflow-x-hidden p-0">
+      <main className="main overflow-y-auto overflow-x-hidden p-0 bg-[#F7F8FA]">
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/optimized-quote" component={OptimizedQuote} />
