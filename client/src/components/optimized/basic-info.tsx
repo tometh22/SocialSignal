@@ -28,25 +28,25 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      <div className="flex items-center mb-5">
+      <div className="flex items-center mb-4">
         <div className="flex-shrink-0">
           <span className="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center text-sm mr-3 font-medium">1</span>
         </div>
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Información Básica</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="section-title">Información Básica</h2>
+          <p className="body-text mt-1">
             Datos principales del proyecto
           </p>
         </div>
       </div>
 
       {/* Grid con columnas y gap según estándares - 24px de gap, 2 columnas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-6">
+      <div className="form-grid grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-6 wizard-step-transition">
         {/* Cliente y Nombre del Proyecto */}
         <div className="space-y-6">
           {/* Cliente */}
-          <div className="space-y-2">
-            <Label htmlFor="client" className="text-sm font-semibold flex items-center">
+          <div className="form-group">
+            <Label htmlFor="client" className="label text-sm font-semibold flex items-center label-spacing">
               Cliente <span className="text-red-500 ml-1">*</span>
             </Label>
             <Select
@@ -57,7 +57,7 @@ const OptimizedBasicInfo: React.FC = () => {
               }}
               disabled={isLoadingClients}
             >
-              <SelectTrigger id="client" className="w-full bg-white rounded-md h-12 text-sm px-3">
+              <SelectTrigger id="client" className="input-field w-full bg-white rounded-md px-3 text-sm">
                 <SelectValue placeholder="Seleccionar cliente" />
               </SelectTrigger>
               <SelectContent>
@@ -71,8 +71,8 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Nombre del Proyecto */}
-          <div className="space-y-2">
-            <Label htmlFor="project-name" className="text-sm font-semibold flex items-center">
+          <div className="form-group">
+            <Label htmlFor="project-name" className="label text-sm font-semibold flex items-center label-spacing">
               Nombre del Proyecto <span className="text-red-500 ml-1">*</span>
             </Label>
             <Input
@@ -80,7 +80,7 @@ const OptimizedBasicInfo: React.FC = () => {
               placeholder="Ej. Análisis de Mercado Q2 2023"
               value={quotationData.project.name}
               onChange={(e) => updateProjectName(e.target.value)}
-              className="bg-white rounded-md h-12 px-3 text-sm"
+              className="input-field bg-white rounded-md px-3 text-sm"
             />
           </div>
         </div>
@@ -88,14 +88,14 @@ const OptimizedBasicInfo: React.FC = () => {
         {/* Tipo y Duración */}
         <div className="space-y-6">
           {/* Tipo de Proyecto */}
-          <div className="space-y-2">
-            <Label htmlFor="project-type" className="text-sm font-semibold">Tipo de Proyecto</Label>
+          <div className="form-group">
+            <Label htmlFor="project-type" className="label text-sm font-semibold label-spacing">Tipo de Proyecto</Label>
             <Select
               value={quotationData.project.type}
               onValueChange={updateProjectType}
               disabled={isLoadingProjectTypes}
             >
-              <SelectTrigger id="project-type" className="w-full bg-white rounded-md h-12 text-sm px-3">
+              <SelectTrigger id="project-type" className="input-field w-full bg-white rounded-md px-3 text-sm">
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -109,13 +109,13 @@ const OptimizedBasicInfo: React.FC = () => {
           </div>
 
           {/* Duración del Proyecto */}
-          <div className="space-y-2">
-            <Label htmlFor="project-duration" className="text-sm font-semibold">Duración del Proyecto</Label>
+          <div className="form-group">
+            <Label htmlFor="project-duration" className="label text-sm font-semibold label-spacing">Duración del Proyecto</Label>
             <Select
               value={quotationData.project.duration}
               onValueChange={(value) => updateProjectDuration(value as any)}
             >
-              <SelectTrigger id="project-duration" className="w-full bg-white rounded-md h-12 text-sm px-3">
+              <SelectTrigger id="project-duration" className="input-field w-full bg-white rounded-md px-3 text-sm">
                 <SelectValue placeholder="Seleccionar duración" />
               </SelectTrigger>
               <SelectContent>

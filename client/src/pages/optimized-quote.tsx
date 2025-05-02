@@ -238,56 +238,62 @@ const OptimizedQuoteContent: React.FC = () => {
         
         {/* Tarjetas de ayuda mejoradas según especificaciones */}
         {currentStep === 1 && (
-          <div className="flex justify-between gap-4 mb-6 mt-10">
-            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+          <div className="advice-cards flex justify-between gap-4 mb-8 mt-10 wizard-step-transition">
+            <div className="advice-card bg-white rounded-lg overflow-hidden flex-1 flex-1-0 max-w-[400px] card-hover">
               <div className="flex h-full">
                 <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
-                <div className="p-4 flex-1 flex flex-col justify-center">
-                  <div className="flex items-center mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <h3 className="text-[#333333] text-sm font-semibold">Consejo</h3>
+                <div className="p-4 flex-1 flex items-center">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                      </svg>
+                      <h3 className="subtitle">Consejo</h3>
+                    </div>
+                    <p className="body-text">
+                      Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización precisa.
+                    </p>
                   </div>
-                  <p className="text-sm text-[#555555] leading-[1.5]">
-                    Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización precisa.
-                  </p>
                 </div>
               </div>
             </div>
             
-            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+            <div className="advice-card bg-white rounded-lg overflow-hidden flex-1 flex-1-0 max-w-[400px] card-hover">
               <div className="flex h-full">
                 <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
-                <div className="p-4 flex-1 flex flex-col justify-center">
-                  <div className="flex items-center mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-                    </svg>
-                    <h3 className="text-[#333333] text-sm font-semibold">Recomendación</h3>
+                <div className="p-4 flex-1 flex items-center">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                      </svg>
+                      <h3 className="subtitle">Recomendación</h3>
+                    </div>
+                    <p className="body-text">
+                      Para proyectos de media o larga duración, incluye al menos un experto en análisis de datos.
+                    </p>
                   </div>
-                  <p className="text-sm text-[#555555] leading-[1.5]">
-                    Para proyectos de media o larga duración, incluye al menos un experto en análisis de datos.
-                  </p>
                 </div>
               </div>
             </div>
             
-            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+            <div className="advice-card bg-white rounded-lg overflow-hidden flex-1 flex-1-0 max-w-[400px] card-hover">
               <div className="flex h-full">
                 <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
-                <div className="p-4 flex-1 flex flex-col justify-center">
-                  <div className="flex items-center mb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                    </svg>
-                    <h3 className="text-[#333333] text-sm font-semibold">Plantillas populares</h3>
+                <div className="p-4 flex-1 flex items-center">
+                  <div>
+                    <div className="flex items-center mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                      </svg>
+                      <h3 className="subtitle">Plantillas populares</h3>
+                    </div>
+                    <p className="body-text">
+                      Las plantillas más utilizadas son "Informe Ejecutivo" y "Análisis de Tendencias".
+                    </p>
                   </div>
-                  <p className="text-sm text-[#555555] leading-[1.5]">
-                    Las plantillas más utilizadas son "Informe Ejecutivo" y "Análisis de Tendencias".
-                  </p>
                 </div>
               </div>
             </div>
@@ -295,26 +301,26 @@ const OptimizedQuoteContent: React.FC = () => {
         )}
       </div>
       
-      {/* Footer más compacto - altura máxima 64px */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-3 px-4 z-50 shadow-sm">
-        <div className="max-w-[1440px] mx-auto flex justify-end w-full">
-          <div className="flex items-center">
+      {/* Footer exactamente de 64px de altura según especificaciones */}
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-200 py-0 px-6 z-50 shadow-sm">
+        <div className="max-w-[1440px] mx-auto flex justify-end w-full h-full">
+          <div className="flex items-center h-full">
             <Button
               variant="ghost"
               onClick={previousStep}
               disabled={currentStep === 1}
-              className="text-sm h-10 min-w-[100px] mr-3"
+              className="text-sm h-10 min-w-[120px] mr-4"
             >
               <ChevronLeft className="mr-2 h-4 w-4" />
               Anterior
             </Button>
             
-            <div className="flex gap-3 mr-6">
+            <div className="flex gap-4 mr-6">
               <Button
                 variant="outline"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="text-sm h-10 min-w-[100px]"
+                className="text-sm h-10 min-w-[120px]"
               >
                 <Save className="mr-2 h-4 w-4" />
                 Guardar
@@ -323,7 +329,7 @@ const OptimizedQuoteContent: React.FC = () => {
               {currentStep < 4 ? (
                 <Button
                   onClick={handleNext}
-                  className="bg-[#2F80ED] hover:bg-[#1D6FE0] text-white text-sm h-10 min-w-[100px] transition-colors duration-150"
+                  className="bg-[#2F80ED] hover:bg-[#1D6FE0] text-white text-sm h-10 min-w-[120px] transition-colors duration-150"
                 >
                   Siguiente
                   <ChevronRight className="ml-2 h-4 w-4" />
@@ -332,7 +338,7 @@ const OptimizedQuoteContent: React.FC = () => {
                 <Button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="bg-green-600 hover:bg-green-700 text-white text-sm h-10 min-w-[100px] transition-colors duration-150"
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm h-10 min-w-[120px] transition-colors duration-150"
                 >
                   <Check className="mr-2 h-4 w-4" />
                   Finalizar

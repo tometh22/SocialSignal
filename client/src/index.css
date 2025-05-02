@@ -127,6 +127,40 @@
     background-color: #F7F8FA; /* Fondo suave en lugar de blanco puro */
     color: #333333; /* Gris oscuro para mejor legibilidad */
   }
+  
+  /* Baseline grid de 8px para todos los elementos */
+  h1, h2, h3, h4, h5, h6, p, div {
+    margin: 0;
+    padding: 0;
+  }
+  
+  .section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #333333;
+  }
+  
+  .subtitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2F80ED;
+  }
+  
+  .body-text {
+    font-size: 14px;
+    font-weight: 400;
+    color: #555555;
+  }
+  
+  /* Espaciados consistentes */
+  .form-group {
+    margin-bottom: 24px;
+  }
+  
+  .label-spacing {
+    margin-bottom: 8px;
+  }
   html {
     height: auto !important;
     min-height: 100%;
@@ -276,12 +310,45 @@
 }
 
 .card-hover:hover {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   border-color: rgba(47, 128, 237, 0.5);
+  background-color: #F5F7FF;
 }
 
-.input-hover:hover {
-  border-color: rgba(47, 128, 237, 0.5);
+/* Microinteracciones para inputs */
+input, select, textarea {
+  transition: all 100ms ease-in-out;
+  height: 48px; /* Altura estándar de 48px */
+  border-radius: 4px;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #2F80ED;
+  box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.1);
+  outline: none;
+}
+
+/* Microinteracciones para botones */
+button {
+  transition: all 150ms ease-in-out;
+  height: 40px;
+  min-width: 120px;
+}
+
+button:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Input heights y labels */
+.input-field {
+  height: 48px;
+}
+
+.label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
 }
 
 /* Tarjetas con sombra sutil */
@@ -357,4 +424,66 @@
   grid-column: 2; 
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   border-left: 1px solid #E0E0E0;
+}
+
+/* Responsive design */
+@media screen and (max-width: 1439px) {
+  .content-container, .header-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .grid-container {
+    column-gap: 16px;
+  }
+}
+
+@media screen and (max-width: 1023px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .sidebar {
+    display: none;
+  }
+  
+  .main {
+    grid-column: 1;
+    border-left: none;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .advice-cards {
+    flex-direction: column;
+  }
+  
+  .advice-card {
+    width: 100% !important;
+    margin-bottom: 16px;
+  }
+  
+  .header-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* Animaciones y transiciones */
+.wizard-step-transition {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeInUp 200ms ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
