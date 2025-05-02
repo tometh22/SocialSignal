@@ -462,55 +462,28 @@ html, body {
   height: 100% !important;
   width: 100% !important;
   overflow: hidden !important;
-  background: #3B82F6 !important; /* Color azul para cubrir franja gris */
+  background: #F7F8FA !important; /* Color de fondo de la aplicación */
 }
 
 /* Contenedor principal que cubre TODO el espacio disponible */
 .layout {
   display: grid;
-  grid-template-rows: 64px 1fr;
+  grid-template-rows: 1fr;
   grid-template-columns: 280px 1fr;
   gap: 0;              /* quita cualquier separación */
   height: 100vh !important;
   width: 100% !important;
   overflow: hidden !important;
-  position: absolute !important; /* Posicionamiento absoluto */
+  position: fixed !important; /* Posicionamiento fixed */
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
 }
 
-/* 3. Haz que el header abarque toda la primera fila de la grid */
-.header {
-  grid-column: 1 / -1; /* desde la columna 1 hasta la última */
-  grid-row: 1;         /* exclusivamente la primera fila */
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 64px;
-  z-index: 100;
-  background: linear-gradient(90deg, #3B82F6, #2563EB);
-  color: white;
-}
-
-/* Agrega un gradiente azul para cubrir el espacio superior */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 30px; /* Altura suficiente para cubrir la franja gris */
-  background: linear-gradient(90deg, #3B82F6, #2563EB);
-  z-index: 999999;
-  pointer-events: none;
-}
-
 /* 4. Si tu sidebar está fuera de ese grid, muévelo dentro de la .layout */
 .sidebar {
-  grid-row: 2;         /* empieza en la segunda fila */
+  grid-row: 1;         /* Ahora empieza en la primera fila */
   grid-column: 1;      /* ocupa la primera columna */
   background-color: #1F2937;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -519,7 +492,7 @@ body::before {
 
 /* 5. El contenido principal, inmediatamente junto a la sidebar */
 .main {
-  grid-row: 2;
+  grid-row: 1;         /* Ahora también empieza en la primera fila */
   grid-column: 2;
   padding-top: 24px;   /* sólo el padding interior, no margen externo */
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
