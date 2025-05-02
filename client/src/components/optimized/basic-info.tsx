@@ -49,6 +49,25 @@ const OptimizedBasicInfo: React.FC = () => {
             <Label htmlFor="client" className="label text-sm font-semibold flex items-center label-spacing">
               Cliente <span className="text-red-500 ml-1">*</span>
             </Label>
+            
+            {/* Buscador rápido de clientes */}
+            <div className="mb-2 relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input 
+                type="text"
+                placeholder="Buscar cliente..."
+                className="w-full py-2 pl-10 pr-3 border border-gray-300 rounded-md input-field text-sm"
+                onChange={(e) => {
+                  // Implementación futura: filtrar clientes por nombre
+                  // Este campo es para demonstración visual de acuerdo a las especificaciones
+                }}
+              />
+            </div>
+            
             <Select
               value={quotationData.client ? String(quotationData.client.id) : ''}
               onValueChange={(value) => {

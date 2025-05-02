@@ -146,6 +146,15 @@ const OptimizedQuoteContent: React.FC = () => {
       </div>
       
       <div className="px-6 py-8 flex-grow max-w-[1440px] mx-auto w-full">
+        {/* Breadcrumb para mejor orientación */}
+        <div className="flex items-center mb-4 text-sm">
+          <a href="#" className="text-gray-500 hover:text-blue-600 transition-colors">Cotizaciones</a>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mx-2 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+          <span className="text-blue-600 font-medium">Nueva Cotización</span>
+        </div>
+        
         {/* Navegación de pasos como progress bar - máximo 48px de altura */}
         <div className="mb-8 flex justify-center">
           <div className="w-full max-w-3xl">
