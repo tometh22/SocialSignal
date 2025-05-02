@@ -22,17 +22,57 @@ function App() {
     document.title = "Sistema de Gestión | Epical";
     
     // Eliminar cualquier margen/padding del HTML y body
+    // y configurar background azul para evitar la franja gris
     document.documentElement.style.margin = '0';
     document.documentElement.style.padding = '0';
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.height = '100vh';
-    document.documentElement.style.background = '#F7F8FA';
+    document.documentElement.style.width = '100%';
+    document.documentElement.style.background = '#3B82F6'; // Usar color azul para cover cualquier espacio
     
     document.body.style.margin = '0';
     document.body.style.padding = '0';
-    document.body.style.overflow = 'auto';
+    document.body.style.overflow = 'hidden';
     document.body.style.height = '100vh';
-    document.body.style.background = '#F7F8FA';
+    document.body.style.width = '100%';
+    document.body.style.background = '#3B82F6'; // Usar color azul para cover cualquier espacio
+    document.body.style.position = 'absolute';
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.bottom = '0';
+    
+    // Agregar un elemento fijo en la parte superior
+    const fixTopGap = () => {
+      // Si ya existe el elemento, no lo recrear
+      if (document.getElementById('top-fix-element')) return;
+      
+      const fixElement = document.createElement('div');
+      fixElement.id = 'top-fix-element';
+      Object.assign(fixElement.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        right: '0',
+        height: '30px',
+        background: 'linear-gradient(90deg, #3B82F6, #2563EB)',
+        zIndex: '999999'
+      });
+      document.body.appendChild(fixElement);
+    };
+    
+    fixTopGap();
+    
+    // Aplicar también al contenedor principal
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      rootElement.style.margin = '0';
+      rootElement.style.padding = '0';
+      rootElement.style.height = '100%';
+      rootElement.style.width = '100%';
+      rootElement.style.background = '#3B82F6';
+    }
+    
   }, []);
 
   return (

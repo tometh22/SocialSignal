@@ -457,22 +457,28 @@ button:hover {
 
 /* 1. Elimina TODO margen/padding que pueda empujar el header */
 html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background: #F7F8FA;  /* tu gris de fondo */
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  background: #3B82F6 !important; /* Color azul para cubrir franja gris */
 }
 
-/* 2. Asegúrate de que tu grid no meta gap entre header y contenido */
+/* Contenedor principal que cubre TODO el espacio disponible */
 .layout {
   display: grid;
   grid-template-rows: 64px 1fr;
   grid-template-columns: 280px 1fr;
   gap: 0;              /* quita cualquier separación */
-  height: 100vh;
-  min-height: 100%;
-  width: 100%;
-  overflow: hidden;
+  height: 100vh !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  position: absolute !important; /* Posicionamiento absoluto */
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
 /* 3. Haz que el header abarque toda la primera fila de la grid */
@@ -487,6 +493,19 @@ html, body {
   z-index: 100;
   background: linear-gradient(90deg, #3B82F6, #2563EB);
   color: white;
+}
+
+/* Agrega un gradiente azul para cubrir el espacio superior */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px; /* Altura suficiente para cubrir la franja gris */
+  background: linear-gradient(90deg, #3B82F6, #2563EB);
+  z-index: 999999;
+  pointer-events: none;
 }
 
 /* 4. Si tu sidebar está fuera de ese grid, muévelo dentro de la .layout */
