@@ -146,56 +146,86 @@ const OptimizedQuoteContent: React.FC = () => {
       </div>
       
       <div className="px-6 py-8 flex-grow max-w-[1440px] mx-auto w-full">
-        {/* Navegación de pasos mejorada (32px de separación) */}
+        {/* Navegación de pasos como progress bar - máximo 48px de altura */}
         <div className="mb-8 flex justify-center">
-          <Tabs 
-            value={currentStep.toString()} 
-            onValueChange={(value) => goToStep(parseInt(value))}
-            className="w-full max-w-3xl"
-          >
-            <TabsList className="grid grid-cols-4 w-full h-10 bg-white p-0.5 rounded-md border border-gray-200 shadow-sm">
-              <TabsTrigger 
-                value="1" 
-                disabled={currentStep < 1}
-                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 rounded transition-all text-sm h-9 min-w-[40px] min-h-[40px]"
-              >
-                <div className="flex items-center">
-                  <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 font-medium">1</span>
-                  <span className="text-sm">Información</span>
+          <div className="w-full max-w-3xl">
+            <div className="step-progress flex justify-between">
+              {/* Paso 1 */}
+              <div className="flex flex-col items-center">
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1 ${
+                    currentStep >= 1 ? 'bg-[#2F80ED] text-white' : 'bg-[#E0E0E0] text-[#666666]'
+                  }`}
+                  onClick={() => currentStep >= 1 && goToStep(1)}
+                >
+                  1
                 </div>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="2" 
-                disabled={currentStep < 2}
-                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 rounded transition-all text-sm h-9 min-w-[40px] min-h-[40px]"
-              >
-                <div className="flex items-center">
-                  <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 font-medium">2</span>
-                  <span className="text-sm">Plantilla</span>
+                <span className={`text-xs ${currentStep === 1 ? 'step-label active' : 'step-label'}`}>
+                  Información
+                </span>
+              </div>
+
+              {/* Barra de progreso 1-2 */}
+              <div className="flex-1 flex items-center mx-2">
+                <div className={`step-progress-bar ${currentStep >= 2 ? 'active' : ''}`}></div>
+              </div>
+
+              {/* Paso 2 */}
+              <div className="flex flex-col items-center">
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1 ${
+                    currentStep >= 2 ? 'bg-[#2F80ED] text-white' : 'bg-[#E0E0E0] text-[#666666]'
+                  }`}
+                  onClick={() => currentStep >= 2 && goToStep(2)}
+                >
+                  2
                 </div>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="3" 
-                disabled={currentStep < 3}
-                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 rounded transition-all text-sm h-9 min-w-[40px] min-h-[40px]"
-              >
-                <div className="flex items-center">
-                  <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 font-medium">3</span>
-                  <span className="text-sm">Equipo</span>
+                <span className={`text-xs ${currentStep === 2 ? 'step-label active' : 'step-label'}`}>
+                  Plantilla
+                </span>
+              </div>
+
+              {/* Barra de progreso 2-3 */}
+              <div className="flex-1 flex items-center mx-2">
+                <div className={`step-progress-bar ${currentStep >= 3 ? 'active' : ''}`}></div>
+              </div>
+
+              {/* Paso 3 */}
+              <div className="flex flex-col items-center">
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1 ${
+                    currentStep >= 3 ? 'bg-[#2F80ED] text-white' : 'bg-[#E0E0E0] text-[#666666]'
+                  }`}
+                  onClick={() => currentStep >= 3 && goToStep(3)}
+                >
+                  3
                 </div>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="4" 
-                disabled={currentStep < 4}
-                className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-600 rounded transition-all text-sm h-9 min-w-[40px] min-h-[40px]"
-              >
-                <div className="flex items-center">
-                  <span className="bg-blue-100 text-blue-600 w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2 font-medium">4</span>
-                  <span className="text-sm">Revisión</span>
+                <span className={`text-xs ${currentStep === 3 ? 'step-label active' : 'step-label'}`}>
+                  Equipo
+                </span>
+              </div>
+
+              {/* Barra de progreso 3-4 */}
+              <div className="flex-1 flex items-center mx-2">
+                <div className={`step-progress-bar ${currentStep >= 4 ? 'active' : ''}`}></div>
+              </div>
+
+              {/* Paso 4 */}
+              <div className="flex flex-col items-center">
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mb-1 ${
+                    currentStep >= 4 ? 'bg-[#2F80ED] text-white' : 'bg-[#E0E0E0] text-[#666666]'
+                  }`}
+                  onClick={() => currentStep >= 4 && goToStep(4)}
+                >
+                  4
                 </div>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+                <span className={`text-xs ${currentStep === 4 ? 'step-label active' : 'step-label'}`}>
+                  Revisión
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Contenedor principal con estilos modernos - con padding de 16px */}
@@ -206,98 +236,109 @@ const OptimizedQuoteContent: React.FC = () => {
           {currentStep === 4 && <OptimizedFinancialReview />}
         </div>
         
-        {/* Tarjetas de ayuda con estilo moderno y compacto - min-height 96px para cards */}
+        {/* Tarjetas de ayuda mejoradas según especificaciones */}
         {currentStep === 1 && (
-          <div className="flex justify-between gap-4 mb-6">
-            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden min-h-[96px] w-1/3 transition-all hover:shadow-md">
-              <div className="flex items-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                <h3 className="text-blue-700 text-sm font-medium">Consejo</h3>
-              </div>
-              <div className="px-4 pb-4">
-                <p className="text-sm text-blue-900 line-height-1.5">
-                  Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización precisa.
-                </p>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden min-h-[96px] w-1/3 transition-all hover:shadow-md">
-              <div className="flex items-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-                </svg>
-                <h3 className="text-blue-700 text-sm font-medium">Recomendación</h3>
-              </div>
-              <div className="px-4 pb-4">
-                <p className="text-sm text-blue-900 line-height-1.5">
-                  Para proyectos de media o larga duración, incluye al menos un experto en análisis de datos.
-                </p>
+          <div className="flex justify-between gap-4 mb-6 mt-10">
+            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+              <div className="flex h-full">
+                <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
+                <div className="p-4 flex-1 flex flex-col justify-center">
+                  <div className="flex items-center mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <h3 className="text-[#333333] text-sm font-semibold">Consejo</h3>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-[1.5]">
+                    Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización precisa.
+                  </p>
+                </div>
               </div>
             </div>
             
-            <div className="bg-blue-50 border border-blue-100 rounded-lg shadow-sm overflow-hidden min-h-[96px] w-1/3 transition-all hover:shadow-md">
-              <div className="flex items-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                </svg>
-                <h3 className="text-blue-700 text-sm font-medium">Plantillas populares</h3>
+            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+              <div className="flex h-full">
+                <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
+                <div className="p-4 flex-1 flex flex-col justify-center">
+                  <div className="flex items-center mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                    </svg>
+                    <h3 className="text-[#333333] text-sm font-semibold">Recomendación</h3>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-[1.5]">
+                    Para proyectos de media o larga duración, incluye al menos un experto en análisis de datos.
+                  </p>
+                </div>
               </div>
-              <div className="px-4 pb-4">
-                <p className="text-sm text-blue-900 line-height-1.5">
-                  Las plantillas más utilizadas son "Informe Ejecutivo" y "Análisis de Tendencias".
-                </p>
+            </div>
+            
+            <div className="advice-card bg-white rounded-lg overflow-hidden w-1/3 p-0">
+              <div className="flex h-full">
+                <div className="w-1 bg-[#F0F4FF]"></div> {/* Borde izquierdo azul muy sutil */}
+                <div className="p-4 flex-1 flex flex-col justify-center">
+                  <div className="flex items-center mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[#2F80ED]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <h3 className="text-[#333333] text-sm font-semibold">Plantillas populares</h3>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-[1.5]">
+                    Las plantillas más utilizadas son "Informe Ejecutivo" y "Análisis de Tendencias".
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
       
-      {/* Botones de navegación (fijos en la parte inferior) - con 16px de padding y min 44px de altura */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-4 px-6 z-50 shadow-sm">
-        <div className="max-w-[1440px] mx-auto flex justify-between w-full">
-          <Button
-            variant="ghost"
-            onClick={previousStep}
-            disabled={currentStep === 1}
-            className="text-sm h-11 min-w-[120px]"
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Anterior
-          </Button>
-          
-          <div className="flex gap-3">
+      {/* Footer más compacto - altura máxima 64px */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-3 px-4 z-50 shadow-sm">
+        <div className="max-w-[1440px] mx-auto flex justify-end w-full">
+          <div className="flex items-center">
             <Button
-              variant="outline"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="text-sm h-11 min-w-[120px]"
+              variant="ghost"
+              onClick={previousStep}
+              disabled={currentStep === 1}
+              className="text-sm h-10 min-w-[100px] mr-3"
             >
-              <Save className="mr-2 h-4 w-4" />
-              Guardar
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Anterior
             </Button>
             
-            {currentStep < 4 ? (
+            <div className="flex gap-3 mr-6">
               <Button
-                onClick={handleNext}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm h-11 min-w-[120px]"
-              >
-                Siguiente
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
+                variant="outline"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="bg-green-600 hover:bg-green-700 text-white text-sm h-11 min-w-[120px]"
+                className="text-sm h-10 min-w-[100px]"
               >
-                <Check className="mr-2 h-4 w-4" />
-                Finalizar
+                <Save className="mr-2 h-4 w-4" />
+                Guardar
               </Button>
-            )}
+              
+              {currentStep < 4 ? (
+                <Button
+                  onClick={handleNext}
+                  className="bg-[#2F80ED] hover:bg-[#1D6FE0] text-white text-sm h-10 min-w-[100px] transition-colors duration-150"
+                >
+                  Siguiente
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm h-10 min-w-[100px] transition-colors duration-150"
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Finalizar
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
