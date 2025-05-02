@@ -1,48 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" style="margin:0; padding:0; background:#3B82F6; overflow:hidden; height:100vh;">
+<html lang="en" style="margin:0; padding:0; background:#F7F8FA; overflow:hidden; height:100vh;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <!-- Script para ocultar la franja gris superior -->
-    <script src="/src/fix-top-bar.js"></script>
     
-    <!-- Estilos inmediatos para el iframe de Replit y layout base -->
+    <!-- Estilos de reset básicos -->
     <style>
-      /* 1. Elimina TODO margen/padding que pueda empujar el header */
+      /* Reset básico para toda la página */
       html, body {
         margin: 0 !important;
         padding: 0 !important;
         height: 100vh !important;
         width: 100% !important;
         overflow: hidden !important;
-      }
-      
-      /* Solo el HTML tiene fondo azul arriba para cubrir la franja gris */
-      html {
-        background: #3B82F6 !important;
-      }
-      
-      /* El body tiene el fondo de la aplicación */
-      body {
         background: #F7F8FA !important;
-        position: relative !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-      }
-      
-      /* Crear una barra superior estática desde CSS */
-      body::before {
-        content: '';
-        display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 30px;
-        background: linear-gradient(90deg, #3B82F6, #2563EB);
-        z-index: 999999;
       }
       
       /* Fix específico para el contenedor body */
