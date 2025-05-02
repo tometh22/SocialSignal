@@ -197,7 +197,7 @@ const OptimizedQuoteContent: React.FC = () => {
         </div>
         
         {/* Contenedor principal con sombra y bordes más elegantes */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-24">
           {currentStep === 1 && <OptimizedBasicInfo />}
           {currentStep === 2 && <OptimizedTemplateSelection />}
           {currentStep === 3 && <OptimizedTeamConfig />}

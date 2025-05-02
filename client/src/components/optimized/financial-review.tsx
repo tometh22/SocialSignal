@@ -62,12 +62,15 @@ const OptimizedFinancialReview: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 h-[600px] overflow-y-auto pr-2">
-      <div className="mb-2">
-        <h2 className="text-lg font-semibold">Revisión Financiera</h2>
-        <p className="text-sm text-neutral-500">
-          Revisa y ajusta los aspectos financieros de la cotización.
-        </p>
+    <div className="space-y-6 pb-10">
+      <div className="flex items-center space-x-2 mb-4">
+        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">4</div>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800">Revisión Financiera</h2>
+          <p className="text-sm text-gray-500">
+            Revisa y ajusta los aspectos financieros de la cotización.
+          </p>
+        </div>
       </div>
 
       {/* Resumen del proyecto */}
@@ -118,6 +121,39 @@ const OptimizedFinancialReview: React.FC = () => {
           <CardDescription>Detalle de todos los conceptos incluidos</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 bg-gray-50 border border-gray-100 rounded-md p-3">
+            <h3 className="font-medium text-blue-700 mb-2 flex items-center">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Análisis de Ajustes por Complejidad
+            </h3>
+            <div className="text-sm text-gray-700 grid grid-cols-2 gap-3">
+              <div>
+                <p className="mb-1 font-medium">Factores que afectan el costo:</p>
+                <ul className="list-disc list-inside space-y-1 pl-2">
+                  <li>Tipo de análisis: {quotationData.analysisType === 'standard' ? 'Estándar' : quotationData.analysisType === 'deep' ? 'Profundo' : 'Básico'}</li>
+                  <li>Volumen de menciones: {quotationData.mentionsVolume === 'small' ? 'Bajo' : quotationData.mentionsVolume === 'medium' ? 'Medio' : 'Alto'}</li>
+                  <li>Países cubiertos: {quotationData.countriesCovered === '1' ? 'Un país' : quotationData.countriesCovered === '2-5' ? '2-5 países' : 'Más de 5 países'}</li>
+                  <li>Interacción con cliente: {quotationData.clientEngagement === 'low' ? 'Baja' : quotationData.clientEngagement === 'medium' ? 'Media' : 'Alta'}</li>
+                </ul>
+              </div>
+              <div>
+                <p className="mb-1 font-medium">Impacto en el costo total:</p>
+                <div className="flex items-center justify-between mb-1">
+                  <span>Costo Base:</span>
+                  <span className="font-medium">{formatCurrency(baseCost)}</span>
+                </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span>Ajuste de Complejidad:</span>
+                  <span className="font-medium text-amber-700">{formatCurrency(complexityAdjustment)}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t">
+                  <span>Porcentaje de Ajuste:</span>
+                  <span className="font-medium">{((complexityAdjustment / baseCost) * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -128,10 +164,10 @@ const OptimizedFinancialReview: React.FC = () => {
             </TableHeader>
             <TableBody>
               {costBreakdown.map((item, index) => (
-                <TableRow key={index}>
+                <TableRow key={index} className={item.name === 'Ajuste por Complejidad' ? 'bg-amber-50' : ''}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-sm text-neutral-600">{item.description}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(item.amount)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
