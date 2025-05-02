@@ -66,7 +66,7 @@ export default function Sidebar() {
         href={item.href}
         onClick={mobile ? handleNavigation : undefined}
         className={cn(
-          "group flex items-center px-4 py-3 my-2 text-sm font-medium rounded-md transition-all duration-150",
+          "group flex items-center px-4 py-3 h-12 text-sm font-medium rounded-md transition-all duration-150",
           isActive 
             ? "text-white bg-gradient-to-r from-blue-600/20 to-blue-700/10 border-l-4 border-blue-500 shadow-inner" 
             : "text-slate-300 hover:bg-slate-800/70 hover:text-white border-l-4 border-transparent hover:border-blue-900",
@@ -151,71 +151,71 @@ export default function Sidebar() {
           </div>
 
           {/* Main navigation */}
-          <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+          <div className="flex flex-col flex-grow overflow-y-auto px-4 py-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
 
             
             {/* General */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
+            <div className="mb-8">
+              <div className="px-3 mb-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Principal
                 </h3>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-2">
                 {navCategories.general.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
             
             {/* Cotizaciones */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
+            <div className="mb-8">
+              <div className="px-3 mb-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Cotizaciones
                 </h3>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-2">
                 {navCategories.cotizaciones.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
             {/* Proyectos */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
+            <div className="mb-8">
+              <div className="px-3 mb-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Proyectos
                 </h3>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-2">
                 {navCategories.proyectos.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
             
             {/* Datos */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
+            <div className="mb-8">
+              <div className="px-3 mb-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Datos e Informes
                 </h3>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-2">
                 {navCategories.datos.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
+            <div className="h-px bg-slate-700/20 my-8 mx-1"></div>
             
             {/* Sistema */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
+            <div className="mb-8">
+              <div className="px-3 mb-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Sistema
                 </h3>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-2">
                 {navCategories.sistema.map((item) => renderNavLink(item))}
               </nav>
             </div>
