@@ -158,12 +158,12 @@ const OptimizedTemplateSelection: React.FC = () => {
     );
   };
 
-  // Datos para la visualización
-  const chartData = [
-    { name: 'Costo Base', valor: baseCost },
-    { name: 'Ajuste', valor: complexityAdjustment },
-    { name: 'Total', valor: totalAmount }
-  ];
+  // Datos para la visualización - forzar actualización inmediata del gráfico
+  const chartData = React.useMemo(() => [
+    { name: 'Costo Base', valor: baseCost || 0 },
+    { name: 'Ajuste', valor: complexityAdjustment || 0 },
+    { name: 'Total', valor: totalAmount || 0 }
+  ], [baseCost, complexityAdjustment, totalAmount]);
 
   // Renderizar el contenido de detalles y configuración
   const renderDetailsContent = () => {
