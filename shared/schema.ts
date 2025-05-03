@@ -81,6 +81,7 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
   features: true,
   platformCost: true,
   deviationPercentage: true,
+  baseCost: true,
 });
 
 export const reportTemplatesRelations = relations(reportTemplates, ({ many }) => ({
