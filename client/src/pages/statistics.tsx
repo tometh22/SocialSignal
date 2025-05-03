@@ -275,10 +275,13 @@ export default function Statistics() {
                   </CardHeader>
                   <CardContent>
                     {isLoading ? (
-                      <div className="h-64 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-0 border-b-1 border-l-0 mx-auto mb-2"></div>
-                          <p className="text-neutral-500">Cargando datos...</p>
+                      <div className="h-64 flex items-center justify-center scale-in">
+                        <div className="glass-pill p-6 rounded-xl shadow-medium flex flex-col items-center">
+                          <div className="bg-accent/10 p-3 rounded-full mb-3">
+                            <Layers className="h-10 w-10 animate-pulse text-accent" />
+                          </div>
+                          <h3 className="text-heading text-lg mb-1">Cargando datos</h3>
+                          <p className="text-neutral-500 text-sm">Procesando información...</p>
                         </div>
                       </div>
                     ) : getAnalysisTypeData().length > 0 ? (
@@ -374,10 +377,13 @@ export default function Statistics() {
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
-                    <div className="h-80 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-0 border-b-1 border-l-0 mx-auto mb-2"></div>
-                        <p className="text-neutral-500">Cargando datos...</p>
+                    <div className="h-80 flex items-center justify-center scale-in">
+                      <div className="glass-pill p-6 rounded-xl shadow-medium flex flex-col items-center">
+                        <div className="bg-primary/10 p-3 rounded-full mb-3">
+                          <BarChart2 className="h-10 w-10 animate-pulse text-primary" />
+                        </div>
+                        <h3 className="text-heading text-lg mb-1">Cargando tendencias</h3>
+                        <p className="text-neutral-500 text-sm">Analizando datos temporales...</p>
                       </div>
                     </div>
                   ) : getMonthlyData().length > 0 ? (
