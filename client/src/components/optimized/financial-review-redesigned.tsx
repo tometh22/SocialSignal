@@ -109,6 +109,9 @@ const OptimizedFinancialReview: React.FC = () => {
   // Calcular total del equipo
   const teamTotal = quotationData.teamMembers.reduce((sum, member) => sum + member.cost, 0);
   const teamHours = quotationData.teamMembers.reduce((sum, member) => sum + member.hours, 0);
+  
+  // Funciones para editar miembros del equipo
+  const {updateTeamMember, removeTeamMember, addTeamMember, applyRecommendedTeam} = useOptimizedQuote();
 
   return (
     <div className="p-6 space-y-6 w-full max-w-full">
@@ -502,7 +505,7 @@ const OptimizedFinancialReview: React.FC = () => {
             </CardHeader>
             <CardContent>
               {quotationData.teamMembers.length > 0 ? (
-                <div className="overflow-x-auto border rounded-md">
+                <div className="overflow-x-auto border rounded-md mb-4">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50">
@@ -511,6 +514,7 @@ const OptimizedFinancialReview: React.FC = () => {
                         <TableHead className="py-2 px-3 text-xs font-medium text-right">Horas</TableHead>
                         <TableHead className="py-2 px-3 text-xs font-medium text-right">Tarifa</TableHead>
                         <TableHead className="py-2 px-3 text-xs font-medium text-right">Costo</TableHead>
+                        <TableHead className="py-2 px-3 text-xs font-medium text-center w-20">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -519,12 +523,57 @@ const OptimizedFinancialReview: React.FC = () => {
                         const person = availablePersonnel?.find((p: {id: number}) => p.id === member.personnelId);
                         
                         return (
-                          <TableRow key={index} className="hover:bg-gray-50">
+                          <TableRow key={index} className="hover:bg-gray-50 group">
                             <TableCell className="py-1.5 px-3 text-xs font-medium">{role?.name || 'Rol no especificado'}</TableCell>
                             <TableCell className="py-1.5 px-3 text-xs">{person?.name || 'No asignado'}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-xs text-right">{member.hours}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-xs text-right">${member.rate.toFixed(2)}</TableCell>
-                            <TableCell className="py-1.5 px-3 text-xs text-right font-medium">${member.cost.toFixed(2)}</TableCell>
+                            <TableCell className="py-1.5 px-3 text-xs text-right">
+                              <Input
+                                type="number"
+                                value={member.hours}
+                                onChange={(e) => {
+                                  const hours = parseInt(e.target.value) || 0;
+                                  updateTeamMember(member.id, { 
+                                    hours: hours,
+                                    cost: hours * member.rate
+                                  });
+                                }}
+                                className="h-6 text-xs px-2 py-1 w-16 inline-block text-right"
+                                min="1"
+                              />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 text-xs text-right">
+                              <Input
+                                type="number"
+                                value={member.rate}
+                                onChange={(e) => {
+                                  const rate = parseFloat(e.target.value) || 0;
+                                  updateTeamMember(member.id, { 
+                                    rate: rate,
+                                    cost: member.hours * rate
+                                  });
+                                }}
+                                className="h-6 text-xs px-2 py-1 w-16 inline-block text-right"
+                                min="0"
+                                step="0.01"
+                              />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 text-xs text-right font-medium">
+                              ${member.cost.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="py-1.5 px-2 text-center">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeTeamMember(member.id)}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
+                                  <path d="M3 6h18"></path>
+                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                </svg>
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -533,15 +582,60 @@ const OptimizedFinancialReview: React.FC = () => {
                         <TableCell className="py-1.5 px-3 text-xs text-right font-medium">{teamHours}</TableCell>
                         <TableCell className="py-1.5 px-3 text-xs text-right"></TableCell>
                         <TableCell className="py-1.5 px-3 text-xs text-right font-medium">${teamTotal.toFixed(2)}</TableCell>
+                        <TableCell></TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="text-center text-sm text-gray-500 py-8 border rounded-md">
+                <div className="text-center text-sm text-gray-500 py-8 border rounded-md mb-4">
                   No hay miembros en el equipo asignado.
                 </div>
               )}
+              
+              {/* Controles para agregar roles y actualizar equipo */}
+              <div className="flex justify-between items-center mb-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-7"
+                  onClick={applyRecommendedTeam}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-primary">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  Recomendar equipo óptimo
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-7 text-green-600 border-green-200 hover:bg-green-50"
+                  onClick={() => {
+                    if (availableRoles && availableRoles.length > 0) {
+                      // Encontrar el primer rol disponible
+                      const firstRole = availableRoles[0];
+                      // Añadir con valores por defecto
+                      addTeamMember({
+                        roleId: firstRole.id,
+                        personnelId: availablePersonnel && availablePersonnel.length > 0 ? availablePersonnel[0].id : null,
+                        hours: 10,
+                        rate: firstRole.defaultRate || 10,
+                        cost: 10 * (firstRole.defaultRate || 10)
+                      });
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-green-600">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                  Agregar rol
+                </Button>
+              </div>
               
               {/* Análisis del equipo */}
               <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
@@ -550,9 +644,9 @@ const OptimizedFinancialReview: React.FC = () => {
                   Análisis de Costos
                 </div>
                 <p className="text-xs text-blue-700">
-                  El costo del equipo ({formatCurrency(teamTotal)}) representa el {((teamTotal / baseCost) * 100).toFixed(0)}% del costo base 
+                  El costo del equipo ({formatCurrency(teamTotal)}) representa el {((teamTotal / totalAmount) * 100).toFixed(0)}% del costo total 
                   del proyecto. Incluye {quotationData.teamMembers.length} roles distribuidos en {teamHours} horas totales, 
-                  con una tarifa promedio de {formatCurrency(teamTotal / teamHours)} por hora.
+                  con una tarifa promedio de {formatCurrency(teamHours > 0 ? teamTotal / teamHours : 0)} por hora.
                 </p>
               </div>
             </CardContent>
