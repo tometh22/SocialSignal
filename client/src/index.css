@@ -630,44 +630,286 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Mejoras de sombras */
-.shadow-soft {
-  box-shadow: 
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    0 4px 6px -1px rgba(0, 0, 0, 0.1);
+/* Variantes mejoradas de Glassmorphism */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 }
 
-.shadow-strong {
+.glass-card-dark {
+  background: rgba(17, 25, 40, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.125);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.glass-navbar {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+.glass-navbar-dark {
+  background: rgba(17, 25, 40, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Sistema de sombras avanzado */
+.shadow-soft {
   box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    0 2px 10px rgba(0, 0, 0, 0.06), 
+    0 0 1px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.3s ease;
+}
+
+.shadow-soft:hover {
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.08), 
+    0 0 4px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-medium {
+  box-shadow: 
+    0 6px 16px -1px rgba(0, 0, 0, 0.1), 
+    0 2px 8px -1px rgba(0, 0, 0, 0.05), 
+    0 0 1px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.3s ease;
+}
+
+.shadow-prominent {
+  box-shadow: 
+    0 12px 28px -6px rgba(0, 0, 0, 0.12), 
+    0 18px 88px -12px rgba(0, 0, 0, 0.08), 
+    0 0 1px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.shadow-floating {
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.03), 
+    0 2px 4px rgba(0, 0, 0, 0.03), 
+    0 4px 8px rgba(0, 0, 0, 0.03), 
+    0 8px 16px rgba(0, 0, 0, 0.03), 
+    0 16px 32px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.3s ease;
 }
 
 .shadow-inner-soft {
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-/* Animaciones sutiles */
+/* Animaciones y transiciones */
 .hover-lift {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 }
 
 .hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.hover-emphasis {
+  transition: all 0.2s ease-out;
+}
+
+.hover-emphasis:hover {
+  transform: scale(1.02);
 }
 
 .fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+  animation: fadeIn 0.5s ease-out forwards;
 }
 
+.slide-in {
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+.scale-in {
+  animation: scaleIn 0.4s ease-out forwards;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Animaciones personalizadas */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
   }
-  to {
-    opacity: 1;
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
   }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideDown {
+  from { 
+    opacity: 0; 
+    transform: translateY(-20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.96); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Utilidades de borde */
+.border-gradient {
+  border: double 1px transparent;
+  background-image: linear-gradient(white, white), 
+                    linear-gradient(to right, var(--color-primary-light), var(--color-accent-light));
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+}
+
+.border-top-accent {
+  border-top: 3px solid hsl(var(--primary));
+  transition: border-color 0.3s ease;
+}
+
+.border-left-accent {
+  border-left: 3px solid hsl(var(--primary));
+  transition: border-color 0.3s ease;
+}
+
+/* Más estilos de glassmorphism */
+.glass-pill {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.25rem 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+/* Componentes reutilizables */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  line-height: var(--line-height-normal);
+  transition: all 0.2s ease;
+}
+
+.status-badge--success {
+  background-color: hsla(var(--success), 0.1);
+  color: hsl(var(--success));
+}
+
+.status-badge--warning {
+  background-color: hsla(var(--warning), 0.1);
+  color: hsl(var(--warning));
+}
+
+.status-badge--error {
+  background-color: hsla(var(--destructive), 0.1);
+  color: hsl(var(--destructive));
+}
+
+.status-badge--primary {
+  background-color: hsla(var(--primary), 0.1);
+  color: hsl(var(--primary));
+}
+
+.status-badge--neutral {
+  background-color: hsl(210, 16%, 93%);
+  color: hsl(210, 12%, 25%);
+}
+
+/* Efectos de desenfoque y profundidad */
+.blur-backdrop {
+  position: relative;
+}
+
+.blur-backdrop::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: inherit;
+  filter: blur(10px);
+  z-index: -1;
+  margin: -20px;
 }

@@ -207,9 +207,14 @@ export default function Statistics() {
               </Card>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <Card className="shadow-soft hover-lift">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-heading">Cotizaciones por Estado</CardTitle>
+                <Card className="glass-card shadow-medium hover-lift scale-in">
+                  <CardHeader className="pb-2 border-b border-white/10">
+                    <CardTitle className="text-heading flex items-center">
+                      <span className="bg-primary/20 p-2 rounded-full mr-2">
+                        <ArrowUpDown className="h-5 w-5 text-primary" />
+                      </span>
+                      Cotizaciones por Estado
+                    </CardTitle>
                     <CardDescription>Distribución de estados de las cotizaciones</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -221,7 +226,7 @@ export default function Statistics() {
                         </div>
                       </div>
                     ) : getStatusData().length > 0 ? (
-                      <div className="h-64">
+                      <div className="h-64 fade-in">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -250,9 +255,14 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-soft hover-lift">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-heading">Tipos de Análisis</CardTitle>
+                <Card className="glass-card shadow-medium hover-lift scale-in">
+                  <CardHeader className="pb-2 border-b border-white/10">
+                    <CardTitle className="text-heading flex items-center">
+                      <span className="bg-accent/20 p-2 rounded-full mr-2">
+                        <Layers className="h-5 w-5 text-accent" />
+                      </span>
+                      Tipos de Análisis
+                    </CardTitle>
                     <CardDescription>Desglose por complejidad de análisis</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -264,7 +274,7 @@ export default function Statistics() {
                         </div>
                       </div>
                     ) : getAnalysisTypeData().length > 0 ? (
-                      <div className="h-64">
+                      <div className="h-64 fade-in">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -293,33 +303,49 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-soft hover-lift">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-heading">Resumen Financiero</CardTitle>
+                <Card className="glass-card shadow-medium hover-lift scale-in">
+                  <CardHeader className="pb-2 border-b border-white/10">
+                    <CardTitle className="text-heading flex items-center">
+                      <span className="bg-success/20 p-2 rounded-full mr-2">
+                        <LineChart className="h-5 w-5 text-success" />
+                      </span>
+                      Resumen Financiero
+                    </CardTitle>
                     <CardDescription>Métricas financieras agregadas</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-6 py-2">
-                      <div className="bg-muted/20 p-4 rounded-md">
+                    <div className="space-y-6 py-4">
+                      <div className="glass-pill p-4 rounded-md shadow-soft slide-in" style={{animationDelay: '0.1s'}}>
                         <p className="text-sm text-neutral-500 font-medium mb-1">Total de Cotizaciones</p>
                         <p className="text-2xl font-semibold text-neutral-900">
-                          {isLoading ? "..." : filteredQuotations.length}
+                          {isLoading ? 
+                            <span className="animate-pulse">...</span> : 
+                            <span className="fade-in">{filteredQuotations.length}</span>
+                          }
                         </p>
                       </div>
                       
-                      <div className="bg-muted/20 p-4 rounded-md">
+                      <div className="glass-pill p-4 rounded-md shadow-soft slide-in" style={{animationDelay: '0.2s'}}>
                         <p className="text-sm text-neutral-500 font-medium mb-1">Valor Total</p>
                         <p className="text-2xl font-semibold text-neutral-900">
-                          {isLoading ? "..." : `$${filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          {isLoading ? 
+                            <span className="animate-pulse">...</span> : 
+                            <span className="fade-in">{`$${filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+                          }
                         </p>
                       </div>
                       
-                      <div className="bg-muted/20 p-4 rounded-md">
+                      <div className="glass-pill p-4 rounded-md shadow-soft slide-in" style={{animationDelay: '0.3s'}}>
                         <p className="text-sm text-neutral-500 font-medium mb-1">Valor Promedio</p>
                         <p className="text-2xl font-semibold text-neutral-900">
-                          {isLoading ? "..." : filteredQuotations.length > 0 
-                            ? `$${(filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0) / filteredQuotations.length).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "$0.00"
+                          {isLoading ? 
+                            <span className="animate-pulse">...</span> : 
+                            <span className="fade-in">
+                              {filteredQuotations.length > 0 
+                                ? `$${(filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0) / filteredQuotations.length).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : "$0.00"
+                              }
+                            </span>
                           }
                         </p>
                       </div>
