@@ -509,17 +509,60 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   // Métodos para el Paso 4: Ajustes Financieros
   const updateFinancials = useCallback((updates: Partial<FinancialSettings>) => {
-    setQuotationData(prev => ({
-      ...prev,
-      financials: {
+    // Actualizar estado financiero inmediatamente
+    setQuotationData(prev => {
+      const newFinancials = {
         ...prev.financials,
         ...updates
-      }
-    }));
-    
-    // Recalcular costos cuando cambian los ajustes financieros
-    setTimeout(() => calculateCosts(quotationData.teamMembers), 0);
-  }, [quotationData.teamMembers]);
+      };
+      
+      // Usar una función auxiliar para recalcular costos inmediatamente
+      const recalculateNow = () => {
+        console.log("Actualizando financials en tiempo real:", updates);
+        
+        // Obtener los valores actualizados para cálculos inmediatos
+        const newBaseCost = baseCost || 0;
+        
+        // Recalcular el ajuste por complejidad
+        const newAdjustment = calculateComplexityAdjustment(
+          newBaseCost, 
+          complexityFactors
+        );
+        
+        // Recalcular el markup
+        const newMarkup = calculateMarkup(newBaseCost + newAdjustment);
+        
+        // Recalcular el total con los nuevos valores financieros
+        const newTotal = calculateTotalAmount(
+          newBaseCost,
+          newAdjustment,
+          newMarkup,
+          'platformCost' in updates ? updates.platformCost! : prev.financials.platformCost,
+          'deviationPercentage' in updates ? updates.deviationPercentage! : prev.financials.deviationPercentage
+        );
+        
+        // Actualizar estados inmediatamente
+        setComplexityAdjustment(newAdjustment);
+        setMarkupAmount(newMarkup);
+        setTotalAmount(newTotal);
+        
+        console.log("Nuevos valores calculados:", {
+          baseCost: newBaseCost,
+          adjustment: newAdjustment,
+          markup: newMarkup,
+          total: newTotal
+        });
+      };
+      
+      // Ejecutar el recálculo después de actualizar el estado
+      setTimeout(recalculateNow, 0);
+      
+      return {
+        ...prev,
+        financials: newFinancials
+      };
+    });
+  }, [baseCost, complexityFactors, calculateComplexityAdjustment, calculateMarkup, calculateTotalAmount]);
 
   // Funciones de cálculo de costos
   const calculateCosts = useCallback((teamMembers: TeamMember[]) => {

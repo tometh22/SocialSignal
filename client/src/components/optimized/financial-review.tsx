@@ -211,8 +211,18 @@ const OptimizedFinancialReview: React.FC = () => {
                 min={0}
                 max={30}
                 step={0.5}
-                onValueChange={(value) => updateFinancials({ discount: value[0] })}
-                className="max-w-md"
+                onValueChange={(value) => {
+                  // Actualización inmediata
+                  updateFinancials({ discount: value[0] });
+                  
+                  // Forzar actualización después de que se complete el cambio
+                  setTimeout(() => {
+                    // Crear y disparar un evento para forzar la actualización de la UI
+                    const event = new Event('change', { bubbles: true });
+                    document.getElementById('discount')?.dispatchEvent(event);
+                  }, 50);
+                }}
+                className="max-w-md focus:ring-2 focus:ring-primary"
               />
             </div>
             
@@ -243,8 +253,20 @@ const OptimizedFinancialReview: React.FC = () => {
                 value={quotationData.financials.platformCost}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
+                  // Actualización inmediata con actualización forzada
+                  updateFinancials({ platformCost: isNaN(value) ? 0 : value });
+                  // Forzar recálculo después de un breve momento para asegurar que se propague el cambio
+                  setTimeout(() => {
+                    const event = new Event('input', { bubbles: true });
+                    e.target.dispatchEvent(event);
+                  }, 50);
+                }}
+                // Agregar evento onBlur para garantizar actualización al salir del campo
+                onBlur={(e) => {
+                  const value = parseFloat(e.target.value);
                   updateFinancials({ platformCost: isNaN(value) ? 0 : value });
                 }}
+                className="transition-all focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-neutral-500">
                 Costos asociados a licencias de software, herramientas de análisis y servicios en la nube.
@@ -263,8 +285,20 @@ const OptimizedFinancialReview: React.FC = () => {
                 value={quotationData.financials.deviationPercentage}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
+                  // Actualización inmediata con actualización forzada
+                  updateFinancials({ deviationPercentage: isNaN(value) ? 0 : value });
+                  // Forzar recálculo después de un breve momento para asegurar que se propague el cambio
+                  setTimeout(() => {
+                    const event = new Event('input', { bubbles: true });
+                    e.target.dispatchEvent(event);
+                  }, 50);
+                }}
+                // Agregar evento onBlur para garantizar actualización al salir del campo
+                onBlur={(e) => {
+                  const value = parseFloat(e.target.value);
                   updateFinancials({ deviationPercentage: isNaN(value) ? 0 : value });
                 }}
+                className="transition-all focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-neutral-500">
                 Margen adicional para cubrir posibles desviaciones durante la ejecución del proyecto.
