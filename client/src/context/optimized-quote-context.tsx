@@ -38,6 +38,7 @@ export interface FinancialSettings {
   platformCost: number;
   deviationPercentage: number;
   discount: number;
+  marginFactor?: number; // Factor multiplicador para el margen operativo (1.0-10.0)
 }
 
 export interface QuotationData {
@@ -131,6 +132,7 @@ const initialQuotationData: QuotationData = {
     platformCost: 0,
     deviationPercentage: 0,
     discount: 0,
+    marginFactor: 1.0, // Valor inicial del multiplicador de margen
   },
 };
 

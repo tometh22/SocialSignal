@@ -304,7 +304,98 @@ const OptimizedFinancialReview: React.FC = () => {
                 Margen adicional para cubrir posibles desviaciones durante la ejecución del proyecto.
               </p>
             </div>
+
+            {/* Factor de multiplicación para el margen operativo */}
+            <div className="space-y-3 col-span-1 md:col-span-2">
+              <Label htmlFor="margin-factor">
+                Factor de Margen Operativo: {quotationData.financials.marginFactor?.toFixed(1) || "1.0"}x
+              </Label>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500">1.0x</span>
+                <Slider
+                  id="margin-factor"
+                  value={[quotationData.financials.marginFactor || 1.0]}
+                  min={1.0}
+                  max={10.0}
+                  step={0.1}
+                  onValueChange={(value) => {
+                    // Actualización inmediata
+                    updateFinancials({ marginFactor: value[0] });
+                    
+                    // Forzar actualización después de que se complete el cambio
+                    setTimeout(() => {
+                      const event = new Event('change', { bubbles: true });
+                      document.getElementById('margin-factor')?.dispatchEvent(event);
+                    }, 50);
+                  }}
+                  className="flex-1 focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-sm text-gray-500">10.0x</span>
+              </div>
+              <p className="text-xs text-neutral-500">
+                Factor multiplicador que determina el margen operativo aplicado al proyecto. A mayor valor, mayor será el margen de ganancia.
+              </p>
+            </div>
           </div>
+        </CardContent>
+      </Card>
+      
+      {/* Detalle del Equipo Asignado */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Detalle del Equipo Asignado
+          </CardTitle>
+          <CardDescription>Resumen de los miembros del equipo y sus costos</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {quotationData.teamMembers.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Personal</TableHead>
+                    <TableHead className="text-right">Horas</TableHead>
+                    <TableHead className="text-right">Tarifa</TableHead>
+                    <TableHead className="text-right">Costo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quotationData.teamMembers.map((member, index) => {
+                    // Buscar el nombre del rol
+                    const role = availableRoles?.find(r => r.id === member.roleId);
+                    const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                    
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{role?.name || 'Rol no especificado'}</TableCell>
+                        <TableCell>{person?.name || 'No asignado'}</TableCell>
+                        <TableCell className="text-right">{member.hours}</TableCell>
+                        <TableCell className="text-right">${member.rate.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-medium">${member.cost.toFixed(2)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  <TableRow className="bg-gray-50 font-medium">
+                    <TableCell colSpan={4} className="text-right">Total Equipo:</TableCell>
+                    <TableCell className="text-right">${baseCost.toFixed(2)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <p>No hay miembros en el equipo asignado.</p>
+              <p className="text-sm mt-2">Regresa al paso anterior para configurar el equipo.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
