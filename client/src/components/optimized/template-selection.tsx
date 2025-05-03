@@ -14,6 +14,7 @@ import { Check, Search, FileText, BarChart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ComplexityFactorsCard } from './complexity-factors-card';
+import { FinancialSummary } from './financial-summary';
 
 const OptimizedTemplateSelection: React.FC = () => {
   const {
@@ -48,13 +49,19 @@ const OptimizedTemplateSelection: React.FC = () => {
   const handleTemplateSelect = (template: ReportTemplate) => {
     console.log("Plantilla seleccionada:", template);
     
+    // Asegurarse de que el costo base de la plantilla sea un número válido
+    console.log("Costo base de la plantilla seleccionada:", template.baseCost);
+    
     // Al seleccionar una plantilla, establecer también su nivel de complejidad
     let templateComplexity: 'low' | 'medium' | 'high' = 'medium';
     if (template.complexity === 'low' || template.complexity === 'medium' || template.complexity === 'high') {
       templateComplexity = template.complexity;
     }
     
-    // Primero establecer la complejidad y otros valores
+    // Ahora actualizar la plantilla para que se considere el costo base
+    updateTemplate(template);
+    
+    // Luego establecer la complejidad y otros valores
     updateComplexity(templateComplexity);
     
     // Si no se han establecido los factores de complejidad, poner valores por defecto
@@ -74,11 +81,15 @@ const OptimizedTemplateSelection: React.FC = () => {
       updateClientEngagement('medium');
     }
     
-    // Asegurarse de que el costo base de la plantilla sea un número válido
-    console.log("Costo base de la plantilla seleccionada:", template.baseCost);
-    
-    // Ahora actualizar la plantilla para que se considere el costo base
-    updateTemplate(template);
+    // Forzar recálculo de costos después de actualizar la plantilla
+    setTimeout(() => {
+      console.log("Valores después de seleccionar plantilla:", {
+        baseCost,
+        complexityAdjustment,
+        totalAmount,
+        template: template
+      });
+    }, 500);
     
     // Cambiar automáticamente a la pestaña "Detalles y Ajustes" después de seleccionar una plantilla
     setTimeout(() => {
@@ -226,44 +237,11 @@ const OptimizedTemplateSelection: React.FC = () => {
           />
           
           {/* Visualización de costos */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Resumen de Costos</CardTitle>
-              <CardDescription>Vista previa del impacto de tus selecciones</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Valor']} />
-                    <Bar 
-                      dataKey="valor" 
-                      fill="#94a3b8"
-                      radius={[4, 4, 0, 0]} 
-                    />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Costo Base:</span>
-                  <span className="font-medium">${baseCost.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Ajuste de Complejidad:</span>
-                  <span className="font-medium">${complexityAdjustment.toFixed(2)}</span>
-                </div>
-                <div className="col-span-2 pt-2 mt-2 border-t flex justify-between">
-                  <span className="font-medium">Total Estimado:</span>
-                  <span className="font-bold text-primary">${totalAmount.toFixed(2)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <FinancialSummary 
+            baseCost={baseCost} 
+            complexityAdjustment={complexityAdjustment} 
+            totalAmount={totalAmount} 
+          />
 
           {/* Selección de complejidad para el caso personalizado */}
           <div className="space-y-4">
@@ -397,59 +375,11 @@ const OptimizedTemplateSelection: React.FC = () => {
         {/* Los factores de complejidad se muestran solo en la sección de abajo */}
         
         {/* Visualización de costos */}
-        <Card className="border-primary/20">
-          <CardHeader className="pb-2 bg-primary/5">
-            <CardTitle className="text-base flex items-center">
-              <span className="text-primary mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <path d="M12 8v8"></path>
-                  <path d="M8 12h8"></path>
-                </svg>
-              </span>
-              Resumen de Costos
-            </CardTitle>
-            <CardDescription>Vista previa del impacto de tus selecciones</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 grid grid-cols-1 gap-x-4 gap-y-2 text-sm">
-              <div className="flex justify-between items-center border-b pb-2">
-                <span className="text-neutral-600">Costo Base:</span>
-                <span className="font-medium text-base">${baseCost.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <div>
-                  <span className="text-neutral-600">Ajuste por Complejidad:</span>
-                  <div className="text-xs text-neutral-500">Basado en tus selecciones</div>
-                </div>
-                <span className="font-medium text-base text-blue-600">${complexityAdjustment.toFixed(2)}</span>
-              </div>
-              <div className="pt-4 mt-2 border-t flex justify-between items-center bg-primary/5 p-3 rounded-md">
-                <div>
-                  <span className="font-medium">Total Estimado:</span>
-                  <div className="text-xs text-neutral-500">Costo Base + Ajustes</div>
-                </div>
-                <span className="font-bold text-xl text-primary">${totalAmount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="h-40 mt-6">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Valor']} />
-                  <Bar 
-                    dataKey="valor" 
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]} 
-                  />
-                </RechartsBarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        <FinancialSummary 
+          baseCost={baseCost} 
+          complexityAdjustment={complexityAdjustment} 
+          totalAmount={totalAmount} 
+        />
 
         {/* Selección de complejidad con diseño mejorado */}
         <div className="space-y-4">
