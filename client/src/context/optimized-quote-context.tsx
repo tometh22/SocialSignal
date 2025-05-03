@@ -654,10 +654,21 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   // Al seleccionar una plantilla, establecer el costo base según la plantilla
   useEffect(() => {
-    if (quotationData.template && quotationData.template.baseCost) {
-      // Usar el costo base de la plantilla
-      setBaseCost(quotationData.template.baseCost);
-      console.log("Estableciendo costo base desde plantilla:", quotationData.template.baseCost);
+    if (quotationData.template) {
+      // Si la plantilla existe, obtener su costo
+      if (quotationData.template.baseCost !== undefined) {
+        // Usar el costo base de la plantilla
+        setBaseCost(quotationData.template.baseCost);
+        console.log("Estableciendo costo base desde plantilla:", quotationData.template.baseCost);
+      } else if (quotationData.template.platformCost) {
+        // Usar el costo de la plataforma como alternativa
+        setBaseCost(quotationData.template.platformCost);
+        console.log("Usando platformCost como costo base:", quotationData.template.platformCost);
+      } else {
+        // Un valor predeterminado si no hay costos
+        setBaseCost(1500);
+        console.log("Usando valor predeterminado para la plantilla:", 1500);
+      }
     } else if (quotationData.template === null) {
       // Si es modo personalizado, establecer un costo base predeterminado
       setBaseCost(1000);

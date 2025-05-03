@@ -70,6 +70,7 @@ export const reportTemplates = pgTable("report_templates", {
   features: text("features"),
   platformCost: doublePrecision("platform_cost").default(0),
   deviationPercentage: doublePrecision("deviation_percentage").default(0),
+  baseCost: doublePrecision("base_cost").default(0),
 });
 
 export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pick({
