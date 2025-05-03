@@ -12,7 +12,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import OptimizedTeamConfig from '@/components/optimized/team-config';
-import OptimizedFinancialReview from '@/components/optimized/financial-review';
+import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 
 // Componente principal que contiene el flujo de cotización optimizado
 const OptimizedQuote = () => {
