@@ -532,7 +532,10 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
         );
         
         // Recalcular el markup
-        const newMarkup = calculateMarkup(newBaseCost + newAdjustment);
+        const newMarkup = calculateMarkup(
+          newBaseCost + newAdjustment,
+          'marginFactor' in updates ? updates.marginFactor! : prev.financials.marginFactor || 1.0
+        );
         
         // Recalcular el total con los nuevos valores financieros
         const newTotal = calculateTotalAmount(
@@ -578,7 +581,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     
     // Calcular markup
     const adjusted = base + complexityAdj;
-    const markup = calculateMarkup(adjusted);
+    const markup = calculateMarkup(adjusted, quotationData.financials.marginFactor || 1.0);
     setMarkupAmount(markup);
     
     // Calcular total con costos de plataforma y desviación

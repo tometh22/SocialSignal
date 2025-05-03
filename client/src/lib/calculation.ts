@@ -114,14 +114,25 @@ export const calculateComplexityAdjustment = (
   return baseCost * totalFactor;
 };
 
-export const calculateMarkup = (adjustedBaseCost: number): number => {
+export const calculateMarkup = (
+  adjustedBaseCost: number,
+  marginFactor: number = 1.0
+): number => {
   // Mejorado para que siempre devuelva un valor numérico válido
   if (isNaN(adjustedBaseCost) || adjustedBaseCost < 0) {
     console.warn("Valor inválido para calcular markup:", adjustedBaseCost);
     return 0;
   }
-  // Apply minimum 2x markup (100% margin)
-  return adjustedBaseCost;
+  
+  // Validar el factor de margen (1.0-10.0)
+  const factor = !isNaN(marginFactor) && marginFactor >= 1.0 && marginFactor <= 10.0 
+    ? marginFactor 
+    : 1.0;
+    
+  console.log(`Aplicando factor de margen: ${factor}x al costo ajustado: ${adjustedBaseCost}`);
+  
+  // Aplicar el factor multiplicador al margen
+  return adjustedBaseCost * factor;
 };
 
 export const calculateTotalAmount = (

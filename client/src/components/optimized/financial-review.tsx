@@ -16,7 +16,9 @@ const OptimizedFinancialReview: React.FC = () => {
     baseCost,
     complexityAdjustment,
     markupAmount,
-    totalAmount
+    totalAmount,
+    availableRoles,
+    availablePersonnel
   } = useOptimizedQuote();
   
   // Usar un efecto para ajustar estilos de scroll
@@ -370,8 +372,8 @@ const OptimizedFinancialReview: React.FC = () => {
                 <TableBody>
                   {quotationData.teamMembers.map((member, index) => {
                     // Buscar el nombre del rol
-                    const role = availableRoles?.find(r => r.id === member.roleId);
-                    const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                    const role = availableRoles?.find((r: {id: number}) => r.id === member.roleId);
+                    const person = availablePersonnel?.find((p: {id: number}) => p.id === member.personnelId);
                     
                     return (
                       <TableRow key={index}>
