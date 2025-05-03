@@ -173,9 +173,13 @@ const ActiveProjects: React.FC = () => {
         <div className="container-xl fade-in">
           <div className="section-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-section">
-              <h1 className="text-display text-balance text-neutral-900">Gestión de Proyectos</h1>
-              <Button className="mt-4 sm:mt-0 hover-lift" onClick={() => setLocation("/active-projects/new")}>
-                <PlusCircle className="mr-2 h-4 w-4" />
+              <h1 className="text-display text-balance text-neutral-900 slide-in">Gestión de Proyectos</h1>
+              <Button 
+                className="mt-4 sm:mt-0 hover-lift shadow-soft hover:shadow-medium transition-all slide-in" 
+                onClick={() => setLocation("/active-projects/new")}
+                size="lg"
+              >
+                <PlusCircle className="mr-2 h-5 w-5" />
                 Nuevo Proyecto
               </Button>
             </div>
@@ -231,21 +235,26 @@ const ActiveProjects: React.FC = () => {
               </Card>
 
               {/* Tabs y tabla de proyectos */}
-              <Card className="shadow-soft">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-heading">Proyectos en Ejecución</CardTitle>
+              <Card className="glass-card shadow-medium scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-white/10">
+                  <CardTitle className="text-heading flex items-center">
+                    <span className="bg-accent/20 p-2 rounded-full mr-2">
+                      <ListChecks className="h-5 w-5 text-accent" />
+                    </span>
+                    Proyectos en Ejecución
+                  </CardTitle>
                   <Tabs
                     defaultValue="all"
                     value={activeTab}
                     onValueChange={setActiveTab}
                     className="w-full max-w-xl"
                   >
-                    <TabsList className="grid grid-cols-5 w-full">
-                      <TabsTrigger value="all">Todos</TabsTrigger>
-                      <TabsTrigger value="active">Activos</TabsTrigger>
-                      <TabsTrigger value="on-hold">En Pausa</TabsTrigger>
-                      <TabsTrigger value="completed">Completados</TabsTrigger>
-                      <TabsTrigger value="by-client">Por Cliente</TabsTrigger>
+                    <TabsList className="grid grid-cols-5 w-full glass-panel">
+                      <TabsTrigger value="all" className="hover-lift">Todos</TabsTrigger>
+                      <TabsTrigger value="active" className="hover-lift">Activos</TabsTrigger>
+                      <TabsTrigger value="on-hold" className="hover-lift">En Pausa</TabsTrigger>
+                      <TabsTrigger value="completed" className="hover-lift">Completados</TabsTrigger>
+                      <TabsTrigger value="by-client" className="hover-lift">Por Cliente</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </CardHeader>
@@ -253,31 +262,42 @@ const ActiveProjects: React.FC = () => {
                 <CardContent className="p-0">
                   <div className="rounded-md">
                     {(isLoadingProjects || isLoadingClientProjects) ? (
-                      <div className="flex justify-center items-center h-[300px]">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <div className="flex justify-center items-center h-[300px] scale-in">
+                        <div className="glass-pill p-8 rounded-xl shadow-medium flex flex-col items-center">
+                          <div className="bg-primary/10 p-4 rounded-full mb-4">
+                            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                          </div>
+                          <h3 className="text-heading text-xl mb-2">Cargando proyectos</h3>
+                          <p className="text-neutral-500">Por favor espera mientras cargamos la información...</p>
+                        </div>
                       </div>
                     ) : filteredProjects.length === 0 ? (
-                      <div className="flex flex-col justify-center items-center h-[300px] text-center px-4">
-                        <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-heading">No hay proyectos</h3>
-                        <p className="text-neutral-500 mt-2 max-w-md">
-                          {searchQuery
-                            ? "No se encontraron proyectos que coincidan con tu búsqueda. Intenta con otros términos."
-                            : activeTab !== "all"
-                            ? `No hay proyectos ${
-                                activeTab === "by-client" ? "para este cliente" : "en este estado"
-                              }.`
-                            : "No hay proyectos activos en el sistema. Crea uno nuevo para comenzar."}
-                        </p>
-                        {!searchQuery && activeTab === "all" && (
-                          <Button
-                            className="mt-4 hover-lift"
-                            onClick={() => setLocation("/active-projects/new")}
-                          >
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Nuevo Proyecto
-                          </Button>
-                        )}
+                      <div className="flex flex-col justify-center items-center h-[300px] text-center px-4 scale-in">
+                        <div className="glass-pill p-8 rounded-xl shadow-medium fade-in flex flex-col items-center max-w-md">
+                          <div className="bg-primary/10 p-4 rounded-full mb-4">
+                            <FileText className="h-12 w-12 text-primary" />
+                          </div>
+                          <h3 className="text-heading text-xl mb-2">No hay proyectos</h3>
+                          <p className="text-neutral-500 mb-6">
+                            {searchQuery
+                              ? "No se encontraron proyectos que coincidan con tu búsqueda. Intenta con otros términos."
+                              : activeTab !== "all"
+                              ? `No hay proyectos ${
+                                  activeTab === "by-client" ? "para este cliente" : "en este estado"
+                                }.`
+                              : "No hay proyectos activos en el sistema. Crea uno nuevo para comenzar."}
+                          </p>
+                          {!searchQuery && activeTab === "all" && (
+                            <Button
+                              className="hover-lift shadow-soft hover:shadow-medium transition-all"
+                              onClick={() => setLocation("/active-projects/new")}
+                              size="lg"
+                            >
+                              <PlusCircle className="mr-2 h-5 w-5" />
+                              Nuevo Proyecto
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="scale-in">
@@ -396,27 +416,32 @@ const ActiveProjects: React.FC = () => {
                             }
                           ]}
                           emptyState={
-                            <div className="flex flex-col justify-center items-center h-[300px] text-center px-4">
-                              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                              <h3 className="text-heading">No hay proyectos</h3>
-                              <p className="text-neutral-500 mt-2 max-w-md">
-                                {searchQuery
-                                  ? "No se encontraron proyectos que coincidan con tu búsqueda. Intenta con otros términos."
-                                  : activeTab !== "all"
-                                  ? `No hay proyectos ${
-                                      activeTab === "by-client" ? "para este cliente" : "en este estado"
-                                    }.`
-                                  : "No hay proyectos activos en el sistema. Crea uno nuevo para comenzar."}
-                              </p>
-                              {!searchQuery && activeTab === "all" && (
-                                <Button
-                                  className="mt-4 hover-lift"
-                                  onClick={() => setLocation("/active-projects/new")}
-                                >
-                                  <PlusCircle className="mr-2 h-4 w-4" />
-                                  Nuevo Proyecto
-                                </Button>
-                              )}
+                            <div className="flex flex-col justify-center items-center h-[300px] text-center px-4 scale-in">
+                              <div className="glass-pill p-8 rounded-xl shadow-medium fade-in flex flex-col items-center max-w-md">
+                                <div className="bg-primary/10 p-4 rounded-full mb-4">
+                                  <FileText className="h-12 w-12 text-primary" />
+                                </div>
+                                <h3 className="text-heading text-xl mb-2">No hay proyectos</h3>
+                                <p className="text-neutral-500 mb-6">
+                                  {searchQuery
+                                    ? "No se encontraron proyectos que coincidan con tu búsqueda. Intenta con otros términos."
+                                    : activeTab !== "all"
+                                    ? `No hay proyectos ${
+                                        activeTab === "by-client" ? "para este cliente" : "en este estado"
+                                      }.`
+                                    : "No hay proyectos activos en el sistema. Crea uno nuevo para comenzar."}
+                                </p>
+                                {!searchQuery && activeTab === "all" && (
+                                  <Button
+                                    className="hover-lift shadow-soft hover:shadow-medium transition-all"
+                                    onClick={() => setLocation("/active-projects/new")}
+                                    size="lg"
+                                  >
+                                    <PlusCircle className="mr-2 h-5 w-5" />
+                                    Nuevo Proyecto
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           }
                         />
