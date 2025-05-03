@@ -46,12 +46,15 @@ const OptimizedTemplateSelection: React.FC = () => {
 
   // Manejar la selección de una plantilla
   const handleTemplateSelect = (template: ReportTemplate) => {
-    updateTemplate(template);
+    console.log("Plantilla seleccionada:", template);
+    
     // Al seleccionar una plantilla, establecer también su nivel de complejidad
     let templateComplexity: 'low' | 'medium' | 'high' = 'medium';
     if (template.complexity === 'low' || template.complexity === 'medium' || template.complexity === 'high') {
       templateComplexity = template.complexity;
     }
+    
+    // Primero establecer la complejidad y otros valores
     updateComplexity(templateComplexity);
     
     // Si no se han establecido los factores de complejidad, poner valores por defecto
@@ -70,6 +73,12 @@ const OptimizedTemplateSelection: React.FC = () => {
     if (!quotationData.clientEngagement) {
       updateClientEngagement('medium');
     }
+    
+    // Asegurarse de que el costo base de la plantilla sea un número válido
+    console.log("Costo base de la plantilla seleccionada:", template.baseCost);
+    
+    // Ahora actualizar la plantilla para que se considere el costo base
+    updateTemplate(template);
     
     // Cambiar automáticamente a la pestaña "Detalles y Ajustes" después de seleccionar una plantilla
     setTimeout(() => {
@@ -132,6 +141,12 @@ const OptimizedTemplateSelection: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-neutral-500">Páginas:</span>
                 <span>{template.pageRange}</span>
+              </div>
+            )}
+            {template.baseCost !== null && template.baseCost !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Costo Base:</span>
+                <span>${template.baseCost.toFixed(2)}</span>
               </div>
             )}
             {template.platformCost !== null && (
@@ -360,6 +375,12 @@ const OptimizedTemplateSelection: React.FC = () => {
                   <div>
                     <p className="font-medium text-neutral-700">Rango de páginas:</p>
                     <p className="mt-1">{quotationData.template.pageRange}</p>
+                  </div>
+                )}
+                {quotationData.template.baseCost !== null && quotationData.template.baseCost !== undefined && (
+                  <div>
+                    <p className="font-medium text-neutral-700">Costo Base:</p>
+                    <p className="mt-1">${quotationData.template.baseCost.toFixed(2)}</p>
                   </div>
                 )}
                 {quotationData.template.features && (
