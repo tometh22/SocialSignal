@@ -81,17 +81,40 @@ export const calculateComplexityAdjustment = (
   baseCost: number,
   factors: ComplexityFactors
 ): number => {
+  // Asegurarse de que todos los factores sean números válidos
+  const analysisTypeFactor = isNaN(factors.analysisTypeFactor) ? 0 : factors.analysisTypeFactor;
+  const mentionsVolumeFactor = isNaN(factors.mentionsVolumeFactor) ? 0 : factors.mentionsVolumeFactor;
+  const countriesFactor = isNaN(factors.countriesFactor) ? 0 : factors.countriesFactor;
+  const clientEngagementFactor = isNaN(factors.clientEngagementFactor) ? 0 : factors.clientEngagementFactor;
+  const templateFactor = isNaN(factors.templateFactor) ? 0 : factors.templateFactor;
+  
+  // Calcular el factor total
   const totalFactor =
-    factors.analysisTypeFactor +
-    factors.mentionsVolumeFactor +
-    factors.countriesFactor +
-    factors.clientEngagementFactor +
-    factors.templateFactor;
+    analysisTypeFactor +
+    mentionsVolumeFactor +
+    countriesFactor +
+    clientEngagementFactor +
+    templateFactor;
+  
+  console.log("Factores de complejidad:", { 
+    analysisTypeFactor, 
+    mentionsVolumeFactor, 
+    countriesFactor, 
+    clientEngagementFactor, 
+    templateFactor,
+    totalFactor
+  });
 
+  // Aplicar el factor al costo base
   return baseCost * totalFactor;
 };
 
 export const calculateMarkup = (adjustedBaseCost: number): number => {
+  // Mejorado para que siempre devuelva un valor numérico válido
+  if (isNaN(adjustedBaseCost) || adjustedBaseCost < 0) {
+    console.warn("Valor inválido para calcular markup:", adjustedBaseCost);
+    return 0;
+  }
   // Apply minimum 2x markup (100% margin)
   return adjustedBaseCost;
 };
@@ -103,11 +126,29 @@ export const calculateTotalAmount = (
   platformCost: number = 0,
   deviationPercentage: number = 0
 ): number => {
+  // Verificar y sanear valores de entrada
+  baseCost = isNaN(baseCost) ? 0 : baseCost;
+  complexityAdjustment = isNaN(complexityAdjustment) ? 0 : complexityAdjustment;
+  markupAmount = isNaN(markupAmount) ? 0 : markupAmount;
+  platformCost = isNaN(platformCost) ? 0 : platformCost;
+  deviationPercentage = isNaN(deviationPercentage) ? 0 : deviationPercentage;
+  
   // Calcular el subtotal antes de aplicar el desvío
   const subtotal = baseCost + complexityAdjustment + markupAmount + platformCost;
   
   // Aplicar el porcentaje de desvío (si existe)
   const deviationAmount = subtotal * (deviationPercentage / 100);
+  
+  console.log("Cálculo total:", {
+    baseCost,
+    complexityAdjustment,
+    markupAmount,
+    platformCost,
+    deviationPercentage,
+    subtotal,
+    deviationAmount,
+    total: subtotal + deviationAmount
+  });
   
   return subtotal + deviationAmount;
 };
