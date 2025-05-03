@@ -81,6 +81,11 @@ export const calculateComplexityAdjustment = (
   baseCost: number,
   factors: ComplexityFactors
 ): number => {
+  // Verificar que el costo base sea un número válido
+  if (!baseCost || isNaN(baseCost)) {
+    baseCost = 0;
+  }
+  
   // Asegurarse de que todos los factores sean números válidos
   const analysisTypeFactor = isNaN(factors.analysisTypeFactor) ? 0 : factors.analysisTypeFactor;
   const mentionsVolumeFactor = isNaN(factors.mentionsVolumeFactor) ? 0 : factors.mentionsVolumeFactor;
