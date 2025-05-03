@@ -129,119 +129,80 @@ const OptimizedQuoteContent = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container py-4">
-          <h2 className="font-medium text-lg">Nueva Cotización Optimizada</h2>
+      {/* Header integrado con la navegación de pasos */}
+      <div className="border-b bg-white shadow-sm sticky top-0 z-10">
+        <div className="container py-3">
+          <div className="flex flex-col">
+            {/* Título principal */}
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-xl font-medium text-gray-800">Nueva Cotización</h1>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-8 border-slate-200 text-slate-700"
+                  onClick={() => setLocation('/')}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-8 border-primary/30 text-primary bg-primary/5"
+                  onClick={() => saveQuotation()}
+                >
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> Guardar borrador
+                </Button>
+              </div>
+            </div>
+            
+            {/* Barra de progreso y pasos */}
+            <div className="relative">
+              {/* Barra de progreso */}
+              <div className="absolute h-0.5 bg-neutral-100 left-0 right-0 top-[18px]"></div>
+              <div className="absolute h-0.5 bg-primary left-0 top-[18px]" style={{ 
+                width: `${(currentStep-1)/(4-1)*100}%`, 
+                transition: 'width 0.3s ease-out' 
+              }}></div>
+              
+              {/* Indicadores de pasos */}
+              <div className="grid grid-cols-4 relative">
+                {[
+                  { num: 1, title: "Información Básica" },
+                  { num: 2, title: "Selección de Plantilla" },
+                  { num: 3, title: "Configuración de Equipo" },
+                  { num: 4, title: "Revisión y Ajustes" }
+                ].map((step) => (
+                  <div key={step.num} className="flex flex-col items-center">
+                    <div 
+                      onClick={() => step.num < currentStep && goToStep(step.num)}
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs z-10 mb-1 transition-all 
+                      ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
+                      ${currentStep >= step.num 
+                        ? 'bg-primary text-white shadow-md' 
+                        : 'bg-white text-neutral-400 border border-neutral-200'}`}
+                    >
+                      {step.num}
+                    </div>
+                    <span className={`text-xs font-medium text-center transition-colors pb-2
+                      ${currentStep === step.num ? 'text-primary' : 'text-neutral-500'}`}>
+                      {step.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
       {/* Main content */}
       <div className="flex-1 overflow-auto">
-        <div className="container py-8">
-          {/* Title - Modern clean design */}
-          <div className="mb-10 max-w-3xl">
-            <h1 className="text-2xl font-medium text-neutral-800 mb-2">Crea una Nueva Cotización</h1>
-            <p className="text-neutral-500 text-sm">Completa los siguientes pasos para crear una cotización detallada y precisa para tus clientes</p>
-          </div>
-          
-          {/* Steps navigation - Modern horizontal step indicator */}
-          <div className="mb-10">
-            <div className="relative mb-8">
-              <div className="absolute h-1 bg-neutral-100 left-0 right-0 top-[15px]"></div>
-              <div className="absolute h-1 bg-primary/90 left-0 top-[15px]" style={{ 
-                width: `${(currentStep-1)/(4-1)*100}%`, 
-                transition: 'width 0.3s ease-out' 
-              }}></div>
-              
-              <div className="grid grid-cols-4 relative">
-                <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
-                    currentStep >= 1 
-                      ? 'bg-primary text-white' 
-                      : 'bg-white text-neutral-400 border border-neutral-200'
-                  }`}>
-                    1
-                  </div>
-                  <span className={`text-xs font-medium text-center transition-colors ${
-                    currentStep === 1 ? 'text-primary' : 'text-neutral-500'
-                  }`}>
-                    Información <br/> Básica
-                  </span>
-                </div>
-                
-                <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
-                    currentStep >= 2 
-                      ? 'bg-primary text-white' 
-                      : 'bg-white text-neutral-400 border border-neutral-200'
-                  }`}>
-                    2
-                  </div>
-                  <span className={`text-xs font-medium text-center transition-colors ${
-                    currentStep === 2 ? 'text-primary' : 'text-neutral-500'
-                  }`}>
-                    Selección de <br/> Plantilla
-                  </span>
-                </div>
-                
-                <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
-                    currentStep >= 3 
-                      ? 'bg-primary text-white' 
-                      : 'bg-white text-neutral-400 border border-neutral-200'
-                  }`}>
-                    3
-                  </div>
-                  <span className={`text-xs font-medium text-center transition-colors ${
-                    currentStep === 3 ? 'text-primary' : 'text-neutral-500'
-                  }`}>
-                    Configuración <br/> de Equipo
-                  </span>
-                </div>
-                
-                <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
-                    currentStep >= 4
-                      ? 'bg-primary text-white' 
-                      : 'bg-white text-neutral-400 border border-neutral-200'
-                  }`}>
-                    4
-                  </div>
-                  <span className={`text-xs font-medium text-center transition-colors ${
-                    currentStep === 4 ? 'text-primary' : 'text-neutral-500'
-                  }`}>
-                    Revisión y <br/> Ajustes
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="container py-6">
           
           {/* Content for current step */}
           <Card className="bg-white border border-neutral-100 shadow-sm mb-10 scale-in">
-            <CardHeader className="border-b border-neutral-100 pb-4">
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
-                  <div className="text-primary font-medium">{currentStep}</div>
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-medium">
-                    {currentStep === 1 && "Información Básica"}
-                    {currentStep === 2 && "Selección de Plantilla"}
-                    {currentStep === 3 && "Configuración de Equipo"}
-                    {currentStep === 4 && "Revisión y Ajustes"}
-                  </CardTitle>
-                  <CardDescription className="text-neutral-500 text-sm mt-1">
-                    {currentStep === 1 && "Ingresa la información básica para comenzar la cotización."}
-                    {currentStep === 2 && "Elige la plantilla que mejor se adapte a tus necesidades."}
-                    {currentStep === 3 && "Configura el equipo ideal para este proyecto."}
-                    {currentStep === 4 && "Revisa y ajusta los detalles finales de la cotización."}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 overflow-visible">
+            <CardContent className="p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
               {currentStep === 3 && <OptimizedTeamConfig />}
