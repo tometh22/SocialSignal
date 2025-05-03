@@ -555,9 +555,21 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   }, [complexityFactors, quotationData.financials]);
 
   // Actualizar costos cuando cambian los miembros del equipo o los factores de complejidad
+  // Este efecto solo se dispara cuando cambian los miembros del equipo,
+  // no cuando cambian los factores de complejidad
   useEffect(() => {
-    calculateCosts(quotationData.teamMembers);
-  }, [calculateCosts, quotationData.teamMembers, complexityFactors]);
+    // Evitar recalcular si estamos en el paso 2 (selección de plantilla)
+    if (currentStep === 2 && quotationData.template !== undefined) {
+      console.log("Omitiendo cálculo de costos basado en miembros del equipo en el paso 2");
+      return;
+    }
+    
+    // Solo calcular costos a partir de miembros del equipo cuando hay miembros
+    if (quotationData.teamMembers.length > 0) {
+      console.log("Calculando costos basados en miembros del equipo:", quotationData.teamMembers.length);
+      calculateCosts(quotationData.teamMembers);
+    }
+  }, [calculateCosts, quotationData.teamMembers, currentStep, quotationData.template]);
 
   // Cargar roles disponibles
   const loadRoles = useCallback(async () => {
@@ -821,6 +833,48 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   // Actualizar los cálculos financieros cuando cambian los factores
   useEffect(() => {
+    // Evitar recalcular si baseCost no está establecido
+    if (baseCost <= 0 && currentStep === 2 && quotationData.template) {
+      // Si estamos en el paso 2 y hay una plantilla seleccionada, pero baseCost es 0,
+      // probablemente se acaba de seleccionar la plantilla y aún no se ha establecido baseCost
+      console.log("Esperando a que baseCost se establezca antes de recalcular...");
+      
+      // Verificar si hay un valor de costo base en la plantilla
+      const templateBaseCost = quotationData.template.baseCost;
+      if (templateBaseCost && templateBaseCost > 0) {
+        console.log("Usando baseCost desde la plantilla para el cálculo:", templateBaseCost);
+        
+        // Forzar el cálculo con el costo base de la plantilla
+        try {
+          const adjustment = calculateComplexityAdjustment(templateBaseCost, complexityFactors);
+          setComplexityAdjustment(adjustment);
+          
+          const markup = calculateMarkup(templateBaseCost + adjustment);
+          setMarkupAmount(markup);
+          
+          const total = calculateTotalAmount(
+            templateBaseCost,
+            adjustment,
+            markup,
+            quotationData.financials.platformCost,
+            quotationData.financials.deviationPercentage
+          );
+          setTotalAmount(total);
+          
+          console.log("Actualización forzada de costos completada:", {
+            baseCost: templateBaseCost,
+            adjustment,
+            markup,
+            total
+          });
+        } catch (error) {
+          console.error("Error durante cálculos financieros forzados:", error);
+        }
+        
+        return;
+      }
+    }
+    
     console.log("Recalculando financieros. Base cost:", baseCost);
     
     try {
@@ -855,7 +909,9 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     baseCost, 
     complexityFactors, 
     quotationData.financials.platformCost, 
-    quotationData.financials.deviationPercentage
+    quotationData.financials.deviationPercentage,
+    currentStep,
+    quotationData.template
   ]);
 
   // Inicializar datos cuando se carga el componente
