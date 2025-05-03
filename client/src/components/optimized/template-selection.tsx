@@ -373,13 +373,7 @@ const OptimizedTemplateSelection: React.FC = () => {
           </CardContent>
         </Card>
         
-        {/* Resumen de Factores de Complejidad */}
-        <ComplexityFactorsCard
-          analysisType={quotationData.analysisType}
-          mentionsVolume={quotationData.mentionsVolume}
-          countriesCovered={quotationData.countriesCovered}
-          clientEngagement={quotationData.clientEngagement}
-        />
+        {/* Los factores de complejidad se muestran solo en la sección de abajo */}
         
         {/* Visualización de costos */}
         <Card className="border-primary/20">
