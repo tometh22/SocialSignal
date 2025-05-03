@@ -28,15 +28,7 @@ const OptimizedBasicInfo: React.FC = () => {
 
   return (
     <div>
-      <div className="flex items-center space-x-2 mb-6">
-        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">1</div>
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800">Información Básica</h2>
-          <p className="text-sm text-gray-500">
-            Ingresa la información básica para comenzar la cotización.
-          </p>
-        </div>
-      </div>
+      {/* El encabezado ya está en la tarjeta principal, no es necesario duplicarlo aquí */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
         {/* Cliente y Nombre del Proyecto */}
@@ -127,34 +119,43 @@ const OptimizedBasicInfo: React.FC = () => {
 
       {/* Información del cliente seleccionado */}
       {quotationData.client && (
-        <Card className="mt-8 bg-gradient-to-r from-slate-50 to-white border border-blue-100 shadow-sm overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full opacity-50"></div>
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-lg text-blue-800">Información del Cliente</CardTitle>
-            <CardDescription>Detalles del cliente seleccionado</CardDescription>
+        <Card className="mt-8 bg-white border border-neutral-100 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 border-b border-neutral-100">
+            <div className="flex items-center">
+              <div className="p-2 bg-neutral-50 rounded-sm mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-700">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <div>
+                <CardTitle className="text-base font-medium text-neutral-800">Información del Cliente</CardTitle>
+                <CardDescription className="text-sm text-neutral-500">Detalles del cliente seleccionado</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="relative z-10">
+          <CardContent className="pt-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
               <div>
-                <p className="font-medium text-gray-700 mb-1">Nombre</p>
-                <p className="text-gray-900">{quotationData.client.name}</p>
+                <p className="font-medium text-neutral-500 mb-1 text-xs uppercase tracking-wide">Nombre</p>
+                <p className="text-neutral-800">{quotationData.client.name}</p>
               </div>
               {quotationData.client.contactName && (
                 <div>
-                  <p className="font-medium text-gray-700 mb-1">Contacto</p>
-                  <p className="text-gray-900">{quotationData.client.contactName}</p>
+                  <p className="font-medium text-neutral-500 mb-1 text-xs uppercase tracking-wide">Contacto</p>
+                  <p className="text-neutral-800">{quotationData.client.contactName}</p>
                 </div>
               )}
               {quotationData.client.contactEmail && (
                 <div>
-                  <p className="font-medium text-gray-700 mb-1">Email</p>
-                  <p className="text-gray-900">{quotationData.client.contactEmail}</p>
+                  <p className="font-medium text-neutral-500 mb-1 text-xs uppercase tracking-wide">Email</p>
+                  <p className="text-neutral-800">{quotationData.client.contactEmail}</p>
                 </div>
               )}
               {quotationData.client.contactPhone && (
                 <div>
-                  <p className="font-medium text-gray-700 mb-1">Teléfono</p>
-                  <p className="text-gray-900">{quotationData.client.contactPhone}</p>
+                  <p className="font-medium text-neutral-500 mb-1 text-xs uppercase tracking-wide">Teléfono</p>
+                  <p className="text-neutral-800">{quotationData.client.contactPhone}</p>
                 </div>
               )}
             </div>

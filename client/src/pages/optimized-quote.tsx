@@ -141,68 +141,83 @@ const OptimizedQuoteContent = () => {
         <div className="container py-8">
           {/* Title */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground slide-in">Crea una Nueva Cotización</h1>
-            <p className="text-muted-foreground mt-2">Completa los siguientes pasos para crear una cotización precisa</p>
+            <h1 className="text-3xl font-semibold text-foreground slide-in">Crea una Nueva Cotización</h1>
+            <p className="text-muted-foreground mt-3 text-sm">Completa los siguientes pasos para crear una cotización precisa</p>
           </div>
           
-          {/* Steps navigation */}
-          <Card className="glass-card shadow-medium mb-8 scale-in">
-            <CardHeader className="pb-3 border-b border-white/10">
-              <CardTitle className="flex items-center">
-                <span className="bg-primary/20 p-2 rounded-full mr-2">
+          {/* Steps navigation - elegant, minimal design */}
+          <Card className="bg-white border-0 shadow-sm mb-8 scale-in">
+            <CardHeader className="pb-3 border-b border-neutral-100">
+              <CardTitle className="flex items-center text-lg font-medium">
+                <span className="bg-primary/5 p-2 rounded-sm mr-3 shadow-inner-soft">
                   <ArrowUpDown className="h-5 w-5 text-primary" />
                 </span>
                 Pasos de Cotización
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-neutral-500 text-sm mt-1">
                 Sigue estos 4 pasos para crear una cotización completa y precisa
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-5">
+              <div className="relative mb-1">
+                <div className="absolute h-0.5 bg-neutral-100 left-0 right-0 top-1/2 -translate-y-1/2"></div>
+                <div className="absolute h-0.5 bg-primary/70 left-0 top-1/2 -translate-y-1/2" style={{ 
+                  width: `${(currentStep/4)*100}%`, 
+                  transition: 'width 0.3s ease-in-out' 
+                }}></div>
+              </div>
               <Tabs 
                 value={currentStep.toString()} 
                 onValueChange={(value) => goToStep(parseInt(value))}
                 className="w-full"
               >
-                <TabsList className="grid grid-cols-4 w-full bg-slate-100/50 p-1 rounded-lg">
+                <TabsList className="grid grid-cols-4 w-full bg-transparent p-0 gap-1">
                   <TabsTrigger 
                     value="1" 
                     disabled={currentStep < 1}
-                    className="hover-lift data-[state=active]:glass-pill data-[state=active]:shadow-medium rounded-md transition-all"
+                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
                   >
-                    <div className="flex flex-col items-center py-2">
-                      <span className="text-sm font-medium">Paso 1</span>
-                      <span className="text-xs mt-1">Información Básica</span>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
+                        1
+                      </div>
+                      <span className="text-sm font-medium">Información Básica</span>
                     </div>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="2" 
                     disabled={currentStep < 2}
-                    className="hover-lift data-[state=active]:glass-pill data-[state=active]:shadow-medium rounded-md transition-all"
+                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
                   >
-                    <div className="flex flex-col items-center py-2">
-                      <span className="text-sm font-medium">Paso 2</span>
-                      <span className="text-xs mt-1">Selección de Plantilla</span>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
+                        2
+                      </div>
+                      <span className="text-sm font-medium">Selección de Plantilla</span>
                     </div>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="3" 
                     disabled={currentStep < 3}
-                    className="hover-lift data-[state=active]:glass-pill data-[state=active]:shadow-medium rounded-md transition-all"
+                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
                   >
-                    <div className="flex flex-col items-center py-2">
-                      <span className="text-sm font-medium">Paso 3</span>
-                      <span className="text-xs mt-1">Configuración de Equipo</span>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full ${currentStep >= 3 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
+                        3
+                      </div>
+                      <span className="text-sm font-medium">Configuración de Equipo</span>
                     </div>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="4" 
                     disabled={currentStep < 4}
-                    className="hover-lift data-[state=active]:glass-pill data-[state=active]:shadow-medium rounded-md transition-all"
+                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
                   >
-                    <div className="flex flex-col items-center py-2">
-                      <span className="text-sm font-medium">Paso 4</span>
-                      <span className="text-xs mt-1">Revisión y Ajustes</span>
+                    <div className="flex flex-col items-center">
+                      <div className={`w-6 h-6 rounded-full ${currentStep >= 4 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
+                        4
+                      </div>
+                      <span className="text-sm font-medium">Revisión y Ajustes</span>
                     </div>
                   </TabsTrigger>
                 </TabsList>
@@ -211,7 +226,28 @@ const OptimizedQuoteContent = () => {
           </Card>
           
           {/* Content for current step */}
-          <Card className="glass-card shadow-medium mb-10 scale-in">
+          <Card className="bg-white border border-neutral-100 shadow-sm mb-10 scale-in">
+            <CardHeader className="border-b border-neutral-100 pb-4">
+              <div className="flex items-center">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                  <div className="text-primary font-medium">{currentStep}</div>
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-medium">
+                    {currentStep === 1 && "Información Básica"}
+                    {currentStep === 2 && "Selección de Plantilla"}
+                    {currentStep === 3 && "Configuración de Equipo"}
+                    {currentStep === 4 && "Revisión y Ajustes"}
+                  </CardTitle>
+                  <CardDescription className="text-neutral-500 text-sm mt-1">
+                    {currentStep === 1 && "Ingresa la información básica para comenzar la cotización."}
+                    {currentStep === 2 && "Elige la plantilla que mejor se adapte a tus necesidades."}
+                    {currentStep === 3 && "Configura el equipo ideal para este proyecto."}
+                    {currentStep === 4 && "Revisa y ajusta los detalles finales de la cotización."}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
             <CardContent className="p-6 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
@@ -223,57 +259,57 @@ const OptimizedQuoteContent = () => {
           {/* Tips section */}
           {currentStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10 fade-in">
-              <Card className="glass-pill shadow-medium hover-lift">
+              <Card className="bg-white border border-neutral-100 shadow-sm hover:shadow">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center text-base">
-                    <span className="bg-primary/10 p-2 rounded-full mr-2">
+                    <span className="bg-primary/5 p-2 rounded-sm mr-3">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <line x1="12" y1="16" x2="12" y2="12"></line>
                         <line x1="12" y1="8" x2="12.01" y2="8"></line>
                       </svg>
                     </span>
-                    Consejo
+                    <span className="font-medium">Consejo</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-neutral-600">
                     Al seleccionar el tipo de proyecto, considera el alcance y objetivos para una cotización más precisa.
                   </p>
                 </CardContent>
               </Card>
               
-              <Card className="glass-pill shadow-medium hover-lift">
+              <Card className="bg-white border border-neutral-100 shadow-sm hover:shadow">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center text-base">
-                    <span className="bg-accent/10 p-2 rounded-full mr-2">
+                    <span className="bg-accent/5 p-2 rounded-sm mr-3">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                       </svg>
                     </span>
-                    Recomendación
+                    <span className="font-medium">Recomendación</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-neutral-600">
                     Para proyectos de media o larga duración, te recomendamos incluir al menos un experto en análisis de datos.
                   </p>
                 </CardContent>
               </Card>
               
-              <Card className="glass-pill shadow-medium hover-lift">
+              <Card className="bg-white border border-neutral-100 shadow-sm hover:shadow">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center text-base">
-                    <span className="bg-success/10 p-2 rounded-full mr-2">
+                    <span className="bg-success/5 p-2 rounded-sm mr-3">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                       </svg>
                     </span>
-                    Plantillas populares
+                    <span className="font-medium">Plantillas populares</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-neutral-600">
                     Las plantillas más utilizadas para este tipo de proyectos son "Informe Ejecutivo" y "Análisis de Tendencias".
                   </p>
                 </CardContent>
@@ -284,13 +320,13 @@ const OptimizedQuoteContent = () => {
       </div>
       
       {/* Footer with navigation buttons */}
-      <div className="border-t glass-navbar backdrop-blur-sm py-4 px-5 z-50 shadow-deep sticky bottom-0">
+      <div className="border-t border-neutral-200 bg-white py-4 px-5 z-50 shadow-sm sticky bottom-0">
         <div className="container flex justify-between items-center">
           <Button
             variant="ghost"
             onClick={previousStep}
             disabled={currentStep === 1}
-            className="flex items-center hover-lift"
+            className="flex items-center text-neutral-600 hover:text-neutral-800 hover:bg-neutral-50"
           >
             <ChevronLeft className="mr-1.5 h-4 w-4" />
             Anterior
@@ -301,7 +337,7 @@ const OptimizedQuoteContent = () => {
               variant="outline"
               onClick={handleSave}
               disabled={isSaving}
-              className="glass-button shadow-medium hover-lift"
+              className="bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-none"
             >
               <Save className="mr-1.5 h-4 w-4" />
               Guardar Borrador
@@ -310,7 +346,7 @@ const OptimizedQuoteContent = () => {
             {currentStep < 4 ? (
               <Button
                 onClick={handleNext}
-                className="bg-primary text-primary-foreground shadow-medium hover-lift"
+                className="bg-primary text-primary-foreground shadow-sm hover:shadow"
               >
                 Siguiente
                 <ChevronRight className="ml-1.5 h-4 w-4" />
@@ -319,7 +355,7 @@ const OptimizedQuoteContent = () => {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="bg-success text-success-foreground shadow-medium hover-lift"
+                className="bg-success text-success-foreground shadow-sm hover:shadow"
               >
                 <Check className="mr-1.5 h-4 w-4" />
                 Finalizar Cotización
