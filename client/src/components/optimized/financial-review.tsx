@@ -67,6 +67,11 @@ const OptimizedFinancialReview: React.FC = () => {
     const marginFactor = quotationData.financials.marginFactor || 1.0;
     const marginPercentage = ((marginFactor - 1.0) * 100).toFixed(1);
     
+    // Cálculo del monto de desviación
+    const deviationPercentage = quotationData.financials.deviationPercentage;
+    const subtotalWithMargin = operativeCost + markupAmount;
+    const deviationAmount = (subtotalWithMargin * deviationPercentage) / 100;
+    
     return [
       {
         name: 'Costo Base',
@@ -93,6 +98,18 @@ const OptimizedFinancialReview: React.FC = () => {
         name: `Margen Operativo (${marginPercentage}%)`,
         description: `Margen aplicado al costo operativo total con factor ${marginFactor}x`,
         amount: markupAmount
+      },
+      {
+        name: 'Subtotal con Margen',
+        description: 'Costos operativos más margen de ganancia',
+        amount: subtotalWithMargin,
+        isSubtotal: true
+      },
+      {
+        name: `Desviación (${deviationPercentage.toFixed(1)}%)`,
+        description: 'Ajuste para cubrir posibles contingencias y desviaciones',
+        amount: deviationAmount,
+        isDeviation: true
       }
     ];
   }, [
@@ -100,6 +117,7 @@ const OptimizedFinancialReview: React.FC = () => {
     complexityAdjustment, 
     quotationData.financials.platformCost,
     quotationData.financials.marginFactor,
+    quotationData.financials.deviationPercentage,
     markupAmount
   ]);
 
@@ -156,79 +174,20 @@ const OptimizedFinancialReview: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Detalle del Equipo Asignado - Movido al principio */}
+      {/* Configuración de costos adicionales y detalle del equipo en un sólo componente */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            Detalle del Equipo Asignado
-          </CardTitle>
-          <CardDescription>Resumen de los miembros del equipo y sus costos</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Configuración Financiera y Equipo</CardTitle>
+          <CardDescription>Ajusta costos adicionales y visualiza el detalle del equipo asignado</CardDescription>
         </CardHeader>
-        <CardContent>
-          {quotationData.teamMembers.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Personal</TableHead>
-                    <TableHead className="text-right">Horas</TableHead>
-                    <TableHead className="text-right">Tarifa</TableHead>
-                    <TableHead className="text-right">Costo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quotationData.teamMembers.map((member, index) => {
-                    // Buscar el nombre del rol
-                    const role = availableRoles?.find((r: {id: number}) => r.id === member.roleId);
-                    const person = availablePersonnel?.find((p: {id: number}) => p.id === member.personnelId);
-                    
-                    return (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{role?.name || 'Rol no especificado'}</TableCell>
-                        <TableCell>{person?.name || 'No asignado'}</TableCell>
-                        <TableCell className="text-right">{member.hours}</TableCell>
-                        <TableCell className="text-right">${member.rate.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-medium">${member.cost.toFixed(2)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  <TableRow className="bg-gray-50 font-medium">
-                    <TableCell colSpan={4} className="text-right">Total Equipo:</TableCell>
-                    <TableCell className="text-right">${baseCost.toFixed(2)}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-              <p className="text-xs mt-2 text-slate-500 italic">
-                Nota: El costo base del proyecto se deriva de la suma de los costos del equipo asignado.
-              </p>
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              <p>No hay miembros en el equipo asignado.</p>
-              <p className="text-sm mt-2">Regresa al paso anterior para configurar el equipo.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Configuración de costos adicionales - Pasa al segundo lugar */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Ajustes Financieros</CardTitle>
-          <CardDescription>Personaliza los factores financieros del proyecto</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CardContent className="space-y-4">
+          {/* Ajustes financieros */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-gray-50 rounded-md border border-gray-100">
             {/* Costo de plataforma */}
-            <div className="space-y-3">
-              <Label htmlFor="platform-cost">Costo de Plataforma ({platformCostPercentage.toFixed(1)}% del costo base)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="platform-cost" className="text-sm font-medium">
+                Costo de Plataforma ({platformCostPercentage.toFixed(1)}%)
+              </Label>
               <Input
                 id="platform-cost"
                 type="number"
@@ -237,29 +196,28 @@ const OptimizedFinancialReview: React.FC = () => {
                 value={quotationData.financials.platformCost}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  // Actualización inmediata con actualización forzada
                   updateFinancials({ platformCost: isNaN(value) ? 0 : value });
-                  // Forzar recálculo después de un breve momento para asegurar que se propague el cambio
                   setTimeout(() => {
                     const event = new Event('input', { bubbles: true });
                     e.target.dispatchEvent(event);
                   }, 50);
                 }}
-                // Agregar evento onBlur para garantizar actualización al salir del campo
                 onBlur={(e) => {
                   const value = parseFloat(e.target.value);
                   updateFinancials({ platformCost: isNaN(value) ? 0 : value });
                 }}
-                className="transition-all focus:ring-2 focus:ring-primary"
+                className="h-9 transition-all focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-neutral-500">
-                Costos asociados a licencias de software, herramientas de análisis y servicios en la nube.
+                Licencias y herramientas de análisis
               </p>
             </div>
             
             {/* Porcentaje de desviación */}
-            <div className="space-y-3">
-              <Label htmlFor="deviation">Porcentaje de Desviación</Label>
+            <div className="space-y-2">
+              <Label htmlFor="deviation" className="text-sm font-medium">
+                Porcentaje de Desviación
+              </Label>
               <Input
                 id="deviation"
                 type="number"
@@ -269,25 +227,107 @@ const OptimizedFinancialReview: React.FC = () => {
                 value={quotationData.financials.deviationPercentage}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  // Actualización inmediata con actualización forzada
                   updateFinancials({ deviationPercentage: isNaN(value) ? 0 : value });
-                  // Forzar recálculo después de un breve momento para asegurar que se propague el cambio
                   setTimeout(() => {
                     const event = new Event('input', { bubbles: true });
                     e.target.dispatchEvent(event);
                   }, 50);
                 }}
-                // Agregar evento onBlur para garantizar actualización al salir del campo
                 onBlur={(e) => {
                   const value = parseFloat(e.target.value);
                   updateFinancials({ deviationPercentage: isNaN(value) ? 0 : value });
                 }}
-                className="transition-all focus:ring-2 focus:ring-primary"
+                className="h-9 transition-all focus:ring-2 focus:ring-primary"
               />
               <p className="text-xs text-neutral-500">
-                Margen adicional para cubrir posibles desviaciones durante la ejecución del proyecto.
+                Ajuste para posibles contingencias
               </p>
             </div>
+            
+            {/* Factor de margen operativo */}
+            <div className="space-y-2">
+              <Label htmlFor="margin-factor" className="text-sm font-medium">
+                Factor de Margen: {quotationData.financials.marginFactor?.toFixed(1) || "1.0"}x
+              </Label>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500">1.0x</span>
+                <Slider
+                  id="margin-factor"
+                  value={[quotationData.financials.marginFactor || 1.0]}
+                  min={1.0}
+                  max={10.0}
+                  step={0.1}
+                  onValueChange={(value) => {
+                    updateFinancials({ marginFactor: value[0] });
+                    setTimeout(() => {
+                      const event = new Event('change', { bubbles: true });
+                      document.getElementById('margin-factor')?.dispatchEvent(event);
+                    }, 50);
+                  }}
+                  className="flex-1 focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-xs text-gray-500">10.0x</span>
+              </div>
+              <p className="text-xs text-neutral-500">
+                Multiplicador del margen operativo
+              </p>
+            </div>
+          </div>
+          
+          {/* Detalle del equipo */}
+          <div className="mt-4 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium flex items-center text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-1">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                Detalle del Equipo Asignado
+              </h3>
+              <span className="text-xs text-slate-500">Total: ${baseCost.toFixed(2)}</span>
+            </div>
+            
+            {quotationData.teamMembers.length > 0 ? (
+              <div className="overflow-x-auto max-h-56 border border-gray-100 rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="py-2 px-3 text-xs font-medium">Rol</TableHead>
+                      <TableHead className="py-2 px-3 text-xs font-medium">Personal</TableHead>
+                      <TableHead className="py-2 px-3 text-xs font-medium text-right">Horas</TableHead>
+                      <TableHead className="py-2 px-3 text-xs font-medium text-right">Tarifa</TableHead>
+                      <TableHead className="py-2 px-3 text-xs font-medium text-right">Costo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quotationData.teamMembers.map((member, index) => {
+                      const role = availableRoles?.find((r: {id: number}) => r.id === member.roleId);
+                      const person = availablePersonnel?.find((p: {id: number}) => p.id === member.personnelId);
+                      
+                      return (
+                        <TableRow key={index} className="hover:bg-gray-50">
+                          <TableCell className="py-1.5 px-3 text-xs font-medium">{role?.name || 'Rol no especificado'}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-xs">{person?.name || 'No asignado'}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-xs text-right">{member.hours}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-xs text-right">${member.rate.toFixed(2)}</TableCell>
+                          <TableCell className="py-1.5 px-3 text-xs text-right font-medium">${member.cost.toFixed(2)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-3 text-gray-500 text-sm border border-gray-100 rounded-md">
+                <p>No hay miembros en el equipo asignado.</p>
+                <p className="text-xs mt-1">Regresa al paso anterior para configurar el equipo.</p>
+              </div>
+            )}
+            <p className="text-xs mt-1 text-slate-500 italic">
+              Nota: El costo base del proyecto se deriva de la suma de los costos del equipo asignado.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -346,6 +386,7 @@ const OptimizedFinancialReview: React.FC = () => {
                   key={index} 
                   className={
                     item.isSubtotal ? 'bg-slate-100 border-t border-b border-slate-200' : 
+                    item.isDeviation ? 'bg-purple-50' :
                     item.name.includes('Margen Operativo') ? 'bg-blue-50' :
                     item.name === 'Ajuste por Complejidad' ? 'bg-amber-50' : ''
                   }
@@ -354,7 +395,7 @@ const OptimizedFinancialReview: React.FC = () => {
                     {item.name}
                   </TableCell>
                   <TableCell className="text-sm text-neutral-600">{item.description}</TableCell>
-                  <TableCell className={`text-right font-medium ${item.isSubtotal ? 'font-semibold' : ''}`}>
+                  <TableCell className={`text-right font-medium ${item.isSubtotal ? 'font-semibold' : ''}${item.isDeviation ? ' text-purple-700' : ''}`}>
                     {formatCurrency(item.amount)}
                   </TableCell>
                 </TableRow>
@@ -364,84 +405,67 @@ const OptimizedFinancialReview: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Factor de margen y resumen final - Ubicado al final */}
+      {/* Precio final y descuento - Ubicado al final */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Margen y Precio Final</CardTitle>
-          <CardDescription>Ajuste el margen operativo y descuentos</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Precio Final</CardTitle>
+          <CardDescription>Ajuste el descuento y vea el total final</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Factor de multiplicación para el margen operativo */}
-          <div className="space-y-3 mb-6">
-            <Label htmlFor="margin-factor">
-              Factor de Margen Operativo: {quotationData.financials.marginFactor?.toFixed(1) || "1.0"}x
-            </Label>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">1.0x</span>
-              <Slider
-                id="margin-factor"
-                value={[quotationData.financials.marginFactor || 1.0]}
-                min={1.0}
-                max={10.0}
-                step={0.1}
-                onValueChange={(value) => {
-                  // Actualización inmediata
-                  updateFinancials({ marginFactor: value[0] });
-                  
-                  // Forzar actualización después de que se complete el cambio
-                  setTimeout(() => {
-                    const event = new Event('change', { bubbles: true });
-                    document.getElementById('margin-factor')?.dispatchEvent(event);
-                  }, 50);
-                }}
-                className="flex-1 focus:ring-2 focus:ring-primary"
-              />
-              <span className="text-sm text-gray-500">10.0x</span>
-            </div>
-            <p className="text-xs text-neutral-500">
-              Factor multiplicador que determina el margen operativo aplicado al proyecto. A mayor valor, mayor será el margen de ganancia.
-            </p>
-          </div>
-
-          {/* Subtotal y descuento */}
-          <div className="mt-4 border-t pt-4">
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-medium">Subtotal:</span>
-              <span className="text-lg">{formatCurrency(totalAmount)}</span>
-            </div>
-            
-            <div className="space-y-4 mb-4">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="discount" className="flex items-center">
-                  Descuento ({discountPercentage.toFixed(1)}%):
-                </Label>
-                <span className="text-neutral-700">{formatCurrency(discountAmount)}</span>
+          <div className="bg-gray-50 p-3 rounded-md border border-gray-100 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Subtotal */}
+              <div className="col-span-2">
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Subtotal:</span>
+                  <span className="text-sm font-medium">{formatCurrency(totalAmount)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-700">Descuento ({discountPercentage.toFixed(1)}%):</span>
+                  <span className="text-sm text-red-600">-{formatCurrency(discountAmount)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-sm font-bold text-gray-900">Total Final:</span>
+                  <span className="text-sm font-bold text-primary">{formatCurrency(finalAmount)}</span>
+                </div>
               </div>
-              <Slider
-                id="discount"
-                value={[discountPercentage]}
-                min={0}
-                max={30}
-                step={0.5}
-                onValueChange={(value) => {
-                  // Actualización inmediata
-                  updateFinancials({ discount: value[0] });
-                  
-                  // Forzar actualización después de que se complete el cambio
-                  setTimeout(() => {
-                    // Crear y disparar un evento para forzar la actualización de la UI
-                    const event = new Event('change', { bubbles: true });
-                    document.getElementById('discount')?.dispatchEvent(event);
-                  }, 50);
-                }}
-                className="max-w-md focus:ring-2 focus:ring-primary"
-              />
+              
+              {/* Slider de descuento */}
+              <div className="space-y-2">
+                <Label htmlFor="discount" className="text-sm font-medium">
+                  Ajustar Descuento
+                </Label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">0%</span>
+                  <Slider
+                    id="discount"
+                    value={[discountPercentage]}
+                    min={0}
+                    max={30}
+                    step={0.5}
+                    onValueChange={(value) => {
+                      updateFinancials({ discount: value[0] });
+                      setTimeout(() => {
+                        const event = new Event('change', { bubbles: true });
+                        document.getElementById('discount')?.dispatchEvent(event);
+                      }, 50);
+                    }}
+                    className="flex-1 focus:ring-2 focus:ring-primary"
+                  />
+                  <span className="text-xs text-gray-500">30%</span>
+                </div>
+                <p className="text-xs text-neutral-500">
+                  Ajusta el descuento aplicado al precio total
+                </p>
+              </div>
             </div>
-            
-            <div className="flex justify-between items-center border-t pt-4">
-              <span className="font-bold text-lg">Total Final:</span>
-              <span className="font-bold text-xl text-primary">{formatCurrency(finalAmount)}</span>
-            </div>
+          </div>
+          
+          {/* Total final destacado */}
+          <div className="bg-primary bg-opacity-5 p-4 rounded-md text-center">
+            <div className="text-lg text-gray-700 mb-1">Total a Facturar</div>
+            <div className="text-3xl font-bold text-primary mb-1">{formatCurrency(finalAmount)}</div>
+            <div className="text-xs text-gray-500">Todos los impuestos incluidos</div>
           </div>
         </CardContent>
       </Card>
