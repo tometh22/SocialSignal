@@ -139,91 +139,84 @@ const OptimizedQuoteContent = () => {
       {/* Main content */}
       <div className="flex-1 overflow-auto">
         <div className="container py-8">
-          {/* Title */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold text-foreground slide-in">Crea una Nueva Cotización</h1>
-            <p className="text-muted-foreground mt-3 text-sm">Completa los siguientes pasos para crear una cotización precisa</p>
+          {/* Title - Modern clean design */}
+          <div className="mb-10 max-w-3xl">
+            <h1 className="text-2xl font-medium text-neutral-800 mb-2">Crea una Nueva Cotización</h1>
+            <p className="text-neutral-500 text-sm">Completa los siguientes pasos para crear una cotización detallada y precisa para tus clientes</p>
           </div>
           
-          {/* Steps navigation - elegant, minimal design */}
-          <Card className="bg-white border-0 shadow-sm mb-8 scale-in">
-            <CardHeader className="pb-3 border-b border-neutral-100">
-              <CardTitle className="flex items-center text-lg font-medium">
-                <span className="bg-primary/5 p-2 rounded-sm mr-3 shadow-inner-soft">
-                  <ArrowUpDown className="h-5 w-5 text-primary" />
-                </span>
-                Pasos de Cotización
-              </CardTitle>
-              <CardDescription className="text-neutral-500 text-sm mt-1">
-                Sigue estos 4 pasos para crear una cotización completa y precisa
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <div className="relative mb-1">
-                <div className="absolute h-0.5 bg-neutral-100 left-0 right-0 top-1/2 -translate-y-1/2"></div>
-                <div className="absolute h-0.5 bg-primary/70 left-0 top-1/2 -translate-y-1/2" style={{ 
-                  width: `${(currentStep/4)*100}%`, 
-                  transition: 'width 0.3s ease-in-out' 
-                }}></div>
+          {/* Steps navigation - Modern horizontal step indicator */}
+          <div className="mb-10">
+            <div className="relative mb-8">
+              <div className="absolute h-1 bg-neutral-100 left-0 right-0 top-[15px]"></div>
+              <div className="absolute h-1 bg-primary/90 left-0 top-[15px]" style={{ 
+                width: `${(currentStep-1)/(4-1)*100}%`, 
+                transition: 'width 0.3s ease-out' 
+              }}></div>
+              
+              <div className="grid grid-cols-4 relative">
+                <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
+                    currentStep >= 1 
+                      ? 'bg-primary text-white' 
+                      : 'bg-white text-neutral-400 border border-neutral-200'
+                  }`}>
+                    1
+                  </div>
+                  <span className={`text-xs font-medium text-center transition-colors ${
+                    currentStep === 1 ? 'text-primary' : 'text-neutral-500'
+                  }`}>
+                    Información <br/> Básica
+                  </span>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
+                    currentStep >= 2 
+                      ? 'bg-primary text-white' 
+                      : 'bg-white text-neutral-400 border border-neutral-200'
+                  }`}>
+                    2
+                  </div>
+                  <span className={`text-xs font-medium text-center transition-colors ${
+                    currentStep === 2 ? 'text-primary' : 'text-neutral-500'
+                  }`}>
+                    Selección de <br/> Plantilla
+                  </span>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
+                    currentStep >= 3 
+                      ? 'bg-primary text-white' 
+                      : 'bg-white text-neutral-400 border border-neutral-200'
+                  }`}>
+                    3
+                  </div>
+                  <span className={`text-xs font-medium text-center transition-colors ${
+                    currentStep === 3 ? 'text-primary' : 'text-neutral-500'
+                  }`}>
+                    Configuración <br/> de Equipo
+                  </span>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm z-10 mb-2 transition-all ${
+                    currentStep >= 4
+                      ? 'bg-primary text-white' 
+                      : 'bg-white text-neutral-400 border border-neutral-200'
+                  }`}>
+                    4
+                  </div>
+                  <span className={`text-xs font-medium text-center transition-colors ${
+                    currentStep === 4 ? 'text-primary' : 'text-neutral-500'
+                  }`}>
+                    Revisión y <br/> Ajustes
+                  </span>
+                </div>
               </div>
-              <Tabs 
-                value={currentStep.toString()} 
-                onValueChange={(value) => goToStep(parseInt(value))}
-                className="w-full"
-              >
-                <TabsList className="grid grid-cols-4 w-full bg-transparent p-0 gap-1">
-                  <TabsTrigger 
-                    value="1" 
-                    disabled={currentStep < 1}
-                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className={`w-6 h-6 rounded-full ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
-                        1
-                      </div>
-                      <span className="text-sm font-medium">Información Básica</span>
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="2" 
-                    disabled={currentStep < 2}
-                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className={`w-6 h-6 rounded-full ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
-                        2
-                      </div>
-                      <span className="text-sm font-medium">Selección de Plantilla</span>
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="3" 
-                    disabled={currentStep < 3}
-                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className={`w-6 h-6 rounded-full ${currentStep >= 3 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
-                        3
-                      </div>
-                      <span className="text-sm font-medium">Configuración de Equipo</span>
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="4" 
-                    disabled={currentStep < 4}
-                    className="hover:bg-neutral-50 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-t-primary pt-4 rounded-none transition-all"
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className={`w-6 h-6 rounded-full ${currentStep >= 4 ? 'bg-primary text-white' : 'bg-neutral-100 text-neutral-500'} flex items-center justify-center text-xs mb-2`}>
-                        4
-                      </div>
-                      <span className="text-sm font-medium">Revisión y Ajustes</span>
-                    </div>
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
           
           {/* Content for current step */}
           <Card className="bg-white border border-neutral-100 shadow-sm mb-10 scale-in">
