@@ -381,74 +381,8 @@ const OptimizedTemplateSelection: React.FC = () => {
           totalAmount={totalAmount} 
         />
 
-        {/* Selección de complejidad con diseño mejorado */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center text-blue-700">
-            <span className="bg-blue-100 p-1 rounded-full mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="9" y1="3" x2="9" y2="21"></line>
-              </svg>
-            </span>
-            Nivel de Complejidad del Proyecto
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div 
-              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'low' ? 'border-blue-400 bg-blue-50' : ''}`} 
-              onClick={() => updateComplexity('low')}
-            >
-              <input 
-                type="radio" 
-                id="complexity-low" 
-                name="complejidad" 
-                checked={quotationData.complexity === 'low'} 
-                onChange={() => updateComplexity('low')}
-                className="h-4 w-4 text-blue-600 mr-2" 
-              />
-              <label htmlFor="complexity-low" className="cursor-pointer">
-                <div className="font-medium">Baja</div>
-                <div className="text-xs text-neutral-500">Proyecto simple con requisitos estándar</div>
-                <div className="text-xs text-blue-600 mt-1">+0%</div>
-              </label>
-            </div>
-            <div 
-              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'medium' ? 'border-blue-400 bg-blue-50' : ''}`} 
-              onClick={() => updateComplexity('medium')}
-            >
-              <input 
-                type="radio" 
-                id="complexity-medium" 
-                name="complejidad" 
-                checked={quotationData.complexity === 'medium'} 
-                onChange={() => updateComplexity('medium')}
-                className="h-4 w-4 text-blue-600 mr-2" 
-              />
-              <label htmlFor="complexity-medium" className="cursor-pointer">
-                <div className="font-medium">Media</div>
-                <div className="text-xs text-neutral-500">Proyecto con algunas personalizaciones</div>
-                <div className="text-xs text-blue-600 mt-1">+10%</div>
-              </label>
-            </div>
-            <div 
-              className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'high' ? 'border-blue-400 bg-blue-50' : ''}`}
-              onClick={() => updateComplexity('high')}
-            >
-              <input 
-                type="radio" 
-                id="complexity-high" 
-                name="complejidad" 
-                checked={quotationData.complexity === 'high'} 
-                onChange={() => updateComplexity('high')}
-                className="h-4 w-4 text-blue-600 mr-2" 
-              />
-              <label htmlFor="complexity-high" className="cursor-pointer">
-                <div className="font-medium">Alta</div>
-                <div className="text-xs text-neutral-500">Proyecto complejo con muchas personalizaciones</div>
-                <div className="text-xs text-blue-600 mt-1">+20%</div>
-              </label>
-            </div>
-          </div>
-        </div>
+        {/* Eliminada la sección duplicada de Nivel de Complejidad */}
+        {/* Los factores de complejidad se manejarán solo con los componentes detallados más abajo */}
         
         {/* Tipo de análisis */}
         <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
