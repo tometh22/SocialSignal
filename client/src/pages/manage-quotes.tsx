@@ -116,133 +116,176 @@ export default function ManageQuotes() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Gestionar Cotizaciones</h2>
+        <h2 className="text-subheading text-neutral-900">Gestionar Cotizaciones</h2>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cotizaciones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <div className="relative flex-grow">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    placeholder="Buscar por nombre de proyecto..."
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+      <div className="flex-1 overflow-y-auto">
+        <div className="container-xl fade-in">
+          <div className="section-sm">
+            <Card className="shadow-soft">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-heading">Cotizaciones</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-4 mb-6 form-group">
+                  <div className="relative flex-grow form-group">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                      <Input
+                        placeholder="Buscar por nombre de proyecto..."
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-full md:w-64">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filtrar por estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los Estados</SelectItem>
+                        <SelectItem value="pending">Pendiente</SelectItem>
+                        <SelectItem value="approved">Aprobada</SelectItem>
+                        <SelectItem value="rejected">Rechazada</SelectItem>
+                        <SelectItem value="in-negotiation">En Negociación</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="w-full md:w-64">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filtrar por estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los Estados</SelectItem>
-                      <SelectItem value="pending">Pendiente</SelectItem>
-                      <SelectItem value="approved">Aprobada</SelectItem>
-                      <SelectItem value="rejected">Rechazada</SelectItem>
-                      <SelectItem value="in-negotiation">En Negociación</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader variant="gradient" size="md" text="Cargando cotizaciones" />
-                </div>
-              ) : filteredQuotations.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-neutral-200">
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Nombre del Proyecto</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">ID Cliente</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Tipo de Análisis</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Creación</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Estado</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Total</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-neutral-500">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredQuotations.map((quote) => (
-                        <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50">
-                          <td className="px-4 py-3 text-sm text-neutral-900">{quote.projectName}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{quote.clientId}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">{quote.analysisType}</td>
-                          <td className="px-4 py-3 text-sm text-neutral-900">
-                            {new Date(quote.createdAt).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(quote.status)}`}>
-                              {getStatusIcon(quote.status)}
-                              <span className="ml-1.5">{translateStatus(quote.status)}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-neutral-900">
-                            ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center space-x-2">
-                              <Button variant="outline" size="sm" onClick={() => openStatusDialog(quote)}>
-                                <Edit className="h-4 w-4 mr-1" />
-                                Estado
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => navigate(`/quote/${quote.id}`)}
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Ver
-                              </Button>
-                            </div>
-                          </td>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader variant="dots" size="md" text="Cargando cotizaciones" />
+                  </div>
+                ) : filteredQuotations.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b border-neutral-200">
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Proyecto</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">ID Cliente</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Tipo de Análisis</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Creación</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Estado</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Total</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Acciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-neutral-500">
-                  {searchTerm || statusFilter !== "all"
-                    ? "No hay cotizaciones que coincidan con tu búsqueda."
-                    : "No se encontraron cotizaciones."}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </thead>
+                      <tbody>
+                        {filteredQuotations.map((quote) => (
+                          <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">{quote.projectName}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.clientId}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.analysisType}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">
+                              {new Date(quote.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              {quote.status === 'approved' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-success/10 text-success-dark">
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                  {translateStatus(quote.status)}
+                                </span>
+                              )}
+                              {quote.status === 'pending' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-warning/10 text-warning-dark">
+                                  <Clock className="h-3.5 w-3.5 mr-1" />
+                                  {translateStatus(quote.status)}
+                                </span>
+                              )}
+                              {quote.status === 'rejected' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-error/10 text-error-dark">
+                                  <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                                  {translateStatus(quote.status)}
+                                </span>
+                              )}
+                              {quote.status === 'in-negotiation' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-primary/10 text-primary-dark">
+                                  <Edit className="h-3.5 w-3.5 mr-1" />
+                                  {translateStatus(quote.status)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">
+                              ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" className="hover-lift" onClick={() => openStatusDialog(quote)}>
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Estado
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="hover-lift"
+                                  onClick={() => navigate(`/quote/${quote.id}`)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Ver
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-neutral-500">
+                    {searchTerm || statusFilter !== "all"
+                      ? "No hay cotizaciones que coincidan con tu búsqueda."
+                      : "No se encontraron cotizaciones."}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle>Actualizar Estado de Cotización</DialogTitle>
+            <DialogTitle className="text-heading">Actualizar Estado de Cotización</DialogTitle>
             <DialogDescription>
               Cambia el estado de esta cotización. Actualizarla a "En Negociación" permite realizar ajustes adicionales.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <div className="mb-4">
-              <h4 className="text-sm font-medium mb-2">Estado Actual:</h4>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${selectedQuote ? getStatusClass(selectedQuote.status) : ''}`}>
-                {selectedQuote && getStatusIcon(selectedQuote.status)}
-                <span className="ml-1.5">
-                  {selectedQuote && translateStatus(selectedQuote.status)}
+          <div className="py-4 form-layout">
+            <div className="form-group">
+              <h4 className="text-label mb-2">Estado Actual:</h4>
+              {selectedQuote && selectedQuote.status === 'approved' && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-success/10 text-success-dark">
+                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                  {translateStatus(selectedQuote.status)}
                 </span>
-              </span>
+              )}
+              {selectedQuote && selectedQuote.status === 'pending' && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-warning/10 text-warning-dark">
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  {translateStatus(selectedQuote.status)}
+                </span>
+              )}
+              {selectedQuote && selectedQuote.status === 'rejected' && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-error/10 text-error-dark">
+                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                  {translateStatus(selectedQuote.status)}
+                </span>
+              )}
+              {selectedQuote && selectedQuote.status === 'in-negotiation' && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-primary/10 text-primary-dark">
+                  <Edit className="h-3.5 w-3.5 mr-1.5" />
+                  {translateStatus(selectedQuote.status)}
+                </span>
+              )}
             </div>
 
-            <div className="mb-4">
-              <h4 className="text-sm font-medium mb-2">Nuevo Estado:</h4>
+            <div className="form-group">
+              <h4 className="text-label mb-2">Nuevo Estado:</h4>
               <Select value={newStatus} onValueChange={setNewStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar nuevo estado" />
@@ -257,9 +300,13 @@ export default function ManageQuotes() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleStatusChange}>Actualizar Estado</Button>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button className="hover-lift" onClick={handleStatusChange}>
+              Actualizar Estado
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

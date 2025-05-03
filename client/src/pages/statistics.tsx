@@ -141,223 +141,250 @@ export default function Statistics() {
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-lg font-semibold text-neutral-900">Estadísticas y Análisis</h2>
+        <h2 className="text-subheading text-neutral-900">Estadísticas y Análisis</h2>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Opciones de Filtro</CardTitle>
-              <CardDescription>Refina la vista de datos analíticos</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    placeholder="Buscar por nombre de proyecto..."
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                
-                <div className="w-full md:w-48">
-                  <Select value={timeFrame} onValueChange={setTimeFrame}>
-                    <SelectTrigger>
-                      <Calendar className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Período de tiempo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todo el tiempo</SelectItem>
-                      <SelectItem value="7days">Últimos 7 días</SelectItem>
-                      <SelectItem value="30days">Últimos 30 días</SelectItem>
-                      <SelectItem value="90days">Últimos 90 días</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="w-full md:w-48">
-                  <Select value={analysisType} onValueChange={setAnalysisType}>
-                    <SelectTrigger>
-                      <Layers className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Tipo de análisis" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los tipos</SelectItem>
-                      <SelectItem value="basic">Análisis Básico</SelectItem>
-                      <SelectItem value="standard">Análisis Estándar</SelectItem>
-                      <SelectItem value="deep">Análisis Profundo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="container-xl fade-in">
+          <div className="section-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-section">
+              <h1 className="text-display text-balance text-neutral-900">Desempeño del Sistema</h1>
+            </div>
+            
+            <div className="mb-section">
+              <Card className="shadow-soft mb-6">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-heading">Filtros de Análisis</CardTitle>
+                  <CardDescription>
+                    Ajusta los parámetros para analizar métricas específicas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row gap-4 form-group">
+                    <div className="relative flex-grow form-group">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                        <Input
+                          placeholder="Buscar por nombre de proyecto..."
+                          className="pl-10"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="w-full md:w-48">
+                      <Select value={timeFrame} onValueChange={setTimeFrame}>
+                        <SelectTrigger>
+                          <Calendar className="mr-2 h-4 w-4" />
+                          <SelectValue placeholder="Período de tiempo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todo el tiempo</SelectItem>
+                          <SelectItem value="7days">Últimos 7 días</SelectItem>
+                          <SelectItem value="30days">Últimos 30 días</SelectItem>
+                          <SelectItem value="90days">Últimos 90 días</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="w-full md:w-48">
+                      <Select value={analysisType} onValueChange={setAnalysisType}>
+                        <SelectTrigger>
+                          <Layers className="mr-2 h-4 w-4" />
+                          <SelectValue placeholder="Tipo de análisis" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los tipos</SelectItem>
+                          <SelectItem value="basic">Análisis Básico</SelectItem>
+                          <SelectItem value="standard">Análisis Estándar</SelectItem>
+                          <SelectItem value="deep">Análisis Profundo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <Card className="shadow-soft hover-lift">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-heading">Cotizaciones por Estado</CardTitle>
+                    <CardDescription>Distribución de estados de las cotizaciones</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-0 border-b-1 border-l-0 mx-auto mb-2"></div>
+                          <p className="text-neutral-500">Cargando datos...</p>
+                        </div>
+                      </div>
+                    ) : getStatusData().length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getStatusData()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            >
+                              {getStatusData().map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-neutral-500">
+                        No hay datos disponibles
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-soft hover-lift">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-heading">Tipos de Análisis</CardTitle>
+                    <CardDescription>Desglose por complejidad de análisis</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="h-64 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-0 border-b-1 border-l-0 mx-auto mb-2"></div>
+                          <p className="text-neutral-500">Cargando datos...</p>
+                        </div>
+                      </div>
+                    ) : getAnalysisTypeData().length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getAnalysisTypeData()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            >
+                              {getAnalysisTypeData().map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-64 flex items-center justify-center text-neutral-500">
+                        No hay datos disponibles
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-soft hover-lift">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-heading">Resumen Financiero</CardTitle>
+                    <CardDescription>Métricas financieras agregadas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6 py-2">
+                      <div className="bg-muted/20 p-4 rounded-md">
+                        <p className="text-sm text-neutral-500 font-medium mb-1">Total de Cotizaciones</p>
+                        <p className="text-2xl font-semibold text-neutral-900">
+                          {isLoading ? "..." : filteredQuotations.length}
+                        </p>
+                      </div>
+                      
+                      <div className="bg-muted/20 p-4 rounded-md">
+                        <p className="text-sm text-neutral-500 font-medium mb-1">Valor Total</p>
+                        <p className="text-2xl font-semibold text-neutral-900">
+                          {isLoading ? "..." : `$${filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </p>
+                      </div>
+                      
+                      <div className="bg-muted/20 p-4 rounded-md">
+                        <p className="text-sm text-neutral-500 font-medium mb-1">Valor Promedio</p>
+                        <p className="text-2xl font-semibold text-neutral-900">
+                          {isLoading ? "..." : filteredQuotations.length > 0 
+                            ? `$${(filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0) / filteredQuotations.length).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : "$0.00"
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cotizaciones por Estado</CardTitle>
-                <CardDescription>Distribución de estados de las cotizaciones</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="h-64 flex items-center justify-center">Cargando datos...</div>
-                ) : getStatusData().length > 0 ? (
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={getStatusData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {getStatusData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-neutral-500">
-                    No hay datos disponibles
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribución de Tipos de Análisis</CardTitle>
-                <CardDescription>Desglose por complejidad de análisis</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="h-64 flex items-center justify-center">Cargando datos...</div>
-                ) : getAnalysisTypeData().length > 0 ? (
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={getAnalysisTypeData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {getAnalysisTypeData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <div className="h-64 flex items-center justify-center text-neutral-500">
-                    No hay datos disponibles
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumen del Valor de Cotizaciones</CardTitle>
-                <CardDescription>Métricas financieras agregadas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <p className="text-sm text-neutral-500">Total de Cotizaciones</p>
-                    <p className="text-2xl font-semibold">
-                      {isLoading ? "..." : filteredQuotations.length}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-neutral-500">Valor Total</p>
-                    <p className="text-2xl font-semibold">
-                      {isLoading ? "..." : `$${filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm text-neutral-500">Valor Promedio</p>
-                    <p className="text-2xl font-semibold">
-                      {isLoading ? "..." : filteredQuotations.length > 0 
-                        ? `$${(filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0) / filteredQuotations.length).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : "$0.00"
-                      }
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="shadow-soft">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-heading">Tendencias Mensuales</CardTitle>
+                  <CardDescription>Actividad de cotizaciones a lo largo del tiempo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="h-80 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary border-r-0 border-b-1 border-l-0 mx-auto mb-2"></div>
+                        <p className="text-neutral-500">Cargando datos...</p>
+                      </div>
+                    </div>
+                  ) : getMonthlyData().length > 0 ? (
+                    <div className="h-80">
+                      <Tabs defaultValue="count">
+                        <TabsList className="mb-4">
+                          <TabsTrigger value="count">Cantidad de Cotizaciones</TabsTrigger>
+                          <TabsTrigger value="value">Valor de Cotizaciones</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="count" className="mt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getMonthlyData()}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Bar dataKey="count" name="Número de Cotizaciones" fill="hsl(var(--primary))" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </TabsContent>
+                        
+                        <TabsContent value="value" className="mt-2">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getMonthlyData()}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, "Valor Total"]} />
+                              <Legend />
+                              <Bar dataKey="value" name="Valor Total de Cotizaciones" fill="hsl(var(--success))" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  ) : (
+                    <div className="h-80 flex items-center justify-center text-neutral-500">
+                      No hay datos de tendencias disponibles
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Tendencias Mensuales</CardTitle>
-              <CardDescription>Actividad de cotizaciones a lo largo del tiempo</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="h-80 flex items-center justify-center">Cargando datos...</div>
-              ) : getMonthlyData().length > 0 ? (
-                <div className="h-80">
-                  <Tabs defaultValue="count">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="count">Cantidad de Cotizaciones</TabsTrigger>
-                      <TabsTrigger value="value">Valor de Cotizaciones</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="count">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={getMonthlyData()}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="count" name="Número de Cotizaciones" fill="#1976d2" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </TabsContent>
-                    
-                    <TabsContent value="value">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={getMonthlyData()}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, "Valor Total"]} />
-                          <Legend />
-                          <Bar dataKey="value" name="Valor Total de Cotizaciones" fill="#4caf50" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              ) : (
-                <div className="h-80 flex items-center justify-center text-neutral-500">
-                  No hay datos de tendencias disponibles
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
