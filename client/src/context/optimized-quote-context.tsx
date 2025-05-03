@@ -897,7 +897,10 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
           const adjustment = calculateComplexityAdjustment(templateBaseCost, complexityFactors);
           setComplexityAdjustment(adjustment);
           
-          const markup = calculateMarkup(templateBaseCost + adjustment);
+          const markup = calculateMarkup(
+            templateBaseCost + adjustment,
+            quotationData.financials.marginFactor || 1.0
+          );
           setMarkupAmount(markup);
           
           const total = calculateTotalAmount(
@@ -930,8 +933,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       const adjustment = calculateComplexityAdjustment(baseCost, complexityFactors);
       setComplexityAdjustment(adjustment);
       
-      // Calcular el markup
-      const markup = calculateMarkup(baseCost + adjustment);
+      // Calcular el markup con el factor de margen
+      const markup = calculateMarkup(
+        baseCost + adjustment,
+        quotationData.financials.marginFactor || 1.0
+      );
       setMarkupAmount(markup);
       
       // Calcular el total final
@@ -958,6 +964,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     complexityFactors, 
     quotationData.financials.platformCost, 
     quotationData.financials.deviationPercentage,
+    quotationData.financials.marginFactor, // Añadimos el factor de margen como dependencia
     currentStep,
     quotationData.template
   ]);
