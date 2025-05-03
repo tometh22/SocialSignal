@@ -143,7 +143,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   
   // Estados adicionales
-  const [baseCost, setBaseCost] = useState(0);
+  const [baseCost, setBaseCost] = useState(1500); // Base cost predeterminado para comenzar con un valor
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -794,6 +794,33 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       throw error;
     }
   }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
+
+  // Actualizar los cálculos financieros cuando cambian los factores
+  useEffect(() => {
+    // Calcular el ajuste de complejidad basado en los factores
+    const adjustment = calculateComplexityAdjustment(baseCost, complexityFactors);
+    setComplexityAdjustment(adjustment);
+    
+    // Calcular el markup
+    const markup = calculateMarkup(baseCost + adjustment);
+    setMarkupAmount(markup);
+    
+    // Calcular el total final
+    const total = calculateTotalAmount(
+      baseCost, 
+      adjustment, 
+      markup,
+      quotationData.financials.platformCost,
+      quotationData.financials.deviationPercentage
+    );
+    setTotalAmount(total);
+    
+  }, [
+    baseCost, 
+    complexityFactors, 
+    quotationData.financials.platformCost, 
+    quotationData.financials.deviationPercentage
+  ]);
 
   // Inicializar datos cuando se carga el componente
   useEffect(() => {
