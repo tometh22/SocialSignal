@@ -143,7 +143,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   
   // Estados adicionales
-  const [baseCost, setBaseCost] = useState(2500); // Base cost predeterminado para comenzar con un valor
+  const [baseCost, setBaseCost] = useState(0); // Inicia en cero hasta que se seleccione una plantilla
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -651,6 +651,19 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       setCurrentStep(prev => prev - 1);
     }
   }, [currentStep]);
+
+  // Al seleccionar una plantilla, establecer el costo base según la plantilla
+  useEffect(() => {
+    if (quotationData.template && quotationData.template.baseCost) {
+      // Usar el costo base de la plantilla
+      setBaseCost(quotationData.template.baseCost);
+      console.log("Estableciendo costo base desde plantilla:", quotationData.template.baseCost);
+    } else if (quotationData.template === null) {
+      // Si es modo personalizado, establecer un costo base predeterminado
+      setBaseCost(1000);
+      console.log("Modo personalizado: estableciendo costo base predeterminado de 1000");
+    }
+  }, [quotationData.template]);
 
   // Método simplificado para guardar la cotización
   const saveQuotation = useCallback(async () => {
