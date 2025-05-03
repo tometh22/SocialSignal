@@ -131,8 +131,16 @@ export const calculateMarkup = (
     
   console.log(`Aplicando factor de margen: ${factor}x al costo ajustado: ${adjustedBaseCost}`);
   
-  // Aplicar el factor multiplicador al margen
-  return adjustedBaseCost * factor;
+  // El margen se calcula como un porcentaje extra sobre el costo ajustado
+  // Un factor de 1.0x significa no agregar margen (100% del costo)
+  // Un factor de 2.0x significa agregar un 100% adicional (200% del costo)
+  // Así, el margen sería (factor - 1.0) * adjustedBaseCost
+  const markupPercentage = factor - 1.0;
+  const markup = adjustedBaseCost * markupPercentage;
+  
+  console.log(`Margen calculado: ${markup} (${markupPercentage * 100}% del costo ajustado)`);
+  
+  return markup;
 };
 
 export const calculateTotalAmount = (
@@ -149,8 +157,16 @@ export const calculateTotalAmount = (
   platformCost = isNaN(platformCost) ? 0 : platformCost;
   deviationPercentage = isNaN(deviationPercentage) ? 0 : deviationPercentage;
   
+  // Calcular el costo base ajustado (incluyendo complejidad)
+  const adjustedBaseCost = baseCost + complexityAdjustment;
+  
+  // Calcular el costo operativo total (costos operativos + plataforma)
+  const operativeCost = adjustedBaseCost + platformCost;
+  
+  // El markupAmount ahora representa el margen operativo calculado
+  
   // Calcular el subtotal antes de aplicar el desvío
-  const subtotal = baseCost + complexityAdjustment + markupAmount + platformCost;
+  const subtotal = operativeCost + markupAmount;
   
   // Aplicar el porcentaje de desvío (si existe)
   const deviationAmount = subtotal * (deviationPercentage / 100);
@@ -158,8 +174,10 @@ export const calculateTotalAmount = (
   console.log("Cálculo total:", {
     baseCost,
     complexityAdjustment,
-    markupAmount,
+    adjustedBaseCost,
     platformCost,
+    operativeCost,
+    markupAmount,
     deviationPercentage,
     subtotal,
     deviationAmount,
