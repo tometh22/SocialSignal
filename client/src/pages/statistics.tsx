@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ChevronDown, Calendar, Layers, ArrowUpDown } from "lucide-react";
+import { Search, ChevronDown, Calendar, Layers, ArrowUpDown, BarChart2, LineChart } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -152,21 +152,26 @@ export default function Statistics() {
             </div>
             
             <div className="mb-section">
-              <Card className="shadow-soft mb-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-heading">Filtros de Análisis</CardTitle>
+              <Card className="glass-card shadow-medium mb-6 scale-in">
+                <CardHeader className="pb-3 border-b border-white/10">
+                  <CardTitle className="text-heading flex items-center">
+                    <span className="bg-accent/20 p-2 rounded-full mr-2">
+                      <Search className="h-5 w-5 text-accent" />
+                    </span>
+                    Filtros de Análisis
+                  </CardTitle>
                   <CardDescription>
                     Ajusta los parámetros para analizar métricas específicas
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-col md:flex-row gap-4 form-group">
+                  <div className="flex flex-col md:flex-row gap-4 form-group slide-in">
                     <div className="relative flex-grow form-group">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
                         <Input
                           placeholder="Buscar por nombre de proyecto..."
-                          className="pl-10"
+                          className="pl-10 shadow-soft focus:shadow-medium transition-shadow"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -175,11 +180,11 @@ export default function Statistics() {
                     
                     <div className="w-full md:w-48">
                       <Select value={timeFrame} onValueChange={setTimeFrame}>
-                        <SelectTrigger>
+                        <SelectTrigger className="hover-lift shadow-soft">
                           <Calendar className="mr-2 h-4 w-4" />
                           <SelectValue placeholder="Período de tiempo" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="glass-light backdrop-blur-md border border-white/20">
                           <SelectItem value="all">Todo el tiempo</SelectItem>
                           <SelectItem value="7days">Últimos 7 días</SelectItem>
                           <SelectItem value="30days">Últimos 30 días</SelectItem>
@@ -190,11 +195,11 @@ export default function Statistics() {
                     
                     <div className="w-full md:w-48">
                       <Select value={analysisType} onValueChange={setAnalysisType}>
-                        <SelectTrigger>
+                        <SelectTrigger className="hover-lift shadow-soft">
                           <Layers className="mr-2 h-4 w-4" />
                           <SelectValue placeholder="Tipo de análisis" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="glass-light backdrop-blur-md border border-white/20">
                           <SelectItem value="all">Todos los tipos</SelectItem>
                           <SelectItem value="basic">Análisis Básico</SelectItem>
                           <SelectItem value="standard">Análisis Estándar</SelectItem>
@@ -354,9 +359,14 @@ export default function Statistics() {
                 </Card>
               </div>
 
-              <Card className="shadow-soft">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-heading">Tendencias Mensuales</CardTitle>
+              <Card className="glass-card shadow-medium hover-lift scale-in">
+                <CardHeader className="pb-2 border-b border-white/10">
+                  <CardTitle className="text-heading flex items-center">
+                    <span className="bg-primary/20 p-2 rounded-full mr-2">
+                      <BarChart2 className="h-5 w-5 text-primary" />
+                    </span>
+                    Tendencias Mensuales
+                  </CardTitle>
                   <CardDescription>Actividad de cotizaciones a lo largo del tiempo</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -368,37 +378,58 @@ export default function Statistics() {
                       </div>
                     </div>
                   ) : getMonthlyData().length > 0 ? (
-                    <div className="h-80">
+                    <div className="h-80 fade-in">
                       <Tabs defaultValue="count">
                         <TabsList className="mb-4">
-                          <TabsTrigger value="count">Cantidad de Cotizaciones</TabsTrigger>
-                          <TabsTrigger value="value">Valor de Cotizaciones</TabsTrigger>
+                          <TabsTrigger value="count" className="hover-lift">Cantidad de Cotizaciones</TabsTrigger>
+                          <TabsTrigger value="value" className="hover-lift">Valor de Cotizaciones</TabsTrigger>
                         </TabsList>
                         
-                        <TabsContent value="count" className="mt-2">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={getMonthlyData()}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="month" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend />
-                              <Bar dataKey="count" name="Número de Cotizaciones" fill="hsl(var(--primary))" />
-                            </BarChart>
-                          </ResponsiveContainer>
+                        <TabsContent value="count" className="mt-2 slide-in">
+                          <div className="glass-panel p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={getMonthlyData()}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                                <XAxis dataKey="month" />
+                                <YAxis />
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                    backdropFilter: 'blur(8px)',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                  }}
+                                />
+                                <Legend />
+                                <Bar dataKey="count" name="Número de Cotizaciones" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
                         </TabsContent>
                         
-                        <TabsContent value="value" className="mt-2">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={getMonthlyData()}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="month" />
-                              <YAxis />
-                              <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, "Valor Total"]} />
-                              <Legend />
-                              <Bar dataKey="value" name="Valor Total de Cotizaciones" fill="hsl(var(--success))" />
-                            </BarChart>
-                          </ResponsiveContainer>
+                        <TabsContent value="value" className="mt-2 slide-in">
+                          <div className="glass-panel p-4">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={getMonthlyData()}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                                <XAxis dataKey="month" />
+                                <YAxis />
+                                <Tooltip 
+                                  formatter={(value) => [`$${value.toLocaleString()}`, "Valor Total"]} 
+                                  contentStyle={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                    backdropFilter: 'blur(8px)',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                                  }}
+                                />
+                                <Legend />
+                                <Bar dataKey="value" name="Valor Total de Cotizaciones" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
                         </TabsContent>
                       </Tabs>
                     </div>

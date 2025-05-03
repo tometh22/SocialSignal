@@ -43,6 +43,8 @@ import {
   Search,
   FileText
 } from "lucide-react";
+import { EnhancedTable } from "@/components/ui/enhanced-table";
+import { getStatusBadgeForProject } from "@/components/ui/status-badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -180,21 +182,26 @@ const ActiveProjects: React.FC = () => {
 
             <div className="mb-section">
               {/* Filtros y búsqueda */}
-              <Card className="shadow-soft mb-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-heading">Filtros</CardTitle>
+              <Card className="glass-card shadow-medium mb-6 scale-in">
+                <CardHeader className="pb-3 border-b border-white/10">
+                  <CardTitle className="text-heading flex items-center">
+                    <span className="bg-primary/20 p-2 rounded-full mr-2">
+                      <Search className="h-5 w-5 text-primary" />
+                    </span>
+                    Filtros
+                  </CardTitle>
                   <CardDescription>
                     Refina los proyectos que deseas visualizar
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-col sm:flex-row gap-4 form-group">
+                  <div className="flex flex-col sm:flex-row gap-4 form-group slide-in">
                     <div className="relative flex-grow form-group">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
                         <Input
                           placeholder="Buscar proyectos..."
-                          className="pl-10"
+                          className="pl-10 shadow-soft focus:shadow-medium transition-shadow"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -205,10 +212,10 @@ const ActiveProjects: React.FC = () => {
                         value={selectedClient}
                         onValueChange={setSelectedClient}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="hover-lift shadow-soft">
                           <SelectValue placeholder="Filtrar por cliente" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="glass-light backdrop-blur-md border border-white/20">
                           <SelectItem value="all">Todos los clientes</SelectItem>
                           {!isLoadingClients &&
                             clients?.map((client: Client) => (
@@ -273,131 +280,146 @@ const ActiveProjects: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-label">Proyecto</TableHead>
-                              <TableHead className="text-label">Cliente</TableHead>
-                              <TableHead className="text-label">Estado</TableHead>
-                              <TableHead className="text-label">Inicio</TableHead>
-                              <TableHead className="text-label">Fin Esperado</TableHead>
-                              <TableHead className="text-label">Seguimiento</TableHead>
-                              <TableHead className="text-label">Acciones</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredProjects.map((project) => (
-                              <TableRow key={project.id} className="hover:bg-neutral-50 transition-colors">
-                                <TableCell className="font-medium text-neutral-900">
-                                  {project.quotation?.projectName}
-                                </TableCell>
-                                <TableCell className="text-neutral-700">
-                                  {clients?.find(
-                                    (c: Client) => c.id === project.quotation?.clientId
-                                  )?.name || "Cliente Desconocido"}
-                                </TableCell>
-                                <TableCell>
-                                  {project.status === 'active' && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-success/10 text-success-dark">
-                                      Activo
-                                    </span>
-                                  )}
-                                  {project.status === 'on-hold' && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-warning/10 text-warning-dark">
-                                      En Pausa
-                                    </span>
-                                  )}
-                                  {project.status === 'completed' && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-primary/10 text-primary-dark">
-                                      Completado
-                                    </span>
-                                  )}
-                                  {project.status === 'cancelled' && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-error/10 text-error-dark">
-                                      Cancelado
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-neutral-700">
-                                  <div className="flex items-center">
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-neutral-400" />
-                                    {formatDate(project.startDate)}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-neutral-700">
-                                  <div className="flex items-center">
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-neutral-400" />
-                                    {formatDate(project.expectedEndDate)}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-neutral-700">
-                                  {getTrackingFrequencyLabel(project.trackingFrequency)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex space-x-2">
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="hover-lift"
-                                            onClick={() => setLocation(`/project-summary/${project.id}`)}
-                                          >
-                                            <FileText className="h-4 w-4" />
-                                            <span className="sr-only">Ver Detalles</span>
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>Ver Detalles del Proyecto</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                    
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="hover-lift"
-                                            onClick={() => setLocation(`/active-projects/${project.id}/time-entries`)}
-                                          >
-                                            <Clock className="h-4 w-4" />
-                                            <span className="sr-only">Registrar Horas</span>
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>Registrar Horas de Trabajo</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                    
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="hover-lift"
-                                            onClick={() => setLocation(`/project-summary/${project.id}`)}
-                                          >
-                                            <LineChart className="h-4 w-4" />
-                                            <span className="sr-only">Estadísticas</span>
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>Ver Estadísticas del Proyecto</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                      <div className="scale-in">
+                        <EnhancedTable
+                          glassmorphism
+                          animateRows
+                          rounded
+                          data={filteredProjects}
+                          columns={[
+                            {
+                              header: "Proyecto",
+                              accessorKey: "quotation.projectName",
+                              className: "font-medium text-neutral-900"
+                            },
+                            {
+                              header: "Cliente",
+                              accessorKey: (row) => {
+                                const client = clients?.find(
+                                  (c: Client) => c.id === row.quotation?.clientId
+                                );
+                                return client?.name || "Cliente Desconocido";
+                              },
+                              className: "text-neutral-700"
+                            },
+                            {
+                              header: "Estado",
+                              accessorKey: (row) => getStatusBadgeForProject(row.status)
+                            },
+                            {
+                              header: "Inicio",
+                              accessorKey: (row) => (
+                                <div className="flex items-center">
+                                  <CalendarIcon className="mr-2 h-4 w-4 text-neutral-400" />
+                                  {formatDate(row.startDate)}
+                                </div>
+                              ),
+                              className: "text-neutral-700"
+                            },
+                            {
+                              header: "Fin Esperado",
+                              accessorKey: (row) => (
+                                <div className="flex items-center">
+                                  <CalendarIcon className="mr-2 h-4 w-4 text-neutral-400" />
+                                  {formatDate(row.expectedEndDate)}
+                                </div>
+                              ),
+                              className: "text-neutral-700"
+                            },
+                            {
+                              header: "Seguimiento",
+                              accessorKey: (row) => getTrackingFrequencyLabel(row.trackingFrequency),
+                              className: "text-neutral-700"
+                            },
+                            {
+                              header: "Acciones",
+                              accessorKey: (row) => (
+                                <div className="flex space-x-2">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="hover-lift"
+                                          onClick={() => setLocation(`/project-summary/${row.id}`)}
+                                        >
+                                          <FileText className="h-4 w-4" />
+                                          <span className="sr-only">Ver Detalles</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Ver Detalles del Proyecto</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="hover-lift"
+                                          onClick={() => setLocation(`/active-projects/${row.id}/time-entries`)}
+                                        >
+                                          <Clock className="h-4 w-4" />
+                                          <span className="sr-only">Registrar Horas</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Registrar Horas de Trabajo</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="hover-lift"
+                                          onClick={() => setLocation(`/project-summary/${row.id}`)}
+                                        >
+                                          <LineChart className="h-4 w-4" />
+                                          <span className="sr-only">Estadísticas</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Ver Estadísticas del Proyecto</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              )
+                            }
+                          ]}
+                          emptyState={
+                            <div className="flex flex-col justify-center items-center h-[300px] text-center px-4">
+                              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                              <h3 className="text-heading">No hay proyectos</h3>
+                              <p className="text-neutral-500 mt-2 max-w-md">
+                                {searchQuery
+                                  ? "No se encontraron proyectos que coincidan con tu búsqueda. Intenta con otros términos."
+                                  : activeTab !== "all"
+                                  ? `No hay proyectos ${
+                                      activeTab === "by-client" ? "para este cliente" : "en este estado"
+                                    }.`
+                                  : "No hay proyectos activos en el sistema. Crea uno nuevo para comenzar."}
+                              </p>
+                              {!searchQuery && activeTab === "all" && (
+                                <Button
+                                  className="mt-4 hover-lift"
+                                  onClick={() => setLocation("/active-projects/new")}
+                                >
+                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                  Nuevo Proyecto
+                                </Button>
+                              )}
+                            </div>
+                          }
+                        />
                       </div>
                     )}
                   </div>
