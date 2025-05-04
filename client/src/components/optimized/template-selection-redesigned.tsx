@@ -336,99 +336,324 @@ const TemplateSelectionRedesigned: React.FC = () => {
         </TabsContent>
         
         <TabsContent value="details" className="space-y-4">
-          {quotationData.template === null ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center">
-                  <Info className="h-4 w-4 mr-2 text-primary" />
-                  Configuración Personalizada
-                </CardTitle>
-                <CardDescription>
-                  Proyecto configurado sin usar una plantilla predefinida
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    Has seleccionado crear un proyecto completamente personalizado sin usar una plantilla predefinida.
-                    Configura las opciones a continuación según tus necesidades específicas.
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                    <div>
-                      <p className="font-medium text-gray-700">Tipo:</p>
-                      <Badge className="mt-1 bg-blue-100 text-blue-800 border-blue-200">
-                        Personalizado
-                      </Badge>
+          <div className="p-4 bg-white rounded-md border border-gray-200">
+            {/* Encabezado con información de la plantilla */}
+            <div className="flex items-start gap-4 border-b border-gray-100 pb-3 mb-4">
+              <div className="flex-1">
+                {quotationData.template === null ? (
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                      <FileText className="h-4 w-4 text-blue-700" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-700">Ventajas:</p>
-                      <p className="mt-1 text-sm">Flexibilidad total en la configuración</p>
+                      <h3 className="font-medium text-sm">Configuración Personalizada</h3>
+                      <p className="text-xs text-gray-500">Mayor flexibilidad en la configuración del proyecto</p>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-base flex items-center">
-                      <Info className="h-4 w-4 mr-2 text-primary" />
-                      {quotationData.template.name}
-                    </CardTitle>
-                    <CardDescription>
-                      {quotationData.template.description}
-                    </CardDescription>
-                  </div>
-                  <Badge className={getComplexityColor(quotationData.template.complexity)}>
-                    {getComplexityLabel(quotationData.template.complexity)}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <p className="font-medium text-gray-700">Páginas:</p>
-                    <p className="mt-1">{quotationData.template.pageRange || 'No especificado'}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-700">Costo Base:</p>
-                    <p className="mt-1">${quotationData.template.baseCost?.toFixed(2) || '0.00'}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-700">Costo Plataforma:</p>
-                    <p className="mt-1">${quotationData.template.platformCost?.toFixed(2) || '0.00'}</p>
-                  </div>
-                  {quotationData.template.features && (
-                    <div className="col-span-full">
-                      <p className="font-medium text-gray-700">Características:</p>
-                      <p className="mt-1">{quotationData.template.features}</p>
+                ) : (
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-3">
+                      <FileText className="h-4 w-4 text-primary" />
                     </div>
-                  )}
+                    <div>
+                      <h3 className="font-medium text-sm">{quotationData.template.name}</h3>
+                      <p className="text-xs text-gray-500 line-clamp-1">{quotationData.template.description}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {quotationData.template !== null && (
+                <Badge className={`${getComplexityColor(quotationData.template.complexity)} px-2 py-1`}>
+                  {getComplexityLabel(quotationData.template.complexity)}
+                </Badge>
+              )}
+            </div>
+            
+            {/* Información de costos y detalles en formato compacto */}
+            {quotationData.template !== null && (
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-gray-50 rounded p-2 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Páginas</div>
+                  <div className="font-medium text-sm">{quotationData.template.pageRange || 'N/A'}</div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Factores de complejidad */}
-          <ComplexityFactorsCard
-            analysisType={quotationData.analysisType}
-            mentionsVolume={quotationData.mentionsVolume}
-            countriesCovered={quotationData.countriesCovered}
-            clientEngagement={quotationData.clientEngagement}
-          />
-          
-          {/* Resumen financiero */}
-          <FinancialSummary 
-            baseCost={baseCost} 
-            complexityAdjustment={complexityAdjustment} 
-            totalAmount={totalAmount} 
-          />
-          
-          {/* Campo de personalización */}
-          {renderCustomizationFields()}
+                <div className="bg-gray-50 rounded p-2 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Costo Base</div>
+                  <div className="font-medium text-sm">${quotationData.template.baseCost?.toFixed(2) || '0.00'}</div>
+                </div>
+                <div className="bg-gray-50 rounded p-2 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Costo Plataforma</div>
+                  <div className="font-medium text-sm">${quotationData.template.platformCost?.toFixed(2) || '0.00'}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Factores de complejidad en formato horizontal más compacto */}
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-3 flex items-center">
+                <BarChart className="h-4 w-4 mr-2 text-primary" />
+                Factores de Complejidad
+              </h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-white border border-gray-200 rounded-md p-2">
+                  <div className="text-xs text-gray-500 mb-1">Tipo de Análisis</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <button 
+                      onClick={() => updateAnalysisType('basic')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.analysisType === 'basic' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Básico
+                    </button>
+                    <button 
+                      onClick={() => updateAnalysisType('standard')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.analysisType === 'standard' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Estándar
+                    </button>
+                    <button 
+                      onClick={() => updateAnalysisType('advanced')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.analysisType === 'advanced' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Avanzado
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-gray-200 rounded-md p-2">
+                  <div className="text-xs text-gray-500 mb-1">Volumen de Menciones</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <button 
+                      onClick={() => updateMentionsVolume('low')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.mentionsVolume === 'low' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Bajo
+                    </button>
+                    <button 
+                      onClick={() => updateMentionsVolume('medium')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.mentionsVolume === 'medium' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Medio
+                    </button>
+                    <button 
+                      onClick={() => updateMentionsVolume('high')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.mentionsVolume === 'high' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Alto
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-gray-200 rounded-md p-2">
+                  <div className="text-xs text-gray-500 mb-1">Países Cubiertos</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <button 
+                      onClick={() => updateCountriesCovered('1')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.countriesCovered === '1' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      1 país
+                    </button>
+                    <button 
+                      onClick={() => updateCountriesCovered('2-3')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.countriesCovered === '2-3' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      2-3 países
+                    </button>
+                    <button 
+                      onClick={() => updateCountriesCovered('4+')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.countriesCovered === '4+' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      4+ países
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-white border border-gray-200 rounded-md p-2">
+                  <div className="text-xs text-gray-500 mb-1">Compromiso del Cliente</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <button 
+                      onClick={() => updateClientEngagement('low')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.clientEngagement === 'low' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Bajo
+                    </button>
+                    <button 
+                      onClick={() => updateClientEngagement('medium')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.clientEngagement === 'medium' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Medio
+                    </button>
+                    <button 
+                      onClick={() => updateClientEngagement('high')}
+                      className={`text-xs px-2 py-0.5 rounded-full border ${
+                        quotationData.clientEngagement === 'high' 
+                          ? 'bg-primary/10 border-primary text-primary font-medium' 
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      Alto
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Resumen financiero en formato visual más amigable */}
+            <div className="mb-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-medium flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M16 8h-6.5a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5H6"></path>
+                    <path d="M12 18v2"></path>
+                    <path d="M12 6v2"></path>
+                  </svg>
+                  Resumen Financiero
+                </h3>
+                <div className="flex items-center">
+                  <div className="flex items-center mr-4">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                    <span className="text-xs text-gray-600">Base</span>
+                  </div>
+                  <div className="flex items-center mr-4">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>
+                    <span className="text-xs text-gray-600">Complejidad</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500 mr-1"></div>
+                    <span className="text-xs font-medium text-gray-700">Total</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="relative">
+                <div className="h-8 rounded-l-md bg-green-100 flex items-center pl-3" 
+                  style={{ 
+                    width: `${baseCost ? (baseCost / (totalAmount || 1)) * 100 : 0}%`,
+                  }}>
+                  <span className="text-xs font-medium text-green-800">${baseCost?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="h-8 bg-blue-100 flex items-center justify-center absolute top-0" 
+                  style={{ 
+                    width: `${complexityAdjustment ? (complexityAdjustment / (totalAmount || 1)) * 100 : 0}%`,
+                    left: `${baseCost ? (baseCost / (totalAmount || 1)) * 100 : 0}%`
+                  }}>
+                  <span className="text-xs font-medium text-blue-800">${complexityAdjustment?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+              
+              <div className="mt-3 flex justify-between items-center">
+                <div className="text-xs text-gray-500">Desglose de Costos</div>
+                <div className="text-sm font-semibold text-purple-800">
+                  Total: ${totalAmount?.toFixed(2) || '0.00'}
+                </div>
+              </div>
+              
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <div 
+                  className="bg-gray-50 border border-gray-200 rounded-md p-2 transition-all cursor-pointer hover:shadow-sm hover:border-gray-300"
+                  title="El costo base refleja el precio inicial de la plantilla seleccionada"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="text-xs text-gray-500">Costo Base</div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  </div>
+                  <div className="font-medium text-sm">${baseCost?.toFixed(2) || '0.00'}</div>
+                </div>
+                
+                <div 
+                  className="bg-gray-50 border border-gray-200 rounded-md p-2 transition-all cursor-pointer hover:shadow-sm hover:border-gray-300"
+                  title="El ajuste de complejidad se basa en los factores seleccionados"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="text-xs text-gray-500">Ajuste</div>
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  </div>
+                  <div className="font-medium text-sm">${complexityAdjustment?.toFixed(2) || '0.00'}</div>
+                </div>
+                
+                <div 
+                  className="bg-gray-50 border border-gray-200 rounded-md p-2 transition-all cursor-pointer hover:shadow-sm hover:border-gray-300"
+                  title="Costo total del proyecto"
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  </div>
+                  <div className="font-medium text-sm text-purple-800">${totalAmount?.toFixed(2) || '0.00'}</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Campo de personalización */}
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2 flex items-center">
+                <FileText className="h-4 w-4 mr-2 text-primary" />
+                Notas de Personalización
+              </h3>
+              
+              <Textarea
+                placeholder="Agrega detalles específicos, requerimientos particulares o cualquier información adicional para este proyecto..."
+                className="min-h-[100px] text-sm"
+                value={quotationData.customization || ''}
+                onChange={(e) => updateCustomization(e.target.value)}
+              />
+              
+              {!quotationData.customization && (
+                <div className="flex gap-2 items-start mt-2 p-2 bg-amber-50 text-amber-800 border border-amber-200 rounded text-xs">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Recomendación</p>
+                    <p>Agregar notas de personalización ayuda a definir mejor el alcance del proyecto y evitar malentendidos con el cliente.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
