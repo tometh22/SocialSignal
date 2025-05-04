@@ -142,16 +142,17 @@ const OptimizedTeamConfig: React.FC = () => {
   
   // Guardar cambios en miembro
   const saveEditing = (member: any) => {
-    if (editingMember[member.id]) {
-      const hours = editingMember[member.id].hours;
-      const rate = editingMember[member.id].rate;
+    const memberId = String(member.id);
+    if (editingMember[memberId]) {
+      const hours = editingMember[memberId].hours;
+      const rate = editingMember[memberId].rate;
       updateTeamMember(member.id, {
         ...member,
         hours,
         rate,
         cost: hours * rate
       });
-      setIsEditing({...isEditing, [member.id]: false});
+      setIsEditing({...isEditing, [memberId]: false});
     }
   };
 
@@ -382,7 +383,7 @@ const OptimizedTeamConfig: React.FC = () => {
                           {quotationData.teamMembers.map(member => {
                             const role = availableRoles?.find(r => r.id === member.roleId);
                             const person = availablePersonnel?.find(p => p.id === member.personnelId);
-                            const isCurrentlyEditing = isEditing[member.id] || false;
+                            const isCurrentlyEditing = isEditing[String(member.id)] || false;
                             
                             return (
                               <tr key={member.id} className="text-sm hover:bg-gray-50">
@@ -404,13 +405,13 @@ const OptimizedTeamConfig: React.FC = () => {
                                       type="number"
                                       min="1"
                                       className="h-7 text-xs w-20 mx-auto"
-                                      value={editingMember[member.id]?.hours || member.hours}
+                                      value={editingMember[String(member.id)]?.hours || member.hours}
                                       onChange={(e) => {
                                         const value = parseInt(e.target.value) || 0;
                                         setEditingMember({
                                           ...editingMember,
-                                          [member.id]: {
-                                            ...(editingMember[member.id] || { rate: member.rate }),
+                                          [String(member.id)]: {
+                                            ...(editingMember[String(member.id)] || { rate: member.rate }),
                                             hours: value
                                           }
                                         });
@@ -430,13 +431,13 @@ const OptimizedTeamConfig: React.FC = () => {
                                         min="0"
                                         step="0.01"
                                         className="h-7 text-xs pl-6"
-                                        value={editingMember[member.id]?.rate || member.rate}
+                                        value={editingMember[String(member.id)]?.rate || member.rate}
                                         onChange={(e) => {
                                           const value = parseFloat(e.target.value) || 0;
                                           setEditingMember({
                                             ...editingMember,
-                                            [member.id]: {
-                                              ...(editingMember[member.id] || { hours: member.hours }),
+                                            [String(member.id)]: {
+                                              ...(editingMember[String(member.id)] || { hours: member.hours }),
                                               rate: value
                                             }
                                           });
@@ -451,8 +452,8 @@ const OptimizedTeamConfig: React.FC = () => {
                                 <td className="p-2 text-right border-b border-gray-100">
                                   <span className="text-xs font-medium text-gray-900">
                                     ${isCurrentlyEditing 
-                                      ? ((editingMember[member.id]?.hours || member.hours) * 
-                                         (editingMember[member.id]?.rate || member.rate)).toFixed(2)
+                                      ? ((editingMember[String(member.id)]?.hours || member.hours) * 
+                                         (editingMember[String(member.id)]?.rate || member.rate)).toFixed(2)
                                       : member.cost.toFixed(2)
                                     }
                                   </span>
