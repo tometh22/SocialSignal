@@ -332,10 +332,7 @@ export default function Sidebar() {
                       <div className="h-1 w-5 rounded-full bg-sidebar-foreground/20"></div>
                     )}
                   </div>
-                  <nav className={cn(
-                    "space-y-2 transition-all duration-300 overflow-hidden",
-                    !isCollapsed && expandedSection !== 'cotizaciones' && navCategories.cotizaciones.length > 1 && "max-h-12 opacity-75"
-                  )}>
+                  <nav className="space-y-2">
                     {navCategories.cotizaciones.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
@@ -399,10 +396,7 @@ export default function Sidebar() {
                       <div className="h-1 w-5 rounded-full bg-sidebar-foreground/20"></div>
                     )}
                   </div>
-                  <nav className={cn(
-                    "space-y-2 transition-all duration-300 overflow-hidden",
-                    !isCollapsed && expandedSection !== 'datos' && navCategories.datos.length > 1 && "max-h-12 opacity-75"
-                  )}>
+                  <nav className="space-y-2">
                     {navCategories.datos.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
