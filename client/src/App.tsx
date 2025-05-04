@@ -38,6 +38,7 @@ function App() {
               </Route>
               <Route path="/manage-quotes" component={ManageQuotes} />
               <Route path="/quote/:id" component={QuoteDetails} />
+              <Route path="/quotations/:id" component={QuotationDetail} />
               <Route path="/quotation/:id" component={QuotationDetail} />
               <Route path="/clients" component={Clients} />
               <Route path="/statistics" component={Statistics} />
