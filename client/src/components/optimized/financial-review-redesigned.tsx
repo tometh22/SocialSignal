@@ -412,7 +412,7 @@ const OptimizedFinancialReview: React.FC = () => {
                     </TableRow>
                   ))}
                   <TableRow className="bg-primary/5 border-t border-b border-primary/20">
-                    <TableCell className="font-bold">PRECIO TOTAL</TableCell>
+                    <TableCell className="font-bold">COSTO ESTIMADO</TableCell>
                     <TableCell className="text-xs">Suma de todos los componentes y ajustes</TableCell>
                     <TableCell className="text-right font-bold text-primary">{formatCurrency(totalAmount)}</TableCell>
                   </TableRow>
