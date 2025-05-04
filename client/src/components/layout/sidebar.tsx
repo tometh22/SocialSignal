@@ -1,32 +1,34 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
 import logoImage from "../../../src/assets/epicaldigital_logo.jpeg";
 import {
+  ChartBarSquare,
   PlusCircle,
-  List,
+  ListChecks,
   Users,
-  Settings,
+  Cog,
   Menu,
   X,
-  BarChart,
   ChevronRight,
   Activity,
   PieChart,
-  ClipboardList,
-  LogOut,
-  Home,
+  BookOpen,
   LayoutDashboard,
   FileText,
   Folder,
-  FolderOpen,
+  Package,
   ChevronDown,
   Briefcase,
+  LightbulbIcon,
+  ClipboardList,
+  CheckCircle,
+  BellRing,
   Search
 } from "lucide-react";
 

@@ -13,7 +13,8 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
-import Sidebar from "@/components/layout/sidebar";
+import SidebarNew from "@/components/layout/sidebar-new";
+import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
 
 function App() {
@@ -23,33 +24,36 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-        <main className="flex-1">
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/optimized-quote" component={OptimizedQuote} />
-            <Route path="/new-quote">
-              <Redirect to="/optimized-quote" />
-            </Route>
-            <Route path="/manage-quotes" component={ManageQuotes} />
-            <Route path="/quote/:id" component={QuoteDetails} />
-            <Route path="/quotation/:id" component={QuotationDetail} />
-            <Route path="/clients" component={Clients} />
-            <Route path="/statistics" component={Statistics} />
-            <Route path="/history">
-              <Redirect to="/statistics" />
-            </Route>
-            <Route path="/admin" component={Admin} />
-            {/* Rutas para gestión de proyectos activos */}
-            <Route path="/active-projects" component={ActiveProjects} />
-            <Route path="/active-projects/new" component={NewActiveProject} />
-            <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
-            <Route path="/time-entries/project/:projectId" component={TimeEntries} />
-            <Route path="/project-summary/:projectId" component={ProjectSummary} />
-            <Route component={NotFound} />
-          </Switch>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      <SidebarNew />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Topbar />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="container mx-auto max-w-7xl p-4 sm:p-6">
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/optimized-quote" component={OptimizedQuote} />
+              <Route path="/new-quote">
+                <Redirect to="/optimized-quote" />
+              </Route>
+              <Route path="/manage-quotes" component={ManageQuotes} />
+              <Route path="/quote/:id" component={QuoteDetails} />
+              <Route path="/quotation/:id" component={QuotationDetail} />
+              <Route path="/clients" component={Clients} />
+              <Route path="/statistics" component={Statistics} />
+              <Route path="/history">
+                <Redirect to="/statistics" />
+              </Route>
+              <Route path="/admin" component={Admin} />
+              {/* Rutas para gestión de proyectos activos */}
+              <Route path="/active-projects" component={ActiveProjects} />
+              <Route path="/active-projects/new" component={NewActiveProject} />
+              <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
+              <Route path="/time-entries/project/:projectId" component={TimeEntries} />
+              <Route path="/project-summary/:projectId" component={ProjectSummary} />
+              <Route component={NotFound} />
+            </Switch>
+          </div>
         </main>
       </div>
       <Toaster />
