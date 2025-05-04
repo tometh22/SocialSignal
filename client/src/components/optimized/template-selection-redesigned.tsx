@@ -544,52 +544,53 @@ const TemplateSelectionRedesigned: React.FC = () => {
             
             {/* Resumen financiero en formato visual más amigable */}
             <div className="mb-4">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <path d="M16 8h-6.5a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5H6"></path>
-                    <path d="M12 18v2"></path>
-                    <path d="M12 6v2"></path>
-                  </svg>
-                  Resumen Financiero
-                </h3>
-                <div className="flex items-center">
-                  <div className="flex items-center mr-4">
-                    <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
-                    <span className="text-xs text-gray-600">Base</span>
-                  </div>
-                  <div className="flex items-center mr-4">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>
-                    <span className="text-xs text-gray-600">Complejidad</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500 mr-1"></div>
-                    <span className="text-xs font-medium text-gray-700">Total</span>
-                  </div>
-                </div>
-              </div>
+              <h3 className="text-sm font-medium mb-3 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary mr-2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M16 8h-6.5a2.5 2.5 0 0 0 0 5h3a2.5 2.5 0 0 1 0 5H6"></path>
+                  <path d="M12 18v2"></path>
+                  <path d="M12 6v2"></path>
+                </svg>
+                Resumen Financiero
+              </h3>
               
-              <div className="relative">
-                <div className="h-8 rounded-l-md bg-green-100 flex items-center pl-3" 
-                  style={{ 
-                    width: `${baseCost ? (baseCost / (totalAmount || 1)) * 100 : 0}%`,
-                  }}>
-                  <span className="text-xs font-medium text-green-800">${baseCost?.toFixed(2) || '0.00'}</span>
+              <div className="bg-gray-100 rounded-md overflow-hidden p-1 mt-1">
+                <div className="relative h-10 rounded-md overflow-hidden flex">
+                  <div className="bg-green-200 flex items-center justify-start pl-3 h-full z-10 transition-all duration-300" 
+                    style={{ 
+                      width: `${baseCost ? Math.max((baseCost / (totalAmount || 1)) * 100, 25) : 0}%`,
+                    }}>
+                    <div className="flex flex-col items-start">
+                      <span className="text-[10px] font-medium text-green-700">Costo Base</span>
+                      <span className="text-xs font-bold text-green-800">${baseCost?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  </div>
+                  <div className="bg-blue-200 flex items-center justify-center h-full absolute z-20 transition-all duration-300" 
+                    style={{ 
+                      width: `${complexityAdjustment ? Math.max((complexityAdjustment / (totalAmount || 1)) * 100, 15) : 0}%`,
+                      left: `${baseCost ? (baseCost / (totalAmount || 1)) * 100 : 0}%`
+                    }}>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-medium text-blue-700">Ajuste</span>
+                      <span className="text-xs font-bold text-blue-800">${complexityAdjustment?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="h-8 bg-blue-100 flex items-center justify-center absolute top-0" 
-                  style={{ 
-                    width: `${complexityAdjustment ? (complexityAdjustment / (totalAmount || 1)) * 100 : 0}%`,
-                    left: `${baseCost ? (baseCost / (totalAmount || 1)) * 100 : 0}%`
-                  }}>
-                  <span className="text-xs font-medium text-blue-800">${complexityAdjustment?.toFixed(2) || '0.00'}</span>
-                </div>
-              </div>
-              
-              <div className="mt-3 flex justify-between items-center">
-                <div className="text-xs text-gray-500">Desglose de Costos</div>
-                <div className="text-sm font-semibold text-purple-800">
-                  Total: ${totalAmount?.toFixed(2) || '0.00'}
+                
+                <div className="flex justify-between items-center mt-2 px-1">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                      <span className="text-xs text-gray-600">Base</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>
+                      <span className="text-xs text-gray-600">Complejidad</span>
+                    </div>
+                  </div>
+                  <div className="text-xs font-semibold text-purple-800 bg-purple-50 px-2 py-1 rounded">
+                    Total: ${totalAmount?.toFixed(2) || '0.00'}
+                  </div>
                 </div>
               </div>
               
@@ -617,14 +618,19 @@ const TemplateSelectionRedesigned: React.FC = () => {
                 </div>
                 
                 <div 
-                  className="bg-gray-50 border border-gray-200 rounded-md p-2 transition-all cursor-pointer hover:shadow-sm hover:border-gray-300"
+                  className="bg-gradient-to-r from-purple-100 to-purple-200 border-2 border-purple-300 rounded-md p-3 shadow-sm transition-all cursor-pointer hover:shadow-md hover:border-purple-400 relative overflow-hidden"
                   title="Costo total del proyecto"
                 >
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="text-xs text-gray-500">Total</div>
-                    <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <div className="absolute -right-6 -top-6 w-12 h-12 rounded-full bg-purple-500/20"></div>
+                  <div className="absolute right-4 top-4 w-8 h-8 rounded-full bg-purple-500/30"></div>
+                  
+                  <div className="flex justify-between items-center mb-1 relative z-10">
+                    <div className="font-medium text-purple-800">Total Final</div>
+                    <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
+                      <span className="text-white text-[9px] font-bold">$</span>
+                    </div>
                   </div>
-                  <div className="font-medium text-sm text-purple-800">${totalAmount?.toFixed(2) || '0.00'}</div>
+                  <div className="font-bold text-lg text-purple-800 relative z-10">${totalAmount?.toFixed(2) || '0.00'}</div>
                 </div>
               </div>
             </div>
