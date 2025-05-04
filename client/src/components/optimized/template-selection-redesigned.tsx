@@ -618,19 +618,20 @@ const TemplateSelectionRedesigned: React.FC = () => {
                 </div>
                 
                 <div 
-                  className="bg-gradient-to-r from-purple-100 to-purple-200 border-2 border-purple-300 rounded-md p-3 shadow-sm transition-all cursor-pointer hover:shadow-md hover:border-purple-400 relative overflow-hidden"
+                  className="bg-[#f7f5fe] border border-[#e2ddf5] rounded-md p-3 transition-all cursor-pointer hover:shadow-sm hover:border-[#d0caed] relative overflow-hidden"
                   title="Costo total del proyecto"
                 >
-                  <div className="absolute -right-6 -top-6 w-12 h-12 rounded-full bg-purple-500/20"></div>
-                  <div className="absolute right-4 top-4 w-8 h-8 rounded-full bg-purple-500/30"></div>
+                  <div className="absolute -right-6 -top-6 w-12 h-12 rounded-full bg-[#9c8ce7]/10"></div>
+                  <div className="absolute right-4 top-4 w-8 h-8 rounded-full bg-[#9c8ce7]/10"></div>
                   
                   <div className="flex justify-between items-center mb-1 relative z-10">
-                    <div className="font-medium text-purple-800">Total Final</div>
-                    <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center">
-                      <span className="text-white text-[9px] font-bold">$</span>
+                    <div className="font-medium text-[#6a5b9d]">Total Final</div>
+                    <div className="w-4 h-4 rounded-full bg-[#9c8ce7] flex items-center justify-center">
+                      <span className="text-white text-[8px] font-medium">$</span>
                     </div>
                   </div>
-                  <div className="font-bold text-lg text-purple-800 relative z-10">${totalAmount?.toFixed(2) || '0.00'}</div>
+                  <div className="font-bold text-lg text-[#6a5b9d] relative z-10">${totalAmount?.toFixed(2) || '0.00'}</div>
+                  <div className="h-1 w-24 bg-[#9c8ce7]/20 absolute bottom-0 left-0 rounded-tr-md"></div>
                 </div>
               </div>
             </div>

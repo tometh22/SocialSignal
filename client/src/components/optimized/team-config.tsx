@@ -526,7 +526,11 @@ const OptimizedTeamConfig: React.FC = () => {
                 <div className="text-xs font-medium text-gray-500">Resumen de Costos</div>
                 <div className="text-xs text-gray-500">
                   {percentageOfBase > 0 ? (
-                    <span className={percentageOfBase > 50 ? 'text-orange-600' : 'text-green-600'}>
+                    <span className={
+                      percentageOfBase > 70 ? 'text-[#d27060]' : 
+                      percentageOfBase > 50 ? 'text-[#d2a860]' : 
+                      'text-[#60d28e]'
+                    }>
                       {percentageOfBase.toFixed(1)}% del costo base
                     </span>
                   ) : null}
@@ -544,31 +548,32 @@ const OptimizedTeamConfig: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white border border-gray-200 rounded p-2 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-gray-500">Costo Equipo</div>
-                    <div className="text-sm font-medium">${totalTeamCost.toFixed(2)}</div>
+                <div className="bg-[#f7f5fe] border border-[#e2ddf5] rounded p-2 flex items-center justify-between relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="text-xs text-[#6a5b9d]/70">Costo Equipo</div>
+                    <div className="text-sm font-medium text-[#6a5b9d]">${totalTeamCost.toFixed(2)}</div>
                   </div>
-                  <div className="h-8 w-8 rounded-full bg-green-50 flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 text-green-600" />
+                  <div className="h-8 w-8 rounded-full bg-[#9c8ce7]/20 flex items-center justify-center">
+                    <DollarSign className="h-4 w-4 text-[#8976e2]" />
                   </div>
+                  <div className="h-1 w-20 bg-[#9c8ce7]/20 absolute bottom-0 left-0 rounded-tr-md"></div>
                 </div>
               </div>
               
               {/* Barra de progreso del costo del equipo */}
               {baseCost > 0 && (
                 <div className="mt-1">
-                  <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div 
                       className={`h-full ${
-                        percentageOfBase > 70 ? 'bg-orange-500' : 
-                        percentageOfBase > 50 ? 'bg-amber-500' : 'bg-green-500'
+                        percentageOfBase > 70 ? 'bg-[#e79c8c]' : 
+                        percentageOfBase > 50 ? 'bg-[#e7d08c]' : 'bg-[#8ce7b5]'
                       }`}
                       style={{ width: `${Math.min(percentageOfBase, 100)}%` }}
                     ></div>
                   </div>
                   
-                  <div className="flex justify-between mt-1 text-[10px] text-gray-500">
+                  <div className="flex justify-between mt-1 text-[10px] text-gray-400">
                     <div>0%</div>
                     <div>50%</div>
                     <div>100%</div>
