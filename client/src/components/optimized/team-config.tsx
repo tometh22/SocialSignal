@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Personnel, Role } from '@shared/schema';
 import { 
   AlertCircle, Plus, Trash, UserPlus, Users, RefreshCcw, Clock, DollarSign,
-  Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles
+  Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles, Edit, Check, X
 } from 'lucide-react';
 
 const OptimizedTeamConfig: React.FC = () => {
@@ -43,6 +43,10 @@ const OptimizedTeamConfig: React.FC = () => {
 
   // Estado para la vista activa
   const [activeTab, setActiveTab] = useState<string>(quotationData.teamOption === 'auto' ? 'recommended' : 'custom');
+  
+  // Estado para miembros en edición
+  const [editingMember, setEditingMember] = useState<Record<number, {hours: number, rate: number}>>({});
+  const [isEditing, setIsEditing] = useState<Record<number, boolean>>({});
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
@@ -121,6 +125,35 @@ const OptimizedTeamConfig: React.FC = () => {
       setTeamOption('manual');
     }
   };
+  
+  // Iniciar edición de miembro
+  const startEditing = (memberId: number, hours: number, rate: number) => {
+    setEditingMember({
+      ...editingMember, 
+      [memberId]: { hours, rate }
+    });
+    setIsEditing({...isEditing, [memberId]: true});
+  };
+  
+  // Cancelar edición
+  const cancelEditing = (memberId: number) => {
+    setIsEditing({...isEditing, [memberId]: false});
+  };
+  
+  // Guardar cambios en miembro
+  const saveEditing = (member: any) => {
+    if (editingMember[member.id]) {
+      const hours = editingMember[member.id].hours;
+      const rate = editingMember[member.id].rate;
+      updateTeamMember(member.id, {
+        ...member,
+        hours,
+        rate,
+        cost: hours * rate
+      });
+      setIsEditing({...isEditing, [member.id]: false});
+    }
+  };
 
   return (
     <div className="h-[600px] overflow-y-auto pr-2">
@@ -154,120 +187,63 @@ const OptimizedTeamConfig: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Equipo recomendado */}
-          <TabsContent value="recommended" className="mt-0">
-            {quotationData.template !== undefined ? (
-              <>
-                {quotationData.template === null ? (
-                  // Personalizado sin plantilla
-                  <div className="flex items-start gap-3 mb-4 p-3 bg-amber-50 rounded-md border border-amber-200">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                    <div>
-                      <h3 className="text-sm font-medium text-amber-800">Configuración Personalizada</h3>
-                      <p className="text-xs text-amber-700 mt-1">
-                        Has elegido configurar la cotización sin plantilla. Cambia a la pestaña "Personalizado" 
-                        para configurar tu equipo manualmente.
-                      </p>
-                    </div>
-                  </div>
-                ) : recommendedRoleIds.length > 0 ? (
-                  // Plantilla con roles recomendados
-                  <div>
-                    <div className="bg-primary/5 rounded-md p-3 border border-primary/20 mb-4">
-                      <h3 className="text-sm font-medium flex items-center mb-2">
-                        <Award className="h-4 w-4 mr-2 text-primary" />
-                        Roles Recomendados para {quotationData.template.name}
-                      </h3>
-                      
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {recommendedRoleIds.map(roleId => {
-                          const role = availableRoles?.find(r => r.id === roleId);
-                          return role ? (
-                            <Badge key={roleId} variant="outline" className="bg-white border-primary/30">
-                              {role.name}
-                            </Badge>
-                          ) : null;
-                        })}
-                      </div>
-                      
-                      <p className="text-xs text-gray-600 mb-3">
-                        Estos roles son los más adecuados para este tipo de proyecto según nuestra experiencia.
-                        Puedes aplicarlos automáticamente o ajustar la configuración manualmente.
-                      </p>
-                      
-                      <div className="flex justify-end">
-                        <Button 
-                          onClick={applyRecommendedTeam}
-                          className="flex items-center bg-primary/80 hover:bg-primary text-sm h-8"
-                        >
-                          <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                          Aplicar Equipo Recomendado
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Previsualización del equipo recomendado */}
-                    <div className="mb-4">
-                      <h3 className="text-xs font-medium text-gray-500 mb-2 flex items-center">
-                        <UserCheck className="h-3.5 w-3.5 mr-1.5" />
-                        Composición del Equipo Recomendado
-                      </h3>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {recommendedRoleIds.map(roleId => {
-                          const role = availableRoles?.find(r => r.id === roleId);
-                          return role ? (
-                            <div key={roleId} className="flex items-center p-2 bg-gray-50 rounded-md border border-gray-200">
-                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center mr-2">
-                                <UserCheck className="h-3 w-3 text-primary" />
-                              </div>
-                              <div>
-                                <div className="text-xs font-medium">{role.name}</div>
-                                <div className="text-[10px] text-gray-500">${role.defaultRate}/hora</div>
-                              </div>
-                            </div>
-                          ) : null;
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  // Plantilla sin roles recomendados
-                  <div className="flex items-start gap-3 mb-4 p-3 bg-amber-50 rounded-md border border-amber-200">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                    <div>
-                      <h3 className="text-sm font-medium text-amber-800">No hay recomendaciones disponibles</h3>
-                      <p className="text-xs text-amber-700 mt-1">
-                        La plantilla seleccionada no tiene roles recomendados. Cambia a la pestaña "Personalizado" 
-                        para configurar tu equipo manualmente.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              // Estado inconsistente
-              <div className="flex items-start gap-3 mb-4 p-3 bg-red-50 rounded-md border border-red-200">
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-medium text-red-800">Error de configuración</h3>
-                  <p className="text-xs text-red-700 mt-1">
-                    Por favor regresa al paso anterior y selecciona una plantilla o la opción personalizada.
-                  </p>
-                </div>
+          {/* Sección informativa sobre roles recomendados - visible en ambas pestañas si hay recomendaciones */}
+          {recommendedRoleIds.length > 0 && (
+            <div className="bg-primary/5 rounded-md p-3 border border-primary/20 mb-4">
+              <h3 className="text-sm font-medium flex items-center mb-2">
+                <Award className="h-4 w-4 mr-2 text-primary" />
+                Roles Recomendados para {quotationData.template?.name || 'este proyecto'}
+              </h3>
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                {recommendedRoleIds.map(roleId => {
+                  const role = availableRoles?.find(r => r.id === roleId);
+                  const isInTeam = quotationData.teamMembers.some(m => m.roleId === roleId);
+                  
+                  return role ? (
+                    <Badge 
+                      key={roleId} 
+                      variant="outline" 
+                      className={`${isInTeam 
+                        ? 'bg-green-50 border-green-200 text-green-700' 
+                        : 'bg-white border-primary/30'}`}
+                    >
+                      {role.name}
+                    </Badge>
+                  ) : null;
+                })}
               </div>
-            )}
-          </TabsContent>
-
-          {/* Equipo personalizado/manual */}
-          <TabsContent value="custom" className="mt-0">
-            <div className="mb-4 border border-gray-200 rounded-md p-3 bg-gray-50">
-              <h3 className="text-xs font-medium mb-2 flex items-center">
+              
+              <p className="text-xs text-gray-600 mb-3">
+                Estos roles son los más adecuados para este tipo de proyecto según nuestra experiencia.
+                {activeTab === 'recommended' && ' Puedes aplicarlos automáticamente o ajustar la configuración manualmente.'}
+              </p>
+              
+              {activeTab === 'recommended' && quotationData.teamMembers.length === 0 && (
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={applyRecommendedTeam}
+                    className="flex items-center bg-primary/80 hover:bg-primary text-sm h-8"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Aplicar Equipo Recomendado
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Formulario para añadir miembros (visible en ambas pestañas) */}
+          <div className="mb-4 border border-gray-200 rounded-md overflow-hidden">
+            <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+              <h3 className="text-xs font-medium flex items-center">
                 <UserPlus className="h-3.5 w-3.5 mr-1.5 text-primary" />
                 Añadir Miembro al Equipo
               </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            </div>
+            
+            <div className="p-3">
+              <div className="grid grid-cols-4 gap-2">
                 {/* Rol */}
                 <div>
                   <Label htmlFor="role-select" className="text-xs mb-1 inline-block">Rol</Label>
@@ -299,33 +275,6 @@ const OptimizedTeamConfig: React.FC = () => {
                               </Badge>
                             )}
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Personal */}
-                <div>
-                  <Label htmlFor="personnel-select" className="text-xs mb-1 inline-block">Personal</Label>
-                  <Select
-                    value={newMember.personnelId ? String(newMember.personnelId) : '0'}
-                    onValueChange={(value) => {
-                      setNewMember(prev => ({
-                        ...prev,
-                        personnelId: value === "0" ? null : parseInt(value)
-                      }));
-                    }}
-                    disabled={!newMember.roleId}
-                  >
-                    <SelectTrigger id="personnel-select" className="h-8 text-xs">
-                      <SelectValue placeholder="Asignar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0" className="text-xs">Sin asignar</SelectItem>
-                      {filteredPersonnel?.map(person => (
-                        <SelectItem key={person.id} value={String(person.id)} className="text-xs">
-                          {person.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -376,168 +325,236 @@ const OptimizedTeamConfig: React.FC = () => {
                     />
                   </div>
                 </div>
-              </div>
-              
-              <div className="mt-3 flex justify-end">
-                <Button
-                  onClick={handleAddMember}
-                  disabled={!newMember.roleId || newMember.hours <= 0 || newMember.rate <= 0}
-                  className="flex items-center h-7 text-xs bg-primary/90 hover:bg-primary"
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Añadir Miembro
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Tabla de miembros del equipo y resumen */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
-        <div className="p-3 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex items-center">
-            <BarChart2 className="h-4 w-4 text-primary mr-2" />
-            <h3 className="text-sm font-medium">Equipo Configurado</h3>
-          </div>
-          
-          {quotationData.teamMembers.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-primary/5 border-primary/20 gap-1 items-center h-6">
-                <Users className="h-3 w-3" />
-                <span>{quotationData.teamMembers.length} {quotationData.teamMembers.length === 1 ? 'Rol' : 'Roles'}</span>
-              </Badge>
-              
-              <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 gap-1 items-center h-6">
-                <Clock className="h-3 w-3" />
-                <span>{totalHours} horas</span>
-              </Badge>
-            </div>
-          )}
-        </div>
-        
-        {quotationData.teamMembers.length > 0 ? (
-          <>
-            <div className="p-0">
-              <ScrollArea className="h-[250px]">
-                <div className="border-b">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr className="text-xs text-gray-500">
-                        <th className="font-medium px-3 py-2 text-left">Rol</th>
-                        <th className="font-medium px-3 py-2 text-left">Personal</th>
-                        <th className="font-medium px-3 py-2 text-center w-[80px]">Horas</th>
-                        <th className="font-medium px-3 py-2 text-center w-[100px]">Tarifa</th>
-                        <th className="font-medium px-3 py-2 text-right w-[100px]">Costo</th>
-                        <th className="font-medium px-2 py-2 text-center w-[50px]"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {quotationData.teamMembers.map(member => {
-                        const role = availableRoles?.find(r => r.id === member.roleId);
-                        const person = availablePersonnel?.find(p => p.id === member.personnelId);
-                        
-                        return (
-                          <tr key={member.id} className="text-sm hover:bg-gray-50">
-                            <td className="px-3 py-2 text-left">
-                              <div className="flex items-center">
-                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center mr-2 flex-shrink-0">
-                                  <UserCheck className="h-3 w-3 text-primary" />
-                                </div>
-                                <div>
-                                  <div className="font-medium text-xs">
-                                    {role?.name || `Rol ID: ${member.roleId}`}
-                                  </div>
-                                  {isRoleRecommended(member.roleId) && (
-                                    <div className="text-[10px] text-primary">Recomendado</div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-left">
-                              <span className="text-xs">{person?.name || "Sin asignar"}</span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min="1"
-                                value={member.hours}
-                                onChange={(e) => {
-                                  const value = parseInt(e.target.value);
-                                  if (!isNaN(value) && value > 0) {
-                                    updateTeamMember(member.id, {
-                                      ...member,
-                                      hours: value,
-                                      cost: value * member.rate
-                                    });
-                                  }
-                                }}
-                                className="w-full h-7 text-center text-xs"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="relative">
-                                <DollarSign className="h-3 w-3 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={member.rate}
-                                  onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    if (!isNaN(value) && value >= 0) {
-                                      updateTeamMember(member.id, {
-                                        ...member,
-                                        rate: value,
-                                        cost: value * member.hours
-                                      });
-                                    }
-                                  }}
-                                  className="w-full h-7 pl-7 text-xs"
-                                />
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-right font-medium text-xs">
-                              ${member.cost.toFixed(2)}
-                            </td>
-                            <td className="px-2 py-2 text-center">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => removeTeamMember(member.id)}
-                                className="h-6 w-6 rounded-full hover:bg-red-50 hover:text-red-500"
-                              >
-                                <Trash className="h-3 w-3" />
-                              </Button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                
+                <div className="flex items-end">
+                  <Button 
+                    onClick={handleAddMember}
+                    disabled={!newMember.roleId || newMember.hours <= 0 || newMember.rate <= 0} 
+                    className="w-full h-8 text-xs bg-primary/80 hover:bg-primary"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Añadir
+                  </Button>
                 </div>
-              </ScrollArea>
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de miembros del equipo */}
+          <div className="border border-gray-200 rounded-md overflow-hidden">
+            <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-xs font-medium flex items-center">
+                <Users className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                Equipo del Proyecto
+              </h3>
+              
+              {quotationData.teamMembers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-primary/5 border-primary/20 gap-1 items-center h-6">
+                    <Users className="h-3 w-3" />
+                    <span>{quotationData.teamMembers.length} {quotationData.teamMembers.length === 1 ? 'Rol' : 'Roles'}</span>
+                  </Badge>
+                  
+                  <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 gap-1 items-center h-6">
+                    <Clock className="h-3 w-3" />
+                    <span>{totalHours} horas</span>
+                  </Badge>
+                </div>
+              )}
             </div>
             
-            {/* Resumen visual con gráfico */}
-            <div className="p-3 bg-gray-50 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-xs font-medium text-gray-500">Resumen de Costos</div>
-                <div className="text-xs text-gray-500">
-                  {percentageOfBase > 0 ? (
-                    <span className={
-                      percentageOfBase > 70 ? 'text-[#d27060]' : 
+            {quotationData.teamMembers.length > 0 ? (
+              <>
+                <div className="p-0">
+                  <ScrollArea className="h-[250px]">
+                    <div className="border-b">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200 bg-gray-50">
+                            <th className="text-left p-2 text-xs font-medium text-gray-500">Rol</th>
+                            <th className="text-center p-2 text-xs font-medium text-gray-500">Horas</th>
+                            <th className="text-center p-2 text-xs font-medium text-gray-500">Tarifa</th>
+                            <th className="text-right p-2 text-xs font-medium text-gray-500">Costo</th>
+                            <th className="text-right p-2 text-xs font-medium text-gray-500">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {quotationData.teamMembers.map(member => {
+                            const role = availableRoles?.find(r => r.id === member.roleId);
+                            const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                            const isCurrentlyEditing = isEditing[member.id] || false;
+                            
+                            return (
+                              <tr key={member.id} className="text-sm hover:bg-gray-50">
+                                <td className="p-2 border-b border-gray-100">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                      <Briefcase className="h-3 w-3 text-primary" />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-medium">{role?.name || 'Rol desconocido'}</div>
+                                      {person && <div className="text-[10px] text-gray-500">{person.name}</div>}
+                                    </div>
+                                  </div>
+                                </td>
+                                
+                                <td className="p-2 text-center border-b border-gray-100">
+                                  {isCurrentlyEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      className="h-7 text-xs w-20 mx-auto"
+                                      value={editingMember[member.id]?.hours || member.hours}
+                                      onChange={(e) => {
+                                        const value = parseInt(e.target.value) || 0;
+                                        setEditingMember({
+                                          ...editingMember,
+                                          [member.id]: {
+                                            ...(editingMember[member.id] || { rate: member.rate }),
+                                            hours: value
+                                          }
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="text-xs">{member.hours}</span>
+                                  )}
+                                </td>
+                                
+                                <td className="p-2 text-center border-b border-gray-100">
+                                  {isCurrentlyEditing ? (
+                                    <div className="relative w-24 mx-auto">
+                                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-[10px] text-gray-500">$</span>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        className="h-7 text-xs pl-6"
+                                        value={editingMember[member.id]?.rate || member.rate}
+                                        onChange={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          setEditingMember({
+                                            ...editingMember,
+                                            [member.id]: {
+                                              ...(editingMember[member.id] || { hours: member.hours }),
+                                              rate: value
+                                            }
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs">${member.rate.toFixed(2)}</span>
+                                  )}
+                                </td>
+                                
+                                <td className="p-2 text-right border-b border-gray-100">
+                                  <span className="text-xs font-medium text-gray-900">
+                                    ${isCurrentlyEditing 
+                                      ? ((editingMember[member.id]?.hours || member.hours) * 
+                                         (editingMember[member.id]?.rate || member.rate)).toFixed(2)
+                                      : member.cost.toFixed(2)
+                                    }
+                                  </span>
+                                </td>
+                                
+                                <td className="p-2 text-right border-b border-gray-100">
+                                  <div className="flex justify-end gap-1">
+                                    {isCurrentlyEditing ? (
+                                      <>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          onClick={() => saveEditing(member)}
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                          onClick={() => cancelEditing(member.id)}
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                          onClick={() => startEditing(member.id, member.hours, member.rate)}
+                                        >
+                                          <Edit className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                          onClick={() => removeTeamMember(member.id)}
+                                        >
+                                          <Trash className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </ScrollArea>
+                </div>
+              </>
+            ) : (
+              <div className="py-12 flex flex-col items-center justify-center bg-gray-50">
+                <Users className="h-10 w-10 text-gray-300 mb-2" />
+                <h3 className="text-sm font-medium text-gray-700 mb-1">No hay miembros en el equipo</h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto mb-4 px-6 text-center">
+                  {activeTab === 'recommended' 
+                    ? "Haz clic en 'Aplicar Equipo Recomendado' o añade miembros manualmente usando el formulario."
+                    : "Utiliza el formulario anterior para añadir miembros al equipo del proyecto."}
+                </p>
+                
+                {activeTab === 'recommended' && recommendedRoleIds.length > 0 && (
+                  <Button 
+                    onClick={applyRecommendedTeam}
+                    className="flex items-center bg-primary/80 hover:bg-primary text-xs h-8"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Aplicar Equipo Recomendado
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Resumen de costos y gráfico */}
+          {quotationData.teamMembers.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-medium text-gray-700 flex items-center">
+                  <BarChart2 className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  Resumen del Costo
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {percentageOfBase > 0 && (
+                    <span className={`font-medium ${
+                      percentageOfBase > 80 ? 'text-[#d27060]' : 
                       percentageOfBase > 50 ? 'text-[#d2a860]' : 
                       'text-[#60d28e]'
-                    }>
+                    }`}>
                       {percentageOfBase.toFixed(1)}% del costo base
                     </span>
-                  ) : null}
-                </div>
+                  )}
+                </span>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-2">
+              <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-white border border-gray-200 rounded p-2 flex items-center justify-between">
                   <div>
                     <div className="text-xs text-gray-500">Total Horas</div>
@@ -560,9 +577,9 @@ const OptimizedTeamConfig: React.FC = () => {
                 </div>
               </div>
               
-              {/* Barra de progreso del costo del equipo */}
+              {/* Barra de progreso */}
               {baseCost > 0 && (
-                <div className="mt-1">
+                <div>
                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div 
                       className={`h-full ${
@@ -581,29 +598,8 @@ const OptimizedTeamConfig: React.FC = () => {
                 </div>
               )}
             </div>
-          </>
-        ) : (
-          <div className="text-center py-8 bg-gray-50 border-t border-gray-200">
-            <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <h3 className="text-sm font-medium text-gray-700 mb-1">No hay miembros en el equipo</h3>
-            <p className="text-xs text-gray-500 max-w-md mx-auto mb-4 px-6">
-              {quotationData.teamOption === 'auto' 
-                ? "Haz clic en 'Aplicar Equipo Recomendado' para añadir automáticamente los roles recomendados."
-                : "Utiliza el formulario anterior para añadir miembros al equipo del proyecto."}
-            </p>
-            
-            {quotationData.teamOption === 'auto' && recommendedRoleIds.length > 0 && (
-              <Button 
-                onClick={applyRecommendedTeam}
-                className="flex items-center mx-auto bg-primary/90 hover:bg-primary h-8 text-xs"
-                size="sm"
-              >
-                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                Aplicar Equipo Recomendado
-              </Button>
-            )}
-          </div>
-        )}
+          )}
+        </Tabs>
       </div>
     </div>
   );
