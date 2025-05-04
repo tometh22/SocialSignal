@@ -111,7 +111,7 @@ export default function Sidebar() {
       {/* Barra lateral */}
       <motion.div
         className={cn(
-          "fixed top-0 bottom-0 left-0 z-50 h-screen flex-col flex-shrink-0 bg-sidebar-background border-r border-sidebar-border shadow-lg md:shadow-none md:relative md:z-0 md:flex",
+          "sidebar fixed top-0 bottom-0 left-0 z-50 h-screen flex-col flex-shrink-0 bg-sidebar-background border-r border-sidebar-border shadow-lg md:shadow-none md:relative md:z-0 md:flex",
           isCollapsed ? "w-[72px]" : "w-[260px]",
           isOpen ? "flex" : "hidden md:flex"
         )}
