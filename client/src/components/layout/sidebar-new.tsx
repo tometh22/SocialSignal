@@ -73,8 +73,8 @@ export default function Sidebar() {
         className={cn(
           "flex items-center px-3 py-2.5 rounded-md text-sm transition-colors relative group",
           isActive
-            ? "bg-sidebar-active-bg text-sidebar-active-fg font-medium"
-            : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-border/20",
+            ? "bg-sidebar-active-bg text-sidebar-active-fg font-medium border-l-2 border-l-primary"
+            : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-border/20 border-l-2 border-transparent",
           isCollapsed && "justify-center py-2.5"
         )}
       >

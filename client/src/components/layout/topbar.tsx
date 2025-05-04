@@ -55,7 +55,8 @@ export default function Topbar() {
       type: 'info' 
     }
   ]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Inicializamos el modo oscuro como activo por defecto
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Calcular el número de notificaciones no leídas
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -106,8 +107,17 @@ export default function Topbar() {
 
   // Toggle para modo oscuro
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    // Aquí se implementaría la lógica real para cambiar el tema
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    
+    // Implementación del cambio de tema
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
+    }
   };
 
   return (

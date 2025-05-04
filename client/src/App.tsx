@@ -18,13 +18,16 @@ import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
 
 function App() {
-  // Set document title
+  // Set document title and apply dark theme
   useEffect(() => {
     document.title = "Sistema de Gestión | Epical";
+    // Forzar modo oscuro 
+    document.documentElement.classList.add('dark');
+    document.body.classList.add('dark');
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar />
