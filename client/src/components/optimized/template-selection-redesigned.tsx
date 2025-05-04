@@ -90,6 +90,11 @@ const TemplateSelectionRedesigned: React.FC = () => {
     }
     
     setTemplateSelected(true);
+    
+    // Cambiar automáticamente a la pestaña de detalles y ajustes
+    setTimeout(() => {
+      setSelectedTab('details');
+    }, 300);
   };
 
   // Seleccionar opción personalizada
@@ -106,6 +111,11 @@ const TemplateSelectionRedesigned: React.FC = () => {
     // Marcar como personalizado (usar null para representar "Sin plantilla")
     updateTemplate(null);
     setTemplateSelected(true);
+    
+    // Cambiar automáticamente a la pestaña de detalles y ajustes
+    setTimeout(() => {
+      setSelectedTab('details');
+    }, 300);
   };
 
   // Obtener color para niveles de complejidad
@@ -261,7 +271,7 @@ const TemplateSelectionRedesigned: React.FC = () => {
           {/* Buscador de escritorio está en la esquina superior derecha */}
           
           {/* Mostrar la tarjeta de personalizado y las plantillas en un grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 bg-white rounded-md border border-gray-200">
             {/* Opción personalizada */}
             <div 
               className={`relative border ${quotationData.template === null ? 'border-primary' : 'border-gray-200'} rounded-md cursor-pointer transition-all hover:shadow-sm ${
@@ -323,16 +333,6 @@ const TemplateSelectionRedesigned: React.FC = () => {
               )
             )}
           </div>
-          
-          {templateSelected && (
-            <Alert className="bg-green-50 border-green-200">
-              <Check className="h-4 w-4 text-green-600" />
-              <AlertTitle className="text-green-800">¡Plantilla seleccionada correctamente!</AlertTitle>
-              <AlertDescription className="text-green-700">
-                Ahora puedes pasar a la pestaña "Detalles y Ajustes" para configurar los parámetros específicos.
-              </AlertDescription>
-            </Alert>
-          )}
         </TabsContent>
         
         <TabsContent value="details" className="space-y-4">
