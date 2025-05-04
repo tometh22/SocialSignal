@@ -4,11 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
 import logoImage from "../../../src/assets/epicaldigital_logo.jpeg";
 import {
-  ChartBarSquare,
   PlusCircle,
   ListChecks,
   Users,
@@ -18,18 +18,14 @@ import {
   ChevronRight,
   Activity,
   PieChart,
-  BookOpen,
   LayoutDashboard,
   FileText,
   Folder,
-  Package,
   ChevronDown,
   Briefcase,
-  LightbulbIcon,
   ClipboardList,
-  CheckCircle,
-  BellRing,
-  Search
+  Search,
+  LogOut
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -48,7 +44,7 @@ export default function Sidebar() {
     ],
     cotizaciones: [
       { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: true, description: "Crear nueva cotización" },
-      { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List, description: "Ver y administrar cotizaciones" }
+      { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: ListChecks, description: "Ver y administrar cotizaciones" }
     ],
     proyectos: [
       { href: "/active-projects", label: "Proyectos Activos", icon: Briefcase, highlight: true, description: "Ver proyectos en curso" }
@@ -58,7 +54,7 @@ export default function Sidebar() {
       { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart, description: "Ver informes y análisis" }
     ],
     sistema: [
-      { href: "/admin", label: "Panel Admin", icon: Settings, description: "Configuración del sistema" }
+      { href: "/admin", label: "Panel Admin", icon: Cog, description: "Configuración del sistema" }
     ]
   };
   

@@ -13,7 +13,7 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
-import SidebarNew from "@/components/layout/sidebar-new";
+import Sidebar from "@/components/layout/sidebar";
 import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
 
@@ -25,7 +25,7 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <SidebarNew />
+      <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
