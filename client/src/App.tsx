@@ -29,7 +29,7 @@ function App() {
       <div className="flex flex-col flex-1 overflow-hidden">
         <Topbar />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="container mx-auto max-w-7xl p-4 sm:p-6">
+          <div className="max-w-full p-3 sm:p-4">
             <Switch>
               <Route path="/" component={Dashboard} />
               <Route path="/optimized-quote" component={OptimizedQuote} />

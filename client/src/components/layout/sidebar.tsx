@@ -314,18 +314,18 @@ export default function Sidebar() {
           </div>
 
           {/* Main navigation */}
-          <div className="flex flex-col flex-grow overflow-y-auto px-3 py-4 space-y-6 scrollbar-thin scrollbar-thumb-sidebar-border/20 scrollbar-track-transparent">
+          <div className="flex flex-col flex-grow overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin scrollbar-thumb-sidebar-border/20 scrollbar-track-transparent">
             {filteredItems ? (
               /* Search results */
               <div className="px-2">
-                <h3 className="text-xs font-medium text-sidebar-foreground/70 mb-3">
+                <h3 className="text-xs font-medium text-sidebar-foreground/70 mb-2">
                   Resultados ({filteredItems.length})
                 </h3>
-                <nav className="space-y-1">
+                <nav className="space-y-0.5">
                   {filteredItems.map((item) => renderNavLink(item))}
                 </nav>
                 {filteredItems.length === 0 && (
-                  <div className="text-center py-6 text-sidebar-foreground/50 text-sm">
+                  <div className="text-center py-4 text-sidebar-foreground/50 text-xs">
                     No se encontraron resultados
                   </div>
                 )}
