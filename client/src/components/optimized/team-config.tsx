@@ -45,8 +45,8 @@ const OptimizedTeamConfig: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>(quotationData.teamOption === 'auto' ? 'recommended' : 'custom');
   
   // Estado para miembros en edición
-  const [editingMember, setEditingMember] = useState<Record<number, {hours: number, rate: number}>>({});
-  const [isEditing, setIsEditing] = useState<Record<number, boolean>>({});
+  const [editingMember, setEditingMember] = useState<Record<string, {hours: number, rate: number}>>({});
+  const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
@@ -127,7 +127,7 @@ const OptimizedTeamConfig: React.FC = () => {
   };
   
   // Iniciar edición de miembro
-  const startEditing = (memberId: number, hours: number, rate: number) => {
+  const startEditing = (memberId: string, hours: number, rate: number) => {
     setEditingMember({
       ...editingMember, 
       [memberId]: { hours, rate }
@@ -136,7 +136,7 @@ const OptimizedTeamConfig: React.FC = () => {
   };
   
   // Cancelar edición
-  const cancelEditing = (memberId: number) => {
+  const cancelEditing = (memberId: string) => {
     setIsEditing({...isEditing, [memberId]: false});
   };
   
@@ -474,7 +474,7 @@ const OptimizedTeamConfig: React.FC = () => {
                                           variant="ghost" 
                                           size="icon" 
                                           className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                                          onClick={() => cancelEditing(member.id)}
+                                          onClick={() => cancelEditing(String(member.id))}
                                         >
                                           <X className="h-3.5 w-3.5" />
                                         </Button>
@@ -485,7 +485,7 @@ const OptimizedTeamConfig: React.FC = () => {
                                           variant="ghost" 
                                           size="icon" 
                                           className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                          onClick={() => startEditing(member.id, member.hours, member.rate)}
+                                          onClick={() => startEditing(String(member.id), member.hours, member.rate)}
                                         >
                                           <Edit className="h-3.5 w-3.5" />
                                         </Button>
