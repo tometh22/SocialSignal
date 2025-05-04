@@ -625,7 +625,7 @@ const TemplateSelectionRedesigned: React.FC = () => {
                   <div className="absolute right-4 top-4 w-8 h-8 rounded-full bg-[#9c8ce7]/10"></div>
                   
                   <div className="flex justify-between items-center mb-1 relative z-10">
-                    <div className="font-medium text-[#6a5b9d]">Total Final</div>
+                    <div className="font-medium text-[#6a5b9d]">Costo estimado</div>
                     <div className="w-4 h-4 rounded-full bg-[#9c8ce7] flex items-center justify-center">
                       <span className="text-white text-[8px] font-medium">$</span>
                     </div>

@@ -550,7 +550,7 @@ const OptimizedTeamConfig: React.FC = () => {
                 
                 <div className="bg-[#f7f5fe] border border-[#e2ddf5] rounded p-2 flex items-center justify-between relative overflow-hidden">
                   <div className="relative z-10">
-                    <div className="text-xs text-[#6a5b9d]/70">Costo Equipo</div>
+                    <div className="text-xs text-[#6a5b9d]/70">Costo estimado</div>
                     <div className="text-sm font-medium text-[#6a5b9d]">${totalTeamCost.toFixed(2)}</div>
                   </div>
                   <div className="h-8 w-8 rounded-full bg-[#9c8ce7]/20 flex items-center justify-center">
