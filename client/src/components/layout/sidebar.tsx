@@ -261,60 +261,11 @@ export default function Sidebar() {
             </Button>
           </div>
           
-          {/* Search bar */}
-          <div className={cn(
-            "px-5 py-4",
-            isCollapsed && "flex justify-center"
-          )}>
-            {isSearchActive ? (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-sidebar-foreground/50" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar..."
-                  className="w-full h-9 pl-10 pr-4 rounded-lg text-sm bg-sidebar-border/20 focus:bg-sidebar-border/30 border border-sidebar-border/30 focus:border-sidebar-primary/30 focus:outline-none focus:ring-1 focus:ring-sidebar-primary/20"
-                  onBlur={() => {
-                    if (searchQuery === "") deactivateSearch();
-                  }}
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-5 w-5 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                    onClick={() => {
-                      setSearchQuery("");
-                      deactivateSearch();
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                size={isCollapsed ? "icon" : "default"}
-                onClick={activateSearch}
-                className={cn(
-                  "text-xs w-full h-9 justify-start bg-sidebar-border/10 hover:bg-sidebar-border/20 border-sidebar-border/20",
-                  isCollapsed ? "w-9 p-0" : "pl-10 relative"
-                )}
-              >
-                <Search className={cn(
-                  "h-4 w-4 text-sidebar-foreground/60",
-                  !isCollapsed && "absolute left-3"
-                )} />
-                {!isCollapsed && <span className="ml-1">Buscar...</span>}
-              </Button>
-            )}
-          </div>
+          {/* Spacer instead of search */}
+          <div className="border-b border-sidebar-border/20 mx-5 my-2"></div>
 
           {/* Main navigation */}
-          <div className="flex flex-col flex-grow overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin scrollbar-thumb-sidebar-border/20 scrollbar-track-transparent">
+          <div className="flex flex-col flex-grow overflow-y-auto px-3 py-5 space-y-6 scrollbar-thin scrollbar-thumb-sidebar-border/20 scrollbar-track-transparent">
             {filteredItems ? (
               /* Search results */
               <div className="px-2">
@@ -349,7 +300,7 @@ export default function Sidebar() {
                       <div className="h-1 w-5 rounded-full bg-sidebar-foreground/20"></div>
                     )}
                   </div>
-                  <nav className="space-y-1">
+                  <nav className="space-y-2">
                     {navCategories.general.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
@@ -382,7 +333,7 @@ export default function Sidebar() {
                     )}
                   </div>
                   <nav className={cn(
-                    "space-y-1 transition-all duration-300 overflow-hidden",
+                    "space-y-2 transition-all duration-300 overflow-hidden",
                     !isCollapsed && expandedSection !== 'cotizaciones' && navCategories.cotizaciones.length > 1 && "max-h-12 opacity-75"
                   )}>
                     {navCategories.cotizaciones.map((item) => renderNavLink(item))}
@@ -416,7 +367,7 @@ export default function Sidebar() {
                       <div className="h-1 w-5 rounded-full bg-sidebar-foreground/20"></div>
                     )}
                   </div>
-                  <nav className="space-y-1">
+                  <nav className="space-y-2">
                     {navCategories.proyectos.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
@@ -449,7 +400,7 @@ export default function Sidebar() {
                     )}
                   </div>
                   <nav className={cn(
-                    "space-y-1 transition-all duration-300 overflow-hidden",
+                    "space-y-2 transition-all duration-300 overflow-hidden",
                     !isCollapsed && expandedSection !== 'datos' && navCategories.datos.length > 1 && "max-h-12 opacity-75"
                   )}>
                     {navCategories.datos.map((item) => renderNavLink(item))}
@@ -472,7 +423,7 @@ export default function Sidebar() {
                       <div className="h-1 w-5 rounded-full bg-sidebar-foreground/20"></div>
                     )}
                   </div>
-                  <nav className="space-y-1">
+                  <nav className="space-y-2">
                     {navCategories.sistema.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
