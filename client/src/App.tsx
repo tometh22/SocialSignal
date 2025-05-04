@@ -13,7 +13,7 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
-import Sidebar from "@/components/layout/sidebar";
+import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
 

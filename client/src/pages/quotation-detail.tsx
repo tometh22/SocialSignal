@@ -60,7 +60,10 @@ interface Template {
 }
 
 const QuotationDetail: React.FC<QuotationDetailProps> = () => {
-  const [, params] = useRoute<{ id: string }>('/quotation/:id');
+  // Soporta ambas rutas: /quotation/:id y /quotations/:id 
+  const [, quotationParams] = useRoute<{ id: string }>('/quotation/:id');
+  const [, quotationsParams] = useRoute<{ id: string }>('/quotations/:id');
+  const params = quotationParams || quotationsParams;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
