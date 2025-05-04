@@ -2,6 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Estilos visuales mejorados */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-soft {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-medium {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Animaciones para elementos */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+
+.scale-in {
+  animation: scaleIn 0.4s cubic-bezier(0.5, 1.6, 0.4, 1);
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideIn {
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Fondo con gradiente sutil */
+body.dark {
+  background: linear-gradient(130deg, hsl(var(--background)), hsl(262, 30%, 12%));
+  background-attachment: fixed;
+}
+
 /* Sistema Layout - Contenedores consistentes */
 .container-fluid {
   width: 100%;
@@ -111,10 +175,10 @@
 /* Sistema de colores armonizado */
 :root {
   /* Colores base */
-  --color-primary-hue: 214.3;
-  --color-accent-hue: 224;
-  --color-success-hue: 142;
-  --color-warning-hue: 45;
+  --color-primary-hue: 250;
+  --color-accent-hue: 280;
+  --color-success-hue: 150;
+  --color-warning-hue: 40;
   --color-error-hue: 0;
 
   /* Colores primarios */
@@ -220,30 +284,30 @@
   }
  
   .dark {
-    /* Tema oscuro más suave */
-    --background: 220 25% 12%;
-    --foreground: 210 15% 90%;
+    /* Tema oscuro mejorado con colores más vibrantes */
+    --background: 260 30% 10%;
+    --foreground: 210 15% 95%;
  
-    --card: 220 25% 15%;
-    --card-foreground: 210 15% 90%;
+    --card: 260 25% 15%;
+    --card-foreground: 210 15% 95%;
  
-    --popover: 220 25% 15%;
-    --popover-foreground: 210 15% 90%;
+    --popover: 260 25% 15%;
+    --popover-foreground: 210 15% 95%;
  
-    --primary: var(--color-primary-hue) 70% 55%;
-    --primary-foreground: 210 15% 98%;
+    --primary: var(--color-primary-hue) 85% 65%;
+    --primary-foreground: 0 0% 100%;
  
-    --secondary: 220 20% 20%;
-    --secondary-foreground: 210 15% 90%;
+    --secondary: 260 25% 20%;
+    --secondary-foreground: 210 15% 95%;
  
-    --muted: 220 15% 25%;
-    --muted-foreground: 210 15% 70%;
+    --muted: 260 20% 22%;
+    --muted-foreground: 210 15% 75%;
  
-    --accent: var(--color-accent-hue) 70% 50%;
+    --accent: var(--color-accent-hue) 85% 60%;
     --accent-foreground: 0 0% 100%;
  
-    --destructive: 0 65% 40%;
-    --destructive-foreground: 210 15% 98%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
 
     --success: var(--color-success-hue) 55% 40%;
     --success-foreground: 0 0% 100%;
