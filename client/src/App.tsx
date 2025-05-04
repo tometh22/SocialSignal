@@ -18,12 +18,14 @@ import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
 
 function App() {
-  // Set document title and apply dark theme
+  // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
   useEffect(() => {
     document.title = "Sistema de Gestión | Epical";
-    // Forzar modo oscuro 
-    document.documentElement.classList.add('dark');
-    document.body.classList.add('dark');
+    // Remover dark mode del documento general (para contenido principal)
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+    // Pero dejamos la clase sidebar-dark que mantendrá la estética oscura solo en el sidebar
+    document.body.classList.add('sidebar-dark');
   }, []);
 
   return (

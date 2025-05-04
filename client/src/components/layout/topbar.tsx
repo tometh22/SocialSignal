@@ -55,8 +55,8 @@ export default function Topbar() {
       type: 'info' 
     }
   ]);
-  // Inicializamos el modo oscuro como activo por defecto
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Inicializamos el modo claro como activo por defecto
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Calcular el número de notificaciones no leídas
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -121,7 +121,7 @@ export default function Topbar() {
   };
 
   return (
-    <div className="h-16 px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between sticky top-0 z-20 w-full">
+    <div className="topbar h-16 px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between sticky top-0 z-20 w-full">
       {/* Breadcrumbs y título */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center text-sm text-muted-foreground">
