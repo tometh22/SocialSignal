@@ -139,47 +139,50 @@ const TemplateSelectionRedesigned: React.FC = () => {
   // Renderizar una tarjeta de plantilla en estilo compacto
   const renderCompactTemplate = (template: ReportTemplate) => {
     const isSelected = quotationData.template?.id === template.id;
-    const complexityBadgeClass = template.complexity === 'high' ? 'Alta' :
-                                template.complexity === 'medium' ? 'Media' : 'Baja';
+    
+    // Determinar la apariencia de la etiqueta de complejidad
+    let complexityBadge = null;
+    if (template.complexity === 'high') {
+      complexityBadge = <div className="absolute top-0 right-0 bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded-bl-md rounded-tr-md font-medium">Alta</div>;
+    } else if (template.complexity === 'medium') {
+      complexityBadge = <div className="absolute top-0 right-0 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-bl-md rounded-tr-md font-medium">Media</div>;
+    } else if (template.complexity === 'low') {
+      complexityBadge = <div className="absolute top-0 right-0 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-bl-md rounded-tr-md font-medium">Baja</div>;
+    }
     
     return (
       <div 
         key={template.id}
-        className={`border ${isSelected ? 'border-primary' : 'border-gray-200'} rounded-md cursor-pointer transition-all hover:border-gray-300 ${
-          isSelected ? 'ring-1 ring-primary/20 bg-primary/5' : ''
+        className={`relative border ${isSelected ? 'border-primary' : 'border-gray-200'} rounded-md cursor-pointer transition-all hover:shadow-sm ${
+          isSelected ? 'ring-1 ring-primary/20 bg-gray-50' : ''
         }`}
         onClick={() => handleTemplateSelect(template)}
       >
-        <div className="p-3">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-sm font-medium">{template.name}</h3>
-            <Badge 
-              className={`text-xs py-0 px-2 h-5 ${getComplexityColor(template.complexity)}`}
-            >
-              {getComplexityLabel(template.complexity)}
-            </Badge>
-          </div>
-          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{template.description}</p>
+        {complexityBadge}
+        
+        <div className="p-3 pt-4">
+          <h3 className="text-sm font-medium mb-1 pr-12">{template.name}</h3>
+          <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">{template.description}</p>
           
-          <div className="grid grid-cols-2 gap-x-1 text-xs">
+          <div className="grid grid-cols-2 gap-x-1 text-xs mb-1">
             <div className="text-gray-500">Páginas:</div>
-            <div className="text-right">{template.pageRange || '-'}</div>
+            <div className="text-right font-medium">{template.pageRange || '-'}</div>
             
             <div className="text-gray-500">Costo Base:</div>
-            <div className="text-right">${template.baseCost?.toFixed(2) || '0.00'}</div>
+            <div className="text-right font-medium">${template.baseCost?.toFixed(2) || '0.00'}</div>
             
             <div className="text-gray-500">Plataforma:</div>
-            <div className="text-right">${template.platformCost?.toFixed(2) || '0.00'}</div>
+            <div className="text-right font-medium">${template.platformCost?.toFixed(2) || '0.00'}</div>
           </div>
         </div>
         
         {isSelected ? (
-          <div className="py-1 text-xs text-primary border-t border-primary/20 bg-primary/10 text-center">
+          <div className="py-0.5 text-xs text-primary border-t border-primary/20 bg-primary/5 text-center">
             <Check className="h-3 w-3 inline-block mr-1" />
             Seleccionada
           </div>
         ) : (
-          <div className="py-1 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center">
+          <div className="py-0.5 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center hover:bg-gray-50">
             Click para seleccionar
           </div>
         )}
@@ -261,35 +264,37 @@ const TemplateSelectionRedesigned: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {/* Opción personalizada */}
             <div 
-              className={`border ${quotationData.template === null ? 'border-primary' : 'border-dashed border-gray-200'} rounded-md cursor-pointer transition-all hover:border-gray-300 ${
-                quotationData.template === null ? 'ring-1 ring-primary/20 bg-primary/5' : ''
+              className={`relative border ${quotationData.template === null ? 'border-primary' : 'border-gray-200'} rounded-md cursor-pointer transition-all hover:shadow-sm ${
+                quotationData.template === null ? 'ring-1 ring-primary/20 bg-gray-50' : ''
               }`}
               onClick={handleCustomSelect}
             >
-              <div className="p-3">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-sm font-medium">Personalizado / Sin Plantilla</h3>
-                  <Badge className="text-xs py-0 px-2 h-5 bg-blue-100 text-blue-800 border-blue-200">
-                    Personalizado
-                  </Badge>
-                </div>
-                <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+              <div className="absolute top-0 right-0 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-bl-md rounded-tr-md font-medium">
+                Personalizado
+              </div>
+              
+              <div className="p-3 pt-4">
+                <h3 className="text-sm font-medium mb-1 pr-12">Personalizado / Sin Plantilla</h3>
+                <p className="text-xs text-gray-500 line-clamp-2 mb-3 h-8">
                   Configura tu proyecto manualmente sin usar plantilla predefinida
                 </p>
                 
-                <div className="grid grid-cols-2 gap-x-1 text-xs">
+                <div className="grid grid-cols-2 gap-x-1 text-xs mb-1">
                   <div className="text-gray-500">Tipo:</div>
-                  <div className="text-right">Flexible</div>
+                  <div className="text-right font-medium">Flexible</div>
+                  
+                  <div className="text-gray-500">Ventaja:</div>
+                  <div className="text-right font-medium">Mayor personalización</div>
                 </div>
               </div>
               
               {quotationData.template === null ? (
-                <div className="py-1 text-xs text-primary border-t border-primary/20 bg-primary/10 text-center">
+                <div className="py-0.5 text-xs text-primary border-t border-primary/20 bg-primary/5 text-center">
                   <Check className="h-3 w-3 inline-block mr-1" />
                   Seleccionada
                 </div>
               ) : (
-                <div className="py-1 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center">
+                <div className="py-0.5 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center hover:bg-gray-50">
                   Click para seleccionar
                 </div>
               )}
