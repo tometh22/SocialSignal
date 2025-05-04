@@ -139,48 +139,50 @@ const TemplateSelectionRedesigned: React.FC = () => {
   // Renderizar una tarjeta de plantilla en estilo compacto
   const renderCompactTemplate = (template: ReportTemplate) => {
     const isSelected = quotationData.template?.id === template.id;
+    const complexityBadgeClass = template.complexity === 'high' ? 'Alta' :
+                                template.complexity === 'medium' ? 'Media' : 'Baja';
     
     return (
       <div 
         key={template.id}
-        className={`border rounded-md p-4 cursor-pointer transition-all hover:border-gray-300 hover:shadow ${
-          isSelected ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-gray-200'
+        className={`border ${isSelected ? 'border-primary' : 'border-gray-200'} rounded-md cursor-pointer transition-all hover:border-gray-300 ${
+          isSelected ? 'ring-1 ring-primary/20 bg-primary/5' : ''
         }`}
         onClick={() => handleTemplateSelect(template)}
       >
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-medium">{template.name}</h3>
-            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{template.description}</p>
+        <div className="p-3">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-sm font-medium">{template.name}</h3>
+            <Badge 
+              className={`text-xs py-0 px-2 h-5 ${getComplexityColor(template.complexity)}`}
+            >
+              {getComplexityLabel(template.complexity)}
+            </Badge>
           </div>
-          <Badge className={getComplexityColor(template.complexity)}>
-            {getComplexityLabel(template.complexity)}
-          </Badge>
+          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{template.description}</p>
+          
+          <div className="grid grid-cols-2 gap-x-1 text-xs">
+            <div className="text-gray-500">Páginas:</div>
+            <div className="text-right">{template.pageRange || '-'}</div>
+            
+            <div className="text-gray-500">Costo Base:</div>
+            <div className="text-right">${template.baseCost?.toFixed(2) || '0.00'}</div>
+            
+            <div className="text-gray-500">Plataforma:</div>
+            <div className="text-right">${template.platformCost?.toFixed(2) || '0.00'}</div>
+          </div>
         </div>
         
-        <div className="mt-3 grid grid-cols-2 text-xs text-gray-600 gap-y-1">
-          <div>Páginas:</div>
-          <div className="text-right font-medium">{template.pageRange || 'N/A'}</div>
-          
-          <div>Costo Base:</div>
-          <div className="text-right font-medium">${template.baseCost?.toFixed(2) || '0.00'}</div>
-          
-          <div>Costo Plataforma:</div>
-          <div className="text-right font-medium">${template.platformCost?.toFixed(2) || '0.00'}</div>
-        </div>
-        
-        <div className="mt-3 text-center">
-          {isSelected ? (
-            <div className="py-1 text-xs font-medium text-primary bg-primary/10 rounded flex items-center justify-center">
-              <Check className="h-3 w-3 mr-1" />
-              ¡Plantilla seleccionada correctamente!
-            </div>
-          ) : (
-            <div className="py-1 text-xs text-gray-500 border border-dashed border-gray-300 rounded">
-              Click para seleccionar
-            </div>
-          )}
-        </div>
+        {isSelected ? (
+          <div className="py-1 text-xs text-primary border-t border-primary/20 bg-primary/10 text-center">
+            <Check className="h-3 w-3 inline-block mr-1" />
+            Seleccionada
+          </div>
+        ) : (
+          <div className="py-1 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center">
+            Click para seleccionar
+          </div>
+        )}
       </div>
     );
   };
@@ -253,58 +255,62 @@ const TemplateSelectionRedesigned: React.FC = () => {
         </div>
         
         <TabsContent value="list" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Buscador de escritorio está en la esquina superior derecha */}
+          
+          {/* Mostrar la tarjeta de personalizado y las plantillas en un grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {/* Opción personalizada */}
             <div 
-              className={`border border-dashed rounded-md p-4 cursor-pointer transition-all hover:border-gray-300 hover:shadow ${
-                quotationData.template === null ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-gray-200'
+              className={`border ${quotationData.template === null ? 'border-primary' : 'border-dashed border-gray-200'} rounded-md cursor-pointer transition-all hover:border-gray-300 ${
+                quotationData.template === null ? 'ring-1 ring-primary/20 bg-primary/5' : ''
               }`}
               onClick={handleCustomSelect}
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium">Personalizado / Sin Plantilla</h3>
-                  <p className="text-xs text-gray-500 mt-1">Configura tu proyecto manualmente sin usar una plantilla predefinida</p>
+              <div className="p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-sm font-medium">Personalizado / Sin Plantilla</h3>
+                  <Badge className="text-xs py-0 px-2 h-5 bg-blue-100 text-blue-800 border-blue-200">
+                    Personalizado
+                  </Badge>
                 </div>
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
-                  Personalizado
-                </Badge>
+                <p className="text-xs text-gray-500 line-clamp-2 mb-2">
+                  Configura tu proyecto manualmente sin usar plantilla predefinida
+                </p>
+                
+                <div className="grid grid-cols-2 gap-x-1 text-xs">
+                  <div className="text-gray-500">Tipo:</div>
+                  <div className="text-right">Flexible</div>
+                </div>
               </div>
               
-              <div className="mt-3 text-xs text-gray-600">
-                <p>Configura tu proyecto manualmente sin usar una plantilla predefinida para obtener mayor flexibilidad en la definición de alcance y requisitos.</p>
-              </div>
-              
-              <div className="mt-3 text-center">
-                {quotationData.template === null ? (
-                  <div className="py-1 text-xs font-medium text-primary bg-primary/10 rounded flex items-center justify-center">
-                    <Check className="h-3 w-3 mr-1" />
-                    Seleccionado
-                  </div>
-                ) : (
-                  <div className="py-1 text-xs text-gray-500 border border-dashed border-gray-300 rounded">
-                    Click para seleccionar
-                  </div>
-                )}
-              </div>
+              {quotationData.template === null ? (
+                <div className="py-1 text-xs text-primary border-t border-primary/20 bg-primary/10 text-center">
+                  <Check className="h-3 w-3 inline-block mr-1" />
+                  Seleccionada
+                </div>
+              ) : (
+                <div className="py-1 text-xs text-gray-500 border-t border-dashed border-gray-200 text-center">
+                  Click para seleccionar
+                </div>
+              )}
             </div>
             
             {/* Plantillas */}
             {isLoading ? (
-              <div className="col-span-full flex justify-center p-4">
-                <p className="text-sm text-gray-500">Cargando plantillas...</p>
+              <div className="col-span-full flex justify-center p-3">
+                <p className="text-xs text-gray-500">Cargando plantillas...</p>
               </div>
             ) : (
               filteredTemplates && filteredTemplates.length > 0 ? (
                 filteredTemplates.map(renderCompactTemplate)
               ) : (
-                <div className="col-span-full flex flex-col items-center justify-center p-6 border border-dashed rounded-md">
-                  <Search className="h-6 w-6 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500">No se encontraron plantillas que coincidan con tu búsqueda.</p>
+                <div className="col-span-full flex flex-col items-center justify-center p-4 border border-dashed rounded-md">
+                  <Search className="h-5 w-5 text-gray-400 mb-1" />
+                  <p className="text-xs text-gray-500">No se encontraron plantillas para: "{searchQuery}"</p>
                   <Button 
                     variant="link" 
                     onClick={() => setSearchQuery('')}
-                    className="mt-1 text-xs"
+                    className="mt-1 text-xs h-6 p-0"
                   >
                     Limpiar búsqueda
                   </Button>
