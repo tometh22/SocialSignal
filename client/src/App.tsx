@@ -13,8 +13,8 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
-import Sidebar from "@/components/layout/sidebar";
-import Topbar from "@/components/layout/topbar";
+import ModernSidebar from "@/components/layout/modern-sidebar";
+import EnhancedTopbar from "@/components/layout/enhanced-topbar";
 import { useEffect } from "react";
 
 function App() {
@@ -25,9 +25,9 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
+      <ModernSidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar />
+        <EnhancedTopbar />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="container mx-auto max-w-7xl p-4 sm:p-6">
             <Switch>
