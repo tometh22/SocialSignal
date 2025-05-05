@@ -109,22 +109,32 @@ export function setupAuth(app: Express) {
     try {
       const { email, password } = req.body;
       
+      console.log("Intento de inicio de sesión:", { email });
+      
       // Buscar el usuario
       const user = await storage.getUserByEmail(email);
       
       if (!user) {
+        console.log("Usuario no encontrado:", email);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
+      console.log("Usuario encontrado:", { id: user.id, email: user.email, firstName: user.firstName });
+      
       // Verificar la contraseña
+      console.log("Contraseña almacenada:", user.password);
+      
       const isPasswordValid = await comparePasswords(password, user.password);
+      console.log("¿Contraseña válida?:", isPasswordValid);
       
       if (!isPasswordValid) {
+        console.log("Contraseña incorrecta");
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
       // Establecer la sesión
       req.session.userId = user.id;
+      console.log("Sesión establecida con ID:", user.id);
       
       // Enviar respuesta
       const { password: _, ...userWithoutPassword } = user;
