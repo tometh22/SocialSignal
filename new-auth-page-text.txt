@@ -1,0 +1,85 @@
+/* Cambiar estos textos */
+
+/* SECCIÓN SUPERIOR */
+<h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión Epical</h1>
+<p className="text-gray-600">
+  Plataforma interna para la gestión de proyectos y cotizaciones
+</p>
+
+/* SECCIÓN INICIAR SESIÓN */
+<CardTitle>Iniciar Sesión</CardTitle>
+<CardDescription>
+  Accede con tu cuenta de Epical Digital
+</CardDescription>
+
+/* SECCIÓN DE FORMULARIO */
+<FormItem>
+  <FormLabel>Correo electrónico</FormLabel>
+  <FormControl>
+    <Input placeholder="tunombre@epicaldigital.com" {...field} />
+  </FormControl>
+  <FormMessage />
+</FormItem>
+
+/* SECCIÓN DERECHA - HERO */
+<h2 className="text-4xl font-bold mb-6">Sistema Interno Epical</h2>
+<p className="text-xl mb-8">
+  Plataforma completa para el equipo de Epical Digital que facilita la gestión de proyectos, 
+  cotizaciones y seguimiento de tiempo con comunicación interna integrada.
+</p>
+
+/* TARJETAS DE CARACTERÍSTICAS */
+<div className="bg-white/10 p-4 rounded-lg">
+  <h3 className="font-semibold text-lg mb-2">Cotizaciones Inteligentes</h3>
+  <p>Crea y gestiona cotizaciones para presentar a clientes con cálculos precisos.</p>
+</div>
+<div className="bg-white/10 p-4 rounded-lg">
+  <h3 className="font-semibold text-lg mb-2">Gestión de Proyectos</h3>
+  <p>Coordina proyectos en curso y mantén informado a todo el equipo sobre avances.</p>
+</div>
+<div className="bg-white/10 p-4 rounded-lg">
+  <h3 className="font-semibold text-lg mb-2">Registro de Horas</h3>
+  <p>Control de tiempo dedicado por cada integrante del equipo Epical a los proyectos.</p>
+</div>
+<div className="bg-white/10 p-4 rounded-lg">
+  <h3 className="font-semibold text-lg mb-2">Chat Interno</h3>
+  <p>Comunícate con el equipo directamente dentro de la plataforma para coordinar tareas.</p>
+</div>
+
+/* MODIFICACIONES EXACTAS SEGÚN LA IMAGEN */
+
+// Cambiar el texto superior a:
+<h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión Epical</h1>
+<p className="text-gray-600">
+  Plataforma interna para la gestión de proyectos y cotizaciones
+</p>
+
+// Cambiar texto del iniciar sesión a:
+<CardTitle>Iniciar Sesión</CardTitle>
+<CardDescription>
+  Accede con tu cuenta de Epical Digital
+</CardDescription>
+
+// En el formulario, cambiar descripciones para que coincidan con la imagen:
+<FormLabel>Correo electrónico</FormLabel>
+<Input placeholder="tunombre@epicaldigital.com" {...field} />
+
+// Cambiar el título del lado derecho a:
+<h2 className="text-4xl font-bold mb-6">Sistema Interno Epical</h2>
+<p className="text-xl mb-8">
+  Plataforma completa para el equipo de Epical Digital que facilita la gestión de proyectos, 
+  cotizaciones y seguimiento de tiempo con comunicación interna integrada.
+</p>
+
+// Para las tarjetas de características, usa estos textos:
+<h3 className="font-semibold text-lg mb-2">Cotizaciones Inteligentes</h3>
+<p>Crea y gestiona cotizaciones para presentar a clientes con cálculos precisos.</p>
+
+<h3 className="font-semibold text-lg mb-2">Gestión de Proyectos</h3>
+<p>Coordina proyectos en curso y mantén informado a todo el equipo sobre avances.</p>
+
+<h3 className="font-semibold text-lg mb-2">Registro de Horas</h3>
+<p>Control de tiempo dedicado por cada integrante del equipo Epical a los proyectos.</p>
+
+<h3 className="font-semibold text-lg mb-2">Chat Interno</h3>
+<p>Comunícate con el equipo directamente dentro de la plataforma para coordinar tareas.</p>

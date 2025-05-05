@@ -85,7 +85,7 @@ export default function AuthPage() {
             <div className="flex justify-center mb-4">
               <img src={epicalLogo} alt="Epical Digital Logo" className="h-20 object-contain" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión Epical</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión - Epical</h1>
             <p className="text-gray-600">
               Plataforma interna para la gestión de proyectos y cotizaciones
             </p>
@@ -102,7 +102,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Iniciar Sesión</CardTitle>
                   <CardDescription>
-                    Accede con tu cuenta de Epical Digital
+                    Accede con tu cuenta de Epical
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -164,7 +164,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Crear Cuenta</CardTitle>
                   <CardDescription>
-                    Registra tu cuenta de equipo Epical Digital
+                    Registra tu cuenta de equipo Epical
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -269,9 +269,9 @@ export default function AuthPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-r from-blue-500 to-purple-600">
         <div className="flex flex-col items-center justify-center w-full p-12 text-white">
           <div className="max-w-lg text-center">
-            <h2 className="text-4xl font-bold mb-6">Sistema Interno Epical</h2>
+            <h2 className="text-4xl font-bold mb-6">Sistema Interno - Epical</h2>
             <p className="text-xl mb-8">
-              Plataforma completa para el equipo de Epical Digital que facilita la gestión de proyectos, 
+              Plataforma completa para el equipo de Epical que facilita la gestión de proyectos, 
               cotizaciones y seguimiento de tiempo con comunicación interna integrada.
             </p>
             <div className="grid grid-cols-2 gap-4 text-left">
