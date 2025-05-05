@@ -32,7 +32,7 @@ const clientSchema = z.object({
 type ClientFormValues = z.infer<typeof clientSchema>;
 
 export default function Clients() {
-  const { data: clients, isLoading } = useQuery<Client[]>({
+  const { data: clients, isLoading, refetch } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
   
@@ -56,11 +56,14 @@ export default function Clients() {
   const createMutation = useMutation({
     mutationFn: (client: InsertClient) => 
       apiRequest("/api/clients", "POST", client),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async () => {
+      // Invalidar la caché de consultas
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      // Forzar una actualización inmediata
+      await refetch();
       toast({
-        title: "Success",
-        description: "Client has been created successfully.",
+        title: "Éxito",
+        description: "El cliente ha sido creado correctamente.",
       });
       setDialogOpen(false);
       form.reset();
@@ -68,7 +71,7 @@ export default function Clients() {
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create client.",
+        description: "No se pudo crear el cliente.",
         variant: "destructive",
       });
     },
@@ -77,11 +80,14 @@ export default function Clients() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertClient> }) => 
       apiRequest(`/api/clients/${id}`, "PATCH", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+    onSuccess: async () => {
+      // Invalidar la caché de consultas
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      // Forzar una actualización inmediata
+      await refetch();
       toast({
-        title: "Success",
-        description: "Client has been updated successfully.",
+        title: "Éxito",
+        description: "El cliente ha sido actualizado correctamente.",
       });
       setDialogOpen(false);
       form.reset();
@@ -89,7 +95,7 @@ export default function Clients() {
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update client.",
+        description: "No se pudo actualizar el cliente.",
         variant: "destructive",
       });
     },
