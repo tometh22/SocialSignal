@@ -41,11 +41,13 @@ export default function AuthPage() {
   // Redireccionar si el usuario ya está autenticado
   useEffect(() => {
     if (user) {
+      console.log("Usuario autenticado detectado, redirigiendo...", user);
       setRedirecting(true);
       // Pequeño retraso para mostrar el estado de redirección
       setTimeout(() => {
+        console.log("Ejecutando redirección a /");
         navigate("/");
-      }, 1000);
+      }, 1500);
     }
   }, [user, navigate]);
 

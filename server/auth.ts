@@ -41,12 +41,15 @@ export function setupAuth(app: Express) {
   // Configuración de la sesión
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key",
-    resave: false,
+    resave: true, // Cambio para forzar guardado de sesión
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semana
+      sameSite: 'lax' as const, // Añadir configuración sameSite
+      httpOnly: true, // Asegurar que la cookie solo es accesible por el servidor
     },
+    name: 'epical.sid', // Nombre personalizado para la cookie
   };
 
   app.use(session(sessionConfig));
@@ -139,13 +142,23 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
-      // Establecer la sesión
+      // Establecer la sesión y guardarla explícitamente
       req.session.userId = user.id;
-      console.log("Sesión establecida con ID:", user.id);
+      console.log("Intentando establecer sesión con ID:", user.id);
       
-      // Enviar respuesta
-      const { password: _, ...userWithoutPassword } = user;
-      res.status(200).json(userWithoutPassword);
+      // Guardar la sesión de forma explícita y esperar a que se complete
+      req.session.save((err) => {
+        if (err) {
+          console.error("Error al guardar la sesión:", err);
+          return res.status(500).json({ message: "Error al iniciar sesión" });
+        }
+        
+        console.log("Sesión guardada correctamente para ID:", user.id);
+        
+        // Enviar respuesta solo después de guardar la sesión
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(200).json(userWithoutPassword);
+      });
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
       res.status(500).json({ message: "Error al iniciar sesión" });
