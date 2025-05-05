@@ -20,9 +20,6 @@ import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
 
 export interface IStorage {
   // Client operations
@@ -149,10 +146,12 @@ export interface IStorage {
   markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void>;
   
   // Session store
-  sessionStore: any;
+  sessionStore: session.Store;
 }
 
 export class MemStorage implements IStorage {
+  sessionStore: session.Store;
+  
   private clients: Map<number, Client>;
   private roles: Map<number, Role>;
   private personnel: Map<number, Personnel>;
@@ -176,6 +175,11 @@ export class MemStorage implements IStorage {
   private progressReportId: number;
 
   constructor() {
+    // Usar MemoryStore para sesiones en memoria
+    const MemoryStore = require('memorystore')(session);
+    this.sessionStore = new MemoryStore({
+      checkPeriod: 86400000 // Limpiar sesiones expiradas cada 24h
+    });
     this.clients = new Map();
     this.roles = new Map();
     this.personnel = new Map();
