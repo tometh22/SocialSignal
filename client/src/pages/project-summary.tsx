@@ -189,8 +189,8 @@ const ProjectSummary = () => {
         return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
       });
 
-      await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
-        projectName: newName
+      await apiRequest(`/api/projects/${parsedProjectId}/update-name`, 'PATCH', {
+        name: newName
       });
 
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
