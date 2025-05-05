@@ -81,15 +81,14 @@ function AppRoutes() {
 }
 
 function App() {
+  // App ya está envuelto en QueryClientProvider en main.tsx
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ChatProvider>
-          <AppRoutes />
-          <Toaster />
-        </ChatProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <ChatProvider>
+        <AppRoutes />
+        <Toaster />
+      </ChatProvider>
+    </AuthProvider>
   );
 }
 

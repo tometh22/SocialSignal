@@ -102,7 +102,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Obtener todas las conversaciones
   const { data: conversations = [], isLoading: isLoadingConversations } = useQuery<ChatConversation[]>({
     queryKey: ["/api/conversations"],
-    queryFn: getQueryFn(),
     enabled: !!user,
   });
 

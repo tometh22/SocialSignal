@@ -13,6 +13,36 @@ export const queryClient = new QueryClient({
   },
 });
 
+// Default query function that will be used by react-query
+export const defaultQueryFn = async ({ queryKey }: { queryKey: string | string[] }) => {
+  const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+  
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    const errorMessage = await response
+      .text()
+      .then(text => {
+        try {
+          const json = JSON.parse(text);
+          return json.message || text;
+        } catch (e) {
+          return text;
+        }
+      })
+      .catch(() => "Error desconocido");
+    
+    throw new Error(errorMessage);
+  }
+  
+  // For empty responses like 204 No Content
+  if (response.status === 204) {
+    return null;
+  }
+  
+  return await response.json();
+};
+
 // Function to get a query function with custom error handling
 export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   return async ({ queryKey }: { queryKey: string | string[] }) => {
