@@ -56,7 +56,13 @@ export const HeaderActions = ({
   const handleSave = () => {
     const trimmedName = editedName.trim();
     if (trimmedName && trimmedName !== projectName) {
+      // Llamamos a la función de guardar, pero mantenemos la UI actualizada inmediatamente
       onSaveProjectName(trimmedName);
+      
+      // Forzamos el cambio de estado a false antes de que se complete la operación
+      setEditing(false);
+    } else {
+      // Si no hay cambios, simplemente salimos del modo edición
       setEditing(false);
     }
   };
