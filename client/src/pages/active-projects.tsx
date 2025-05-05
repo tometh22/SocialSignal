@@ -139,7 +139,7 @@ export default function ActiveProjects() {
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg font-semibold">Gestión de Proyectos</h1>
         <Button
-          onClick={() => setLocation("/projects/new")}
+          onClick={() => setLocation("/active-projects/new")}
           size="sm"
           className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs"
         >
