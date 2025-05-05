@@ -59,14 +59,14 @@ export default function ActiveProjects() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
-  const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const { toast } = useToast();
 
-  // Mutation para actualizar el cliente de una cotización
+  // Mutation para asignar cliente a un proyecto
   const assignClientMutation = useMutation({
-    mutationFn: ({ quotationId, clientId }: { quotationId: number; clientId: number }) => 
-      apiRequest(`/api/quotations/${quotationId}/client`, "PATCH", { clientId }),
+    mutationFn: ({ projectId, clientId }: { projectId: number; clientId: number }) => 
+      apiRequest(`/api/active-projects/${projectId}/assign-client`, "PATCH", { clientId }),
     onSuccess: async () => {
       // Invalidar caché y forzar actualización
       await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
@@ -76,7 +76,7 @@ export default function ActiveProjects() {
         description: "Cliente asignado correctamente al proyecto.",
       });
       setAssignClientDialogOpen(false);
-      setSelectedQuotationId(null);
+      setSelectedProjectId(null);
       setSelectedClientId("");
     },
     onError: () => {
@@ -104,15 +104,15 @@ export default function ActiveProjects() {
     }
   };
 
-  const openAssignClientDialog = (e: React.MouseEvent, quotationId: number) => {
+  const openAssignClientDialog = (e: React.MouseEvent, projectId: number) => {
     e.stopPropagation();
-    setSelectedQuotationId(quotationId);
+    setSelectedProjectId(projectId);
     setSelectedClientId("");
     setAssignClientDialogOpen(true);
   };
 
   const assignClient = () => {
-    if (!selectedQuotationId || !selectedClientId) {
+    if (!selectedProjectId || !selectedClientId) {
       toast({
         title: "Error",
         description: "Debes seleccionar un cliente.",
@@ -122,7 +122,7 @@ export default function ActiveProjects() {
     }
 
     assignClientMutation.mutate({ 
-      quotationId: selectedQuotationId, 
+      projectId: selectedProjectId, 
       clientId: parseInt(selectedClientId) 
     });
   };
@@ -224,7 +224,7 @@ export default function ActiveProjects() {
                         variant="ghost"
                         size="sm"
                         className="h-5 w-5 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                        onClick={(e) => openAssignClientDialog(e, project.quotation.id)}
+                        onClick={(e) => openAssignClientDialog(e, project.id)}
                         title="Asignar cliente"
                       >
                         <UserPlus className="h-3 w-3" />
