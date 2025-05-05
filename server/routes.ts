@@ -832,6 +832,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update active project" });
     }
   });
+
+  // Eliminar proyecto activo
+  app.delete("/api/active-projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      // Verificar que el proyecto exista
+      const project = await storage.getActiveProject(id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Eliminar el proyecto y sus datos relacionados
+      const deleted = await storage.deleteActiveProject(id);
+      
+      if (!deleted) {
+        return res.status(500).json({ message: "Failed to delete project" });
+      }
+      
+      console.log(`Proyecto ID ${id} eliminado correctamente`);
+      
+      res.status(200).json({ 
+        success: true, 
+        message: "Project deleted successfully", 
+        id 
+      });
+    } catch (error) {
+      console.error("Error deleting active project:", error);
+      res.status(500).json({ message: "Failed to delete project", error: String(error) });
+    }
+  });
   
   // ---------- RUTAS PARA REGISTRO DE HORAS ----------
   

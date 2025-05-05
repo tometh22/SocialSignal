@@ -96,11 +96,20 @@ export default function ActiveProjects() {
     if (!deleteProjectId) return;
     
     try {
-      await apiRequest(`/api/active-projects/${deleteProjectId}`, 'DELETE');
+      await apiRequest('DELETE', `/api/active-projects/${deleteProjectId}`);
+      toast({
+        title: "Éxito",
+        description: "El proyecto ha sido eliminado correctamente.",
+      });
       await refetchProjects();
       setDeleteProjectId(null);
     } catch (error) {
       console.error('Error al eliminar el proyecto:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el proyecto. Inténtalo de nuevo más tarde.",
+        variant: "destructive",
+      });
     }
   };
 
