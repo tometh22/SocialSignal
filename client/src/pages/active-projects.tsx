@@ -27,6 +27,7 @@ interface Quotation {
   analysisType: string;
   projectType: string;
   client?: Client; // Added client property for easier access
+  clientName?: string; // Added clientName property for fallback
 }
 
 interface ActiveProject {
@@ -115,9 +116,9 @@ export default function ActiveProjects() {
             ) : projects.map((project) => (
               <tr key={project.id} className="text-sm hover:bg-gray-50">
                 <td className="px-4 py-2">{project.quotation?.projectName || '-'}</td>
-                <td className="px-4 py-2">{project.quotation?.client?.name || 'Cliente Desconocido'}</td>
+                <td className="px-4 py-2">{project.quotation?.client?.name || project.quotation?.clientName || 'Cliente Desconocido'}</td>
                 <td className="px-4 py-2">
-                  <Badge variant={project.status === 'active' ? 'success' : 'default'}>
+                  <Badge className={project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}>
                     {project.status === 'active' ? 'Activo' : project.status}
                   </Badge>
                 </td>
