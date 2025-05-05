@@ -960,17 +960,22 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Active project operations
-  async getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation })[]> {
+  async getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } })[]> {
     const projects = await db.select({
       project: activeProjects,
-      quotation: quotations
+      quotation: quotations,
+      client: clients
     })
     .from(activeProjects)
-    .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id));
+    .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .leftJoin(clients, eq(quotations.clientId, clients.id));
     
     return projects.map(item => ({
       ...item.project,
-      quotation: item.quotation
+      quotation: {
+        ...item.quotation,
+        client: item.client || undefined
+      }
     }));
   }
   
@@ -999,20 +1004,25 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
   
-  async getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation }) | undefined> {
+  async getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined> {
     const results = await db.select({
       project: activeProjects,
-      quotation: quotations
+      quotation: quotations,
+      client: clients
     })
     .from(activeProjects)
     .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .leftJoin(clients, eq(quotations.clientId, clients.id))
     .where(eq(activeProjects.id, id));
     
     if (results.length === 0) return undefined;
     
     return {
       ...results[0].project,
-      quotation: results[0].quotation
+      quotation: {
+        ...results[0].quotation,
+        client: results[0].client || undefined
+      }
     };
   }
   

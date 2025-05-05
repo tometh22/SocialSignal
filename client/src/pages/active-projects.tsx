@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, ArrowUpDown, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, Clock, BarChart2, Eye, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
@@ -163,7 +163,7 @@ export default function ActiveProjects() {
                 onClick={() => setLocation(`/project-summary/${project.id}`)}
               >
                 <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
-                <td className="px-2 py-1.5">{project.quotation?.client?.name || project.quotation?.clientName || 'Cliente Desconocido'}</td>
+                <td className="px-2 py-1.5">{project.quotation?.client?.name || 'Cliente Desconocido'}</td>
                 <td className="px-2 py-1.5">
                   <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
                     {project.status === 'active' ? 'Activo' : project.status}
@@ -175,7 +175,12 @@ export default function ActiveProjects() {
                 <td className="px-2 py-1.5 text-gray-600">
                   {formatDate(project.expectedEndDate)}
                 </td>
-                <td className="px-2 py-1.5">{project.trackingFrequency}</td>
+                <td className="px-2 py-1.5">
+                  {project.trackingFrequency === "weekly" ? "Semanal" : 
+                   project.trackingFrequency === "biweekly" ? "Quincenal" :
+                   project.trackingFrequency === "monthly" ? "Mensual" : 
+                   project.trackingFrequency}
+                </td>
                 <td className="px-2 py-1.5">
                   <div className="flex gap-1">
                     <Button
@@ -185,7 +190,7 @@ export default function ActiveProjects() {
                       onClick={() => setLocation(`/project-summary/${project.id}`)}
                       title="Ver resumen del proyecto"
                     >
-                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      <BarChart2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
