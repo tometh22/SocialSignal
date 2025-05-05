@@ -31,6 +31,7 @@ type NavItem = {
 };
 
 export default function Sidebar() {
+  const { user, logoutMutation } = useAuth();
   const [currentPath] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -39,6 +40,12 @@ export default function Sidebar() {
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
+  };
+  
+  // Función para obtener las iniciales del usuario
+  const getUserInitials = () => {
+    if (!user) return "US";
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
   // Categorías de navegación
@@ -332,14 +339,15 @@ export default function Sidebar() {
                     <TooltipTrigger asChild>
                       <Avatar className="h-9 w-9 border border-sidebar-border/30 cursor-pointer">
                         <AvatarFallback className="bg-sidebar-primary/80 text-white text-sm">
-                          JS
+                          {getUserInitials()}
                         </AvatarFallback>
+                        {user?.avatar && <AvatarImage src={user.avatar} />}
                       </Avatar>
                     </TooltipTrigger>
                     <TooltipContent side="right">
                       <div className="flex flex-col">
-                        <span className="font-medium">Jane Smith</span>
-                        <span className="text-xs text-muted-foreground">Administrador</span>
+                        <span className="font-medium">{user ? `${user.firstName} ${user.lastName}` : 'Usuario'}</span>
+                        <span className="text-xs text-muted-foreground">{user?.isAdmin ? 'Administrador' : 'Usuario'}</span>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -348,12 +356,13 @@ export default function Sidebar() {
                 <>
                   <Avatar className="h-9 w-9 border border-sidebar-border/30">
                     <AvatarFallback className="bg-sidebar-primary/80 text-white text-sm">
-                      JS
+                      {getUserInitials()}
                     </AvatarFallback>
+                    {user?.avatar && <AvatarImage src={user.avatar} />}
                   </Avatar>
                   <div className="ml-3 min-w-0">
-                    <p className="text-sm font-medium truncate">Jane Smith</p>
-                    <p className="text-[11px] text-sidebar-foreground/60 truncate">Administrador</p>
+                    <p className="text-sm font-medium truncate">{user ? `${user.firstName} ${user.lastName}` : 'Usuario'}</p>
+                    <p className="text-[11px] text-sidebar-foreground/60 truncate">{user?.isAdmin ? 'Administrador' : 'Usuario'}</p>
                   </div>
                   <TooltipProvider>
                     <Tooltip>
@@ -362,6 +371,7 @@ export default function Sidebar() {
                           variant="ghost" 
                           size="icon" 
                           className="ml-auto h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-border/20 rounded-full"
+                          onClick={() => logoutMutation.mutate()}
                         >
                           <LogOut className="h-4 w-4" />
                         </Button>
