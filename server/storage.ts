@@ -1061,6 +1061,13 @@ export class DatabaseStorage implements IStorage {
     return updatedProject;
   }
   
+  async getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
+    return await db
+      .select()
+      .from(activeProjects)
+      .where(eq(activeProjects.quotationId, quotationId));
+  }
+  
   // Time entry operations
   async getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
     return await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
