@@ -56,7 +56,12 @@ export const HeaderActions = ({
   const handleSave = () => {
     const trimmedName = editedName.trim();
     if (trimmedName && trimmedName !== projectName) {
-      // Llamamos a la función de guardar, pero mantenemos la UI actualizada inmediatamente
+      // Actualizamos localmente primero para mostrar el cambio inmediatamente
+      document.querySelectorAll('.project-name').forEach(el => {
+        (el as HTMLElement).innerText = trimmedName;
+      });
+      
+      // Después llamamos a la función que guardará el cambio en el servidor
       onSaveProjectName(trimmedName);
       
       // Forzamos el cambio de estado a false antes de que se complete la operación
@@ -139,7 +144,7 @@ export const HeaderActions = ({
           </div>
         ) : (
           <div className="flex items-center gap-1.5">
-            <h1 className="text-lg font-bold">
+            <h1 className="text-lg font-bold project-name">
               {projectName || "Sin nombre"}
             </h1>
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)} className="h-7 w-7">
