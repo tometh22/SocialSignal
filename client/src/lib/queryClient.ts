@@ -17,7 +17,9 @@ export const queryClient = new QueryClient({
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string | string[] }) => {
   const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
   
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    credentials: "include" // Asegurar que las cookies se envíen con la solicitud
+  });
   
   if (!response.ok) {
     const errorMessage = await response
@@ -48,7 +50,9 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   return async ({ queryKey }: { queryKey: string | string[] }) => {
     const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      credentials: "include" // Asegurar que las cookies se envíen con la solicitud
+    });
     
     if (!response.ok) {
       if (response.status === 401 && on401 === "returnNull") {

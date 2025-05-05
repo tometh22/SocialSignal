@@ -13,6 +13,13 @@ declare global {
   }
 }
 
+// Extender la definición de session para TypeScript
+declare module 'express-session' {
+  interface SessionData {
+    userId: number;
+  }
+}
+
 const scryptAsync = promisify(scrypt);
 
 // Función para generar hash de contraseña

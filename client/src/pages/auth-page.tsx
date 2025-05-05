@@ -79,13 +79,26 @@ export default function AuthPage() {
 
   // Manejar envío del formulario de inicio de sesión
   function onLoginSubmit(data: LoginFormValues) {
-    loginMutation.mutate(data);
+    console.log("Iniciando login con:", data.email);
+    loginMutation.mutate(data, {
+      onSuccess: () => {
+        console.log("Login exitoso, redirigiendo...");
+        // Forzar una recarga de los datos del usuario actual
+        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      }
+    });
   }
 
   // Manejar envío del formulario de registro
   function onRegisterSubmit(data: RegisterFormValues) {
     const { confirmPassword, ...userData } = data;
-    registerMutation.mutate(userData);
+    registerMutation.mutate(userData, {
+      onSuccess: () => {
+        console.log("Registro exitoso, redirigiendo...");
+        // Forzar una recarga de los datos del usuario actual
+        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      }
+    });
   }
 
   return (
