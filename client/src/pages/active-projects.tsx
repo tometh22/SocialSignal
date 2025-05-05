@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, ArrowUpDown } from "lucide-react";
+import { Plus, Search, Calendar, Clock, ArrowUpDown, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
 
 // Definición de tipos (from original code)
@@ -45,8 +48,25 @@ interface ActiveProject {
 
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
-  const { data: projects = [] } = useQuery({ queryKey: ['/api/active-projects'] });
+  const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ['/api/active-projects'] });
   const { data: clients = [] } = useQuery({ queryKey: ['/api/clients'] });
+  const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
+
+  const handleDeleteProject = (projectId: number) => {
+    setDeleteProjectId(projectId);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteProjectId) return;
+    
+    try {
+      await apiRequest(`/api/active-projects/${deleteProjectId}`, 'DELETE');
+      await refetchProjects();
+      setDeleteProjectId(null);
+    } catch (error) {
+      console.error('Error al eliminar el proyecto:', error);
+    }
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "N/A";
@@ -136,6 +156,7 @@ export default function ActiveProjects() {
                       size="sm"
                       className="h-7 w-7 p-0"
                       onClick={() => setLocation(`/projects/${project.id}`)}
+                      title="Ver resumen del proyecto"
                     >
                       <ArrowUpDown className="h-4 w-4" />
                     </Button>
@@ -144,8 +165,18 @@ export default function ActiveProjects() {
                       size="sm"
                       className="h-7 w-7 p-0"
                       onClick={() => setLocation(`/projects/${project.id}/time-entries`)}
+                      title="Gestión de horas"
                     >
                       <Clock className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => handleDeleteProject(project.id)}
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </td>
@@ -154,6 +185,26 @@ export default function ActiveProjects() {
           </tbody>
         </table>
       </div>
+
+      {/* Diálogo de confirmación para eliminar */}
+      <Dialog open={deleteProjectId !== null} onOpenChange={() => setDeleteProjectId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteProjectId(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
