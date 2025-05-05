@@ -16,7 +16,7 @@ async function hashPassword(password: string) {
 async function createNewAdminUser() {
   try {
     // Borrar cualquier usuario existente con este email
-    await db.delete(users).where(eq(users.email, "admin@epical.digital"));
+    await db.delete(users).where(eq(users.email, "tomas@epical.digital"));
     
     // Creamos una contraseña simple para pruebas
     const plainPassword = "admin123";
@@ -29,9 +29,9 @@ async function createNewAdminUser() {
     
     // Insertar nuevo usuario
     const [newUser] = await db.insert(users).values({
-      firstName: "Admin",
-      lastName: "Epical",
-      email: "admin@epical.digital",
+      firstName: "Tomás",
+      lastName: "Criado",
+      email: "tomas@epical.digital",
       password: hashedPassword,
       isAdmin: true,
       createdAt: new Date(),
@@ -46,7 +46,7 @@ async function createNewAdminUser() {
     });
     
     console.log("\nUtiliza estas credenciales para iniciar sesión:");
-    console.log("Email: admin@epical.digital");
+    console.log("Email: tomas@epical.digital");
     console.log("Contraseña: admin123");
     
   } catch (error) {
