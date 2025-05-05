@@ -137,8 +137,8 @@ const ProjectSummary = () => {
   });
 
   // Consultas de datos
-  const { data: project, isLoading: isLoadingProject } = useQuery({
-    queryKey: ['/api/active-projects', parsedProjectId],
+  const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
+    queryKey: [`/api/active-projects/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
 
@@ -184,7 +184,7 @@ const ProjectSummary = () => {
       };
 
       // Update local state immediately
-      queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
+      queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
       queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
         return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
       });
@@ -194,6 +194,7 @@ const ProjectSummary = () => {
       });
 
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
 
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
@@ -612,7 +613,7 @@ const ProjectSummary = () => {
 
         {/* Header - Acciones y filtros */}
         <HeaderActions
-          projectName={project?.quotation?.projectName || project?.quotation?.client?.name || "Sin nombre"}
+          projectName={project?.quotation?.projectName || "Sin nombre"}
           status={project.status || ""}
           projectId={project.id}
           timeFilter={dashboardState.timeFilter}
