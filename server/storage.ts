@@ -15,7 +15,7 @@ import {
   projectStatusOptions, trackingFrequencyOptions
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Client operations
@@ -1052,6 +1052,20 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(timeEntries).where(eq(timeEntries.personnelId, personnelId));
   }
   
+  async getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]> {
+    // 1. Obtener todas las cotizaciones del cliente
+    const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+    const clientQuotationIds = clientQuotations.map(q => q.id);
+    
+    // 2. Obtener todos los proyectos activos basados en esas cotizaciones
+    const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
+    const projectIds = projects.map(p => p.id);
+    
+    // 3. Obtener todas las entradas de tiempo para esos proyectos
+    if (projectIds.length === 0) return [];
+    return await db.select().from(timeEntries).where(inArray(timeEntries.projectId, projectIds));
+  }
+  
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
     const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
     return entry;
@@ -1153,6 +1167,92 @@ export class DatabaseStorage implements IStorage {
       actualCost,
       variance,
       percentageUsed
+    };
+  }
+  
+  async getClientCostSummary(clientId: number): Promise<{
+    totalEstimatedCost: number;
+    totalActualCost: number;
+    totalVariance: number;
+    averagePercentageUsed: number;
+    projectCount: number;
+    projectsData: Array<{
+      projectId: number;
+      projectName: string;
+      estimatedCost: number;
+      actualCost: number;
+      variance: number;
+      percentageUsed: number;
+    }>;
+  }> {
+    // 1. Obtener todas las cotizaciones del cliente
+    const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+    if (clientQuotations.length === 0) {
+      return {
+        totalEstimatedCost: 0,
+        totalActualCost: 0,
+        totalVariance: 0,
+        averagePercentageUsed: 0,
+        projectCount: 0,
+        projectsData: []
+      };
+    }
+    
+    // 2. Obtener todos los proyectos activos basados en esas cotizaciones
+    const clientQuotationIds = clientQuotations.map(q => q.id);
+    const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
+    
+    if (projects.length === 0) {
+      return {
+        totalEstimatedCost: 0,
+        totalActualCost: 0,
+        totalVariance: 0,
+        averagePercentageUsed: 0,
+        projectCount: 0,
+        projectsData: []
+      };
+    }
+    
+    // 3. Obtener resumen de costos para cada proyecto
+    let totalEstimatedCost = 0;
+    let totalActualCost = 0;
+    let totalVariance = 0;
+    let totalPercentageUsed = 0;
+    const projectsData = [];
+    
+    for (const project of projects) {
+      try {
+        // Obtener el nombre del proyecto desde la cotización
+        const quotation = clientQuotations.find(q => q.id === project.quotationId);
+        const projectName = quotation ? quotation.projectName : 'Proyecto sin nombre';
+        
+        // Calcular costos
+        const costSummary = await this.getProjectCostSummary(project.id);
+        
+        totalEstimatedCost += costSummary.estimatedCost;
+        totalActualCost += costSummary.actualCost;
+        totalVariance += costSummary.variance;
+        totalPercentageUsed += costSummary.percentageUsed;
+        
+        projectsData.push({
+          projectId: project.id,
+          projectName,
+          ...costSummary
+        });
+      } catch (error) {
+        console.error(`Error getting cost summary for project ${project.id}:`, error);
+      }
+    }
+    
+    const averagePercentageUsed = projects.length > 0 ? totalPercentageUsed / projects.length : 0;
+    
+    return {
+      totalEstimatedCost,
+      totalActualCost,
+      totalVariance,
+      averagePercentageUsed,
+      projectCount: projects.length,
+      projectsData
     };
   }
 }
