@@ -181,8 +181,7 @@ const ProjectSummary = () => {
     }
 
     try {
-      // Optimistic update
-      const oldProject = project;
+      // Crear una copia actualizada del proyecto
       const updatedProject = {
         ...project,
         quotation: {
@@ -191,8 +190,12 @@ const ProjectSummary = () => {
         }
       };
 
-      console.log("Actualizando optimistamente el estado local");
-      // Update local state immediately
+      console.log("Actualizando inmediatamente la UI");
+      
+      // Forzar actualización directa en la UI antes de la petición API
+      setProject(updatedProject);
+      
+      // Actualizar también el cache para mantener coherencia
       queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
       queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
         return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
@@ -201,7 +204,6 @@ const ProjectSummary = () => {
       console.log("Enviando solicitud al servidor");
       console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
       console.log("Datos enviados:", { name: newName });
-      console.log("Verificando firma de apiRequest: method, endpoint, data");
       
       const response = await apiRequest(
         'PATCH', 
@@ -211,13 +213,39 @@ const ProjectSummary = () => {
       
       console.log("Respuesta del servidor:", response);
 
-      console.log("Invalidando consultas para actualizar datos");
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
+      // Refrescar los datos después de la respuesta exitosa para asegurar sincronización
+      console.log("Invalidando consultas para sincronizar datos");
+      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
+      
+      // Mostrar notificación de éxito
+      toast({
+        title: "Nombre actualizado",
+        description: "El nombre del proyecto se ha actualizado con éxito",
+        variant: "default",
+      });
       
       console.log("Actualización completada con éxito");
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
+      
+      // Revertir cambios en caso de error
+      if (project) {
+        setProject(project);
+        
+        // Restablecer caché
+        queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], project);
+        queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
+          return old?.map(p => p.id === parsedProjectId ? project : p) ?? [];
+        });
+      }
+      
+      // Mostrar notificación de error
+      toast({
+        title: "Error al actualizar",
+        description: "No se pudo actualizar el nombre del proyecto. Intente nuevamente.",
+        variant: "destructive",
+      });
     }
   };
 
