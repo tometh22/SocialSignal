@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Eye,
@@ -114,43 +114,43 @@ export const HeaderActions = ({
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 bg-background rounded-lg border p-4">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 bg-background rounded-lg border p-2.5">
+      <div className="flex items-center gap-2">
         {editing ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Input
               value={editedName}
               onChange={(e) => setEditedName(e.target.value)}
-              className="text-2xl font-bold h-10 min-w-[300px]"
+              className="text-lg font-bold h-8 min-w-[250px]"
               autoFocus
             />
-            <Button size="icon" onClick={handleSave} variant="outline">
-              <Save className="h-4 w-4" />
+            <Button size="icon" onClick={handleSave} variant="outline" className="h-7 w-7">
+              <Save className="h-3.5 w-3.5" />
             </Button>
-            <Button size="icon" variant="ghost" onClick={handleCancel}>
-              <ChevronLeft className="h-4 w-4" />
+            <Button size="icon" variant="ghost" onClick={handleCancel} className="h-7 w-7">
+              <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-lg font-bold">
               {projectName || "Sin nombre"}
             </h1>
-            <Button size="icon" variant="ghost" onClick={() => setEditing(true)}>
-              <Edit2 className="h-4 w-4" />
+            <Button size="icon" variant="ghost" onClick={() => setEditing(true)} className="h-7 w-7">
+              <Edit2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         )}
         <StatusBadge status={status} />
       </div>
       
-      <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
+      <div className="flex flex-wrap gap-2 mt-2 md:mt-0 items-center">
         <Select
           value={timeFilter}
           onValueChange={onTimeFilterChange}
         >
-          <SelectTrigger className="w-[180px]">
-            <Calendar className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-[140px] h-8 text-xs">
+            <Calendar className="h-3.5 w-3.5 mr-1.5" />
             <SelectValue placeholder="Periodo" />
           </SelectTrigger>
           <SelectContent>
@@ -165,8 +165,8 @@ export const HeaderActions = ({
           value={viewMode}
           onValueChange={onViewModeChange}
         >
-          <SelectTrigger className="w-[180px]">
-            <Eye className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-[140px] h-8 text-xs">
+            <Eye className="h-3.5 w-3.5 mr-1.5" />
             <SelectValue placeholder="Vista" />
           </SelectTrigger>
           <SelectContent>
@@ -179,16 +179,18 @@ export const HeaderActions = ({
           variant="outline"
           size="icon"
           onClick={onSettingsClick}
+          className="h-8 w-8"
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-3.5 w-3.5" />
         </Button>
         
         <Button
           variant="default"
-          className="flex gap-2 items-center"
+          size="sm"
+          className="flex gap-1.5 items-center h-8 text-xs"
           onClick={onRegisterHours}
         >
-          <Clock className="h-4 w-4" />
+          <Clock className="h-3.5 w-3.5" />
           Registrar Horas
         </Button>
       </div>

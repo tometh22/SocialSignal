@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Plus, Search, Calendar, Clock, ArrowUpDown, Trash2 } from "lucide-react";
@@ -75,115 +81,135 @@ export default function ActiveProjects() {
 
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 space-y-3">
       {/* Header más compacto */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Gestión de Proyectos</h1>
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-lg font-semibold">Gestión de Proyectos</h1>
         <Button
           onClick={() => setLocation("/projects/new")}
           size="sm"
-          className="bg-indigo-600 hover:bg-indigo-700"
+          className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs"
         >
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="h-3.5 w-3.5 mr-1" />
           Nuevo Proyecto
         </Button>
       </div>
 
-      {/* Filtros más compactos */}
-      <div className="bg-white rounded-lg shadow-sm border p-3">
-        <div className="flex gap-3 items-center">
+      {/* Filtros integrados en la tabla */}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        {/* Barra de filtros */}
+        <div className="flex gap-2 items-center p-2 border-b bg-gray-50">
+          <div className="flex items-center text-xs font-medium text-gray-600 mr-1">
+            <Search className="h-3.5 w-3.5 mr-1 text-gray-500" />
+            Filtros:
+          </div>
+          
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <Input
                 placeholder="Buscar proyectos..."
-                className="pl-9 h-9"
+                className="pl-6 h-7 text-xs"
               />
+              <Search className="absolute left-1.5 top-1.5 h-3.5 w-3.5 text-gray-400" />
             </div>
           </div>
-          <Select defaultValue="all" className="w-48 h-9">
-            <option value="all">Todos los clientes</option>
-            {clients.map(client => (
-              <option key={client.id} value={client.id}>{client.name}</option>
-            ))}
-          </Select>
+          
+          <div className="w-40">
+            <Select defaultValue="all">
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Todos los clientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los clientes</SelectItem>
+                {clients && clients.map((client: Client) => (
+                  <SelectItem key={client.id} value={client.id.toString()}>{client.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
 
-      {/* Tabla de proyectos más compacta */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="flex items-center justify-between p-3 border-b bg-gray-50">
-          <h2 className="text-sm font-medium">Proyectos en Ejecución</h2>
+        <div className="flex items-center justify-between p-2 bg-gray-50 border-b">
+          <h2 className="text-xs font-medium text-gray-600">Proyectos en Ejecución</h2>
+          <div className="flex gap-1">
+            <Badge variant="outline" className="text-[10px] h-5 bg-white">
+              {projects.length} proyectos
+            </Badge>
+          </div>
         </div>
 
+        {/* Tabla optimizada */}
         <table className="w-full">
           <thead>
-            <tr className="text-xs text-gray-500 bg-gray-50">
-              <th className="px-4 py-2 text-left font-medium">Proyecto</th>
-              <th className="px-4 py-2 text-left font-medium">Cliente</th>
-              <th className="px-4 py-2 text-left font-medium">Estado</th>
-              <th className="px-4 py-2 text-left font-medium">Inicio</th>
-              <th className="px-4 py-2 text-left font-medium">Fin Esperado</th>
-              <th className="px-4 py-2 text-left font-medium">Seguimiento</th>
-              <th className="px-4 py-2 text-left font-medium">Acciones</th>
+            <tr className="text-[11px] text-gray-500 bg-gray-50">
+              <th className="px-2 py-1.5 text-left font-medium">Proyecto</th>
+              <th className="px-2 py-1.5 text-left font-medium">Cliente</th>
+              <th className="px-2 py-1.5 text-left font-medium">Estado</th>
+              <th className="px-2 py-1.5 text-left font-medium">Inicio</th>
+              <th className="px-2 py-1.5 text-left font-medium">Fin Esperado</th>
+              <th className="px-2 py-1.5 text-left font-medium">Seguimiento</th>
+              <th className="px-2 py-1.5 text-left font-medium">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {projects.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No hay proyectos</td>
+                <td colSpan={7} className="px-2 py-4 text-center text-gray-500 text-xs">No hay proyectos</td>
               </tr>
             ) : projects.map((project) => (
               <tr 
                 key={project.id} 
-                className="text-sm hover:bg-gray-50 cursor-pointer"
+                className="text-xs hover:bg-gray-50 cursor-pointer"
                 onClick={() => setLocation(`/project-summary/${project.id}`)}
               >
-                <td className="px-4 py-2">{project.quotation?.projectName || '-'}</td>
-                <td className="px-4 py-2">{project.quotation?.client?.name || project.quotation?.clientName || 'Cliente Desconocido'}</td>
-                <td className="px-4 py-2">
-                  <Badge className={project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}>
+                <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
+                <td className="px-2 py-1.5">{project.quotation?.client?.name || project.quotation?.clientName || 'Cliente Desconocido'}</td>
+                <td className="px-2 py-1.5">
+                  <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
                     {project.status === 'active' ? 'Activo' : project.status}
                   </Badge>
                 </td>
-                <td className="px-4 py-2 text-gray-600">
+                <td className="px-2 py-1.5 text-gray-600">
                   {formatDate(project.startDate)}
                 </td>
-                <td className="px-4 py-2 text-gray-600">
+                <td className="px-2 py-1.5 text-gray-600">
                   {formatDate(project.expectedEndDate)}
                 </td>
-                <td className="px-4 py-2">{project.trackingFrequency}</td>
-                <td className="px-4 py-2">
+                <td className="px-2 py-1.5">{project.trackingFrequency}</td>
+                <td className="px-2 py-1.5">
                   <div className="flex gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0"
+                      className="h-6 w-6 p-0"
                       onClick={() => setLocation(`/project-summary/${project.id}`)}
                       title="Ver resumen del proyecto"
                     >
-                      <ArrowUpDown className="h-4 w-4" />
+                      <ArrowUpDown className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0"
+                      className="h-6 w-6 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         setLocation(`/projects/${project.id}/time-entries`);
                       }}
                       title="Gestión de horas"
                     >
-                      <Clock className="h-4 w-4" />
+                      <Clock className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                      onClick={() => handleDeleteProject(project.id)}
+                      className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteProject(project.id);
+                      }}
                       title="Eliminar proyecto"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </td>
