@@ -198,7 +198,7 @@ export default function ActiveProjects() {
                       className="h-6 w-6 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setLocation(`/projects/${project.id}/time-entries`);
+                        setLocation(`/active-projects/${project.id}/time-entries`);
                       }}
                       title="Gestión de horas"
                     >
