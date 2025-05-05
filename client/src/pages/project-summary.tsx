@@ -169,7 +169,7 @@ const ProjectSummary = () => {
 
   // Función para actualizar el nombre del proyecto
   const handleSaveProjectName = async (newName: string) => {
-    if (!project || !parsedProjectId) return;
+    if (!project?.quotation?.id || !parsedProjectId || !newName) return;
 
     try {
       // Optimistic update
