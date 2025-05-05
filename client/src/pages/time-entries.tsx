@@ -889,7 +889,7 @@ const TimeEntries: React.FC = () => {
                           )}
                           {calendarView === "week" && (
                             <span>
-                              Mostrando semana: {format(startOfWeek(selectedDate, { locale: es }), "dd/MM/yyyy", { locale: es })} - {format(endOfWeek(selectedDate, { locale: es }), "dd/MM/yyyy", { locale: es })}
+                              Mostrando semana: {format(startOfWeek(selectedDate), "dd/MM/yyyy", { locale: es })} - {format(endOfWeek(selectedDate), "dd/MM/yyyy", { locale: es })}
                             </span>
                           )}
                           {calendarView === "fortnight" && (
@@ -1050,93 +1050,230 @@ const TimeEntries: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  // Vista de calendario mejorada
+                  // Vista de calendario tipo grid
                   <div 
-                    className="border rounded-md p-4" 
+                    className="border rounded-md"
                     style={{
-                      height: "450px",
                       maxHeight: "70vh",
                       position: "relative",
                       overflowY: "auto",
-                      marginBottom: "120px"
+                      marginBottom: "20px"
                     }}
                   >
-                    {/* Agrupación por semana para la vista de calendario */}
-                    <div className="pb-6">
-                      <h3 className="font-medium text-sm mb-3">Vista Calendario - Registros Agrupados por Fecha</h3>
-                      <div className="space-y-6">
-                        {groupEntriesByDate().size > 0 ? (
-                          Array.from(groupEntriesByDate().entries())
-                            .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                            .map(([dateStr, entries]) => (
-                              <div key={dateStr} className="border rounded-md overflow-hidden">
-                                <div className="flex items-center justify-between p-3 bg-muted/30 border-b">
-                                  <h4 className="text-sm font-semibold text-primary">
-                                    {format(new Date(dateStr), "EEEE dd 'de' MMMM yyyy", { locale: es })}
-                                  </h4>
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <Badge variant="outline" className="font-normal">
-                                      {entries.reduce((sum, entry) => sum + entry.hours, 0)} 
-                                      {entries.reduce((sum, entry) => sum + entry.hours, 0) === 1 ? " hora" : " horas"}
-                                    </Badge>
-                                  </div>
-                                </div>
-                                <div className="divide-y">
-                                  {entries.map((entry) => {
-                                    const person = personnel?.find(p => p.id === entry.personnelId);
-                                    return (
-                                      <div 
-                                        key={entry.id} 
-                                        className="flex items-center justify-between p-2.5 hover:bg-muted/10"
-                                      >
-                                        <div className="flex items-center space-x-2">
-                                          <div className="relative">
-                                            <PersonAvatar name={person?.name || "Usuario"} />
-                                            {entry.billable ? (
-                                              <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background" title="Facturable" />
-                                            ) : (
-                                              <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 border-2 border-background" title="No Facturable" />
-                                            )}
-                                          </div>
-                                          <div>
-                                            <div className="font-medium text-sm flex items-center">
-                                              {person?.name}
-                                              <span className="text-xs text-muted-foreground ml-2">({getRoleNameById(person?.roleId || 0)})</span>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                              {entry.description || "Sin descripción"}
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center space-x-3">
-                                          <Badge variant={entry.billable ? "default" : "outline"} className="font-medium">
-                                            {entry.hours} h
+                    {/* Vista de calendario semanal */}
+                    <div className="p-4">
+                      {calendarView === "month" ? (
+                        <div>
+                          {/* Cabecera con los días de la semana */}
+                          <div className="grid grid-cols-7 gap-0 mb-2 border-b pb-2">
+                            {["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"].map((dayName, idx) => (
+                              <div 
+                                key={idx} 
+                                className="text-center text-sm font-medium text-muted-foreground p-1"
+                              >
+                                {dayName}
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Rejilla del calendario */}
+                          <div className="grid grid-cols-7 gap-0 border-l">
+                            {/* Generación dinámica de los días del mes */}
+                            {(() => {
+                              const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+                              const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+                              
+                              // Ajustar el día de inicio (0=domingo, 1=lunes, etc.) para que comience en lunes
+                              let startDay = firstDayOfMonth.getDay() - 1;
+                              if (startDay === -1) startDay = 6; // Si es domingo (0), ajustar a 6
+                              
+                              const totalDays = lastDayOfMonth.getDate();
+                              const totalCells = Math.ceil((totalDays + startDay) / 7) * 7;
+                              
+                              const days = [];
+                              
+                              // Mapeo de entradas por fecha para rápida búsqueda
+                              const entriesByDate = new Map<string, TimeEntry[]>();
+                              
+                              filteredEntries.forEach(entry => {
+                                const dateStr = entry.date.split('T')[0];
+                                if (!entriesByDate.has(dateStr)) {
+                                  entriesByDate.set(dateStr, []);
+                                }
+                                entriesByDate.get(dateStr)?.push(entry);
+                              });
+                              
+                              // Generar celdas para el calendario
+                              for (let i = 0; i < totalCells; i++) {
+                                const dayNumber = i - startDay + 1;
+                                const isCurrentMonth = dayNumber > 0 && dayNumber <= totalDays;
+                                
+                                if (isCurrentMonth) {
+                                  const currentDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), dayNumber);
+                                  const dateStr = format(currentDate, "yyyy-MM-dd");
+                                  const entries = entriesByDate.get(dateStr) || [];
+                                  const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
+                                  
+                                  days.push(
+                                    <div 
+                                      key={i} 
+                                      className={`min-h-[120px] p-1 border-r border-b ${
+                                        new Date().toDateString() === currentDate.toDateString() 
+                                          ? 'bg-primary/5' 
+                                          : ''
+                                      }`}
+                                    >
+                                      <div className="flex justify-between items-start mb-2">
+                                        <span className={`text-sm font-medium p-1 rounded-full w-6 h-6 flex items-center justify-center ${
+                                          new Date().toDateString() === currentDate.toDateString() 
+                                            ? 'bg-primary text-primary-foreground' 
+                                            : ''
+                                        }`}>
+                                          {dayNumber}
+                                        </span>
+                                        {entries.length > 0 && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {totalHours}h
                                           </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Mostrar entradas para este día */}
+                                      <div className="space-y-1">
+                                        {entries.slice(0, 2).map(entry => {
+                                          const person = personnel?.find(p => p.id === entry.personnelId);
+                                          return (
+                                            <div 
+                                              key={entry.id} 
+                                              className={`
+                                                text-xs p-1 rounded
+                                                ${entry.billable 
+                                                  ? 'bg-green-50 text-green-700 border-l-2 border-green-500' 
+                                                  : 'bg-amber-50 text-amber-700 border-l-2 border-amber-500'
+                                                }
+                                                flex items-center gap-1 overflow-hidden
+                                              `}
+                                              title={`${person?.name || 'Usuario'} - ${entry.hours}h - ${entry.description || 'Sin descripción'}`}
+                                            >
+                                              <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-current" />
+                                              <span className="truncate font-medium">{person?.name || 'Usuario'}</span>
+                                              <span className="ml-auto">{entry.hours}h</span>
+                                            </div>
+                                          );
+                                        })}
+                                        
+                                        {entries.length > 2 && (
+                                          <div className="text-xs text-center text-muted-foreground mt-1">
+                                            + {entries.length - 2} más
+                                          </div>
+                                        )}
+                                        
+                                        {entries.length === 0 && (
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 w-7 p-0 opacity-70 hover:opacity-100"
+                                            className="w-full h-7 text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity"
                                             onClick={() => {
-                                              setEntryToDelete(entry.id);
-                                              setDeleteDialogOpen(true);
+                                              const dateObj = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), dayNumber);
+                                              setDialogOpen(true);
                                             }}
                                           >
-                                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                            <PlusCircle className="h-3 w-3 mr-1" />
+                                            Agregar
                                           </Button>
-                                        </div>
+                                        )}
                                       </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))
-                        ) : (
-                          <div className="text-center py-10 text-muted-foreground">
-                            No hay registros para mostrar en el calendario
+                                    </div>
+                                  );
+                                } else {
+                                  // Días fuera del mes actual
+                                  days.push(
+                                    <div key={i} className="min-h-[120px] p-1 border-r border-b bg-muted/10" />
+                                  );
+                                }
+                              }
+                              
+                              return days;
+                            })()}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        // Vista agrupada para otras vistas (día, semana, quincena)
+                        <div className="space-y-6">
+                          <h3 className="font-medium text-sm mb-3">Registros Agrupados por Fecha</h3>
+                          {groupEntriesByDate().size > 0 ? (
+                            Array.from(groupEntriesByDate().entries())
+                              .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
+                              .map(([dateStr, entries]) => (
+                                <div key={dateStr} className="border rounded-md overflow-hidden">
+                                  <div className="flex items-center justify-between p-3 bg-muted/30 border-b">
+                                    <h4 className="text-sm font-semibold text-primary">
+                                      {format(new Date(dateStr), "EEEE dd 'de' MMMM yyyy", { locale: es })}
+                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-muted-foreground" />
+                                      <Badge variant="outline" className="font-normal">
+                                        {entries.reduce((sum, entry) => sum + entry.hours, 0)} 
+                                        {entries.reduce((sum, entry) => sum + entry.hours, 0) === 1 ? " hora" : " horas"}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="divide-y">
+                                    {entries.map((entry) => {
+                                      const person = personnel?.find(p => p.id === entry.personnelId);
+                                      return (
+                                        <div 
+                                          key={entry.id} 
+                                          className="flex items-center justify-between p-2.5 hover:bg-muted/10"
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <div className="relative">
+                                              <PersonAvatar name={person?.name || "Usuario"} />
+                                              {entry.billable ? (
+                                                <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background" title="Facturable" />
+                                              ) : (
+                                                <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 border-2 border-background" title="No Facturable" />
+                                              )}
+                                            </div>
+                                            <div>
+                                              <div className="font-medium text-sm flex items-center">
+                                                {person?.name}
+                                                <span className="text-xs text-muted-foreground ml-2">({getRoleNameById(person?.roleId || 0)})</span>
+                                              </div>
+                                              <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                                {entry.description || "Sin descripción"}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center space-x-3">
+                                            <Badge variant={entry.billable ? "default" : "outline"} className="font-medium">
+                                              {entry.hours} h
+                                            </Badge>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-7 w-7 p-0 opacity-70 hover:opacity-100"
+                                              onClick={() => {
+                                                setEntryToDelete(entry.id);
+                                                setDeleteDialogOpen(true);
+                                              }}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-center py-10 text-muted-foreground">
+                              No hay registros para mostrar en el período seleccionado
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
