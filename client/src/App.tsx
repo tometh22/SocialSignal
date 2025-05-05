@@ -13,6 +13,7 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
+import ClientSummary from "@/pages/client-summary";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { useEffect } from "react";
@@ -57,6 +58,7 @@ function App() {
               <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
               <Route path="/time-entries/project/:projectId" component={TimeEntries} />
               <Route path="/project-summary/:projectId" component={ProjectSummary} />
+              <Route path="/client-summary/:clientId" component={ClientSummary} />
               <Route component={NotFound} />
             </Switch>
           </div>

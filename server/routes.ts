@@ -604,6 +604,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener registros de tiempo por cliente
+  app.get("/api/time-entries/client/:clientId", async (req, res) => {
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    
+    try {
+      const entries = await storage.getTimeEntriesByClient(clientId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching client time entries:", error);
+      res.status(500).json({ message: "Failed to fetch client time entries" });
+    }
+  });
+  
+  // Obtener resumen de costos por cliente
+  app.get("/api/clients/:clientId/cost-summary", async (req, res) => {
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    
+    try {
+      const summary = await storage.getClientCostSummary(clientId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error getting client cost summary:", error);
+      res.status(500).json({ message: "Failed to calculate client cost summary" });
+    }
+  });
+  
   // Obtener un proyecto activo específico
   app.get("/api/active-projects/:id", async (req, res) => {
     const id = parseInt(req.params.id);

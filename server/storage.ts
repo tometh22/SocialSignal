@@ -76,6 +76,7 @@ export interface IStorage {
   // Time entry operations
   getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
   getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
+  getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]>;
   getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
   updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
@@ -94,6 +95,22 @@ export interface IStorage {
     actualCost: number;
     variance: number;
     percentageUsed: number;
+  }>;
+  
+  getClientCostSummary(clientId: number): Promise<{
+    totalEstimatedCost: number;
+    totalActualCost: number;
+    totalVariance: number;
+    averagePercentageUsed: number;
+    projectCount: number;
+    projectsData: Array<{
+      projectId: number;
+      projectName: string;
+      estimatedCost: number;
+      actualCost: number;
+      variance: number;
+      percentageUsed: number;
+    }>;
   }>;
   
   // Get option lists
