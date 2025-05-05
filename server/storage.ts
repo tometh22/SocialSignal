@@ -9,10 +9,12 @@ import {
   type ActiveProject, type InsertActiveProject,
   type TimeEntry, type InsertTimeEntry,
   type ProgressReport, type InsertProgressReport,
+  type User, type InsertUser,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
-  activeProjects, timeEntries, progressReports,
+  activeProjects, timeEntries, progressReports, users,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
-  projectStatusOptions, trackingFrequencyOptions
+  projectStatusOptions, trackingFrequencyOptions,
+  chatConversations, chatMessages, chatConversationParticipants
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
@@ -122,6 +124,14 @@ export interface IStorage {
   getClientEngagementOptions(): Promise<typeof clientEngagementOptions>;
   getProjectStatusOptions(): Promise<typeof projectStatusOptions>;
   getTrackingFrequencyOptions(): Promise<typeof trackingFrequencyOptions>;
+  
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  
+  // Session store
+  sessionStore: any;
 }
 
 export class MemStorage implements IStorage {

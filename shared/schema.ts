@@ -1,8 +1,36 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// ==================== USUARIOS ====================
+// Tabla de usuarios
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  avatar: varchar("avatar", { length: 255 }),
+  isAdmin: boolean("is_admin").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Esquema para crear usuarios
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Esquema para iniciar sesión
+export const loginUserSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+// ==================== CLIENTES ====================
 // Clients table
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -10,6 +38,7 @@ export const clients = pgTable("clients", {
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const insertClientSchema = createInsertSchema(clients).pick({
@@ -17,12 +46,10 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   contactName: true,
   contactEmail: true,
   contactPhone: true,
+  createdBy: true,
 });
 
-export const clientsRelations = relations(clients, ({ many }) => ({
-  quotations: many(quotations),
-}));
-
+// ==================== ROLES ====================
 // Team roles table
 export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
@@ -37,10 +64,7 @@ export const insertRoleSchema = createInsertSchema(roles).pick({
   defaultRate: true,
 });
 
-export const rolesRelations = relations(roles, ({ many }) => ({
-  personnel: many(personnel),
-}));
-
+// ==================== PERSONAL ====================
 // Team personnel table
 export const personnel = pgTable("personnel", {
   id: serial("id").primaryKey(),
@@ -55,11 +79,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   hourlyRate: true,
 });
 
-export const personnelRelations = relations(personnel, ({ one, many }) => ({
-  role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
-  quotationTeamMembers: many(quotationTeamMembers),
-}));
-
+// ==================== PLANTILLAS DE REPORTES ====================
 // Report templates table
 export const reportTemplates = pgTable("report_templates", {
   id: serial("id").primaryKey(),
@@ -84,10 +104,7 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
   baseCost: true,
 });
 
-export const reportTemplatesRelations = relations(reportTemplates, ({ many }) => ({
-  quotations: many(quotations),
-}));
-
+// ==================== COTIZACIONES ====================
 // Quotations table
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
@@ -109,6 +126,7 @@ export const quotations = pgTable("quotations", {
   status: text("status").notNull().default("pending"), // 'pending', 'approved', 'rejected', 'in-negotiation'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const insertQuotationSchema = createInsertSchema(quotations).omit({
@@ -117,12 +135,7 @@ export const insertQuotationSchema = createInsertSchema(quotations).omit({
   updatedAt: true,
 });
 
-export const quotationsRelations = relations(quotations, ({ one, many }) => ({
-  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
-  template: one(reportTemplates, { fields: [quotations.templateId], references: [reportTemplates.id] }),
-  teamMembers: many(quotationTeamMembers),
-}));
-
+// ==================== ASIGNACIÓN DE MIEMBROS DE EQUIPO ====================
 // Quotation team members junction table
 export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
@@ -137,29 +150,253 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
   id: true,
 });
 
+// ==================== ASIGNACIÓN DE ROLES EN PLANTILLAS ====================
+// Template Role Assignments table
+export const templateRoleAssignments = pgTable("template_role_assignments", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull().references(() => reportTemplates.id),
+  roleId: integer("role_id").notNull().references(() => roles.id),
+  hours: numeric("hours", { precision: 8, scale: 2 }).notNull().default("0"),
+});
+
+export const insertTemplateRoleAssignmentSchema = createInsertSchema(templateRoleAssignments).omit({
+  id: true,
+});
+
+// ==================== PROYECTOS ACTIVOS ====================
+// Proyectos Activos
+export const activeProjects = pgTable("active_projects", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold
+  startDate: timestamp("start_date").notNull(),
+  expectedEndDate: timestamp("expected_end_date"),
+  actualEndDate: timestamp("actual_end_date"),
+  trackingFrequency: text("tracking_frequency").notNull().default("weekly"), // daily, weekly, biweekly, monthly
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+// Esquema base generado por drizzle-zod
+const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Esquema personalizado que permite tanto Date como string para las fechas
+export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
+// ==================== REGISTRO DE HORAS ====================
+// Registro de horas
+export const timeEntries = pgTable("time_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  date: timestamp("date").notNull(),
+  hours: doublePrecision("hours").notNull(),
+  description: text("description"),
+  approved: boolean("approved").default(true),
+  approvedBy: integer("approved_by").references(() => personnel.id),
+  approvedDate: timestamp("approved_date"),
+  billable: boolean("billable").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+// Esquema base generado por drizzle-zod
+const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Esquema personalizado que permite tanto Date como string para las fechas
+export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
+  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
+// ==================== INFORMES DE PROGRESO ====================
+// Informes de progreso
+export const progressReports = pgTable("progress_reports", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  reportDate: timestamp("report_date").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  totalHoursLogged: doublePrecision("total_hours_logged").notNull(),
+  totalCostToDate: doublePrecision("total_cost_to_date").notNull(),
+  budgetPercentUsed: doublePrecision("budget_percent_used").notNull(),
+  statusSummary: text("status_summary").notNull(),
+  challenges: text("challenges"),
+  nextSteps: text("next_steps"),
+  createdBy: integer("created_by").notNull().references(() => personnel.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProgressReportSchema = createInsertSchema(progressReports).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ==================== SISTEMA DE CHAT ====================
+// Tabla de conversaciones
+export const chatConversations = pgTable("chat_conversations", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }),
+  isGroup: boolean("is_group").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+  projectId: integer("project_id").references(() => activeProjects.id),
+});
+
+// Esquema para crear conversaciones
+export const insertChatConversationSchema = createInsertSchema(chatConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastMessageAt: true,
+});
+
+// Tabla de mensajes de chat
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull().references(() => chatConversations.id, { onDelete: "cascade" }),
+  senderId: integer("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  imageUrl: varchar("image_url", { length: 255 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  seen: boolean("seen").default(false),
+});
+
+// Esquema para crear mensajes
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Tabla de participantes en conversaciones
+export const chatConversationParticipants = pgTable("chat_conversation_participants", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull().references(() => chatConversations.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Esquema para agregar participantes
+export const insertChatParticipantSchema = createInsertSchema(chatConversationParticipants).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ==================== RELACIONES ====================
+
+// Relaciones de clientes
+export const clientsRelations = relations(clients, ({ many, one }) => ({
+  quotations: many(quotations),
+  creator: one(users, { fields: [clients.createdBy], references: [users.id] }),
+}));
+
+// Relaciones de roles
+export const rolesRelations = relations(roles, ({ many }) => ({
+  personnel: many(personnel),
+  templateAssignments: many(templateRoleAssignments),
+}));
+
+// Relaciones de personal
+export const personnelRelations = relations(personnel, ({ one, many }) => ({
+  role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
+  quotationTeamMembers: many(quotationTeamMembers),
+}));
+
+// Relaciones de plantillas de reportes
+export const reportTemplatesRelations = relations(reportTemplates, ({ many }) => ({
+  quotations: many(quotations),
+  roleAssignments: many(templateRoleAssignments),
+}));
+
+// Relaciones de cotizaciones
+export const quotationsRelations = relations(quotations, ({ one, many }) => ({
+  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
+  template: one(reportTemplates, { fields: [quotations.templateId], references: [reportTemplates.id] }),
+  teamMembers: many(quotationTeamMembers),
+  activeProjects: many(activeProjects),
+  creator: one(users, { fields: [quotations.createdBy], references: [users.id] }),
+}));
+
+// Relaciones de miembros de equipo en cotizaciones
 export const quotationTeamMembersRelations = relations(quotationTeamMembers, ({ one }) => ({
   quotation: one(quotations, { fields: [quotationTeamMembers.quotationId], references: [quotations.id] }),
   personnel: one(personnel, { fields: [quotationTeamMembers.personnelId], references: [personnel.id] }),
 }));
 
-// Types
-export type Client = typeof clients.$inferSelect;
-export type InsertClient = z.infer<typeof insertClientSchema>;
+// Relaciones de asignaciones de roles en plantillas
+export const templateRoleAssignmentsRelations = relations(templateRoleAssignments, ({ one }) => ({
+  template: one(reportTemplates, { fields: [templateRoleAssignments.templateId], references: [reportTemplates.id] }),
+  role: one(roles, { fields: [templateRoleAssignments.roleId], references: [roles.id] }),
+}));
 
-export type Role = typeof roles.$inferSelect;
-export type InsertRole = z.infer<typeof insertRoleSchema>;
+// Relaciones de proyectos activos
+export const activeProjectsRelations = relations(activeProjects, ({ one, many }) => ({
+  quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
+  timeEntries: many(timeEntries),
+  progressReports: many(progressReports),
+  creator: one(users, { fields: [activeProjects.createdBy], references: [users.id] }),
+  chatConversations: many(chatConversations),
+}));
 
-export type Personnel = typeof personnel.$inferSelect;
-export type InsertPersonnel = z.infer<typeof insertPersonnelSchema>;
+// Relaciones de registros de horas
+export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
+  project: one(activeProjects, { fields: [timeEntries.projectId], references: [activeProjects.id] }),
+  personnel: one(personnel, { fields: [timeEntries.personnelId], references: [personnel.id] }),
+  approver: one(personnel, { fields: [timeEntries.approvedBy], references: [personnel.id] }),
+  creator: one(users, { fields: [timeEntries.createdBy], references: [users.id] }),
+}));
 
-export type ReportTemplate = typeof reportTemplates.$inferSelect;
-export type InsertReportTemplate = z.infer<typeof insertReportTemplateSchema>;
+// Relaciones de informes de progreso
+export const progressReportsRelations = relations(progressReports, ({ one }) => ({
+  project: one(activeProjects, { fields: [progressReports.projectId], references: [activeProjects.id] }),
+  creator: one(personnel, { fields: [progressReports.createdBy], references: [personnel.id] }),
+}));
 
-export type Quotation = typeof quotations.$inferSelect;
-export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+// Relaciones de usuario
+export const usersRelations = relations(users, ({ many }) => ({
+  createdClients: many(clients, { relationName: 'creator' }),
+  createdQuotations: many(quotations, { relationName: 'creator' }),
+  createdProjects: many(activeProjects, { relationName: 'creator' }),
+  createdTimeEntries: many(timeEntries, { relationName: 'creator' }),
+  sentMessages: many(chatMessages, { relationName: 'sender' }),
+  participatingConversations: many(chatConversationParticipants),
+  createdConversations: many(chatConversations, { relationName: 'creator' }),
+}));
 
-export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
-export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
+// Relaciones para el sistema de chat
+export const chatConversationsRelations = relations(chatConversations, ({ one, many }) => ({
+  participants: many(chatConversationParticipants),
+  messages: many(chatMessages),
+  creator: one(users, { fields: [chatConversations.createdBy], references: [users.id] }),
+  project: one(activeProjects, { fields: [chatConversations.projectId], references: [activeProjects.id] }),
+}));
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  conversation: one(chatConversations, { fields: [chatMessages.conversationId], references: [chatConversations.id] }),
+  sender: one(users, { fields: [chatMessages.senderId], references: [users.id] }),
+}));
+
+export const chatParticipantsRelations = relations(chatConversationParticipants, ({ one }) => ({
+  conversation: one(chatConversations, { fields: [chatConversationParticipants.conversationId], references: [chatConversations.id] }),
+  user: one(users, { fields: [chatConversationParticipants.userId], references: [users.id] }),
+}));
+
+// ==================== CONSTANTES Y OPCIONES ====================
 
 // Opciones de metodología de análisis
 export const analysisTypes = [
@@ -208,130 +445,6 @@ export const quotationStatusOptions = [
   { value: "in-negotiation", label: "En Negociación" },
 ];
 
-// Template Role Assignments table
-export const templateRoleAssignments = pgTable("template_role_assignments", {
-  id: serial("id").primaryKey(),
-  templateId: integer("template_id").notNull().references(() => reportTemplates.id),
-  roleId: integer("role_id").notNull().references(() => roles.id),
-  hours: numeric("hours", { precision: 8, scale: 2 }).notNull().default("0"),
-});
-
-export const insertTemplateRoleAssignmentSchema = createInsertSchema(templateRoleAssignments).omit({
-  id: true,
-});
-
-export const templateRoleAssignmentsRelations = relations(templateRoleAssignments, ({ one }) => ({
-  template: one(reportTemplates, { fields: [templateRoleAssignments.templateId], references: [reportTemplates.id] }),
-  role: one(roles, { fields: [templateRoleAssignments.roleId], references: [roles.id] }),
-}));
-
-// Update existing relations
-export const rolesRelationsWithTemplates = relations(roles, ({ many }) => ({
-  personnel: many(personnel),
-  templateAssignments: many(templateRoleAssignments),
-}));
-
-export const reportTemplatesRelationsWithRoles = relations(reportTemplates, ({ many }) => ({
-  quotations: many(quotations),
-  roleAssignments: many(templateRoleAssignments),
-}));
-
-export type TemplateRoleAssignment = typeof templateRoleAssignments.$inferSelect;
-export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssignmentSchema>;
-
-// Proyectos Activos
-export const activeProjects = pgTable("active_projects", {
-  id: serial("id").primaryKey(),
-  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
-  status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold
-  startDate: timestamp("start_date").notNull(),
-  expectedEndDate: timestamp("expected_end_date"),
-  actualEndDate: timestamp("actual_end_date"),
-  trackingFrequency: text("tracking_frequency").notNull().default("weekly"), // daily, weekly, biweekly, monthly
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-// Esquema base generado por drizzle-zod
-const baseInsertActiveProjectSchema = createInsertSchema(activeProjects).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Esquema personalizado que permite tanto Date como string para las fechas
-export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
-  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-  actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-});
-
-// Nota: La relación con timeEntries se definirá después de declarar timeEntries
-export const activeProjectsRelations = relations(activeProjects, ({ one }) => ({
-  quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
-}));
-
-// Registro de horas
-export const timeEntries = pgTable("time_entries", {
-  id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull().references(() => activeProjects.id),
-  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
-  date: timestamp("date").notNull(),
-  hours: doublePrecision("hours").notNull(),
-  description: text("description"),
-  approved: boolean("approved").default(true),
-  approvedBy: integer("approved_by").references(() => personnel.id),
-  approvedDate: timestamp("approved_date"),
-  billable: boolean("billable").default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// Esquema base generado por drizzle-zod
-const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Esquema personalizado que permite tanto Date como string para las fechas
-export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
-  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
-  approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-});
-
-export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
-  project: one(activeProjects, { fields: [timeEntries.projectId], references: [activeProjects.id] }),
-  personnel: one(personnel, { fields: [timeEntries.personnelId], references: [personnel.id] }),
-  approver: one(personnel, { fields: [timeEntries.approvedBy], references: [personnel.id] }),
-}));
-
-// Informes de progreso
-export const progressReports = pgTable("progress_reports", {
-  id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull().references(() => activeProjects.id),
-  reportDate: timestamp("report_date").notNull(),
-  periodStart: timestamp("period_start").notNull(),
-  periodEnd: timestamp("period_end").notNull(),
-  totalHoursLogged: doublePrecision("total_hours_logged").notNull(),
-  totalCostToDate: doublePrecision("total_cost_to_date").notNull(),
-  budgetPercentUsed: doublePrecision("budget_percent_used").notNull(),
-  statusSummary: text("status_summary").notNull(),
-  challenges: text("challenges"),
-  nextSteps: text("next_steps"),
-  createdBy: integer("created_by").notNull().references(() => personnel.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertProgressReportSchema = createInsertSchema(progressReports).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const progressReportsRelations = relations(progressReports, ({ one }) => ({
-  project: one(activeProjects, { fields: [progressReports.projectId], references: [activeProjects.id] }),
-  creator: one(personnel, { fields: [progressReports.createdBy], references: [personnel.id] }),
-}));
-
 // Opciones de estado de proyecto
 export const projectStatusOptions = [
   { value: "active", label: "Activo" },
@@ -348,7 +461,33 @@ export const trackingFrequencyOptions = [
   { value: "monthly", label: "Mensual" },
 ];
 
-// Tipos exportados
+// ==================== TIPOS EXPORTADOS ====================
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginUser = z.infer<typeof loginUserSchema>;
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+
+export type Role = typeof roles.$inferSelect;
+export type InsertRole = z.infer<typeof insertRoleSchema>;
+
+export type Personnel = typeof personnel.$inferSelect;
+export type InsertPersonnel = z.infer<typeof insertPersonnelSchema>;
+
+export type ReportTemplate = typeof reportTemplates.$inferSelect;
+export type InsertReportTemplate = z.infer<typeof insertReportTemplateSchema>;
+
+export type Quotation = typeof quotations.$inferSelect;
+export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+
+export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
+export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
+
+export type TemplateRoleAssignment = typeof templateRoleAssignments.$inferSelect;
+export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssignmentSchema>;
+
 export type ActiveProject = typeof activeProjects.$inferSelect;
 export type InsertActiveProject = z.infer<typeof insertActiveProjectSchema>;
 
@@ -358,17 +497,11 @@ export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type ProgressReport = typeof progressReports.$inferSelect;
 export type InsertProgressReport = z.infer<typeof insertProgressReportSchema>;
 
-// Completamos las relaciones circulares
-export const activeProjectsRelationsComplete = relations(activeProjects, ({ one, many }) => ({
-  quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
-  timeEntries: many(timeEntries),
-  progressReports: many(progressReports),
-}));
+export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InsertChatConversation = z.infer<typeof insertChatConversationSchema>;
 
-// Actualizar relaciones de quotations para incluir proyectos activos
-export const quotationsRelationsWithProjects = relations(quotations, ({ one, many }) => ({
-  client: one(clients, { fields: [quotations.clientId], references: [clients.id] }),
-  template: one(reportTemplates, { fields: [quotations.templateId], references: [reportTemplates.id] }),
-  teamMembers: many(quotationTeamMembers),
-  activeProjects: many(activeProjects),
-}));
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
+export type ChatParticipant = typeof chatConversationParticipants.$inferSelect;
+export type InsertChatParticipant = z.infer<typeof insertChatParticipantSchema>;

@@ -17,6 +17,8 @@ import {
   trackingFrequencyOptions
 } from "@shared/schema";
 import { reinitializeDatabase } from "./reinit-data";
+import { setupAuth, requireAuth } from "./auth";
+import { setupChatServer, setupChatRoutes } from "./chat";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Clients routes
@@ -1156,6 +1158,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Configurar autenticación
+  setupAuth(app);
+  
+  // Configurar rutas del chat
+  setupChatRoutes(app);
+  
+  // Crear el servidor HTTP
   const httpServer = createServer(app);
+  
+  // Configurar WebSocket para el chat
+  setupChatServer(httpServer);
+  
   return httpServer;
 }
