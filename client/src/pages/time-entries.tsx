@@ -5,6 +5,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "../lib/queryClient";
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
 import {
   Card,
   CardContent,
@@ -73,11 +75,14 @@ import {
   DollarSign,
   FolderKanban,
   MoreHorizontal,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  User
 } from "lucide-react";
-import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, addMonths, subMonths, isSameDay, isSameMonth, parse, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar as UICalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 
@@ -492,6 +497,7 @@ const TimeEntries: React.FC = () => {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [calendarView, setCalendarView] = useState<"day" | "week" | "fortnight" | "month">("month");
   const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   // Estado local para actualización en tiempo real
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
@@ -653,32 +659,30 @@ const TimeEntries: React.FC = () => {
   const getEntriesForPeriod = (): TimeEntry[] => {
     if (!filteredEntries || filteredEntries.length === 0) return [];
     
-    const today = new Date();
-    
     switch (calendarView) {
       case "day":
         return filteredEntries.filter(entry => {
           const entryDate = new Date(entry.date);
-          return entryDate >= startOfDay(today) && entryDate <= endOfDay(today);
+          return entryDate >= startOfDay(selectedDate) && entryDate <= endOfDay(selectedDate);
         });
       
       case "week":
         return filteredEntries.filter(entry => {
           const entryDate = new Date(entry.date);
-          return entryDate >= startOfWeek(today) && entryDate <= endOfWeek(today);
+          return entryDate >= startOfWeek(selectedDate) && entryDate <= endOfWeek(selectedDate);
         });
       
       case "fortnight":
         return filteredEntries.filter(entry => {
           const entryDate = new Date(entry.date);
-          return entryDate >= startOfFortnight(today) && entryDate <= endOfFortnight(today);
+          return entryDate >= startOfFortnight(selectedDate) && entryDate <= endOfFortnight(selectedDate);
         });
       
       case "month":
       default:
         return filteredEntries.filter(entry => {
           const entryDate = new Date(entry.date);
-          return entryDate >= startOfMonth(today) && entryDate <= endOfMonth(today);
+          return entryDate >= startOfMonth(selectedDate) && entryDate <= endOfMonth(selectedDate);
         });
     }
   };
@@ -850,31 +854,52 @@ const TimeEntries: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* Mostrar el rango de fecha según el período seleccionado */}
-                      <div className="p-2 bg-muted/30 rounded-md text-sm">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">Período actual: </span>
-                            {calendarView === "day" && (
-                              <span>{format(new Date(), "EEEE dd 'de' MMMM yyyy", { locale: es })}</span>
-                            )}
-                            {calendarView === "week" && (
-                              <span>
-                                {format(startOfWeek(new Date()), "dd/MM/yyyy", { locale: es })} - {format(endOfWeek(new Date()), "dd/MM/yyyy", { locale: es })}
-                              </span>
-                            )}
-                            {calendarView === "fortnight" && (
-                              <span>
-                                {new Date().getDate() <= 15 ? "Primera" : "Segunda"} quincena de {format(new Date(), "MMMM yyyy", { locale: es })}
-                              </span>
-                            )}
-                            {calendarView === "month" && (
-                              <span>{format(new Date(), "MMMM yyyy", { locale: es })}</span>
-                            )}
+                      {/* Mostrar el rango de fecha según el período seleccionado + controles para cambiar meses */}
+                      <div className="p-2 bg-muted/30 rounded-md">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 mr-1"
+                              onClick={() => setSelectedDate(subMonths(selectedDate, 1))}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="font-medium">
+                              {format(selectedDate, "MMMM yyyy", { locale: es })}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 ml-1"
+                              onClick={() => setSelectedDate(addMonths(selectedDate, 1))}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
                           </div>
                           <Badge variant="outline" className="ml-2">
                             {getEntriesForPeriod().length} {getEntriesForPeriod().length === 1 ? "registro" : "registros"}
                           </Badge>
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground">
+                          {calendarView === "day" && (
+                            <span>Mostrando: {format(selectedDate, "EEEE dd 'de' MMMM yyyy", { locale: es })}</span>
+                          )}
+                          {calendarView === "week" && (
+                            <span>
+                              Mostrando semana: {format(startOfWeek(selectedDate, { locale: es }), "dd/MM/yyyy", { locale: es })} - {format(endOfWeek(selectedDate, { locale: es }), "dd/MM/yyyy", { locale: es })}
+                            </span>
+                          )}
+                          {calendarView === "fortnight" && (
+                            <span>
+                              Mostrando {selectedDate.getDate() <= 15 ? "primera" : "segunda"} quincena de {format(selectedDate, "MMMM yyyy", { locale: es })}
+                            </span>
+                          )}
+                          {calendarView === "month" && (
+                            <span>Mostrando mes completo: {format(selectedDate, "MMMM yyyy", { locale: es })}</span>
+                          )}
                         </div>
                       </div>
                     </div>
