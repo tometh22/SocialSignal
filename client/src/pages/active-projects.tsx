@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue 
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -54,8 +54,8 @@ interface ActiveProject {
 
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
-  const { data: projects = [], refetch: refetchProjects } = useQuery({ queryKey: ['/api/active-projects'] });
-  const { data: clients = [] } = useQuery({ queryKey: ['/api/clients'] });
+  const { data: projects = [], refetch: refetchProjects } = useQuery<ActiveProject[]>({ queryKey: ['/api/active-projects'] });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
 
   const handleDeleteProject = (projectId: number) => {
