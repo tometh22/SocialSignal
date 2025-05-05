@@ -1,12 +1,13 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Client, InsertClient } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash } from "lucide-react";
+import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart } from "lucide-react";
 import {
   Dialog,
   DialogContent,
