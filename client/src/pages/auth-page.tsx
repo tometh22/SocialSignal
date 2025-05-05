@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import epicalLogo from "../assets/epical_logo.jpeg";
 
 // Esquemas de validación
@@ -43,6 +43,11 @@ export default function AuthPage() {
       navigate("/");
     }
   }, [user, navigate]);
+
+  // Estados para mostrar/ocultar contraseñas
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   // Configuración del formulario de inicio de sesión
   const loginForm = useForm<LoginFormValues>({
@@ -127,9 +132,28 @@ export default function AuthPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Contraseña</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
+                            <div className="relative">
+                              <FormControl>
+                                <Input 
+                                  type={showLoginPassword ? "text" : "password"} 
+                                  placeholder="••••••••" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowLoginPassword(!showLoginPassword)}
+                              >
+                                {showLoginPassword ? (
+                                  <EyeOff className="h-4 w-4 text-gray-500" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-500" />
+                                )}
+                              </Button>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -217,9 +241,28 @@ export default function AuthPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Contraseña</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
+                            <div className="relative">
+                              <FormControl>
+                                <Input 
+                                  type={showRegisterPassword ? "text" : "password"} 
+                                  placeholder="••••••••" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                              >
+                                {showRegisterPassword ? (
+                                  <EyeOff className="h-4 w-4 text-gray-500" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-500" />
+                                )}
+                              </Button>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -230,9 +273,28 @@ export default function AuthPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Confirmar contraseña</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
+                            <div className="relative">
+                              <FormControl>
+                                <Input 
+                                  type={showRegisterConfirmPassword ? "text" : "password"} 
+                                  placeholder="••••••••" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowRegisterConfirmPassword(!showRegisterConfirmPassword)}
+                              >
+                                {showRegisterConfirmPassword ? (
+                                  <EyeOff className="h-4 w-4 text-gray-500" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-500" />
+                                )}
+                              </Button>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
