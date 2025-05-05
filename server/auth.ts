@@ -45,16 +45,18 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  // Configuración de la sesión
+  // Configuración de la sesión según estándares de seguridad
+  const isProduction = process.env.NODE_ENV === 'production';
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key",
-    resave: true, // Forzar guardado de sesión en cada petición
-    saveUninitialized: true, // Guardar sesiones vacías para mayor compatibilidad
+    resave: false, // Solo guardar cuando se modifique
+    saveUninitialized: false, // No guardar sesiones vacías para cumplir con GDPR
+    rolling: true, // Renovar cookie en cada respuesta (mantiene la sesión activa con actividad)
     cookie: {
-      secure: false, // false para desarrollo local sin HTTPS
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semana
-      sameSite: 'lax' as const, // Configuración sameSite
-      httpOnly: true, // Cookie solo accesible por el servidor
+      secure: isProduction, // Usar 'true' en producción para HTTPS
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días para mayor permanencia
+      sameSite: 'lax' as const, // Protección contra CSRF pero permite navegación normal
+      httpOnly: true, // Previene acceso a la cookie mediante JavaScript
       path: '/', // Asegurar que la cookie sea accesible en todas las rutas
     },
     name: 'epical.sid', // Nombre personalizado para la cookie

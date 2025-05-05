@@ -44,11 +44,8 @@ export default function AuthPage() {
     if (user) {
       console.log("Usuario autenticado detectado, redirigiendo...", user);
       setRedirecting(true);
-      // Pequeño retraso para mostrar el estado de redirección
-      setTimeout(() => {
-        console.log("Ejecutando redirección a /");
-        navigate("/");
-      }, 1500);
+      // Redirección inmediata
+      navigate("/");
     }
   }, [user, navigate]);
 
@@ -82,10 +79,12 @@ export default function AuthPage() {
   function onLoginSubmit(data: LoginFormValues) {
     console.log("Iniciando login con:", data.email);
     loginMutation.mutate(data, {
-      onSuccess: () => {
-        console.log("Login exitoso, redirigiendo...");
-        // Forzar una recarga de los datos del usuario actual
-        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      onSuccess: (user) => {
+        console.log("Login exitoso, redirigiendo...", user);
+        // Actualizar el estado y redirigir
+        queryClient.setQueryData(["/api/current-user"], user);
+        setRedirecting(true);
+        navigate("/");
       }
     });
   }
@@ -94,10 +93,12 @@ export default function AuthPage() {
   function onRegisterSubmit(data: RegisterFormValues) {
     const { confirmPassword, ...userData } = data;
     registerMutation.mutate(userData, {
-      onSuccess: () => {
-        console.log("Registro exitoso, redirigiendo...");
-        // Forzar una recarga de los datos del usuario actual
-        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      onSuccess: (user) => {
+        console.log("Registro exitoso, redirigiendo...", user);
+        // Actualizar el estado y redirigir
+        queryClient.setQueryData(["/api/current-user"], user);
+        setRedirecting(true);
+        navigate("/");
       }
     });
   }
