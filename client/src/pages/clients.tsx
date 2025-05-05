@@ -191,6 +191,15 @@ export default function Clients() {
                                   <Edit className="h-4 w-4 mr-1" />
                                   Editar
                                 </Button>
+                                <Button 
+                                  variant="default" 
+                                  size="sm" 
+                                  className="hover-lift bg-blue-600 hover:bg-blue-700"
+                                  onClick={() => setLocation(`/client-summary/${client.id}`)}
+                                >
+                                  <BarChart className="h-4 w-4 mr-1" />
+                                  Resumen
+                                </Button>
                               </div>
                             </td>
                           </tr>
