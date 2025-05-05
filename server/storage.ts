@@ -1355,21 +1355,30 @@ export class DatabaseStorage implements IStorage {
       // 1. Verificar que el proyecto exista
       const project = await this.getActiveProject(id);
       if (!project) {
+        console.log(`Proyecto con ID ${id} no encontrado para eliminar`);
         return false;
       }
       
+      console.log(`Eliminando proyecto ID ${id}...`);
+      
       // 2. Eliminar todas las entradas de tiempo asociadas al proyecto
-      await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
+      const timeDeleteResult = await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
+      console.log(`Entradas de tiempo eliminadas: ${JSON.stringify(timeDeleteResult)}`);
       
       // 3. Eliminar todos los informes de progreso asociados al proyecto
-      await db.delete(progressReports).where(eq(progressReports.projectId, id));
+      const reportDeleteResult = await db.delete(progressReports).where(eq(progressReports.projectId, id));
+      console.log(`Informes de progreso eliminados: ${JSON.stringify(reportDeleteResult)}`);
       
       // 4. Eliminar el proyecto
-      await db.delete(activeProjects).where(eq(activeProjects.id, id));
+      const projectDeleteResult = await db.delete(activeProjects).where(eq(activeProjects.id, id));
+      console.log(`Resultado de eliminación del proyecto: ${JSON.stringify(projectDeleteResult)}`);
       
       // 5. Verificar que se haya eliminado
       const projectExists = await this.getActiveProject(id);
-      return !projectExists;
+      const deleted = !projectExists;
+      console.log(`Proyecto con ID ${id} eliminado: ${deleted}`);
+      
+      return deleted;
     } catch (error) {
       console.error("Error al eliminar el proyecto activo:", error);
       return false;

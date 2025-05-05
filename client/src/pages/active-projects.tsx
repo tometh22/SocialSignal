@@ -55,7 +55,10 @@ interface ActiveProject {
 
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
-  const { data: projects = [], refetch: refetchProjects } = useQuery<ActiveProject[]>({ queryKey: ['/api/active-projects'] });
+  const { data: projects = [], refetch: refetchProjects, isFetching: isLoadingProjects } = useQuery<ActiveProject[]>({ 
+    queryKey: ['/api/active-projects'],
+    refetchOnWindowFocus: true,
+  });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
@@ -92,18 +95,23 @@ export default function ActiveProjects() {
     setDeleteProjectId(projectId);
   };
 
-  const confirmDelete = async () => {
-    if (!deleteProjectId) return;
-    
-    try {
-      await apiRequest('DELETE', `/api/active-projects/${deleteProjectId}`);
+  // Mutation para eliminar proyectos
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      const response = await apiRequest('DELETE', `/api/active-projects/${projectId}`);
+      return response;
+    },
+    onSuccess: () => {
       toast({
-        title: "Éxito",
+        title: "Proyecto eliminado",
         description: "El proyecto ha sido eliminado correctamente.",
       });
-      await refetchProjects();
+      // Importante: invalidar la caché y forzar recarga de datos
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      // Cerrar el diálogo
       setDeleteProjectId(null);
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error al eliminar el proyecto:', error);
       toast({
         title: "Error",
@@ -111,6 +119,11 @@ export default function ActiveProjects() {
         variant: "destructive",
       });
     }
+  });
+
+  const confirmDelete = () => {
+    if (!deleteProjectId) return;
+    deleteProjectMutation.mutate(deleteProjectId);
   };
 
   const openAssignClientDialog = (e: React.MouseEvent, projectId: number) => {
@@ -314,8 +327,12 @@ export default function ActiveProjects() {
             <Button variant="outline" onClick={() => setDeleteProjectId(null)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Eliminar
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
