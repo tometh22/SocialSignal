@@ -173,6 +173,7 @@ const ProjectSummary = () => {
 
     try {
       // Optimistic update
+      const oldProject = project;
       const updatedProject = {
         ...project,
         quotation: {
@@ -181,7 +182,11 @@ const ProjectSummary = () => {
         }
       };
       
+      // Update local state immediately
       queryClient.setQueryData(['/api/active-projects', parsedProjectId], updatedProject);
+      queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
+        return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
+      });
       
       await apiRequest(`/api/quotations/${project.quotationId}`, 'PATCH', {
         projectName: newName

@@ -45,11 +45,18 @@ export const HeaderActions = ({
   onSaveProjectName
 }: HeaderActionsProps) => {
   const [editing, setEditing] = useState(false);
-  const [editedName, setEditedName] = useState(projectName || "");
+  const [editedName, setEditedName] = useState("");
+
+  useEffect(() => {
+    if (projectName) {
+      setEditedName(projectName);
+    }
+  }, [projectName]);
 
   const handleSave = () => {
-    if (editedName && editedName.trim()) {
-      onSaveProjectName(editedName.trim());
+    const trimmedName = editedName.trim();
+    if (trimmedName && trimmedName !== projectName) {
+      onSaveProjectName(trimmedName);
       setEditing(false);
     }
   };
