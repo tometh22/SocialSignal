@@ -156,13 +156,24 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/current-user", requireAuth, (req, res) => {
-    if (!req.user) {
+  app.get("/api/current-user", async (req, res) => {
+    if (!req.session.userId) {
       return res.status(401).json({ message: "No autenticado" });
     }
     
-    const { password, ...userWithoutPassword } = req.user;
-    res.status(200).json(userWithoutPassword);
+    try {
+      const user = await storage.getUser(req.session.userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "Usuario no encontrado" });
+      }
+      
+      const { password, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error al obtener usuario actual:", error);
+      res.status(500).json({ message: "Error en el servidor" });
+    }
   });
 
   // Exportar el middleware para su uso en otras rutas
