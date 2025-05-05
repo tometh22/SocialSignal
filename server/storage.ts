@@ -17,7 +17,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, ne, and, sql, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -753,12 +753,17 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
   
   constructor() {
-    // Crear store para sesiones usando PostgreSQL
+    // Crear store para sesiones usando PostgreSQL con configuración optimizada para multiusuario
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
       pool,
       tableName: 'session',
-      createTableIfMissing: true
+      createTableIfMissing: true,
+      // Configuración para optimizar sesiones concurrentes
+      pruneSessionInterval: 60, // Limpiar sesiones expiradas cada 60 segundos (1 minuto)
+      errorLog: console.error.bind(console),
+      // No fijar el ID de sesión manualmente para permitir rotación natural de sesiones
+      disableTouch: false, // Permitir actualización de tiempo de sesión con cada actividad
     });
   }
 
@@ -982,13 +987,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void> {
+    // Utilizar SQL raw para simplificar la operación
     await db
       .update(chatMessages)
       .set({ seen: true })
       .where(
         and(
           eq(chatMessages.conversationId, conversationId),
-          sql`${chatMessages.sender_id} != ${userId}`
+          sql`${chatMessages.senderId} <> ${userId}`
         )
       );
   }

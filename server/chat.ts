@@ -21,6 +21,12 @@ interface MessagePayload {
 interface ActiveConnection {
   userId: number;
   socket: WebSocket;
+  clientInfo: {
+    ip: string;
+    userAgent?: string;
+    connectionTime: Date;
+    lastActivity: Date;
+  };
 }
 
 // Clase para gestionar las conexiones WebSocket
@@ -43,7 +49,7 @@ export class ChatManager {
           return;
         }
 
-        this.handleConnection(ws, userId);
+        this.handleConnection(ws, userId, req);
       } catch (error) {
         console.error("Error en la conexión WebSocket:", error);
         ws.close(1011, "Error interno");
@@ -51,14 +57,38 @@ export class ChatManager {
     });
   }
 
-  private handleConnection(ws: WebSocket, userId: number) {
+  private handleConnection(ws: WebSocket, userId: number, req?: any) {
     console.log(`Usuario conectado: ${userId}`);
     
-    // Almacenar la conexión
-    this.connections.push({ userId, socket: ws });
+    // Determinar la dirección IP y agente de usuario del cliente
+    const ip = req?.socket?.remoteAddress || 'desconocido';
+    const userAgent = req?.headers?.['user-agent'] || 'desconocido';
+    
+    // Almacenar la conexión con información del cliente
+    this.connections.push({ 
+      userId, 
+      socket: ws,
+      clientInfo: {
+        ip,
+        userAgent,
+        connectionTime: new Date(),
+        lastActivity: new Date()
+      }
+    });
 
-    // Enviar mensaje de bienvenida
-    ws.send(JSON.stringify({ type: "connected", message: "Conectado al servidor de chat" }));
+    // Monitorear conexiones activas por usuario
+    const userConnectionCount = this.connections.filter(conn => conn.userId === userId).length;
+    console.log(`Usuario ${userId} tiene ${userConnectionCount} conexión(es) activa(s)`);
+
+    // Enviar mensaje de bienvenida con más información
+    ws.send(JSON.stringify({ 
+      type: "connected", 
+      message: "Conectado al servidor de chat",
+      timestamp: new Date().toISOString(),
+      connectionInfo: {
+        activeConnections: userConnectionCount
+      }
+    }));
 
     // Manejar mensajes entrantes
     ws.on("message", async (data) => {
@@ -211,12 +241,11 @@ export class ChatManager {
           projectId: payload.projectId,
         });
 
-        // Agregar al creador si no está en la lista
-        const uniqueUserIds = new Set(payload.userIds);
-        uniqueUserIds.add(creatorId);
+        // Agregar al creador si no está en la lista y convertir a array para compatibilidad
+        const uniqueUserIdsArray = Array.from(new Set([...payload.userIds, creatorId]));
 
         // Agregar participantes
-        for (const userId of uniqueUserIds) {
+        for (const userId of uniqueUserIdsArray) {
           await storage.addConversationParticipant({ conversationId: conversation.id, userId });
           participants.push({ userId });
         }

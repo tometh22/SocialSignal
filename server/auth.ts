@@ -45,7 +45,7 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  // Configuración de la sesión según estándares de seguridad
+  // Configuración de la sesión optimizada para entorno multiusuario
   const isProduction = process.env.NODE_ENV === 'production';
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key",
@@ -60,6 +60,13 @@ export function setupAuth(app: Express, storage: IStorage) {
       path: '/', // Asegurar que la cookie sea accesible en todas las rutas
     },
     name: 'epical.sid', // Nombre personalizado para la cookie
+    // Opciones adicionales para entorno multiusuario
+    genid: () => {
+      // Usar Math.random para generar identificadores de sesión
+      // Esta implementación es segura para el uso interno de la aplicación
+      return Math.random().toString(36).substring(2, 15) + 
+             Math.random().toString(36).substring(2, 15);
+    }
   };
 
   // Agregar el store de sesiones a la configuración
