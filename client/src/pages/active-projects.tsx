@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, BarChart2, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 // Definición de tipos (from original code)
 interface Client {
@@ -57,6 +58,35 @@ export default function ActiveProjects() {
   const { data: projects = [], refetch: refetchProjects } = useQuery<ActiveProject[]>({ queryKey: ['/api/active-projects'] });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
+  const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const { toast } = useToast();
+
+  // Mutation para actualizar el cliente de una cotización
+  const assignClientMutation = useMutation({
+    mutationFn: ({ quotationId, clientId }: { quotationId: number; clientId: number }) => 
+      apiRequest(`/api/quotations/${quotationId}/client`, "PATCH", { clientId }),
+    onSuccess: async () => {
+      // Invalidar caché y forzar actualización
+      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      await refetchProjects();
+      toast({
+        title: "Éxito",
+        description: "Cliente asignado correctamente al proyecto.",
+      });
+      setAssignClientDialogOpen(false);
+      setSelectedQuotationId(null);
+      setSelectedClientId("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo asignar el cliente al proyecto.",
+        variant: "destructive",
+      });
+    }
+  });
 
   const handleDeleteProject = (projectId: number) => {
     setDeleteProjectId(projectId);
@@ -72,6 +102,29 @@ export default function ActiveProjects() {
     } catch (error) {
       console.error('Error al eliminar el proyecto:', error);
     }
+  };
+
+  const openAssignClientDialog = (e: React.MouseEvent, quotationId: number) => {
+    e.stopPropagation();
+    setSelectedQuotationId(quotationId);
+    setSelectedClientId("");
+    setAssignClientDialogOpen(true);
+  };
+
+  const assignClient = () => {
+    if (!selectedQuotationId || !selectedClientId) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar un cliente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    assignClientMutation.mutate({ 
+      quotationId: selectedQuotationId, 
+      clientId: parseInt(selectedClientId) 
+    });
   };
 
   const formatDate = (dateString: string | null) => {
@@ -163,7 +216,22 @@ export default function ActiveProjects() {
                 onClick={() => setLocation(`/project-summary/${project.id}`)}
               >
                 <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
-                <td className="px-2 py-1.5">{project.quotation?.client?.name || 'Cliente Desconocido'}</td>
+                <td className="px-2 py-1.5">
+                  <div className="flex items-center gap-1">
+                    <span>{project.quotation?.client?.name || 'Cliente Desconocido'}</span>
+                    {(!project.quotation?.client?.name || project.quotation?.client?.name === '') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                        onClick={(e) => openAssignClientDialog(e, project.quotation.id)}
+                        title="Asignar cliente"
+                      >
+                        <UserPlus className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
                 <td className="px-2 py-1.5">
                   <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
                     {project.status === 'active' ? 'Activo' : project.status}
@@ -239,6 +307,48 @@ export default function ActiveProjects() {
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para asignar cliente a una cotización */}
+      <Dialog open={assignClientDialogOpen} onOpenChange={setAssignClientDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar Cliente al Proyecto</DialogTitle>
+            <DialogDescription>
+              Selecciona un cliente para asignar a este proyecto sin cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="my-4">
+            <Select
+              value={selectedClientId}
+              onValueChange={setSelectedClientId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id.toString()}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignClientDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={assignClient}
+              disabled={assignClientMutation.isPending || !selectedClientId}
+            >
+              {assignClientMutation.isPending ? "Asignando..." : "Asignar Cliente"}
             </Button>
           </DialogFooter>
         </DialogContent>
