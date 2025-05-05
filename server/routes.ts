@@ -703,6 +703,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  app.get("/api/active-projects/quotation/:quotationId", async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
+
+    try {
+      const projects = await storage.getProjectsByQuotationId(quotationId);
+      res.json(projects);
+    } catch (error) {
+      console.error("Error obteniendo proyectos por cotización:", error);
+      res.status(500).json({ message: "Error al obtener proyectos por cotización" });
+    }
+  });
+  
   // Obtener registros de tiempo por cliente
   app.get("/api/time-entries/client/:clientId", async (req, res) => {
     const clientId = parseInt(req.params.clientId);
