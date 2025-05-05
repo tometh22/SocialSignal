@@ -35,7 +35,8 @@ export default function Clients() {
   const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
-
+  
+  const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -196,7 +197,7 @@ export default function Clients() {
                                   variant="default" 
                                   size="sm" 
                                   className="hover-lift bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => setLocation(`/client-summary/${client.id}`)}
+                                  onClick={() => navigate(`/client-summary/${client.id}`)}
                                 >
                                   <BarChart className="h-4 w-4 mr-1" />
                                   Resumen
