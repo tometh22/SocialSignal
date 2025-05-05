@@ -403,6 +403,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update quotation status" });
     }
   });
+  
+  // Actualizar el cliente asociado a una cotización
+  app.patch("/api/quotations/:id/client", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const { clientId } = req.body;
+      if (!clientId || isNaN(clientId)) {
+        return res.status(400).json({ message: "Valid client ID is required" });
+      }
+
+      // Verificar que el cliente existe
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Actualizar la cotización con el nuevo cliente
+      const updatedQuotation = await storage.updateQuotation(id, { clientId });
+      
+      if (!updatedQuotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      
+      res.json(updatedQuotation);
+    } catch (error) {
+      console.error("Error updating quotation client:", error);
+      res.status(500).json({ message: "Failed to update quotation client" });
+    }
+  });
 
   // Quotation team members routes
   app.get("/api/quotation-team/:quotationId", async (req, res) => {
