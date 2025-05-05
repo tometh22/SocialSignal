@@ -170,7 +170,15 @@ const ProjectSummary = () => {
 
   // Función para actualizar el nombre del proyecto
   const handleSaveProjectName = async (newName: string) => {
-    if (!project?.quotation?.id || !parsedProjectId || !newName) return;
+    console.log("=== ACTUALIZACIÓN DE NOMBRE INICIADA EN EL CLIENTE ===");
+    console.log("Nuevo nombre:", newName);
+    console.log("ID del proyecto:", parsedProjectId);
+    console.log("ID de cotización:", project?.quotation?.id);
+    
+    if (!project?.quotation?.id || !parsedProjectId || !newName) {
+      console.log("Faltan datos necesarios para actualizar el nombre");
+      return;
+    }
 
     try {
       // Optimistic update
@@ -183,19 +191,31 @@ const ProjectSummary = () => {
         }
       };
 
+      console.log("Actualizando optimistamente el estado local");
       // Update local state immediately
       queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
       queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
         return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
       });
 
-      await apiRequest(`/api/projects/${parsedProjectId}/update-name`, 'PATCH', {
-        name: newName
-      });
+      console.log("Enviando solicitud al servidor");
+      console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
+      console.log("Datos enviados:", { name: newName });
+      console.log("Verificando firma de apiRequest: method, endpoint, data");
+      
+      const response = await apiRequest(
+        'PATCH', 
+        `/api/projects/${parsedProjectId}/update-name`, 
+        { name: newName }
+      );
+      
+      console.log("Respuesta del servidor:", response);
 
+      console.log("Invalidando consultas para actualizar datos");
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
-
+      
+      console.log("Actualización completada con éxito");
     } catch (error) {
       console.error("Error al actualizar el nombre del proyecto:", error);
     }

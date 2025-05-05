@@ -1127,24 +1127,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Actualizar nombre de proyecto
   app.patch("/api/projects/:id/update-name", async (req, res) => {
+    console.log("=== ENDPOINT DE ACTUALIZACIÓN DE NOMBRE LLAMADO ===");
+    console.log("Request body:", req.body);
+    
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) {
+      console.log("ID inválido:", req.params.id);
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+    
+    console.log("ID del proyecto a actualizar:", id);
     
     try {
       const { name } = req.body;
+      console.log("Nombre recibido:", name);
+      
       if (!name || typeof name !== 'string' || name.trim() === '') {
+        console.log("Nombre inválido o vacío");
         return res.status(400).json({ message: "Project name is required" });
       }
       
+      console.log("Buscando proyecto con ID:", id);
       const project = await storage.getActiveProject(id);
       if (!project) {
+        console.log("Proyecto no encontrado con ID:", id);
         return res.status(404).json({ message: "Project not found" });
       }
       
+      console.log("Proyecto encontrado:", project.id);
+      console.log("Buscando cotización con ID:", project.quotationId);
+      
       const quotation = await storage.getQuotation(project.quotationId);
       if (!quotation) {
+        console.log("Cotización no encontrada con ID:", project.quotationId);
         return res.status(404).json({ message: "Quotation not found" });
       }
+      
+      console.log("Cotización encontrada, nombre anterior:", quotation.projectName);
+      console.log("Actualizando a nuevo nombre:", name.trim());
       
       // Actualizar el nombre del proyecto en la cotización
       const updatedQuotation = await storage.updateQuotation(project.quotationId, {
@@ -1152,11 +1172,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       if (!updatedQuotation) {
+        console.log("Error al actualizar la cotización");
         return res.status(500).json({ message: "Failed to update project name" });
       }
       
+      console.log("Cotización actualizada exitosamente:", updatedQuotation.projectName);
+      
       // Obtenemos el proyecto actualizado
       const updatedProject = await storage.getActiveProject(id);
+      console.log("Retornando proyecto actualizado");
       res.json(updatedProject);
     } catch (error) {
       console.error("Error updating project name:", error);
