@@ -599,14 +599,14 @@ const ProjectSummary = () => {
         <Breadcrumb
           items={[
             { label: "Inicio", href: "/" },
-            { label: "Proyectos", href: "/projects" },
-            { label: project.quotation?.projectName || "Proyecto" }
+            { label: "Proyectos", href: "/active-projects" },
+            { label: project?.quotation?.projectName || "Sin nombre" }
           ]}
         />
         
         {/* Header - Acciones y filtros */}
         <HeaderActions
-          projectName={project.quotation?.projectName || ""}
+          projectName={project?.quotation?.projectName || "Sin nombre"}
           status={project.status || ""}
           projectId={project.id}
           timeFilter={dashboardState.timeFilter}
