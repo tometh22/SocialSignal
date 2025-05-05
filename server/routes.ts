@@ -24,8 +24,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create the HTTP server
   const httpServer = createServer(app);
   
-  // Setup authentication
-  setupAuth(app);
+  // Setup authentication with storage
+  setupAuth(app, storage);
   
   // Setup chat websocket server
   setupChat(app, httpServer);

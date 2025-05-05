@@ -2,8 +2,8 @@ import { Express, Request, Response } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
 import { User } from "@shared/schema";
+import type { IStorage } from "./storage";
 
 declare global {
   namespace Express {
@@ -44,22 +44,29 @@ async function comparePasswords(supplied: string, stored: string) {
   }
 }
 
-export function setupAuth(app: Express) {
+export function setupAuth(app: Express, storage: IStorage) {
   // Configuración de la sesión
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key",
-    resave: true, // Cambio para forzar guardado de sesión
-    saveUninitialized: false,
+    resave: true, // Forzar guardado de sesión en cada petición
+    saveUninitialized: true, // Guardar sesiones vacías para mayor compatibilidad
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // false para desarrollo local sin HTTPS
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semana
-      sameSite: 'lax' as const, // Añadir configuración sameSite
-      httpOnly: true, // Asegurar que la cookie solo es accesible por el servidor
+      sameSite: 'lax' as const, // Configuración sameSite
+      httpOnly: true, // Cookie solo accesible por el servidor
+      path: '/', // Asegurar que la cookie sea accesible en todas las rutas
     },
     name: 'epical.sid', // Nombre personalizado para la cookie
   };
 
-  app.use(session(sessionConfig));
+  // Agregar el store de sesiones a la configuración
+  const sessionWithStore = {
+    ...sessionConfig,
+    store: storage.sessionStore
+  };
+
+  app.use(session(sessionWithStore));
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {

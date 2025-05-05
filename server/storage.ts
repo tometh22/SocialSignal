@@ -16,8 +16,13 @@ import {
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 
 export interface IStorage {
   // Client operations
@@ -741,12 +746,16 @@ export class MemStorage implements IStorage {
 
 // Implementación de la base de datos
 export class DatabaseStorage implements IStorage {
-  // Session store
-  sessionStore: any;
+  sessionStore: session.Store;
   
   constructor() {
-    // Session store is initialized in auth.ts
-    this.sessionStore = null;
+    // Crear store para sesiones usando PostgreSQL
+    const PgStore = connectPgSimple(session);
+    this.sessionStore = new PgStore({
+      pool,
+      tableName: 'session',
+      createTableIfMissing: true
+    });
   }
 
   // User operations
