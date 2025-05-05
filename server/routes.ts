@@ -434,6 +434,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update quotation client" });
     }
   });
+  
+  // Asignar cliente a un proyecto específico
+  app.patch("/api/active-projects/:id/assign-client", async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const { clientId } = req.body;
+      if (!clientId || isNaN(clientId)) {
+        return res.status(400).json({ message: "Valid client ID is required" });
+      }
+
+      // Verificar que el cliente existe
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Obtener el proyecto
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Obtener la cotización actual
+      const currentQuotation = await storage.getQuotation(project.quotationId);
+      if (!currentQuotation) {
+        return res.status(404).json({ message: "Original quotation not found" });
+      }
+      
+      let updatedProject;
+      
+      // Verificar si hay otros proyectos que usan la misma cotización
+      const projectsWithSameQuotation = await storage.getProjectsByQuotationId(project.quotationId);
+      
+      if (projectsWithSameQuotation.length > 1) {
+        // Si hay múltiples proyectos que usan la misma cotización, crear una copia
+        console.log(`Creando una nueva cotización para el proyecto ${projectId} y asignando cliente ${clientId}`);
+        
+        // Crear una copia de la cotización con el nuevo cliente
+        const newQuotation = { ...currentQuotation, id: undefined, clientId };
+        const createdQuotation = await storage.createQuotation(newQuotation);
+        
+        if (!createdQuotation) {
+          return res.status(500).json({ message: "Failed to create new quotation" });
+        }
+        
+        // Actualizar el proyecto para usar la nueva cotización
+        updatedProject = await storage.updateActiveProject(projectId, { 
+          quotationId: createdQuotation.id 
+        });
+      } else {
+        // Si solo hay un proyecto, simplemente actualizar el cliente en la cotización existente
+        console.log(`Actualizando cliente de la cotización ${project.quotationId} a ${clientId}`);
+        await storage.updateQuotation(project.quotationId, { clientId });
+        updatedProject = await storage.getActiveProject(projectId);
+      }
+      
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Failed to update project" });
+      }
+      
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error assigning client to project:", error);
+      res.status(500).json({ message: "Failed to assign client to project" });
+    }
+  });
 
   // Quotation team members routes
   app.get("/api/quotation-team/:quotationId", async (req, res) => {
