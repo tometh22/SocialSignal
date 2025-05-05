@@ -36,11 +36,16 @@ export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string>("login");
   const { user, loginMutation, registerMutation, isLoading } = useAuth();
   const [location, navigate] = useLocation();
+  const [redirecting, setRedirecting] = useState<boolean>(false);
 
   // Redireccionar si el usuario ya está autenticado
   useEffect(() => {
     if (user) {
-      navigate("/");
+      setRedirecting(true);
+      // Pequeño retraso para mostrar el estado de redirección
+      setTimeout(() => {
+        navigate("/");
+      }, 1000);
     }
   }, [user, navigate]);
 
@@ -83,6 +88,17 @@ export default function AuthPage() {
 
   return (
     <div className="flex min-h-screen">
+      {/* Overlay de redirección */}
+      {redirecting && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="flex flex-col items-center space-y-4 p-6 bg-card rounded-lg shadow-lg">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="text-xl font-medium">Redirigiendo...</div>
+            <div className="text-muted-foreground">Accediendo al Dashboard</div>
+          </div>
+        </div>
+      )}
+      
       {/* Columna izquierda - Formulario */}
       <div className="flex items-center justify-center w-full lg:w-1/2 p-8">
         <div className="w-full max-w-md">
