@@ -27,7 +27,14 @@ async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  
+  try {
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch (error) {
+    console.error("Error en timingSafeEqual:", error);
+    // Fallback en caso de error con timingSafeEqual
+    return Buffer.compare(hashedBuf, suppliedBuf) === 0;
+  }
 }
 
 export function setupAuth(app: Express) {
