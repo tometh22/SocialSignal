@@ -22,9 +22,11 @@ import {
   ClockIcon,
   BarChart,
   FileWarning,
-  MessageSquare
+  MessageSquare,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 // Importación de los componentes de funcionalidades
 import { GlobalSearch } from "@/components/features/global-search";
@@ -42,8 +44,20 @@ type Notification = {
 };
 
 export default function Topbar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { user, logoutMutation, isLoading } = useAuth();
+  
+  // Obtener iniciales del nombre de usuario
+  const getUserInitials = () => {
+    if (!user) return "--";
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  };
+  
+  // Manejar el cierre de sesión
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
   
   // Notificaciones relacionadas con riesgos de proyectos
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -269,37 +283,63 @@ export default function Topbar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-9 pl-2 pr-3 gap-2">
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">JS</AvatarFallback>
-                  <AvatarImage src="" />
-                </Avatar>
-                <span className="text-sm font-medium">Jane</span>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                      {user?.avatar && <AvatarImage src={user.avatar} />}
+                    </Avatar>
+                    <span className="text-sm font-medium">
+                      {user ? user.firstName : 'Usuario'}
+                    </span>
+                  </>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <div className="px-4 py-3 flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback className="bg-primary text-white">JS</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-medium">Jane Smith</p>
-                  <p className="text-xs text-muted-foreground">jane@example.com</p>
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <div className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span>Configuración</span>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <div className="flex items-center gap-2 text-destructive">
-                  <LogOut className="h-4 w-4" />
-                  <span>Cerrar sesión</span>
-                </div>
-              </DropdownMenuItem>
+              {user && (
+                <>
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback className="bg-primary text-white">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                      {user.avatar && <AvatarImage src={user.avatar} />}
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{user.firstName} {user.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      <span>Configuración</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleLogout}>
+                    <div className="flex items-center gap-2 text-destructive">
+                      <LogOut className="h-4 w-4" />
+                      <span>
+                        {logoutMutation.isPending ? (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Cerrando sesión...</span>
+                          </div>
+                        ) : (
+                          "Cerrar sesión"
+                        )}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

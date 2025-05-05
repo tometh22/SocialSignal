@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   MessageSquare, 
-  User, 
   Send, 
   ChevronsRight, 
   MessageCircleMore, 
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,142 +14,138 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-type Message = {
-  id: string;
-  sender: {
-    id: string;
-    name: string;
-    avatar?: string;
-    initials: string;
-  };
-  content: string;
-  timestamp: Date;
-  read: boolean;
-  conversation: string;
-};
-
-type Conversation = {
-  id: string;
-  participants: Array<{
-    id: string;
-    name: string;
-    avatar?: string;
-    initials: string;
-  }>;
-  lastMessage?: Message;
-  unreadCount: number;
-};
+import { useChat, ChatConversation, ChatMessage } from "@/hooks/use-chat";
+import { useAuth } from "@/hooks/use-auth";
 
 export function MessagesPopup() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [, navigate] = useLocation();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  
+  const { 
+    conversations, 
+    activeConversation,
+    isLoadingConversations,
+    sendMessage,
+    markConversationAsRead,
+    setActiveConversationId,
+    isConnected
+  } = useChat();
 
-  // Datos de ejemplo
-  const conversations: Conversation[] = [
-    {
-      id: "1",
-      participants: [
-        { id: "2", name: "María López", initials: "ML" }
-      ],
-      lastMessage: {
-        id: "101",
-        sender: { id: "2", name: "María López", initials: "ML" },
-        content: "¿Cuándo estará lista la propuesta para el cliente?",
-        timestamp: new Date(Date.now() - 3600000), // 1 hora atrás
-        read: false,
-        conversation: "1"
-      },
-      unreadCount: 2
-    },
-    {
-      id: "2",
-      participants: [
-        { id: "3", name: "Carlos Ruiz", initials: "CR" }
-      ],
-      lastMessage: {
-        id: "201",
-        sender: { id: "1", name: "Usuario Actual", initials: "YO" },
-        content: "Revisaré los cambios y te aviso",
-        timestamp: new Date(Date.now() - 86400000), // 1 día atrás
-        read: true,
-        conversation: "2"
-      },
-      unreadCount: 0
+  // Scroll al último mensaje cuando se añade uno nuevo
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  ];
+  }, [activeConversation?.messages]);
 
-  const messages: Record<string, Message[]> = {
-    "1": [
-      {
-        id: "100",
-        sender: { id: "2", name: "María López", initials: "ML" },
-        content: "Hola, necesito actualizar el calendario del proyecto",
-        timestamp: new Date(Date.now() - 7200000), // 2 horas atrás
-        read: true,
-        conversation: "1"
-      },
-      {
-        id: "101",
-        sender: { id: "2", name: "María López", initials: "ML" },
-        content: "¿Cuándo estará lista la propuesta para el cliente?",
-        timestamp: new Date(Date.now() - 3600000), // 1 hora atrás
-        read: false,
-        conversation: "1"
-      }
-    ],
-    "2": [
-      {
-        id: "200",
-        sender: { id: "3", name: "Carlos Ruiz", initials: "CR" },
-        content: "Te envío los cambios solicitados para el proyecto",
-        timestamp: new Date(Date.now() - 172800000), // 2 días atrás
-        read: true,
-        conversation: "2"
-      },
-      {
-        id: "201",
-        sender: { id: "1", name: "Usuario Actual", initials: "YO" },
-        content: "Revisaré los cambios y te aviso",
-        timestamp: new Date(Date.now() - 86400000), // 1 día atrás
-        read: true,
-        conversation: "2"
-      }
-    ]
+  // Marcar mensajes como leídos cuando se abre una conversación
+  useEffect(() => {
+    if (activeConversation && isOpen) {
+      markConversationAsRead(activeConversation.id);
+    }
+  }, [activeConversation, isOpen, markConversationAsRead]);
+
+  // Calcular el total de mensajes no leídos
+  const totalUnread = conversations.reduce((sum, conv) => {
+    return sum + (conv._count?.unreadMessages || 0);
+  }, 0);
+
+  // Función para obtener las iniciales de un nombre
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
-
+  // Función para enviar un mensaje
   const handleSendMessage = () => {
     if (!messageInput.trim() || !activeConversation) return;
     
-    // Aquí se implementaría el envío real del mensaje
+    sendMessage({
+      conversationId: activeConversation.id,
+      message: messageInput,
+    });
+    
     setMessageInput("");
   };
 
-  const formatTimestamp = (date: Date) => {
+  // Formatear la marca de tiempo
+  const formatTimestamp = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = now.getTime() - dateObj.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
     if (diffDays === 0) {
-      return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      return dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
       return 'Ayer';
     } else if (diffDays < 7) {
-      return date.toLocaleDateString('es-ES', { weekday: 'long' });
+      return dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
     } else {
-      return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+      return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
     }
+  };
+
+  // Obtener nombre del participante (para conversaciones directas)
+  const getParticipantName = (conversation: ChatConversation) => {
+    if (!conversation.participants || conversation.participants.length === 0) return "Sin nombre";
+    
+    // Para conversaciones grupales, usar el título
+    if (conversation.isGroup) return conversation.title || "Grupo";
+    
+    // Para conversaciones directas, mostrar el nombre del otro participante
+    const otherParticipant = conversation.participants.find(p => p.userId !== user?.id);
+    if (otherParticipant) {
+      return `${otherParticipant.user.firstName} ${otherParticipant.user.lastName}`;
+    }
+    
+    return "Sin nombre";
+  };
+
+  // Obtener iniciales del participante
+  const getParticipantInitials = (conversation: ChatConversation) => {
+    if (!conversation.participants || conversation.participants.length === 0) return "--";
+    
+    // Para conversaciones grupales, usar las iniciales del título
+    if (conversation.isGroup && conversation.title) {
+      const words = conversation.title.split(' ');
+      if (words.length >= 2) {
+        return `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase();
+      }
+      return conversation.title.substring(0, 2).toUpperCase();
+    }
+    
+    // Para conversaciones directas, mostrar las iniciales del otro participante
+    const otherParticipant = conversation.participants.find(p => p.userId !== user?.id);
+    if (otherParticipant) {
+      return getInitials(otherParticipant.user.firstName, otherParticipant.user.lastName);
+    }
+    
+    return "--";
+  };
+
+  // Obtener el último mensaje de una conversación
+  const getLastMessage = (conversation: ChatConversation) => {
+    if (!conversation.messages || conversation.messages.length === 0) {
+      return null;
+    }
+    
+    // Ordenar mensajes por fecha y obtener el último
+    const sortedMessages = [...conversation.messages].sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    return sortedMessages[0];
   };
 
   return (
@@ -167,123 +163,158 @@ export function MessagesPopup() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
-        <Tabs defaultValue={activeConversation || "list"} onValueChange={(value) => {
-          if (value !== "list") setActiveConversation(value);
-        }}>
+        <Tabs 
+          defaultValue="list" 
+          value={activeConversation ? activeConversation.id.toString() : "list"}
+          onValueChange={(value) => {
+            if (value !== "list") {
+              setActiveConversationId(parseInt(value));
+            } else {
+              setActiveConversationId(null);
+            }
+          }}
+        >
           <div className="border-b p-3 flex items-center justify-between">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="list" className="text-xs">Conversaciones</TabsTrigger>
-              <TabsTrigger value={activeConversation || "list"} disabled={!activeConversation} className="text-xs">
-                {activeConversation ? conversations.find(c => c.id === activeConversation)?.participants[0].name : "Chat"}
+              <TabsTrigger 
+                value={activeConversation ? activeConversation.id.toString() : "list"} 
+                disabled={!activeConversation} 
+                className="text-xs"
+              >
+                {activeConversation ? getParticipantName(activeConversation) : "Chat"}
               </TabsTrigger>
             </TabsList>
           </div>
           
           <TabsContent value="list" className="focus:outline-none max-h-[400px] overflow-auto">
-            <div className="py-2">
-              {conversations.length > 0 ? (
-                conversations.map((conversation) => (
-                  <DropdownMenuItem 
-                    key={conversation.id}
-                    className="px-4 py-2 focus:bg-muted cursor-pointer"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setActiveConversation(conversation.id);
-                    }}
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <Avatar className="h-9 w-9 flex-shrink-0">
-                        <AvatarFallback className={conversation.unreadCount > 0 ? "bg-primary text-primary-foreground" : ""}>
-                          {conversation.participants[0].initials}
-                        </AvatarFallback>
-                        {conversation.participants[0].avatar && (
-                          <AvatarImage src={conversation.participants[0].avatar} />
-                        )}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className={cn(
-                            "text-sm truncate",
-                            conversation.unreadCount > 0 ? "font-medium" : ""
-                          )}>
-                            {conversation.participants[0].name}
-                          </p>
-                          {conversation.lastMessage && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatTimestamp(conversation.lastMessage.timestamp)}
+            {isLoadingConversations ? (
+              <div className="py-8 text-center">
+                <Loader2 className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2 animate-spin" />
+                <p className="text-sm text-muted-foreground">Cargando conversaciones...</p>
+              </div>
+            ) : (
+              <div className="py-2">
+                {conversations.length > 0 ? (
+                  conversations.map((conversation) => {
+                    const lastMessage = getLastMessage(conversation);
+                    const unreadCount = conversation._count?.unreadMessages || 0;
+                    
+                    return (
+                      <DropdownMenuItem 
+                        key={conversation.id}
+                        className="px-4 py-2 focus:bg-muted cursor-pointer"
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setActiveConversationId(conversation.id);
+                        }}
+                      >
+                        <div className="flex items-center gap-3 w-full">
+                          <Avatar className="h-9 w-9 flex-shrink-0">
+                            <AvatarFallback className={unreadCount > 0 ? "bg-primary text-primary-foreground" : ""}>
+                              {getParticipantInitials(conversation)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className={cn(
+                                "text-sm truncate",
+                                unreadCount > 0 ? "font-medium" : ""
+                              )}>
+                                {getParticipantName(conversation)}
+                              </p>
+                              {lastMessage && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatTimestamp(lastMessage.createdAt)}
+                                </span>
+                              )}
+                            </div>
+                            {lastMessage && (
+                              <p className={cn(
+                                "text-xs truncate mt-0.5",
+                                unreadCount > 0 ? "text-foreground" : "text-muted-foreground"
+                              )}>
+                                {lastMessage.senderId === user?.id && (
+                                  <span className="mr-1 text-muted-foreground flex-shrink-0 inline-block">
+                                    <CheckCircle2 className="inline h-3 w-3 mr-0.5" />
+                                  </span>
+                                )}
+                                {lastMessage.content}
+                              </p>
+                            )}
+                          </div>
+                          {unreadCount > 0 && (
+                            <span className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-[10px] text-primary-foreground font-medium">
+                              {unreadCount}
                             </span>
                           )}
                         </div>
-                        {conversation.lastMessage && (
-                          <p className={cn(
-                            "text-xs truncate mt-0.5",
-                            conversation.unreadCount > 0 ? "text-foreground" : "text-muted-foreground"
-                          )}>
-                            {conversation.lastMessage.sender.id === "1" && (
-                              <span className="mr-1 text-muted-foreground flex-shrink-0 inline-block">
-                                <CheckCircle2 className="inline h-3 w-3 mr-0.5" />
-                              </span>
-                            )}
-                            {conversation.lastMessage.content}
-                          </p>
-                        )}
-                      </div>
-                      {conversation.unreadCount > 0 && (
-                        <span className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-[10px] text-primary-foreground font-medium">
-                          {conversation.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                ))
-              ) : (
-                <div className="py-8 text-center">
-                  <MessageCircleMore className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No hay conversaciones</p>
-                </div>
-              )}
-            </div>
+                      </DropdownMenuItem>
+                    );
+                  })
+                ) : (
+                  <div className="py-8 text-center">
+                    <MessageCircleMore className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No hay conversaciones</p>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
           
           {activeConversation && (
-            <TabsContent value={activeConversation} className="focus:outline-none">
+            <TabsContent value={activeConversation.id.toString()} className="focus:outline-none">
               <div className="h-[300px] flex flex-col">
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {messages[activeConversation]?.map((message) => (
-                    <div 
-                      key={message.id}
-                      className={cn(
-                        "flex gap-2 max-w-[85%]",
-                        message.sender.id === "1" ? "ml-auto flex-row-reverse" : ""
-                      )}
-                    >
-                      {message.sender.id !== "1" && (
-                        <Avatar className="h-7 w-7 flex-shrink-0">
-                          <AvatarFallback>{message.sender.initials}</AvatarFallback>
-                          {message.sender.avatar && (
-                            <AvatarImage src={message.sender.avatar} />
+                  {activeConversation.messages && activeConversation.messages.length > 0 ? (
+                    <>
+                      {activeConversation.messages.map((message) => (
+                        <div 
+                          key={message.id}
+                          className={cn(
+                            "flex gap-2 max-w-[85%]",
+                            message.senderId === user?.id ? "ml-auto flex-row-reverse" : ""
                           )}
-                        </Avatar>
-                      )}
-                      <div>
-                        <div className={cn(
-                          "rounded-lg px-3 py-2 text-sm",
-                          message.sender.id === "1" 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-muted"
-                        )}>
-                          {message.content}
+                        >
+                          {message.senderId !== user?.id && (
+                            <Avatar className="h-7 w-7 flex-shrink-0">
+                              <AvatarFallback>
+                                {message.sender ? getInitials(message.sender.firstName, message.sender.lastName) : "--"}
+                              </AvatarFallback>
+                              {message.sender?.avatar && (
+                                <AvatarImage src={message.sender.avatar} />
+                              )}
+                            </Avatar>
+                          )}
+                          <div>
+                            <div className={cn(
+                              "rounded-lg px-3 py-2 text-sm",
+                              message.senderId === user?.id 
+                                ? "bg-primary text-primary-foreground" 
+                                : "bg-muted"
+                            )}>
+                              {message.content}
+                              {message.imageUrl && (
+                                <img src={message.imageUrl} alt="Imagen adjunta" className="mt-2 rounded max-w-full" />
+                              )}
+                            </div>
+                            <p className={cn(
+                              "text-[10px] mt-1",
+                              "text-muted-foreground",
+                              message.senderId === user?.id ? "text-right" : ""
+                            )}>
+                              {formatTimestamp(message.createdAt)}
+                            </p>
+                          </div>
                         </div>
-                        <p className={cn(
-                          "text-[10px] mt-1",
-                          "text-muted-foreground",
-                          message.sender.id === "1" ? "text-right" : ""
-                        )}>
-                          {formatTimestamp(message.timestamp)}
-                        </p>
-                      </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">No hay mensajes</p>
                     </div>
-                  ))}
+                  )}
                 </div>
                 
                 <div className="p-3 border-t bg-background">
@@ -299,12 +330,13 @@ export function MessagesPopup() {
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
                       className="flex-1 h-9"
+                      disabled={!isConnected}
                     />
                     <Button 
                       type="submit" 
                       size="icon"
                       className="h-9 w-9"
-                      disabled={!messageInput.trim()}
+                      disabled={!messageInput.trim() || !isConnected}
                     >
                       <Send className="h-4 w-4" />
                     </Button>

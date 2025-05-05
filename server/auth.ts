@@ -1,35 +1,28 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
-import { db } from "./db";
-import { users, User, InsertUser } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { storage } from "./storage";
+import { User } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface Request {
+      user?: User;
+    }
   }
 }
 
 const scryptAsync = promisify(scrypt);
 
-const PostgresSessionStore = connectPg(session);
-const sessionStore = new PostgresSessionStore({
-  pool,
-  createTableIfMissing: true
-});
-
+// Función para generar hash de contraseña
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
+// Función para comparar contraseñas
 async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
@@ -39,151 +32,129 @@ async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   // Configuración de la sesión
-  const sessionSettings: session.SessionOptions = {
-    store: sessionStore,
-    secret: process.env.SESSION_SECRET || "super-secret-key-change-in-production",
+  const sessionConfig = {
+    secret: process.env.SESSION_SECRET || "epical-secret-key",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000, // 24 horas
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 semana
     },
   };
 
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
+  app.use(session(sessionConfig));
 
-  // Configuración de passport
-  passport.use(
-    new LocalStrategy(
-      {
-        usernameField: "email",
-        passwordField: "password",
-      },
-      async (email, password, done) => {
-        try {
-          const [user] = await db.select().from(users).where(eq(users.email, email));
-          
-          if (!user || !(await comparePasswords(password, user.password))) {
-            return done(null, false, { message: "Credenciales incorrectas" });
-          }
-          
-          return done(null, user);
-        } catch (error) {
-          return done(error);
-        }
-      }
-    )
-  );
-
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const [user] = await db.select().from(users).where(eq(users.id, id));
-      done(null, user);
-    } catch (error) {
-      done(error);
+  // Middleware para verificar autenticación
+  const requireAuth = async (req: Request, res: Response, next: Function) => {
+    const userId = req.session.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: "No autenticado" });
     }
-  });
+    
+    try {
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: "Usuario no encontrado" });
+      }
+      
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error("Error de autenticación:", error);
+      return res.status(500).json({ message: "Error en el servidor" });
+    }
+  };
 
   // Rutas de autenticación
   app.post("/api/register", async (req, res) => {
     try {
-      // Comprobar si el usuario ya existe
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, req.body.email));
-
+      const { email, password, firstName, lastName } = req.body;
+      
+      // Verificar si el correo ya existe
+      const existingUser = await storage.getUserByEmail(email);
+      
       if (existingUser) {
         return res.status(400).json({ message: "El correo electrónico ya está registrado" });
       }
-
-      // Crear el nuevo usuario
-      const hashedPassword = await hashPassword(req.body.password);
       
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          firstName: req.body.firstName,
-          lastName: req.body.lastName,
-          email: req.body.email,
-          password: hashedPassword,
-          avatar: req.body.avatar || null,
-          isAdmin: false,
-        })
-        .returning();
-
-      // Eliminar la contraseña antes de devolver el usuario
-      const { password, ...userWithoutPassword } = newUser;
+      // Crear el usuario
+      const hashedPassword = await hashPassword(password);
       
-      // Iniciar sesión con el nuevo usuario
-      req.login(newUser, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Error al iniciar sesión después del registro" });
-        }
-        return res.status(201).json(userWithoutPassword);
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        isAdmin: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
-
+      
+      // Establecer la sesión
+      req.session.userId = user.id;
+      
+      // Enviar respuesta
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
     } catch (error) {
       console.error("Error al registrar usuario:", error);
-      return res.status(500).json({ message: "Error al registrar el usuario" });
+      res.status(500).json({ message: "Error al crear el usuario" });
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
-      if (err) {
-        return next(err);
-      }
+  app.post("/api/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      // Buscar el usuario
+      const user = await storage.getUserByEmail(email);
+      
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Credenciales incorrectas" });
+        return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
-      req.login(user, (err) => {
-        if (err) {
-          return next(err);
-        }
-        
-        // Eliminar la contraseña antes de devolver el usuario
-        const { password, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
-      });
-    })(req, res, next);
+      // Verificar la contraseña
+      const isPasswordValid = await comparePasswords(password, user.password);
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Credenciales incorrectas" });
+      }
+      
+      // Establecer la sesión
+      req.session.userId = user.id;
+      
+      // Enviar respuesta
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error al iniciar sesión:", error);
+      res.status(500).json({ message: "Error al iniciar sesión" });
+    }
   });
 
   app.post("/api/logout", (req, res) => {
-    req.logout(function(err) {
+    req.session.destroy((err) => {
       if (err) {
+        console.error("Error al cerrar sesión:", err);
         return res.status(500).json({ message: "Error al cerrar sesión" });
       }
-      res.status(200).json({ message: "Sesión cerrada exitosamente" });
+      
+      res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
 
-  app.get("/api/current-user", (req, res) => {
-    if (!req.isAuthenticated()) {
+  app.get("/api/current-user", requireAuth, (req, res) => {
+    if (!req.user) {
       return res.status(401).json({ message: "No autenticado" });
     }
     
-    // Eliminar la contraseña antes de devolver el usuario
-    const { password, ...userWithoutPassword } = req.user as User;
-    return res.json(userWithoutPassword);
+    const { password, ...userWithoutPassword } = req.user;
+    res.status(200).json(userWithoutPassword);
   });
-}
 
-// Middleware para proteger rutas que requieren autenticación
-export function requireAuth(req: Express.Request, res: Express.Response, next: Express.NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ message: "No autorizado" });
+  // Exportar el middleware para su uso en otras rutas
+  return { requireAuth };
 }
-
-// Función para hashear contraseñas (para crear usuarios iniciales)
-export { hashPassword };

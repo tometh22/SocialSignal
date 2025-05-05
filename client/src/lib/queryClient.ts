@@ -1,55 +1,91 @@
 import { QueryClient } from "@tanstack/react-query";
 
-// Crear una instancia de QueryClient para ser usada en toda la aplicación
-export const queryClient = new QueryClient();
-
-// Función para hacer peticiones a la API
-export const apiRequest = async (
-  url: string,
-  method: string = "GET",
-  data?: any
-): Promise<any> => {
-  try {
-    const options: RequestInit = {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    };
-
-    if (data && (method === "POST" || method === "PUT" || method === "PATCH")) {
-      options.body = JSON.stringify(data);
-    }
-
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `Error en la petición: ${response.status}`
-      );
-    }
-
-    // Para las peticiones DELETE no hay respuesta JSON
-    if (method === "DELETE") {
-      return true;
-    }
-
-    return await response.json();
-  } catch (error: any) {
-    console.error("API request error:", error);
-    throw new Error(error.message || "Error desconocido");
-  }
+type FetcherOptions = {
+  on401?: "throw" | "returnNull";
 };
 
-// Función por defecto para consultas
-export const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
-  const url = queryKey[0];
-  const response = await fetch(url);
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
+// Function to get a query function with custom error handling
+export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
+  return async ({ queryKey }: { queryKey: string | string[] }) => {
+    const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 401 && on401 === "returnNull") {
+        return null;
+      }
+      
+      const errorMessage = await response
+        .text()
+        .then(text => {
+          try {
+            const json = JSON.parse(text);
+            return json.message || text;
+          } catch (e) {
+            return text;
+          }
+        })
+        .catch(() => "Error desconocido");
+      
+      throw new Error(errorMessage);
+    }
+    
+    // For empty responses like 204 No Content
+    if (response.status === 204) {
+      return null;
+    }
+    
+    return await response.json();
+  };
+}
+
+// Generic function for API requests
+export async function apiRequest(
+  method: string,
+  endpoint: string,
+  data?: any
+) {
+  const url = endpoint;
+  
+  const options: RequestInit = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  };
+  
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+  
+  const response = await fetch(url, options);
   
   if (!response.ok) {
-    throw new Error(`Error en la petición: ${response.status}`);
+    const errorMessage = await response
+      .text()
+      .then(text => {
+        try {
+          const json = JSON.parse(text);
+          return json.message || text;
+        } catch (e) {
+          return text;
+        }
+      })
+      .catch(() => "Error desconocido");
+    
+    throw new Error(errorMessage);
   }
   
-  return response.json();
-};
+  return response;
+}

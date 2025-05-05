@@ -14,11 +14,17 @@ import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
 import ClientSummary from "@/pages/client-summary";
+import AuthPage from "@/pages/auth-page";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
+import { AuthProvider } from "@/hooks/use-auth";
+import { ChatProvider } from "@/hooks/use-chat";
+import { ProtectedRoute } from "@/lib/protected-route";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useEffect } from "react";
 
-function App() {
+function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
   useEffect(() => {
     document.title = "Sistema de Gestión | Epical";
@@ -30,42 +36,60 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-full p-3 sm:p-4">
-            <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/optimized-quote" component={OptimizedQuote} />
-              <Route path="/new-quote">
-                <Redirect to="/optimized-quote" />
-              </Route>
-              <Route path="/manage-quotes" component={ManageQuotes} />
-              <Route path="/quote/:id" component={QuoteDetails} />
-              <Route path="/quotations/:id" component={QuotationDetail} />
-              <Route path="/quotation/:id" component={QuotationDetail} />
-              <Route path="/clients" component={Clients} />
-              <Route path="/statistics" component={Statistics} />
-              <Route path="/history">
-                <Redirect to="/statistics" />
-              </Route>
-              <Route path="/admin" component={Admin} />
-              {/* Rutas para gestión de proyectos activos */}
-              <Route path="/active-projects" component={ActiveProjects} />
-              <Route path="/active-projects/new" component={NewActiveProject} />
-              <Route path="/active-projects/:projectId/time-entries" component={TimeEntries} />
-              <Route path="/time-entries/project/:projectId" component={TimeEntries} />
-              <Route path="/project-summary/:projectId" component={ProjectSummary} />
-              <Route path="/client-summary/:clientId" component={ClientSummary} />
-              <Route component={NotFound} />
-            </Switch>
+    <Switch>
+      <Route path="/auth" component={AuthPage} />
+      
+      <Route path="*">
+        <div className="flex h-screen overflow-hidden bg-background">
+          <Sidebar />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <Topbar />
+            <main className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="max-w-full p-3 sm:p-4">
+                <Switch>
+                  <ProtectedRoute path="/" component={Dashboard} />
+                  <ProtectedRoute path="/optimized-quote" component={OptimizedQuote} />
+                  <ProtectedRoute path="/new-quote">
+                    <Redirect to="/optimized-quote" />
+                  </ProtectedRoute>
+                  <ProtectedRoute path="/manage-quotes" component={ManageQuotes} />
+                  <ProtectedRoute path="/quote/:id" component={QuoteDetails} />
+                  <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
+                  <ProtectedRoute path="/quotation/:id" component={QuotationDetail} />
+                  <ProtectedRoute path="/clients" component={Clients} />
+                  <ProtectedRoute path="/statistics" component={Statistics} />
+                  <ProtectedRoute path="/history">
+                    <Redirect to="/statistics" />
+                  </ProtectedRoute>
+                  <ProtectedRoute path="/admin" component={Admin} />
+                  {/* Rutas para gestión de proyectos activos */}
+                  <ProtectedRoute path="/active-projects" component={ActiveProjects} />
+                  <ProtectedRoute path="/active-projects/new" component={NewActiveProject} />
+                  <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
+                  <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
+                  <ProtectedRoute path="/project-summary/:projectId" component={ProjectSummary} />
+                  <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
+                  <Route component={NotFound} />
+                </Switch>
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
-      <Toaster />
-    </div>
+        </div>
+      </Route>
+    </Switch>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ChatProvider>
+          <AppRoutes />
+          <Toaster />
+        </ChatProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
