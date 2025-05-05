@@ -45,7 +45,7 @@ export const HeaderActions = ({
   onSaveProjectName
 }: HeaderActionsProps) => {
   const [editing, setEditing] = useState(false);
-  const [editedName, setEditedName] = useState(projectName || "");
+  const [editedName, setEditedName] = useState(projectName);
 
   const handleSave = () => {
     if (editedName.trim()) {

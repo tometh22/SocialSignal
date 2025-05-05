@@ -606,7 +606,7 @@ const ProjectSummary = () => {
         
         {/* Header - Acciones y filtros */}
         <HeaderActions
-          projectName={project?.quotation?.projectName || "Sin nombre"}
+          projectName={project?.quotation?.projectName || project?.quotation?.client?.name || "Sin nombre"}
           status={project.status || ""}
           projectId={project.id}
           timeFilter={dashboardState.timeFilter}
