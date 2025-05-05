@@ -134,7 +134,11 @@ export default function ActiveProjects() {
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No hay proyectos</td>
               </tr>
             ) : projects.map((project) => (
-              <tr key={project.id} className="text-sm hover:bg-gray-50">
+              <tr 
+                key={project.id} 
+                className="text-sm hover:bg-gray-50 cursor-pointer"
+                onClick={() => setLocation(`/projects/${project.id}`)}
+              >
                 <td className="px-4 py-2">{project.quotation?.projectName || '-'}</td>
                 <td className="px-4 py-2">{project.quotation?.client?.name || project.quotation?.clientName || 'Cliente Desconocido'}</td>
                 <td className="px-4 py-2">
@@ -155,7 +159,7 @@ export default function ActiveProjects() {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0"
-                      onClick={() => setLocation(`/projects/${project.id}`)}
+                      onClick={() => setLocation(`/project-summary/${project.id}`)}
                       title="Ver resumen del proyecto"
                     >
                       <ArrowUpDown className="h-4 w-4" />
@@ -164,7 +168,10 @@ export default function ActiveProjects() {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0"
-                      onClick={() => setLocation(`/projects/${project.id}/time-entries`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/projects/${project.id}/time-entries`);
+                      }}
                       title="Gestión de horas"
                     >
                       <Clock className="h-4 w-4" />
