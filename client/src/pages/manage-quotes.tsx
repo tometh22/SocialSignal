@@ -46,8 +46,8 @@ export default function ManageQuotes() {
 
     try {
       await apiRequest(
-        "PATCH",
         `/api/quotations/${selectedQuote.id}/status`,
+        "PATCH",
         { status: newStatus }
       );
       
