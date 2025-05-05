@@ -861,33 +861,82 @@ const TimeEntries: React.FC = () => {
                     </div>
                   </div>
                 ) : (
+                  // Vista de calendario mejorada
                   <div 
-                    className="p-6" 
+                    className="border rounded-md p-4" 
                     style={{
                       height: "450px",
                       maxHeight: "70vh",
                       position: "relative",
                       overflowY: "auto",
-                      marginBottom: "120px" // Espacio adicional después del contenedor
+                      marginBottom: "120px"
                     }}
                   >
-                    <div style={{ paddingBottom: "150px" }}> {/* Espacio adicional dentro del contenedor */}
-                      {groupEntriesByDate().size > 0 ? (
-                        Array.from(groupEntriesByDate().entries())
-                          .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                          .map(([dateStr, entries]) => (
-                            <DaySummary
-                              key={dateStr}
-                              date={new Date(dateStr)}
-                              entries={entries}
-                              personnel={personnel}
-                            />
-                          ))
-                      ) : (
-                        <div className="text-center py-10 text-muted-foreground">
-                          No hay registros para mostrar en el calendario
-                        </div>
-                      )}
+                    {/* Agrupación por semana para la vista de calendario */}
+                    <div className="pb-6">
+                      <h3 className="font-medium text-sm mb-3">Vista Calendario - Registros Agrupados por Fecha</h3>
+                      <div className="space-y-6">
+                        {groupEntriesByDate().size > 0 ? (
+                          Array.from(groupEntriesByDate().entries())
+                            .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
+                            .map(([dateStr, entries]) => (
+                              <div key={dateStr} className="border rounded-md p-3 bg-muted/20">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="text-sm font-semibold text-primary">
+                                    {format(new Date(dateStr), "EEEE dd 'de' MMMM yyyy", { locale: es })}
+                                  </h4>
+                                  <Badge variant="outline" className="font-normal">
+                                    {entries.reduce((sum, entry) => sum + entry.hours, 0)} 
+                                    {entries.reduce((sum, entry) => sum + entry.hours, 0) === 1 ? " hora" : " horas"}
+                                  </Badge>
+                                </div>
+                                <div className="space-y-2">
+                                  {entries.map((entry) => {
+                                    const person = personnel?.find(p => p.id === entry.personnelId);
+                                    return (
+                                      <div 
+                                        key={entry.id} 
+                                        className="flex items-center justify-between bg-background p-2 rounded-md"
+                                      >
+                                        <div className="flex items-center space-x-2">
+                                          <PersonAvatar name={person?.name || "Usuario"} />
+                                          <div>
+                                            <div className="font-medium text-sm">{person?.name}</div>
+                                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                              {entry.description || "Sin descripción"}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                          <Badge variant="outline" className="font-medium">
+                                            {entry.hours} h
+                                          </Badge>
+                                          {!entry.billable && (
+                                            <Badge variant="secondary" className="h-5 text-xs">
+                                              No facturable
+                                            </Badge>
+                                          )}
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 w-7 p-0"
+                                            onClick={() => handleDeleteEntry(entry.id)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <div className="text-center py-10 text-muted-foreground">
+                            No hay registros para mostrar en el calendario
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
