@@ -127,7 +127,7 @@ export const HeaderActions = ({
         ) : (
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">
-              {projectName || "Sin nombre"}
+              {projectName || project?.quotation?.projectName || "Sin nombre"}
             </h1>
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)}>
               <Edit2 className="h-4 w-4" />
