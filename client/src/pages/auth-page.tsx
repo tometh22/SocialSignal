@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
+import epicalLogo from "../assets/epical_logo.jpeg";
 
 // Esquemas de validación
 const loginSchema = z.object({
@@ -81,9 +82,12 @@ export default function AuthPage() {
       <div className="flex items-center justify-center w-full lg:w-1/2 p-8">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
+            <div className="flex justify-center mb-4">
+              <img src={epicalLogo} alt="Epical Digital Logo" className="h-20 object-contain" />
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión Epical</h1>
             <p className="text-gray-600">
-              Accede a la plataforma de gestión de proyectos y cotizaciones
+              Plataforma interna para la gestión de proyectos y cotizaciones
             </p>
           </div>
 
@@ -98,7 +102,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Iniciar Sesión</CardTitle>
                   <CardDescription>
-                    Ingresa tus credenciales para acceder a tu cuenta
+                    Accede con tu cuenta de Epical Digital
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -111,7 +115,7 @@ export default function AuthPage() {
                           <FormItem>
                             <FormLabel>Correo electrónico</FormLabel>
                             <FormControl>
-                              <Input placeholder="nombre@ejemplo.com" {...field} />
+                              <Input placeholder="tunombre@epicaldigital.com" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -160,7 +164,7 @@ export default function AuthPage() {
                 <CardHeader>
                   <CardTitle>Crear Cuenta</CardTitle>
                   <CardDescription>
-                    Regístrate para acceder al sistema
+                    Registra tu cuenta de equipo Epical Digital
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -174,7 +178,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Nombre</FormLabel>
                               <FormControl>
-                                <Input placeholder="Juan" {...field} />
+                                <Input placeholder="Tu nombre" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -187,7 +191,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Apellido</FormLabel>
                               <FormControl>
-                                <Input placeholder="Pérez" {...field} />
+                                <Input placeholder="Tu apellido" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -201,7 +205,7 @@ export default function AuthPage() {
                           <FormItem>
                             <FormLabel>Correo electrónico</FormLabel>
                             <FormControl>
-                              <Input placeholder="nombre@ejemplo.com" {...field} />
+                              <Input placeholder="tunombre@epicaldigital.com" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -265,27 +269,27 @@ export default function AuthPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-r from-blue-500 to-purple-600">
         <div className="flex flex-col items-center justify-center w-full p-12 text-white">
           <div className="max-w-lg text-center">
-            <h2 className="text-4xl font-bold mb-6">Sistema de Gestión de Proyectos</h2>
+            <h2 className="text-4xl font-bold mb-6">Sistema Interno Epical</h2>
             <p className="text-xl mb-8">
-              Una plataforma completa para gestionar tus proyectos de monitoreo social, 
-              cotizaciones, y seguimiento de tiempo con análisis detallado de costos.
+              Plataforma completa para el equipo de Epical Digital que facilita la gestión de proyectos, 
+              cotizaciones y seguimiento de tiempo con comunicación interna integrada.
             </p>
             <div className="grid grid-cols-2 gap-4 text-left">
               <div className="bg-white/10 p-4 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">Cotizaciones Inteligentes</h3>
-                <p>Genera cotizaciones basadas en plantillas con cálculos automatizados.</p>
+                <p>Crea y gestiona cotizaciones para presentar a clientes con cálculos precisos.</p>
               </div>
               <div className="bg-white/10 p-4 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">Gestión de Proyectos</h3>
-                <p>Administra proyectos activos con seguimiento detallado de avances.</p>
+                <p>Coordina proyectos en curso y mantén informado a todo el equipo sobre avances.</p>
               </div>
               <div className="bg-white/10 p-4 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">Registro de Horas</h3>
-                <p>Seguimiento preciso del tiempo invertido por cada miembro del equipo.</p>
+                <p>Control de tiempo dedicado por cada integrante del equipo Epical a los proyectos.</p>
               </div>
               <div className="bg-white/10 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Análisis Financiero</h3>
-                <p>Visualiza el rendimiento financiero de proyectos y clientes.</p>
+                <h3 className="font-semibold text-lg mb-2">Chat Interno</h3>
+                <p>Comunícate con el equipo directamente dentro de la plataforma para coordinar tareas.</p>
               </div>
             </div>
           </div>
