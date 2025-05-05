@@ -1361,24 +1361,33 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Eliminando proyecto ID ${id}...`);
       
-      // 2. Eliminar todas las entradas de tiempo asociadas al proyecto
-      const timeDeleteResult = await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
-      console.log(`Entradas de tiempo eliminadas: ${JSON.stringify(timeDeleteResult)}`);
-      
-      // 3. Eliminar todos los informes de progreso asociados al proyecto
-      const reportDeleteResult = await db.delete(progressReports).where(eq(progressReports.projectId, id));
-      console.log(`Informes de progreso eliminados: ${JSON.stringify(reportDeleteResult)}`);
-      
-      // 4. Eliminar el proyecto
-      const projectDeleteResult = await db.delete(activeProjects).where(eq(activeProjects.id, id));
-      console.log(`Resultado de eliminación del proyecto: ${JSON.stringify(projectDeleteResult)}`);
-      
-      // 5. Verificar que se haya eliminado
-      const projectExists = await this.getActiveProject(id);
-      const deleted = !projectExists;
-      console.log(`Proyecto con ID ${id} eliminado: ${deleted}`);
-      
-      return deleted;
+      // Usar SQL directo para asegurar la eliminación correcta
+      try {
+        // 1. Eliminar conversaciones de chat relacionadas con el proyecto
+        const chatDeleteQuery = `DELETE FROM chat_conversations WHERE project_id = $1`;
+        await pool.query(chatDeleteQuery, [id]);
+        console.log(`Conversaciones de chat eliminadas para el proyecto ${id}`);
+        
+        // 2. Eliminar entradas de tiempo
+        const timeDeleteQuery = `DELETE FROM time_entries WHERE project_id = $1`;
+        await pool.query(timeDeleteQuery, [id]);
+        console.log(`Entradas de tiempo eliminadas para el proyecto ${id}`);
+        
+        // 3. Eliminar informes de progreso
+        const progressDeleteQuery = `DELETE FROM progress_reports WHERE project_id = $1`;
+        await pool.query(progressDeleteQuery, [id]);
+        console.log(`Informes de progreso eliminados para el proyecto ${id}`);
+        
+        // 4. Finalmente eliminar el proyecto
+        const projectDeleteQuery = `DELETE FROM active_projects WHERE id = $1`;
+        const result = await pool.query(projectDeleteQuery, [id]);
+        console.log(`Resultado de eliminación SQL: ${result.rowCount} fila(s) eliminada(s)`);
+        
+        return result.rowCount > 0;
+      } catch (sqlError) {
+        console.error("Error SQL al eliminar el proyecto:", sqlError);
+        throw sqlError;
+      }
     } catch (error) {
       console.error("Error al eliminar el proyecto activo:", error);
       return false;
