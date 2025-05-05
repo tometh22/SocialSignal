@@ -55,7 +55,7 @@ export default function Clients() {
 
   const createMutation = useMutation({
     mutationFn: (client: InsertClient) => 
-      apiRequest("POST", "/api/clients", client),
+      apiRequest("/api/clients", "POST", client),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
@@ -76,7 +76,7 @@ export default function Clients() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InsertClient> }) => 
-      apiRequest("PATCH", `/api/clients/${id}`, data),
+      apiRequest(`/api/clients/${id}`, "PATCH", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
       toast({
