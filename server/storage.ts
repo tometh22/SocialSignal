@@ -77,6 +77,7 @@ export interface IStorage {
   createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
   updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
   getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
+  deleteActiveProject(id: number): Promise<boolean>;
   
   // Time entry operations
   getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
@@ -1347,6 +1348,32 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(activeProjects)
       .where(eq(activeProjects.quotationId, quotationId));
+  }
+  
+  async deleteActiveProject(id: number): Promise<boolean> {
+    try {
+      // 1. Verificar que el proyecto exista
+      const project = await this.getActiveProject(id);
+      if (!project) {
+        return false;
+      }
+      
+      // 2. Eliminar todas las entradas de tiempo asociadas al proyecto
+      await db.delete(timeEntries).where(eq(timeEntries.projectId, id));
+      
+      // 3. Eliminar todos los informes de progreso asociados al proyecto
+      await db.delete(progressReports).where(eq(progressReports.projectId, id));
+      
+      // 4. Eliminar el proyecto
+      await db.delete(activeProjects).where(eq(activeProjects.id, id));
+      
+      // 5. Verificar que se haya eliminado
+      const projectExists = await this.getActiveProject(id);
+      return !projectExists;
+    } catch (error) {
+      console.error("Error al eliminar el proyecto activo:", error);
+      return false;
+    }
   }
   
   // Time entry operations
