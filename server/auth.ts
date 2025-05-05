@@ -106,8 +106,6 @@ export function setupAuth(app: Express) {
         firstName,
         lastName,
         isAdmin: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
       
       // Establecer la sesión

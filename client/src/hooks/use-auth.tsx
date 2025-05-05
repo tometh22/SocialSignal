@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<UserType | null, Error>({
     queryKey: ["/api/current-user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    refetchInterval: 2 * 60 * 1000, // Refrescar cada 2 minutos
   });
 
   const loginMutation = useMutation({
