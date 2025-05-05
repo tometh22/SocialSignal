@@ -11,22 +11,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertTriangle,
   Bell,
-  CheckCircle,
+  CheckCircle, 
   ChevronsRight,
   Search,
   Settings,
   LogOut,
   ChevronRight,
-  Moon,
-  Sun,
+  ClockIcon,
+  BarChart,
+  FileWarning,
   MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Importación de los componentes de funcionalidades
 import { GlobalSearch } from "@/components/features/global-search";
-import { CalendarPopup } from "@/components/features/calendar-popup";
 import { MessagesPopup } from "@/components/features/messages-popup";
 import { HelpPopup } from "@/components/features/help-popup";
 
@@ -37,31 +38,43 @@ type Notification = {
   time: string;
   read: boolean;
   type: 'info' | 'success' | 'warning';
+  projectId?: number;
 };
 
 export default function Topbar() {
   const [location] = useLocation();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  
+  // Notificaciones relacionadas con riesgos de proyectos
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
-      title: 'Cotización aprobada',
-      message: 'La cotización para XYZ Corp ha sido aprobada',
-      time: 'hace 10 min',
+      title: 'Proyecto en riesgo',
+      message: 'Warner Bros. - 80% del presupuesto consumido',
+      time: 'hace 2 días',
       read: false,
-      type: 'success'
+      type: 'warning',
+      projectId: 1
     },
     {
       id: '2',
-      title: 'Nuevo comentario',
-      message: 'Juan ha comentado en el proyecto Alpha',
-      time: 'hace 30 min',
+      title: 'Fecha de entrega próxima',
+      message: 'Proyecto Warner - 5 días para la entrega',
+      time: 'hace 1 día',
       read: false,
-      type: 'info' 
+      type: 'warning',
+      projectId: 1
+    },
+    {
+      id: '3',
+      title: 'Horas excedidas',
+      message: 'Proyecto uberchil - 110% de horas planeadas',
+      time: 'hace 3 horas',
+      read: false,
+      type: 'warning',
+      projectId: 3
     }
   ]);
-  // Inicializamos el modo claro como activo por defecto
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Calcular el número de notificaciones no leídas
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -95,6 +108,7 @@ export default function Topbar() {
       'admin': 'Administración',
       'project-summary': 'Resumen de Proyecto',
       'client-summary': 'Resumen de Cliente',
+      'time-entries': 'Registro de Horas',
     };
     
     // Generar las migas de pan
@@ -112,18 +126,11 @@ export default function Topbar() {
   
   const breadcrumbs = generateBreadcrumbs();
 
-  // Toggle para modo oscuro
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-    
-    // Implementación del cambio de tema
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.remove('dark');
+  // Navegar al proyecto desde una notificación
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    if (notification.projectId) {
+      window.location.href = `/project-summary/${notification.projectId}`;
     }
   };
 
@@ -160,19 +167,6 @@ export default function Topbar() {
             <Search className="h-4.5 w-4.5" />
           </Button>
           
-          {/* Toggle modo oscuro/claro */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDarkMode}
-            className="h-9 w-9 text-muted-foreground hover:text-foreground"
-          >
-            {isDarkMode ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
-          </Button>
-          
-          {/* Calendario - Usando el componente CalendarPopup */}
-          <CalendarPopup />
-          
           {/* Mensajes - Usando el componente MessagesPopup */}
           <MessagesPopup />
           
@@ -191,7 +185,7 @@ export default function Topbar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
               <div className="flex items-center justify-between px-4 py-2">
-                <DropdownMenuLabel className="font-normal">Notificaciones</DropdownMenuLabel>
+                <DropdownMenuLabel className="font-normal">Alertas de Proyectos</DropdownMenuLabel>
                 {unreadCount > 0 && (
                   <Button 
                     variant="ghost" 
@@ -216,17 +210,22 @@ export default function Topbar() {
                     >
                       <button 
                         className="w-full text-left px-4 py-2.5 flex items-start gap-3"
-                        onClick={() => markAsRead(notification.id)}
+                        onClick={() => handleNotificationClick(notification)}
                       >
                         <div className={cn(
                           "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
                           notification.type === 'success' && "bg-success/10 text-success",
                           notification.type === 'info' && "bg-info/10 text-info",
-                          notification.type === 'warning' && "bg-warning/10 text-warning"
+                          notification.type === 'warning' && "bg-amber-100 text-amber-700"
                         )}>
                           {notification.type === 'success' && <CheckCircle className="h-4 w-4" />}
                           {notification.type === 'info' && <MessageSquare className="h-4 w-4" />}
-                          {notification.type === 'warning' && <Bell className="h-4 w-4" />}
+                          {notification.type === 'warning' && (
+                            notification.message.includes('presupuesto') ? <BarChart className="h-4 w-4" /> :
+                            notification.message.includes('fecha') ? <ClockIcon className="h-4 w-4" /> :
+                            notification.message.includes('horas') ? <AlertTriangle className="h-4 w-4" /> :
+                            <FileWarning className="h-4 w-4" />
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -247,7 +246,7 @@ export default function Topbar() {
                   ))
                 ) : (
                   <div className="py-8 text-center">
-                    <p className="text-sm text-muted-foreground">No hay notificaciones</p>
+                    <p className="text-sm text-muted-foreground">No hay alertas de proyectos</p>
                   </div>
                 )}
               </div>
@@ -255,7 +254,7 @@ export default function Topbar() {
               <DropdownMenuItem asChild className="p-0 focus:bg-transparent">
                 <Link href="/notifications" className="w-full">
                   <div className="px-4 py-2 text-xs text-center text-muted-foreground hover:text-primary flex items-center justify-center">
-                    Ver todas las notificaciones
+                    Ver todas las alertas
                     <ChevronsRight className="h-3.5 w-3.5 ml-1" />
                   </div>
                 </Link>

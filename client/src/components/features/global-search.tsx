@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, FileText, Users, Briefcase, X } from "lucide-react";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { Quotation, ActiveProject, Client } from "@shared/schema";
 
 type SearchResult = {
   id: string | number;
@@ -20,58 +22,99 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [, navigate] = useLocation();
 
+  // Datos para buscar
+  const [projects, setProjects] = useState<ActiveProject[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+
+  // Cargar datos cuando se abre el buscador
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
+    if (isOpen) {
+      const fetchSearchData = async () => {
+        setIsLoading(true);
+        try {
+          const [projectsData, quotationsData, clientsData] = await Promise.all([
+            apiRequest('/api/active-projects'),
+            apiRequest('/api/quotations'),
+            apiRequest('/api/clients')
+          ]);
+          
+          setProjects(projectsData || []);
+          setQuotations(quotationsData || []);
+          setClients(clientsData || []);
+        } catch (error) {
+          console.error("Error al cargar datos para búsqueda:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchSearchData();
+      
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
     }
   }, [isOpen]);
 
+  // Realizar búsqueda con los datos cargados
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm.trim().length > 1) {
-        setIsLoading(true);
-        // Simulación de búsqueda - reemplazar con llamada real a API
-        setTimeout(() => {
-          const searchResults: SearchResult[] = [
-            // Proyectos
-            {
-              id: 1,
-              type: 'project',
-              title: 'Desarrollo Web Warner',
-              subtitle: 'Activo',
-              path: '/project-summary/1'
-            },
-            // Cotizaciones
-            {
-              id: 5,
-              type: 'quote',
-              title: 'Diseño UX/UI',
-              subtitle: 'Pendiente',
-              path: '/quote/5'
-            },
-            // Clientes
-            {
-              id: 9,
-              type: 'client',
-              title: 'Acme Corporation',
-              subtitle: 'Cliente',
-              path: '/clients/9'
-            }
-          ].filter(item => 
-            item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.subtitle?.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-          
-          setResults(searchResults);
-          setIsLoading(false);
-        }, 300);
-      } else {
-        setResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+    if (searchTerm.trim().length > 1) {
+      setIsLoading(true);
+      
+      // Buscar en proyectos
+      const projectResults: SearchResult[] = projects
+        .filter(project => 
+          project.quotation?.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          project.quotation?.client?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .map(project => ({
+          id: project.id,
+          type: 'project',
+          title: project.quotation?.projectName || `Proyecto #${project.id}`,
+          subtitle: `${project.status === 'active' ? 'Activo' : project.status} - ${project.quotation?.client?.name || 'Sin cliente'}`,
+          path: `/project-summary/${project.id}`
+        }));
+      
+      // Buscar en cotizaciones
+      const quoteResults: SearchResult[] = quotations
+        .filter(quote => 
+          quote.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          quote.status?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .map(quote => ({
+          id: quote.id,
+          type: 'quote',
+          title: quote.projectName || `Cotización #${quote.id}`,
+          subtitle: quote.status === 'pending' ? 'Pendiente' : 
+                    quote.status === 'approved' ? 'Aprobada' : 
+                    quote.status === 'rejected' ? 'Rechazada' : 
+                    quote.status === 'in-negotiation' ? 'En Negociación' : quote.status,
+          path: `/quote/${quote.id}`
+        }));
+      
+      // Buscar en clientes
+      const clientResults: SearchResult[] = clients
+        .filter(client => 
+          client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          client.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          client.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .map(client => ({
+          id: client.id,
+          type: 'client',
+          title: client.name || `Cliente #${client.id}`,
+          subtitle: client.contactName || 'Cliente',
+          path: `/client-summary/${client.id}`
+        }));
+      
+      // Combinar resultados y ordenar por relevancia
+      setResults([...projectResults, ...quoteResults, ...clientResults]);
+      setIsLoading(false);
+    } else {
+      setResults([]);
+    }
+  }, [searchTerm, projects, quotations, clients]);
 
   const handleResultClick = (path: string) => {
     navigate(path);
@@ -94,6 +137,7 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md" onEscapeKeyDown={onClose}>
+        <DialogTitle className="sr-only">Búsqueda global</DialogTitle>
         <div className="p-1">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
