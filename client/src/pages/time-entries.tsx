@@ -72,6 +72,7 @@ import {
   ClipboardList,
   Calendar as CalendarSquare,
   BarChart3,
+  Briefcase,
   DollarSign,
   FolderKanban,
   MoreHorizontal,
@@ -753,153 +754,173 @@ const TimeEntries: React.FC = () => {
               Volver a Proyectos
             </Button>
             
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap justify-between items-center">
-                  <div>
-                    <CardTitle className="text-2xl">Registro de Horas</CardTitle>
-                    <CardDescription>
-                      Proyecto: {project?.quotation?.projectName || "Sin nombre"}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setLocation(`/project-summary/${projectId}`)}>
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Ver resumen
-                    </Button>
-                    <Button size="sm" onClick={() => setDialogOpen(true)}>
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Registrar Horas
-                    </Button>
-                  </div>
+            <div className="mb-6 bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="p-6 md:flex md:items-center md:justify-between">
+                <div className="mb-4 md:mb-0">
+                  <h1 className="text-2xl font-bold tracking-tight mb-1">Registro de Horas</h1>
+                  <p className="text-muted-foreground flex items-center">
+                    <Briefcase className="h-4 w-4 mr-1.5 text-primary/70" />
+                    <span>Proyecto: <span className="font-medium text-foreground">{project?.quotation?.projectName || "Sin nombre"}</span></span>
+                  </p>
                 </div>
-              </CardHeader>
+                <div className="flex gap-2 mt-2 md:mt-0">
+                  <Button 
+                    variant="outline" 
+                    className="h-9 px-3 border-muted-foreground/20 hover:bg-muted/20" 
+                    onClick={() => setLocation(`/project-summary/${projectId}`)}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Ver resumen
+                  </Button>
+                  <Button 
+                    className="h-9 px-4" 
+                    onClick={() => setDialogOpen(true)}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Registrar Horas
+                  </Button>
+                </div>
+              </div>
               
               <CardContent>
                 <div className="flex flex-wrap gap-3 mb-4">
-                  <div className="flex-1 max-w-[300px]">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="search"
-                        placeholder="Buscar registros..."
-                        className="pl-9"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
+                  {/* Barra de acciones principal */}
+                  <div className="flex justify-between w-full bg-card rounded-md border shadow-sm p-2">
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-[260px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="search"
+                          placeholder="Buscar registros..."
+                          className="pl-9 h-9"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="flex h-9 border rounded-md p-0.5 bg-muted/5">
+                        <Button
+                          variant={viewMode === "list" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-full rounded-r-none"
+                          onClick={() => setViewMode("list")}
+                        >
+                          <ClipboardList className="h-4 w-4 mr-1" />
+                          Lista
+                        </Button>
+                        <Button
+                          variant={viewMode === "calendar" ? "default" : "ghost"}
+                          size="sm"
+                          className="h-full rounded-l-none"
+                          onClick={() => setViewMode("calendar")}
+                        >
+                          <CalendarSquare className="h-4 w-4 mr-1" />
+                          Calendario
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Tabs defaultValue="all" className="w-[400px]" value={activeTab} onValueChange={setActiveTab}>
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="all">Todos</TabsTrigger>
-                        <TabsTrigger value="billable">Facturables</TabsTrigger>
-                        <TabsTrigger value="non-billable">No Facturables</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    <div className="flex border rounded-md p-0.5 h-9">
-                      <Button
-                        variant={viewMode === "list" ? "default" : "outline"}
-                        size="sm"
-                        className="h-full rounded-r-none"
-                        onClick={() => setViewMode("list")}
+                    
+                    <div className="flex items-center gap-3">
+                      <Tabs 
+                        defaultValue="all" 
+                        className="h-9" 
+                        value={activeTab} 
+                        onValueChange={setActiveTab}
                       >
-                        <ClipboardList className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "calendar" ? "default" : "outline"}
-                        size="sm"
-                        className="h-full rounded-l-none"
-                        onClick={() => setViewMode("calendar")}
-                      >
-                        <CalendarSquare className="h-4 w-4" />
-                      </Button>
+                        <TabsList className="h-9 bg-muted/5">
+                          <TabsTrigger value="all" className="px-3 h-7">Todos</TabsTrigger>
+                          <TabsTrigger value="billable" className="px-3 h-7">Facturables</TabsTrigger>
+                          <TabsTrigger value="non-billable" className="px-3 h-7">No Facturables</TabsTrigger>
+                        </TabsList>
+                      </Tabs>
                     </div>
                   </div>
                   
                   {/* Controles de vista de calendario, solo visibles cuando calendario está activo */}
                   {viewMode === "calendar" && (
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between border rounded-md p-1">
-                        <div className="text-sm text-muted-foreground mr-3 ml-2">Vista:</div>
-                        <div className="flex">
-                          <Button
-                            variant={calendarView === "day" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCalendarView("day")}
-                          >
-                            Día
-                          </Button>
-                          <Button
-                            variant={calendarView === "week" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCalendarView("week")}
-                          >
-                            Semana
-                          </Button>
-                          <Button
-                            variant={calendarView === "fortnight" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCalendarView("fortnight")}
-                          >
-                            Quincena
-                          </Button>
-                          <Button
-                            variant={calendarView === "month" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCalendarView("month")}
-                          >
-                            Mes
-                          </Button>
+                    <div className="w-full flex flex-col md:flex-row gap-3">
+                      {/* Control de vista de período */}
+                      <div className="flex-none">
+                        <div className="flex items-center border rounded-md overflow-hidden">
+                          <div className="text-xs font-medium text-muted-foreground px-3 py-2 border-r bg-muted/5">
+                            Vista:
+                          </div>
+                          <div className="flex">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-9 rounded-none px-3 ${calendarView === "day" ? "bg-primary/10 text-primary" : ""}`}
+                              onClick={() => setCalendarView("day")}
+                            >
+                              Día
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-9 rounded-none px-3 ${calendarView === "week" ? "bg-primary/10 text-primary" : ""}`}
+                              onClick={() => setCalendarView("week")}
+                            >
+                              Semana
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-9 rounded-none px-3 ${calendarView === "fortnight" ? "bg-primary/10 text-primary" : ""}`}
+                              onClick={() => setCalendarView("fortnight")}
+                            >
+                              Quincena
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-9 rounded-none px-3 ${calendarView === "month" ? "bg-primary/10 text-primary" : ""}`}
+                              onClick={() => setCalendarView("month")}
+                            >
+                              Mes
+                            </Button>
+                          </div>
                         </div>
                       </div>
                       
-                      {/* Mostrar el rango de fecha según el período seleccionado + controles para cambiar meses */}
-                      <div className="p-2 bg-muted/30 rounded-md">
-                        <div className="flex items-center justify-between mb-2">
+                      {/* Navegador de períodos */}
+                      <div className="flex-grow">
+                        <div className="flex items-center h-full border rounded-md p-2 bg-card">
                           <div className="flex items-center">
                             <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0 mr-1"
+                              variant="outline" 
+                              size="icon"
+                              className="h-7 w-7 mr-2 rounded-full"
                               onClick={() => setSelectedDate(subMonths(selectedDate, 1))}
                             >
                               <ChevronLeft className="h-4 w-4" />
                             </Button>
-                            <span className="font-medium">
+                            
+                            <span className="font-medium text-base">
                               {format(selectedDate, "MMMM yyyy", { locale: es })}
                             </span>
+                            
                             <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 w-8 p-0 ml-1"
+                              variant="outline" 
+                              size="icon"
+                              className="h-7 w-7 ml-2 rounded-full"
                               onClick={() => setSelectedDate(addMonths(selectedDate, 1))}
                             >
                               <ChevronRight className="h-4 w-4" />
                             </Button>
                           </div>
-                          <Badge variant="outline" className="ml-2">
-                            {getEntriesForPeriod().length} {getEntriesForPeriod().length === 1 ? "registro" : "registros"}
-                          </Badge>
-                        </div>
-                        
-                        <div className="text-xs text-muted-foreground">
-                          {calendarView === "day" && (
-                            <span>Mostrando: {format(selectedDate, "EEEE dd 'de' MMMM yyyy", { locale: es })}</span>
-                          )}
-                          {calendarView === "week" && (
-                            <span>
-                              Mostrando semana: {format(startOfWeek(selectedDate), "dd/MM/yyyy", { locale: es })} - {format(endOfWeek(selectedDate), "dd/MM/yyyy", { locale: es })}
-                            </span>
-                          )}
-                          {calendarView === "fortnight" && (
-                            <span>
-                              Mostrando {selectedDate.getDate() <= 15 ? "primera" : "segunda"} quincena de {format(selectedDate, "MMMM yyyy", { locale: es })}
-                            </span>
-                          )}
-                          {calendarView === "month" && (
-                            <span>Mostrando mes completo: {format(selectedDate, "MMMM yyyy", { locale: es })}</span>
-                          )}
+                          
+                          <div className="ml-auto flex items-center gap-2">
+                            <div className="text-xs text-muted-foreground mr-2">
+                              {calendarView === "day" ? format(selectedDate, "EEEE dd", { locale: es }) : ""}
+                              {calendarView === "week" ? `Semana ${format(startOfWeek(selectedDate), "dd")} - ${format(endOfWeek(selectedDate), "dd")}` : ""}
+                              {calendarView === "fortnight" ? `${selectedDate.getDate() <= 15 ? "1ª" : "2ª"} quincena` : ""}
+                              {calendarView === "month" ? "Mes completo" : ""}
+                            </div>
+                            
+                            <Badge variant="outline" className="h-6">
+                              {getEntriesForPeriod().length} {getEntriesForPeriod().length === 1 ? "registro" : "registros"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1064,20 +1085,20 @@ const TimeEntries: React.FC = () => {
                     <div className="p-4">
                       {calendarView === "month" ? (
                         <div>
-                          {/* Cabecera con los días de la semana */}
-                          <div className="grid grid-cols-7 gap-0 mb-2 border-b pb-2">
+                          {/* Cabecera con los días de la semana - Estilo mejorado */}
+                          <div className="grid grid-cols-7 gap-0 mb-2 border-b pb-2 bg-muted/5">
                             {["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"].map((dayName, idx) => (
                               <div 
                                 key={idx} 
-                                className="text-center text-sm font-medium text-muted-foreground p-1"
+                                className="text-center text-xs font-semibold py-2 text-muted-foreground"
                               >
                                 {dayName}
                               </div>
                             ))}
                           </div>
                           
-                          {/* Rejilla del calendario */}
-                          <div className="grid grid-cols-7 gap-0 border-l">
+                          {/* Rejilla del calendario - Estilo mejorado */}
+                          <div className="grid grid-cols-7 gap-[1px] bg-muted/10 rounded-md overflow-hidden">
                             {/* Generación dinámica de los días del mes */}
                             {(() => {
                               const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
@@ -1103,6 +1124,13 @@ const TimeEntries: React.FC = () => {
                                 entriesByDate.get(dateStr)?.push(entry);
                               });
                               
+                              const isToday = (date: Date) => {
+                                const today = new Date();
+                                return date.getDate() === today.getDate() && 
+                                       date.getMonth() === today.getMonth() && 
+                                       date.getFullYear() === today.getFullYear();
+                              };
+                              
                               // Generar celdas para el calendario
                               for (let i = 0; i < totalCells; i++) {
                                 const dayNumber = i - startDay + 1;
@@ -1113,58 +1141,58 @@ const TimeEntries: React.FC = () => {
                                   const dateStr = format(currentDate, "yyyy-MM-dd");
                                   const entries = entriesByDate.get(dateStr) || [];
                                   const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
+                                  const today = isToday(currentDate);
                                   
                                   days.push(
                                     <div 
                                       key={i} 
-                                      className={`min-h-[120px] p-1 border-r border-b ${
-                                        new Date().toDateString() === currentDate.toDateString() 
-                                          ? 'bg-primary/5' 
-                                          : ''
+                                      className={`min-h-[100px] bg-white ${
+                                        today ? 'ring-2 ring-primary/20 ring-inset' : ''
                                       }`}
                                     >
-                                      <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-sm font-medium p-1 rounded-full w-6 h-6 flex items-center justify-center ${
-                                          new Date().toDateString() === currentDate.toDateString() 
-                                            ? 'bg-primary text-primary-foreground' 
-                                            : ''
+                                      <div className="flex justify-between items-center p-1 border-b">
+                                        <span className={`text-sm font-medium flex items-center justify-center ${
+                                          today ? 'text-primary' : 'text-gray-700'
                                         }`}>
-                                          {dayNumber}
+                                          <span className={`h-6 w-6 flex items-center justify-center rounded-full ${
+                                            today ? 'bg-primary text-white' : ''
+                                          }`}>
+                                            {dayNumber}
+                                          </span>
                                         </span>
                                         {entries.length > 0 && (
-                                          <Badge variant="outline" className="text-xs">
+                                          <Badge variant="outline" className="text-xs h-5">
                                             {totalHours}h
                                           </Badge>
                                         )}
                                       </div>
                                       
-                                      {/* Mostrar entradas para este día */}
-                                      <div className="space-y-1">
-                                        {entries.slice(0, 2).map(entry => {
+                                      {/* Mostrar entradas para este día - Estilo mejorado */}
+                                      <div className="p-1">
+                                        {entries.slice(0, 3).map(entry => {
                                           const person = personnel?.find(p => p.id === entry.personnelId);
                                           return (
                                             <div 
                                               key={entry.id} 
                                               className={`
-                                                text-xs p-1 rounded
+                                                text-xs mb-1 py-1 px-1.5 rounded flex items-center gap-1.5 overflow-hidden
                                                 ${entry.billable 
-                                                  ? 'bg-green-50 text-green-700 border-l-2 border-green-500' 
-                                                  : 'bg-amber-50 text-amber-700 border-l-2 border-amber-500'
+                                                  ? 'bg-green-50 border-l-[3px] border-green-400 text-green-700' 
+                                                  : 'bg-amber-50 border-l-[3px] border-amber-400 text-amber-700'
                                                 }
-                                                flex items-center gap-1 overflow-hidden
                                               `}
                                               title={`${person?.name || 'Usuario'} - ${entry.hours}h - ${entry.description || 'Sin descripción'}`}
                                             >
-                                              <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-current" />
+                                              <div className="flex-shrink-0 w-2 h-2 rounded-full bg-current" />
                                               <span className="truncate font-medium">{person?.name || 'Usuario'}</span>
-                                              <span className="ml-auto">{entry.hours}h</span>
+                                              <span className="ml-auto font-semibold">{entry.hours}h</span>
                                             </div>
                                           );
                                         })}
                                         
-                                        {entries.length > 2 && (
-                                          <div className="text-xs text-center text-muted-foreground mt-1">
-                                            + {entries.length - 2} más
+                                        {entries.length > 3 && (
+                                          <div className="text-xs text-center py-0.5 px-1 bg-muted/5 rounded text-muted-foreground">
+                                            + {entries.length - 3} más
                                           </div>
                                         )}
                                         
@@ -1172,7 +1200,7 @@ const TimeEntries: React.FC = () => {
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="w-full h-7 text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity"
+                                            className="w-full h-6 text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity"
                                             onClick={() => {
                                               const dateObj = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), dayNumber);
                                               setDialogOpen(true);
@@ -1186,9 +1214,9 @@ const TimeEntries: React.FC = () => {
                                     </div>
                                   );
                                 } else {
-                                  // Días fuera del mes actual
+                                  // Días fuera del mes actual - Estilo mejorado
                                   days.push(
-                                    <div key={i} className="min-h-[120px] p-1 border-r border-b bg-muted/10" />
+                                    <div key={i} className="min-h-[100px] bg-gray-50/50" />
                                   );
                                 }
                               }
@@ -1278,7 +1306,7 @@ const TimeEntries: React.FC = () => {
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </div>
           </div>
 
           {/* Diálogo de nuevo registro de tiempo */}
