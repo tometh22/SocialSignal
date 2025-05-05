@@ -192,38 +192,30 @@ const ProjectSummary = () => {
 
       console.log("Actualizando inmediatamente la UI");
       
-      // Forzar actualización directa en la UI antes de la petición API
-      setProject(updatedProject);
-      
-      // Actualizar también el cache para mantener coherencia
+      // Actualizar directamente el cache de React Query para actualizar la UI
       queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
-      queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
-        return old?.map(p => p.id === parsedProjectId ? updatedProject : p) ?? [];
+      
+      // Actualizar la lista de proyectos activos si existe en caché
+      queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
+        if (!old) return undefined;
+        return old.map(p => p.id === parsedProjectId ? updatedProject : p);
       });
 
       console.log("Enviando solicitud al servidor");
       console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
       console.log("Datos enviados:", { name: newName });
       
-      const response = await apiRequest(
+      // Enviar la solicitud al servidor
+      await apiRequest(
         'PATCH', 
         `/api/projects/${parsedProjectId}/update-name`, 
         { name: newName }
       );
       
-      console.log("Respuesta del servidor:", response);
-
-      // Refrescar los datos después de la respuesta exitosa para asegurar sincronización
+      // Invalidar consultas para asegurar que todos los datos están sincronizados
       console.log("Invalidando consultas para sincronizar datos");
-      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      await queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
-      
-      // Mostrar notificación de éxito
-      toast({
-        title: "Nombre actualizado",
-        description: "El nombre del proyecto se ha actualizado con éxito",
-        variant: "default",
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
       
       console.log("Actualización completada con éxito");
     } catch (error) {
@@ -231,21 +223,15 @@ const ProjectSummary = () => {
       
       // Revertir cambios en caso de error
       if (project) {
-        setProject(project);
-        
         // Restablecer caché
         queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], project);
-        queryClient.setQueryData(['/api/active-projects'], (old: any[]) => {
-          return old?.map(p => p.id === parsedProjectId ? project : p) ?? [];
+        queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
+          if (!old) return undefined;
+          return old.map(p => p.id === parsedProjectId ? project : p);
         });
       }
       
-      // Mostrar notificación de error
-      toast({
-        title: "Error al actualizar",
-        description: "No se pudo actualizar el nombre del proyecto. Intente nuevamente.",
-        variant: "destructive",
-      });
+      console.error("No se pudo actualizar el nombre del proyecto. Intente nuevamente.");
     }
   };
 
