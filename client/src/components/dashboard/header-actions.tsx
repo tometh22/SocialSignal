@@ -50,12 +50,14 @@ export const HeaderActions = ({
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [displayName, setDisplayName] = useState(projectName);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Actualizar el nombre editado cuando cambia el nombre del proyecto
+  // Actualizar el nombre editado y mostrado cuando cambia el nombre del proyecto
   useEffect(() => {
     if (projectName) {
       setEditedName(projectName);
+      setDisplayName(projectName);
     }
   }, [projectName]);
 
@@ -81,6 +83,9 @@ export const HeaderActions = ({
       // Activar estado de carga
       setIsSaving(true);
       
+      // Actualizamos inmediatamente el nombre en la UI
+      setDisplayName(trimmedName);
+      
       // Guardar el nombre del proyecto - esperar a que la operación se complete
       await onSaveProjectName(trimmedName);
       
@@ -97,6 +102,9 @@ export const HeaderActions = ({
     } catch (error) {
       console.error("Error al guardar el nombre:", error);
       
+      // Revertir el nombre en caso de error
+      setDisplayName(projectName);
+      
       // Mostrar notificación de error
       toast({
         title: "Error",
@@ -111,6 +119,7 @@ export const HeaderActions = ({
   const handleCancel = () => {
     // Cancelar la edición y restaurar el nombre original
     setEditedName(projectName || "");
+    setDisplayName(projectName || "");
     setEditing(false);
   };
 
@@ -199,7 +208,7 @@ export const HeaderActions = ({
         ) : (
           <div className="flex items-center gap-1.5">
             <h1 className="text-lg font-bold project-name">
-              {projectName || "Sin nombre"}
+              {displayName || "Sin nombre"}
             </h1>
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)} className="h-7 w-7">
               <Edit2 className="h-3.5 w-3.5" />
