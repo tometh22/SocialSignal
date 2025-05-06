@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
@@ -19,6 +19,8 @@ import {
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
+import { upload, deleteOldFile } from "./upload";
+import path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create the HTTP server
@@ -26,6 +28,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup authentication with storage
   setupAuth(app, storage);
+  
+  // Servir archivos estáticos desde public
+  app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
   
   // Temporalmente deshabilitado: Chat websocket server
   // setupChat(app, httpServer);
@@ -78,6 +83,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid client data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update client" });
+    }
+  });
+  
+  // Ruta para cargar logo de cliente
+  app.post("/api/clients/:id/logo", upload.single('logo'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No logo file provided" });
+      }
+      
+      // Obtener el cliente actual para ver si ya tiene un logo
+      const client = await storage.getClient(id);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Si existe un logo anterior, eliminar el archivo
+      if (client.logoUrl) {
+        deleteOldFile(client.logoUrl.replace(/^\/uploads\//, 'public/uploads/'));
+      }
+      
+      // Actualizar el cliente con la nueva URL del logo
+      const logoUrl = `/uploads/${path.basename(req.file.path)}`;
+      
+      const updatedClient = await storage.updateClient(id, {
+        logoUrl: logoUrl
+      });
+      
+      res.json(updatedClient);
+    } catch (error) {
+      console.error("Error uploading client logo:", error);
+      res.status(500).json({ message: "Failed to upload client logo", error: String(error) });
     }
   });
 

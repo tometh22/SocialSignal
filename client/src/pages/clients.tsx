@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,7 @@ import { Client, InsertClient } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart } from "lucide-react";
+import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart, Upload, Image } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,8 @@ export default function Clients() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const form = useForm<ClientFormValues>({
