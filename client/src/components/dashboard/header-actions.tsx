@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calendar, 
   Eye,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderActionsProps {
   projectName: string;
@@ -45,14 +46,27 @@ export const HeaderActions = ({
   onSettingsClick,
   onSaveProjectName
 }: HeaderActionsProps) => {
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [visibleName, setVisibleName] = useState(projectName);
+  const intervalRef = useRef<number | null>(null);
+  
+  // Limpiar el intervalo si existe cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
 
-  // Actualizar el nombre editado cuando cambia el nombre del proyecto
+  // Actualizar los estados locales cuando cambia el projectName
   useEffect(() => {
     if (projectName) {
       setEditedName(projectName);
+      setVisibleName(projectName);
     }
   }, [projectName]);
 
@@ -66,31 +80,80 @@ export const HeaderActions = ({
     }
     
     try {
-      // Activar estado de carga
+      // 1. Actualizar el estado local para visualización inmediata
+      setVisibleName(trimmedName);
       setIsSaving(true);
       
-      // Actualizar todos los elementos project-name en la página inmediatamente
-      document.querySelectorAll('.project-name').forEach(el => {
-        (el as HTMLElement).innerText = trimmedName;
-      });
+      // 2. Actualizar el DOM para mostrar cambios inmediatamente en todos los lugares
+      let retryCount = 0;
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
       
-      // Guardar en el servidor
+      // Usar un intervalo para asegurar que el DOM se actualice incluso si hay recargas parciales
+      const updateDOM = () => {
+        document.querySelectorAll('.project-name').forEach(el => {
+          if (el.textContent !== trimmedName) {
+            (el as HTMLElement).innerText = trimmedName;
+          }
+        });
+        
+        retryCount++;
+        if (retryCount >= 10) {
+          if (intervalRef.current) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+        }
+      };
+      
+      // Ejecutar inmediatamente
+      updateDOM();
+      
+      // Programar actualizaciones repetidas por un breve período para asegurar que
+      // incluso si hay recargas parciales de componentes, el nombre se actualice
+      intervalRef.current = window.setInterval(updateDOM, 100);
+      
+      // 3. Guardar en el servidor
       await onSaveProjectName(trimmedName);
       
-      // Desactivar estado de carga
-      setIsSaving(false);
+      // 4. Limpiar estados
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
       
-      // Cerrar modo edición
+      setIsSaving(false);
       setEditing(false);
+      
+      // Notificar éxito
+      toast({
+        title: "Nombre actualizado",
+        description: "El nombre del proyecto ha sido actualizado correctamente."
+      });
+      
     } catch (error) {
       console.error("Error al guardar:", error);
       
-      // Revertir cambios visuales
+      // Revertir cambios en caso de error
+      setVisibleName(projectName);
+      
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      // Revertir cambios visuales en el DOM
       document.querySelectorAll('.project-name').forEach(el => {
         (el as HTMLElement).innerText = projectName;
       });
       
-      // Desactivar estado de carga
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el nombre del proyecto.",
+        variant: "destructive"
+      });
+      
       setIsSaving(false);
     }
   };
@@ -186,7 +249,7 @@ export const HeaderActions = ({
         ) : (
           <div className="flex items-center gap-1.5">
             <h1 className="text-lg font-bold project-name">
-              {projectName || "Sin nombre"}
+              {visibleName || "Sin nombre"}
             </h1>
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)} className="h-7 w-7">
               <Edit2 className="h-3.5 w-3.5" />
