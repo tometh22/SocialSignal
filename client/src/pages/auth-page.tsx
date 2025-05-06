@@ -12,8 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-// Importamos la ruta del logo desde los assets locales para uso en la interfaz
-import epicalLogoPath from "../assets/epical_logo.jpeg";
+// Importamos componentes y hooks necesarios
+import { Logo } from "@/components/ui/logo";
 
 // Esquemas de validación
 const loginSchema = z.object({
@@ -123,13 +123,7 @@ export default function AuthPage() {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 flex items-center justify-center">
-                <img 
-                  src={epicalLogoPath} 
-                  alt="Epical Digital Logo" 
-                  className="h-16 w-16 object-contain rounded-sm" 
-                />
-              </div>
+              <Logo size="lg" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión - Epical</h1>
             <p className="text-gray-600">
