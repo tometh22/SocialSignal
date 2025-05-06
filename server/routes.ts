@@ -463,6 +463,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Eliminar una cotización
+  app.delete("/api/quotations/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    
+    try {
+      const success = await storage.deleteQuotation(id);
+      
+      if (!success) {
+        return res.status(409).json({ 
+          message: "No se puede eliminar esta cotización. Puede estar en uso por proyectos activos o no existe." 
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Cotización eliminada exitosamente",
+        id
+      });
+    } catch (error) {
+      console.error("Error eliminando cotización:", error);
+      res.status(500).json({ message: "Error al eliminar la cotización" });
+    }
+  });
+  
   // Actualizar el cliente asociado a una cotización
   app.patch("/api/quotations/:id/client", async (req, res) => {
     const id = parseInt(req.params.id);

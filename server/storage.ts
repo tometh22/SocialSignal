@@ -64,6 +64,7 @@ export interface IStorage {
   createQuotation(quotation: InsertQuotation): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined>;
   updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined>;
+  deleteQuotation(id: number): Promise<boolean>;
 
   // Quotation team members operations
   getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
@@ -1188,6 +1189,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(quotations.id, id))
       .returning();
     return updatedQuotation;
+  }
+  
+  async deleteQuotation(id: number): Promise<boolean> {
+    try {
+      // 1. Verificar que la cotización exista
+      const quotation = await this.getQuotation(id);
+      if (!quotation) {
+        console.log(`Cotización con ID ${id} no encontrada para eliminar`);
+        return false;
+      }
+      
+      // 2. Verificar si la cotización está asociada a algún proyecto activo
+      const activeProjects = await this.getActiveProjectsByQuotationId(id);
+      if (activeProjects.length > 0) {
+        console.log(`No se puede eliminar la cotización ID ${id} porque está asociada a ${activeProjects.length} proyectos activos`);
+        return false;
+      }
+      
+      // 3. Eliminar los miembros del equipo de cotización asociados
+      await this.deleteQuotationTeamMembers(id);
+      
+      // 4. Eliminar la cotización
+      await db.delete(quotations).where(eq(quotations.id, id));
+      
+      // 5. Verificar que la cotización haya sido eliminada
+      const checkQuotation = await this.getQuotation(id);
+      return checkQuotation === undefined;
+    } catch (error) {
+      console.error(`Error al eliminar la cotización ID ${id}:`, error);
+      return false;
+    }
   }
 
   // Quotation team members operations

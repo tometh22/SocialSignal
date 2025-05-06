@@ -29,6 +29,7 @@ export default function ManageQuotes() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const { toast } = useToast();
 
@@ -71,6 +72,36 @@ export default function ManageQuotes() {
     setSelectedQuote(quote);
     setNewStatus(quote.status);
     setDialogOpen(true);
+  };
+  
+  const openDeleteDialog = (quote: Quotation) => {
+    setSelectedQuote(quote);
+    setDeleteDialogOpen(true);
+  };
+  
+  const handleDeleteQuotation = async () => {
+    if (!selectedQuote) return;
+    
+    try {
+      const response = await apiRequest(`/api/quotations/${selectedQuote.id}`, "DELETE");
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: "Cotización eliminada",
+          description: "La cotización ha sido eliminada correctamente.",
+        });
+        
+        refetch();
+        setDeleteDialogOpen(false);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la cotización. Puede estar siendo utilizada por proyectos activos.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -124,7 +155,7 @@ export default function ManageQuotes() {
           <div className="section-sm">
             <Card className="shadow-soft">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-heading">Cotizaciones</CardTitle>
+                <CardTitle className="text-heading sr-only">Cotizaciones</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col md:flex-row gap-4 mb-6 form-group">
@@ -225,6 +256,15 @@ export default function ManageQuotes() {
                                 >
                                   <Eye className="h-4 w-4 mr-1" />
                                   Ver
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="hover-lift text-destructive hover:text-destructive-foreground hover:bg-destructive"
+                                  onClick={() => openDeleteDialog(quote)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Eliminar
                                 </Button>
                               </div>
                             </td>
