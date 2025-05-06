@@ -69,17 +69,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
 
     try {
+      console.log("Recibida solicitud de actualización de cliente:", id, req.body);
+      
       // Partial validation - only validate the fields provided
       const validatedData = insertClientSchema.partial().parse(req.body);
+      console.log("Datos validados:", validatedData);
+      
       const updatedClient = await storage.updateClient(id, validatedData);
+      console.log("Resultado de la actualización:", updatedClient);
       
       if (!updatedClient) {
+        console.log("Cliente no encontrado con ID:", id);
         return res.status(404).json({ message: "Client not found" });
       }
       
       res.json(updatedClient);
     } catch (error) {
+      console.error("Error actualizando cliente:", error);
       if (error instanceof z.ZodError) {
+        console.error("Error de validación Zod:", error.errors);
         return res.status(400).json({ message: "Invalid client data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update client" });

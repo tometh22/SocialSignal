@@ -1017,12 +1017,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined> {
-    const [updatedClient] = await db
-      .update(clients)
-      .set(client)
-      .where(eq(clients.id, id))
-      .returning();
-    return updatedClient;
+    try {
+      console.log("DatabaseStorage.updateClient: Actualizando cliente con ID:", id);
+      console.log("DatabaseStorage.updateClient: Datos a actualizar:", client);
+      
+      // Verificar primero si el cliente existe
+      const existingClient = await this.getClient(id);
+      if (!existingClient) {
+        console.log("DatabaseStorage.updateClient: Cliente no encontrado con ID:", id);
+        return undefined;
+      }
+      
+      // Realizar la actualización
+      const [updatedClient] = await db
+        .update(clients)
+        .set(client)
+        .where(eq(clients.id, id))
+        .returning();
+      
+      console.log("DatabaseStorage.updateClient: Cliente actualizado:", updatedClient);
+      return updatedClient;
+    } catch (error) {
+      console.error("DatabaseStorage.updateClient: Error al actualizar cliente:", error);
+      throw error;
+    }
   }
 
   // Role operations
