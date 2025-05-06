@@ -197,7 +197,29 @@ export default function ActiveProjects() {
               <SelectContent>
                 <SelectItem value="all">Todos los clientes</SelectItem>
                 {clients && clients.map((client: Client) => (
-                  <SelectItem key={client.id} value={client.id.toString()}>{client.name}</SelectItem>
+                  <SelectItem key={client.id} value={client.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      {client.logoUrl ? (
+                        <div className="h-4 w-4 rounded overflow-hidden flex-shrink-0">
+                          <img 
+                            src={client.logoUrl} 
+                            alt={`${client.name} logo`} 
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-4 w-4 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-[9px] font-medium text-primary">
+                            {client.name.substring(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      {client.name}
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -239,7 +261,25 @@ export default function ActiveProjects() {
               >
                 <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
                 <td className="px-2 py-1.5">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
+                    {project.quotation?.client?.logoUrl ? (
+                      <div className="h-5 w-5 rounded overflow-hidden border flex-shrink-0">
+                        <img 
+                          src={project.quotation.client.logoUrl} 
+                          alt={`${project.quotation.client.name} logo`} 
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : project.quotation?.client?.name ? (
+                      <div className="h-5 w-5 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                        <span className="text-[9px] font-medium text-primary">
+                          {project.quotation.client.name.substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                    ) : null}
                     <span>{project.quotation?.client?.name || 'Cliente Desconocido'}</span>
                     {(!project.quotation?.client?.name || project.quotation?.client?.name === '') && (
                       <Button
@@ -359,7 +399,27 @@ export default function ActiveProjects() {
               <SelectContent>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id.toString()}>
-                    {client.name}
+                    <div className="flex items-center gap-2">
+                      {client.logoUrl ? (
+                        <div className="h-4 w-4 rounded overflow-hidden flex-shrink-0">
+                          <img 
+                            src={client.logoUrl} 
+                            alt={`${client.name} logo`} 
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-4 w-4 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-[9px] font-medium text-primary">
+                            {client.name.substring(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      {client.name}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
