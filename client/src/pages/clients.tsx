@@ -267,7 +267,6 @@ export default function Clients() {
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Cliente</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Persona de Contacto</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Email</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Teléfono</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Acciones</th>
                         </tr>
                       </thead>
@@ -296,7 +295,6 @@ export default function Clients() {
                             </td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactPhone || "-"}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center space-x-2">
                                 <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
@@ -387,19 +385,7 @@ export default function Clients() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="contactPhone"
-                render={({ field }) => (
-                  <FormItem className="form-group">
-                    <FormLabel className="text-label">Teléfono</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Introduce el número de teléfono" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Campo de teléfono eliminado por solicitud del usuario */}
               
               <FormField
                 control={form.control}
