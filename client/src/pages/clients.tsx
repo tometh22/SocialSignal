@@ -27,6 +27,7 @@ const clientSchema = z.object({
   contactName: z.string().optional(),
   contactEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
   contactPhone: z.string().optional(),
+  logoUrl: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
@@ -50,6 +51,7 @@ export default function Clients() {
       contactName: "",
       contactEmail: "",
       contactPhone: "",
+      logoUrl: "",
     },
   });
 
@@ -116,6 +118,7 @@ export default function Clients() {
       contactName: "",
       contactEmail: "",
       contactPhone: "",
+      logoUrl: "",
     });
     setCurrentClient(null);
     setIsEditing(false);
@@ -128,6 +131,7 @@ export default function Clients() {
       contactName: client.contactName || "",
       contactEmail: client.contactEmail || "",
       contactPhone: client.contactPhone || "",
+      logoUrl: client.logoUrl || "",
     });
     setCurrentClient(client);
     setIsEditing(true);

@@ -38,6 +38,7 @@ export const clients = pgTable("clients", {
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
+  logoUrl: varchar("logo_url", { length: 255 }),
   createdBy: integer("created_by").references(() => users.id),
 });
 
@@ -46,6 +47,7 @@ export const insertClientSchema = createInsertSchema(clients).pick({
   contactName: true,
   contactEmail: true,
   contactPhone: true,
+  logoUrl: true,
   createdBy: true,
 });
 
