@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface HeaderActionsProps {
   projectName: string;
@@ -51,9 +52,9 @@ export const HeaderActions = ({
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [displayName, setDisplayName] = useState(projectName);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nameRef = useRef<HTMLHeadingElement>(null);
 
-  // Actualizar el nombre editado y mostrado cuando cambia el nombre del proyecto
+  // Actualizar el nombre editado cuando cambia el nombre del proyecto
   useEffect(() => {
     if (projectName) {
       setEditedName(projectName);
@@ -61,14 +62,47 @@ export const HeaderActions = ({
     }
   }, [projectName]);
 
-  // Limpiar timeouts al desmontar
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+  // Función para actualizar directamente el DOM con el nuevo nombre del proyecto
+  const updateNameInDOM = (newName: string) => {
+    // Actualizar todas las referencias del nombre del proyecto en el DOM
+    document.querySelectorAll('.project-name').forEach(el => {
+      (el as HTMLElement).innerText = newName;
+    });
+  };
+
+  // Función para actualizar los datos en React Query directamente
+  const updateQueryCache = (newName: string) => {
+    // Actualizar el proyecto actual en la caché
+    queryClient.setQueryData([`/api/active-projects/${projectId}`], (oldData: any) => {
+      if (!oldData) return oldData;
+      
+      // Crear una copia profunda para evitar mutaciones
+      const newData = JSON.parse(JSON.stringify(oldData));
+      
+      // Actualizar el nombre del proyecto en los datos
+      if (newData.quotation) {
+        newData.quotation.projectName = newName;
       }
-    };
-  }, []);
+      
+      return newData;
+    });
+    
+    // Actualizar la lista de proyectos si existe en caché
+    queryClient.setQueryData(['/api/active-projects'], (oldData: any[] | undefined) => {
+      if (!oldData) return oldData;
+      
+      // Crear una copia profunda para evitar mutaciones
+      const newData = JSON.parse(JSON.stringify(oldData));
+      
+      // Actualizar el nombre del proyecto específico
+      return newData.map((project: any) => {
+        if (project.id === projectId && project.quotation) {
+          project.quotation.projectName = newName;
+        }
+        return project;
+      });
+    });
+  };
 
   const handleSave = async () => {
     const trimmedName = editedName.trim();
@@ -83,17 +117,21 @@ export const HeaderActions = ({
       // Activar estado de carga
       setIsSaving(true);
       
-      // Actualizamos inmediatamente el nombre en la UI
+      // 1. Actualizar el nombre inmediatamente en la interfaz
       setDisplayName(trimmedName);
+      updateNameInDOM(trimmedName);
       
-      // Guardar el nombre del proyecto - esperar a que la operación se complete
+      // 2. Aplicar cambios en la caché de React Query para mantener la UI sincronizada
+      updateQueryCache(trimmedName);
+      
+      // 3. Enviar la actualización al servidor
       await onSaveProjectName(trimmedName);
       
-      // Inmediatamente desactivar estado de carga y cerrar edición
+      // 4. Desactivar estados de carga y edición
       setIsSaving(false);
       setEditing(false);
       
-      // Mostrar notificación de éxito
+      // 5. Mostrar notificación de éxito
       toast({
         title: "Nombre actualizado",
         description: "El nombre del proyecto ha sido actualizado correctamente.",
@@ -102,8 +140,10 @@ export const HeaderActions = ({
     } catch (error) {
       console.error("Error al guardar el nombre:", error);
       
-      // Revertir el nombre en caso de error
+      // Revertir cambios en caso de error
       setDisplayName(projectName);
+      updateNameInDOM(projectName);
+      updateQueryCache(projectName); // Revertir también en la caché
       
       // Mostrar notificación de error
       toast({
