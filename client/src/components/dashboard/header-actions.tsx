@@ -222,6 +222,12 @@ export const HeaderActions = ({
               className="text-lg font-bold h-8 min-w-[250px]"
               disabled={isSaving}
               autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSaving) {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
             />
             <Button 
               size="icon" 
