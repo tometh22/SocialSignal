@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+// Importamos la ruta del logo desde los assets locales para uso en la interfaz
 import epicalLogoPath from "../assets/epical_logo.jpeg";
 
 // Esquemas de validación

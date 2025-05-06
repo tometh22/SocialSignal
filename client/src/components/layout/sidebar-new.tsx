@@ -138,7 +138,7 @@ export default function Sidebar() {
             <Link href="/" className="flex items-center gap-2.5">
               <div className="flex-shrink-0 h-9 w-9 flex items-center justify-center">
                 <img 
-                  src="/epical-logo.jpeg" 
+                  src="/images/epical-logo.jpeg" 
                   alt="Epical" 
                   className="h-full w-full object-contain rounded-sm"
                 />
