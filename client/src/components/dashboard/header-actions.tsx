@@ -55,32 +55,32 @@ export const HeaderActions = ({
     }
   }, [projectName]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const trimmedName = editedName.trim();
     if (trimmedName && trimmedName !== projectName) {
-      try {
-        // Establecer estado de carga
-        setIsSaving(true);
-        
-        // Actualizamos localmente primero para mostrar el cambio inmediatamente
-        document.querySelectorAll('.project-name').forEach(el => {
-          (el as HTMLElement).innerText = trimmedName;
-        });
-        
-        // Después llamamos a la función que guardará el cambio en el servidor
-        // Añadir pequeña espera artificial para que el usuario vea el estado de guardado
+      // Establecer estado de carga inmediatamente
+      setIsSaving(true);
+      
+      // Actualizamos localmente primero para mostrar el cambio inmediatamente
+      document.querySelectorAll('.project-name').forEach(el => {
+        (el as HTMLElement).innerText = trimmedName;
+      });
+      
+      // Creamos una pequeña espera para asegurar que el estado visual se actualice
+      // antes de iniciar la llamada a la API
+      requestAnimationFrame(() => {
+        // Delay artificial para asegurar que el usuario vea el spinner
         setTimeout(() => {
+          // Llamar la función que guardará el cambio en el servidor
           onSaveProjectName(trimmedName);
-          // Desactivar estado de carga tras un breve retraso para una mejor UX
+          
+          // Dar tiempo para completar la operación y actualizar la interfaz
           setTimeout(() => {
             setIsSaving(false);
             setEditing(false);
-          }, 300);
-        }, 100);
-      } catch (error) {
-        console.error("Error al guardar el nombre:", error);
-        setIsSaving(false);
-      }
+          }, 500);
+        }, 300);
+      });
     } else {
       // Si no hay cambios, simplemente salimos del modo edición
       setEditing(false);

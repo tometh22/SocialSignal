@@ -205,12 +205,18 @@ const ProjectSummary = () => {
       console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
       console.log("Datos enviados:", { name: newName });
       
+      // Esperar un poco para que se vea el spinner de carga
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Enviar la solicitud al servidor
       await apiRequest(
         'PATCH', 
         `/api/projects/${parsedProjectId}/update-name`, 
         { name: newName }
       );
+      
+      // Esperar otro poco para que el usuario vea que la operación completó
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Invalidar consultas para asegurar que todos los datos están sincronizados
       console.log("Invalidando consultas para sincronizar datos");
