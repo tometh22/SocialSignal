@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -18,6 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
@@ -350,6 +360,36 @@ export default function ManageQuotes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de confirmación para eliminar cotización */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La cotización será eliminada permanentemente.
+              {selectedQuote && (
+                <div className="mt-2 p-3 bg-muted rounded-md">
+                  <p className="font-medium text-sm">Detalles de la cotización:</p>
+                  <p className="text-sm mt-1">Proyecto: <span className="font-semibold">{selectedQuote.projectName}</span></p>
+                  <p className="text-sm mt-1">ID: <span className="font-semibold">{selectedQuote.id}</span></p>
+                  <p className="text-sm mt-1">Estado: <span className="font-semibold">{translateStatus(selectedQuote.status)}</span></p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteQuotation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
