@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import epicalLogoPath from "../assets/epical_logo.jpeg";
 
 // Esquemas de validación
 const loginSchema = z.object({
@@ -123,7 +124,7 @@ export default function AuthPage() {
             <div className="flex justify-center mb-4">
               <div className="h-16 w-16 bg-gray-900 rounded-xl flex items-center justify-center">
                 <img 
-                  src="/epical-logo.svg" 
+                  src={epicalLogoPath} 
                   alt="Epical Digital Logo" 
                   className="h-12 w-12 object-contain" 
                 />
