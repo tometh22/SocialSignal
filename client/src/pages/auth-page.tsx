@@ -10,8 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Eye, EyeOff } from "lucide-react";
-import epicalLogo from "../assets/epical_logo.jpeg";
+import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Esquemas de validación
 const loginSchema = z.object({
@@ -117,11 +117,17 @@ export default function AuthPage() {
       )}
       
       {/* Columna izquierda - Formulario */}
-      <div className="flex items-center justify-center w-full lg:w-1/2 p-8">
+      <div className="flex items-center justify-center w-full lg:w-1/2 p-8 bg-gray-50">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-4">
-              <img src={epicalLogo} alt="Epical Digital Logo" className="h-20 object-contain" />
+              <div className="h-16 w-16 bg-gray-900 rounded-xl flex items-center justify-center">
+                <img 
+                  src="/epical-logo.svg" 
+                  alt="Epical Digital Logo" 
+                  className="h-12 w-12 object-contain" 
+                />
+              </div>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión - Epical</h1>
             <p className="text-gray-600">
@@ -193,7 +199,7 @@ export default function AuthPage() {
                       />
                       <Button 
                         type="submit" 
-                        className="w-full" 
+                        className="w-full bg-gray-900 hover:bg-gray-800" 
                         disabled={loginMutation.isPending}
                       >
                         {loginMutation.isPending ? (
@@ -334,7 +340,7 @@ export default function AuthPage() {
                       />
                       <Button 
                         type="submit" 
-                        className="w-full" 
+                        className="w-full bg-gray-900 hover:bg-gray-800" 
                         disabled={registerMutation.isPending}
                       >
                         {registerMutation.isPending ? (
@@ -361,30 +367,42 @@ export default function AuthPage() {
       </div>
 
       {/* Columna derecha - Hero section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-r from-blue-500 to-purple-600">
+      <div className="hidden lg:flex lg:w-1/2 bg-gray-900">
         <div className="flex flex-col items-center justify-center w-full p-12 text-white">
           <div className="max-w-lg text-center">
             <h2 className="text-4xl font-bold mb-6">Sistema Interno - Epical</h2>
-            <p className="text-xl mb-8">
+            <p className="text-xl mb-8 text-gray-300">
               Plataforma completa para el equipo de Epical que facilita la gestión de proyectos, 
               cotizaciones y seguimiento de tiempo con comunicación interna integrada.
             </p>
             <div className="grid grid-cols-2 gap-4 text-left">
-              <div className="bg-white/10 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Cotizaciones Inteligentes</h3>
-                <p>Crea y gestiona cotizaciones para presentar a clientes con cálculos precisos.</p>
+              <div className="bg-gray-800 border border-gray-700 p-4 rounded-lg flex items-start space-x-3">
+                <FileText className="h-6 w-6 text-blue-400 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">Cotizaciones Inteligentes</h3>
+                  <p className="text-gray-400">Crea y gestiona cotizaciones para presentar a clientes con cálculos precisos.</p>
+                </div>
               </div>
-              <div className="bg-white/10 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Gestión de Proyectos</h3>
-                <p>Coordina proyectos en curso y mantén informado a todo el equipo sobre avances.</p>
+              <div className="bg-gray-800 border border-gray-700 p-4 rounded-lg flex items-start space-x-3">
+                <BarChart className="h-6 w-6 text-green-400 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">Gestión de Proyectos</h3>
+                  <p className="text-gray-400">Coordina proyectos en curso y mantén informado a todo el equipo sobre avances.</p>
+                </div>
               </div>
-              <div className="bg-white/10 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Registro de Horas</h3>
-                <p>Control de tiempo dedicado por cada integrante del equipo Epical a los proyectos.</p>
+              <div className="bg-gray-800 border border-gray-700 p-4 rounded-lg flex items-start space-x-3">
+                <ClockIcon className="h-6 w-6 text-amber-400 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">Registro de Horas</h3>
+                  <p className="text-gray-400">Control de tiempo dedicado por cada integrante del equipo Epical a los proyectos.</p>
+                </div>
               </div>
-              <div className="bg-white/10 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Chat Interno</h3>
-                <p>Comunícate con el equipo directamente dentro de la plataforma para coordinar tareas.</p>
+              <div className="bg-gray-800 border border-gray-700 p-4 rounded-lg flex items-start space-x-3">
+                <MessageSquare className="h-6 w-6 text-purple-400 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">Chat Interno</h3>
+                  <p className="text-gray-400">Comunícate con el equipo directamente dentro de la plataforma para coordinar tareas.</p>
+                </div>
               </div>
             </div>
           </div>
