@@ -74,7 +74,27 @@ const OptimizedBasicInfo: React.FC = () => {
                             value={String(client.id)}
                             className="hover:bg-neutral-50"
                           >
-                            {client.name}
+                            <div className="flex items-center gap-2">
+                              {client.logoUrl ? (
+                                <div className="h-4 w-4 rounded overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={client.logoUrl} 
+                                    alt={`${client.name} logo`} 
+                                    className="h-full w-full object-contain"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="h-4 w-4 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                                  <span className="text-[9px] font-medium text-primary">
+                                    {client.name.substring(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              {client.name}
+                            </div>
                           </SelectItem>
                         ))
                       )}
@@ -158,16 +178,34 @@ const OptimizedBasicInfo: React.FC = () => {
             <div className="md:border-l border-neutral-100 md:pl-6">
               {quotationData.client ? (
                 <div className="bg-slate-50 p-4 rounded-md">
-                  <div className="flex items-center mb-2">
+                  <div className="flex items-center mb-3">
                     <User className="h-4 w-4 mr-2 text-primary" />
                     <h3 className="text-sm font-medium text-gray-700">Información de Contacto</h3>
                   </div>
+
+                  <div className="flex items-center gap-3 mb-3">
+                    {quotationData.client.logoUrl ? (
+                      <div className="h-10 w-10 rounded-md overflow-hidden border border-gray-200 bg-white flex items-center justify-center">
+                        <img 
+                          src={quotationData.client.logoUrl} 
+                          alt={`${quotationData.client.name} logo`} 
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 bg-primary/10 rounded-md flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {quotationData.client.name.substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <span className="font-medium text-gray-700">{quotationData.client.name}</span>
+                  </div>
                   
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-xs text-gray-500">Empresa:</span>
-                      <span className="font-medium text-gray-700">{quotationData.client.name}</span>
-                    </div>
                     
                     {quotationData.client.contactName && (
                       <div className="flex justify-between">

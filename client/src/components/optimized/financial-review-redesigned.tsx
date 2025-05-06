@@ -147,7 +147,27 @@ const OptimizedFinancialReview: React.FC = () => {
                 <Info className="h-3 w-3 mr-1 text-primary/70" />
                 Cliente
               </div>
-              <div className="text-sm font-medium truncate">{quotationData.client?.name || 'No seleccionado'}</div>
+              <div className="flex items-center gap-2">
+                {quotationData.client?.logoUrl ? (
+                  <div className="h-5 w-5 rounded overflow-hidden">
+                    <img 
+                      src={quotationData.client.logoUrl} 
+                      alt={`${quotationData.client.name} logo`} 
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                ) : quotationData.client ? (
+                  <div className="h-5 w-5 bg-primary/10 rounded flex items-center justify-center">
+                    <span className="text-xs font-medium text-primary">
+                      {quotationData.client.name.substring(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="text-sm font-medium truncate">{quotationData.client?.name || 'No seleccionado'}</div>
+              </div>
             </div>
             
             <div className="bg-white p-3 border border-gray-100 rounded-md shadow-sm">

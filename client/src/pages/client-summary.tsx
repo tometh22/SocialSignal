@@ -369,7 +369,7 @@ const ClientSummary = () => {
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
@@ -378,13 +378,36 @@ const ClientSummary = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {client.name}
-            </h1>
+            
+            {client.logoUrl ? (
+              <div className="h-10 w-10 rounded overflow-hidden border flex-shrink-0">
+                <img 
+                  src={client.logoUrl} 
+                  alt={`${client.name} logo`} 
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    // Manejo de error si la imagen no se puede cargar
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="h-10 w-10 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-medium text-primary">
+                  {client.name.substring(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+            
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {client.name}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                <span className="font-medium">Contacto:</span> {client.contactName} · {client.contactEmail}
+              </p>
+            </div>
           </div>
-          <p className="text-muted-foreground mt-1">
-            <span className="font-medium">Contacto:</span> {client.contactName} · {client.contactEmail}
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
