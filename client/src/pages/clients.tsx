@@ -43,6 +43,7 @@ export default function Clients() {
   const [isEditing, setIsEditing] = useState(false);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -104,6 +105,49 @@ export default function Clients() {
       });
     },
   });
+  
+  // Mutación para cargar el logo del cliente
+  const uploadLogoMutation = useMutation({
+    mutationFn: async ({ clientId, file }: { clientId: number; file: File }) => {
+      setIsUploadingLogo(true);
+      const formData = new FormData();
+      formData.append('logo', file);
+      
+      const response = await fetch(`/api/clients/${clientId}/logo`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar el logo');
+      }
+      
+      return await response.json();
+    },
+    onSuccess: async (data) => {
+      // Actualizar el formulario con la nueva URL del logo
+      form.setValue('logoUrl', data.logoUrl);
+      setLogoPreview(data.logoUrl);
+      
+      // Invalidar la caché de consultas para actualizar los datos
+      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      
+      toast({
+        title: "Éxito",
+        description: "Logo cargado correctamente.",
+      });
+      setIsUploadingLogo(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el logo.",
+        variant: "destructive",
+      });
+      setIsUploadingLogo(false);
+    },
+  });
 
   // Filter clients based on search term
   const filteredClients = clients
@@ -124,6 +168,7 @@ export default function Clients() {
     });
     setCurrentClient(null);
     setIsEditing(false);
+    setLogoPreview(null);
     setDialogOpen(true);
   };
 
@@ -137,7 +182,28 @@ export default function Clients() {
     });
     setCurrentClient(client);
     setIsEditing(true);
+    setLogoPreview(client.logoUrl || null);
     setDialogOpen(true);
+  };
+  
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentClient) return;
+    
+    // Crear URL de objeto para vista previa local
+    const objectUrl = URL.createObjectURL(file);
+    setLogoPreview(objectUrl);
+    
+    // Subir el archivo
+    uploadLogoMutation.mutate({ 
+      clientId: currentClient.id,
+      file 
+    });
+    
+    // Limpiar el campo de archivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const onSubmit = (values: ClientFormValues) => {
@@ -326,16 +392,53 @@ export default function Clients() {
                 name="logoUrl"
                 render={({ field }) => (
                   <FormItem className="form-group">
-                    <FormLabel className="text-label">URL del Logo</FormLabel>
+                    <FormLabel className="text-label">Logo del Cliente</FormLabel>
+                    
+                    {/* Si estamos editando, mostramos el uploader de archivo */}
+                    {isEditing && currentClient && (
+                      <div className="mb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            className="h-9 flex gap-1 items-center" 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploadingLogo}
+                          >
+                            <Upload className="h-4 w-4" />
+                            <span>{isUploadingLogo ? "Subiendo..." : "Subir logo"}</span>
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Formatos aceptados: JPEG, PNG, GIF, SVG, WEBP
+                          </p>
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/svg+xml,image/webp"
+                          className="hidden"
+                          onChange={handleLogoUpload}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* URL del logo (modo fallback o para ver la URL actual) */}
                     <FormControl>
-                      <Input placeholder="https://example.com/logo.png" {...field} />
+                      <Input 
+                        placeholder="https://example.com/logo.png" 
+                        {...field} 
+                        className={isEditing ? "text-sm text-muted-foreground" : ""}
+                        readOnly={isEditing} 
+                      />
                     </FormControl>
                     <FormMessage />
-                    {field.value && (
+                    
+                    {/* Vista previa del logo */}
+                    {(field.value || logoPreview) && (
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="h-8 w-8 rounded overflow-hidden border">
+                        <div className="h-16 w-16 rounded overflow-hidden border shadow-sm">
                           <img 
-                            src={field.value} 
+                            src={logoPreview || field.value} 
                             alt="Logo preview" 
                             className="h-full w-full object-contain"
                             onError={(e) => {
@@ -344,7 +447,12 @@ export default function Clients() {
                             }}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">Vista previa</p>
+                        <div>
+                          <p className="text-xs font-medium">Vista previa</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {isUploadingLogo ? "Subiendo logo..." : "Logo del cliente"}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </FormItem>
