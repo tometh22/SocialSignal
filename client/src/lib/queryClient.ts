@@ -83,12 +83,19 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   };
 }
 
-// Generic function for API requests
+// Generic function for API requests that handles both parameter orders for backward compatibility
 export async function apiRequest(
-  endpoint: string,
-  method: string,
+  arg1: string,    // Can be either endpoint or method
+  arg2: string,    // Can be either method or endpoint
   data?: any
 ) {
+  // Determine which argument is the method and which is the endpoint
+  const isArg1Method = ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(arg1.toUpperCase());
+  
+  // Assign variables based on the detected order
+  const method = isArg1Method ? arg1 : arg2;
+  const endpoint = isArg1Method ? arg2 : arg1;
+  
   const url = endpoint;
   
   console.log(`API Request: ${method} ${url}`, data);
@@ -105,27 +112,32 @@ export async function apiRequest(
     options.body = JSON.stringify(data);
   }
   
-  const response = await fetch(url, options);
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
+  try {
+    const response = await fetch(url, options);
     
-    const errorMessage = (() => {
-      try {
-        const json = JSON.parse(errorText);
-        return json.message || errorText;
-      } catch (e) {
-        return errorText || "Error desconocido";
-      }
-    })();
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
+      
+      const errorMessage = (() => {
+        try {
+          const json = JSON.parse(errorText);
+          return json.message || errorText;
+        } catch (e) {
+          return errorText || "Error desconocido";
+        }
+      })();
+      
+      throw new Error(errorMessage);
+    }
     
-    throw new Error(errorMessage);
+    if (response.status === 204) {
+      return null;
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Error en solicitud API ${method} ${url}:`, error);
+    throw error;
   }
-  
-  if (response.status === 204) {
-    return null;
-  }
-  
-  return await response.json();
 }
