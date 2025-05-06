@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Calendar, 
   Eye,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderActionsProps {
   projectName: string;
@@ -30,7 +31,7 @@ interface HeaderActionsProps {
   onViewModeChange: (value: string) => void;
   onRegisterHours: () => void;
   onSettingsClick: () => void;
-  onSaveProjectName: (name: string) => void;
+  onSaveProjectName: (name: string) => Promise<void>;
 }
 
 export const HeaderActions = ({
@@ -45,49 +46,72 @@ export const HeaderActions = ({
   onSettingsClick,
   onSaveProjectName
 }: HeaderActionsProps) => {
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Actualizar el nombre editado cuando cambia el nombre del proyecto
   useEffect(() => {
     if (projectName) {
       setEditedName(projectName);
     }
   }, [projectName]);
 
-  const handleSave = () => {
+  // Limpiar timeouts al desmontar
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSave = async () => {
     const trimmedName = editedName.trim();
-    if (trimmedName && trimmedName !== projectName) {
-      // Establecer estado de carga inmediatamente
+    
+    // Si no hay cambios o el nombre está vacío, salir del modo edición
+    if (!trimmedName || trimmedName === projectName) {
+      setEditing(false);
+      return;
+    }
+    
+    try {
+      // Activar estado de carga
       setIsSaving(true);
       
-      // Actualizamos localmente primero para mostrar el cambio inmediatamente
-      document.querySelectorAll('.project-name').forEach(el => {
-        (el as HTMLElement).innerText = trimmedName;
+      // Guardar el nombre del proyecto
+      await onSaveProjectName(trimmedName);
+      
+      // Mostrar notificación de éxito
+      toast({
+        title: "Nombre actualizado",
+        description: "El nombre del proyecto ha sido actualizado correctamente.",
       });
       
-      // Creamos una pequeña espera para asegurar que el estado visual se actualice
-      // antes de iniciar la llamada a la API
-      requestAnimationFrame(() => {
-        // Delay artificial para asegurar que el usuario vea el spinner
-        setTimeout(() => {
-          // Llamar la función que guardará el cambio en el servidor
-          onSaveProjectName(trimmedName);
-          
-          // Dar tiempo para completar la operación y actualizar la interfaz
-          setTimeout(() => {
-            setIsSaving(false);
-            setEditing(false);
-          }, 500);
-        }, 300);
+      // Retardo para mejorar la experiencia de usuario
+      saveTimeoutRef.current = setTimeout(() => {
+        setIsSaving(false);
+        setEditing(false);
+      }, 500);
+      
+    } catch (error) {
+      console.error("Error al guardar el nombre:", error);
+      
+      // Mostrar notificación de error
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el nombre del proyecto. Por favor, intente nuevamente.",
+        variant: "destructive",
       });
-    } else {
-      // Si no hay cambios, simplemente salimos del modo edición
-      setEditing(false);
+      
+      setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
+    // Cancelar la edición y restaurar el nombre original
     setEditedName(projectName || "");
     setEditing(false);
   };

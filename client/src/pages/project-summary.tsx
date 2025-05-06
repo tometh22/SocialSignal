@@ -169,7 +169,7 @@ const ProjectSummary = () => {
     isLoadingCostSummary;
 
   // Función para actualizar el nombre del proyecto
-  const handleSaveProjectName = async (newName: string) => {
+  const handleSaveProjectName = async (newName: string): Promise<void> => {
     console.log("=== ACTUALIZACIÓN DE NOMBRE INICIADA EN EL CLIENTE ===");
     console.log("Nuevo nombre:", newName);
     console.log("ID del proyecto:", parsedProjectId);
@@ -177,11 +177,11 @@ const ProjectSummary = () => {
     
     if (!project?.quotation?.id || !parsedProjectId || !newName) {
       console.log("Faltan datos necesarios para actualizar el nombre");
-      return;
+      throw new Error("Datos incompletos para actualizar el nombre del proyecto");
     }
 
     try {
-      // Crear una copia actualizada del proyecto
+      // Crear una copia actualizada del proyecto para la UI inmediata
       const updatedProject = {
         ...project,
         quotation: {
@@ -190,12 +190,8 @@ const ProjectSummary = () => {
         }
       };
 
-      console.log("Actualizando inmediatamente la UI");
-      
-      // Actualizar directamente el cache de React Query para actualizar la UI
+      // Actualizar optimísticamente la UI
       queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
-      
-      // Actualizar la lista de proyectos activos si existe en caché
       queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
         if (!old) return undefined;
         return old.map(p => p.id === parsedProjectId ? updatedProject : p);
@@ -205,9 +201,6 @@ const ProjectSummary = () => {
       console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
       console.log("Datos enviados:", { name: newName });
       
-      // Esperar un poco para que se vea el spinner de carga
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       // Enviar la solicitud al servidor
       await apiRequest(
         'PATCH', 
@@ -215,11 +208,7 @@ const ProjectSummary = () => {
         { name: newName }
       );
       
-      // Esperar otro poco para que el usuario vea que la operación completó
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Invalidar consultas para asegurar que todos los datos están sincronizados
-      console.log("Invalidando consultas para sincronizar datos");
+      // Invalidar consultas para actualizar datos desde el servidor
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
       
@@ -229,7 +218,6 @@ const ProjectSummary = () => {
       
       // Revertir cambios en caso de error
       if (project) {
-        // Restablecer caché
         queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], project);
         queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
           if (!old) return undefined;
@@ -237,7 +225,8 @@ const ProjectSummary = () => {
         });
       }
       
-      console.error("No se pudo actualizar el nombre del proyecto. Intente nuevamente.");
+      // Relanzar el error para que sea capturado por el componente HeaderActions
+      throw error;
     }
   };
 
