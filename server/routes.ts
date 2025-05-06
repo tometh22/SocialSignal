@@ -469,22 +469,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
     
     try {
-      const success = await storage.deleteQuotation(id);
+      console.log(`[API] Procesando solicitud para eliminar cotización ID ${id}`);
       
-      if (!success) {
-        return res.status(409).json({ 
-          message: "No se puede eliminar esta cotización. Puede estar en uso por proyectos activos o no existe." 
+      // 1. Verificar que la cotización exista
+      const quotation = await storage.getQuotation(id);
+      if (!quotation) {
+        console.log(`[API] La cotización ID ${id} no existe`);
+        return res.status(404).json({ 
+          success: false, 
+          message: "La cotización no existe" 
         });
       }
       
+      // 2. Verificar si la cotización está asociada a proyectos activos
+      const activeProjects = await storage.getActiveProjectsByQuotationId(id);
+      console.log(`[API] La cotización ID ${id} tiene ${activeProjects.length} proyectos activos asociados`);
+      
+      if (activeProjects.length > 0) {
+        console.log(`[API] No se puede eliminar la cotización ID ${id} porque tiene proyectos activos`);
+        
+        const projectInfo = activeProjects.map(p => ({ id: p.id, name: `Proyecto ID ${p.id}` }));
+        
+        return res.status(409).json({ 
+          success: false, 
+          message: "No se puede eliminar esta cotización porque está siendo utilizada por proyectos activos", 
+          projects: projectInfo
+        });
+      }
+      
+      // 3. Proceder con la eliminación
+      console.log(`[API] Procediendo con la eliminación de la cotización ID ${id}`);
+      await storage.deleteQuotationTeamMembers(id);
+      const success = await storage.deleteQuotation(id);
+      
+      if (!success) {
+        console.log(`[API] Error al eliminar la cotización ID ${id}`);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Ocurrió un error al intentar eliminar la cotización" 
+        });
+      }
+      
+      console.log(`[API] Cotización ID ${id} eliminada exitosamente`);
       res.json({ 
         success: true, 
         message: "Cotización eliminada exitosamente",
         id
       });
     } catch (error) {
-      console.error("Error eliminando cotización:", error);
-      res.status(500).json({ message: "Error al eliminar la cotización" });
+      console.error("[API] Error eliminando cotización:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error al eliminar la cotización" 
+      });
     }
   });
   
