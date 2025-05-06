@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Eye,
@@ -19,8 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 
 interface HeaderActionsProps {
   projectName: string;
@@ -47,62 +45,16 @@ export const HeaderActions = ({
   onSettingsClick,
   onSaveProjectName
 }: HeaderActionsProps) => {
-  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [displayName, setDisplayName] = useState(projectName);
-  const nameRef = useRef<HTMLHeadingElement>(null);
 
   // Actualizar el nombre editado cuando cambia el nombre del proyecto
   useEffect(() => {
     if (projectName) {
       setEditedName(projectName);
-      setDisplayName(projectName);
     }
   }, [projectName]);
-
-  // Función para actualizar directamente el DOM con el nuevo nombre del proyecto
-  const updateNameInDOM = (newName: string) => {
-    // Actualizar todas las referencias del nombre del proyecto en el DOM
-    document.querySelectorAll('.project-name').forEach(el => {
-      (el as HTMLElement).innerText = newName;
-    });
-  };
-
-  // Función para actualizar los datos en React Query directamente
-  const updateQueryCache = (newName: string) => {
-    // Actualizar el proyecto actual en la caché
-    queryClient.setQueryData([`/api/active-projects/${projectId}`], (oldData: any) => {
-      if (!oldData) return oldData;
-      
-      // Crear una copia profunda para evitar mutaciones
-      const newData = JSON.parse(JSON.stringify(oldData));
-      
-      // Actualizar el nombre del proyecto en los datos
-      if (newData.quotation) {
-        newData.quotation.projectName = newName;
-      }
-      
-      return newData;
-    });
-    
-    // Actualizar la lista de proyectos si existe en caché
-    queryClient.setQueryData(['/api/active-projects'], (oldData: any[] | undefined) => {
-      if (!oldData) return oldData;
-      
-      // Crear una copia profunda para evitar mutaciones
-      const newData = JSON.parse(JSON.stringify(oldData));
-      
-      // Actualizar el nombre del proyecto específico
-      return newData.map((project: any) => {
-        if (project.id === projectId && project.quotation) {
-          project.quotation.projectName = newName;
-        }
-        return project;
-      });
-    });
-  };
 
   const handleSave = async () => {
     const trimmedName = editedName.trim();
@@ -117,41 +69,28 @@ export const HeaderActions = ({
       // Activar estado de carga
       setIsSaving(true);
       
-      // 1. Actualizar el nombre inmediatamente en la interfaz
-      setDisplayName(trimmedName);
-      updateNameInDOM(trimmedName);
+      // Actualizar todos los elementos project-name en la página inmediatamente
+      document.querySelectorAll('.project-name').forEach(el => {
+        (el as HTMLElement).innerText = trimmedName;
+      });
       
-      // 2. Aplicar cambios en la caché de React Query para mantener la UI sincronizada
-      updateQueryCache(trimmedName);
-      
-      // 3. Enviar la actualización al servidor
+      // Guardar en el servidor
       await onSaveProjectName(trimmedName);
       
-      // 4. Desactivar estados de carga y edición
+      // Desactivar estado de carga
       setIsSaving(false);
+      
+      // Cerrar modo edición
       setEditing(false);
-      
-      // 5. Mostrar notificación de éxito
-      toast({
-        title: "Nombre actualizado",
-        description: "El nombre del proyecto ha sido actualizado correctamente.",
-      });
-      
     } catch (error) {
-      console.error("Error al guardar el nombre:", error);
+      console.error("Error al guardar:", error);
       
-      // Revertir cambios en caso de error
-      setDisplayName(projectName);
-      updateNameInDOM(projectName);
-      updateQueryCache(projectName); // Revertir también en la caché
-      
-      // Mostrar notificación de error
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el nombre del proyecto. Por favor, intente nuevamente.",
-        variant: "destructive",
+      // Revertir cambios visuales
+      document.querySelectorAll('.project-name').forEach(el => {
+        (el as HTMLElement).innerText = projectName;
       });
       
+      // Desactivar estado de carga
       setIsSaving(false);
     }
   };
@@ -159,7 +98,6 @@ export const HeaderActions = ({
   const handleCancel = () => {
     // Cancelar la edición y restaurar el nombre original
     setEditedName(projectName || "");
-    setDisplayName(projectName || "");
     setEditing(false);
   };
 
@@ -248,7 +186,7 @@ export const HeaderActions = ({
         ) : (
           <div className="flex items-center gap-1.5">
             <h1 className="text-lg font-bold project-name">
-              {displayName || "Sin nombre"}
+              {projectName || "Sin nombre"}
             </h1>
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)} className="h-7 w-7">
               <Edit2 className="h-3.5 w-3.5" />

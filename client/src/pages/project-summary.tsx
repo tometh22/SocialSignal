@@ -170,63 +170,29 @@ const ProjectSummary = () => {
 
   // Función para actualizar el nombre del proyecto
   const handleSaveProjectName = async (newName: string): Promise<void> => {
-    console.log("=== ACTUALIZACIÓN DE NOMBRE INICIADA EN EL CLIENTE ===");
-    console.log("Nuevo nombre:", newName);
-    console.log("ID del proyecto:", parsedProjectId);
-    console.log("ID de cotización:", project?.quotation?.id);
-    
-    if (!project?.quotation?.id || !parsedProjectId || !newName) {
-      console.log("Faltan datos necesarios para actualizar el nombre");
-      throw new Error("Datos incompletos para actualizar el nombre del proyecto");
+    if (!parsedProjectId || !newName) {
+      alert("Error: Faltan datos para actualizar el nombre del proyecto");
+      return;
     }
 
     try {
-      // Crear una copia actualizada del proyecto para la UI inmediata
-      const updatedProject = {
-        ...project,
-        quotation: {
-          ...project.quotation,
-          projectName: newName
-        }
-      };
-
-      // Actualizar optimísticamente la UI
-      queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], updatedProject);
-      queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
-        if (!old) return undefined;
-        return old.map(p => p.id === parsedProjectId ? updatedProject : p);
+      // Actualizar todos los nombres en la página inmediatamente (DOM manipulation)
+      document.querySelectorAll('.project-name').forEach(el => {
+        (el as HTMLElement).innerText = newName;
       });
-
-      console.log("Enviando solicitud al servidor");
-      console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
-      console.log("Datos enviados:", { name: newName });
       
-      // Enviar la solicitud al servidor inmediatamente sin retrasos
-      await apiRequest(
-        'PATCH', 
-        `/api/projects/${parsedProjectId}/update-name`, 
-        { name: newName }
-      );
-      
-      // Invalidar consultas para actualizar datos desde el servidor
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${parsedProjectId}`] });
-      
-      console.log("Actualización completada con éxito");
+      // Enviar al servidor
+      await fetch(`/api/projects/${parsedProjectId}/update-name`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newName }),
+        credentials: 'include'
+      });
     } catch (error) {
-      console.error("Error al actualizar el nombre del proyecto:", error);
-      
-      // Revertir cambios en caso de error
-      if (project) {
-        queryClient.setQueryData([`/api/active-projects/${parsedProjectId}`], project);
-        queryClient.setQueryData(['/api/active-projects'], (old: any[] | undefined) => {
-          if (!old) return undefined;
-          return old.map(p => p.id === parsedProjectId ? project : p);
-        });
-      }
-      
-      // Relanzar el error para que sea capturado por el componente HeaderActions
-      throw error;
+      console.error("Error al actualizar el nombre:", error);
+      alert("Error al guardar. Por favor, recarga la página e intenta de nuevo.");
     }
   };
 
