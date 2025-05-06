@@ -85,11 +85,13 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
 
 // Generic function for API requests
 export async function apiRequest(
-  method: string,
   endpoint: string,
+  method: string,
   data?: any
 ) {
   const url = endpoint;
+  
+  console.log(`API Request: ${method} ${url}`, data);
   
   const options: RequestInit = {
     method,
@@ -106,20 +108,24 @@ export async function apiRequest(
   const response = await fetch(url, options);
   
   if (!response.ok) {
-    const errorMessage = await response
-      .text()
-      .then(text => {
-        try {
-          const json = JSON.parse(text);
-          return json.message || text;
-        } catch (e) {
-          return text;
-        }
-      })
-      .catch(() => "Error desconocido");
+    const errorText = await response.text();
+    console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
+    
+    const errorMessage = (() => {
+      try {
+        const json = JSON.parse(errorText);
+        return json.message || errorText;
+      } catch (e) {
+        return errorText || "Error desconocido";
+      }
+    })();
     
     throw new Error(errorMessage);
   }
   
-  return response;
+  if (response.status === 204) {
+    return null;
+  }
+  
+  return await response.json();
 }
