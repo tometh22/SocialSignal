@@ -32,10 +32,10 @@ const OptimizedQuoteContent = () => {
     goToStep,
     saveQuotation,
     quotationData,
-    updateTemplate
+    updateTemplate,
+    isSavingInProgress
   } = useOptimizedQuote();
   
-  const [isSaving, setIsSaving] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -105,9 +105,14 @@ const OptimizedQuoteContent = () => {
       return;
     }
 
-    setIsSaving(true);
     try {
       const quotationId = await saveQuotation();
+      
+      // Si se devuelve -1, significa que ya hay una operación en progreso
+      if (quotationId === -1) {
+        return;
+      }
+      
       toast({
         title: "Cotización guardada",
         description: `La cotización se ha guardado correctamente con ID: ${quotationId}`,
@@ -122,8 +127,6 @@ const OptimizedQuoteContent = () => {
         description: "No se pudo guardar la cotización. Por favor, intenta nuevamente.",
         variant: "destructive",
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -150,10 +153,10 @@ const OptimizedQuoteContent = () => {
                   size="sm" 
                   className="text-xs h-8 border-primary/30 text-primary bg-primary/5"
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSavingInProgress}
                 >
                   <Save className="h-3.5 w-3.5 mr-1.5" /> 
-                  {isSaving ? "Guardando..." : "Guardar borrador"}
+                  {isSavingInProgress ? "Guardando..." : "Guardar borrador"}
                 </Button>
               </div>
             </div>
@@ -292,7 +295,7 @@ const OptimizedQuoteContent = () => {
             <Button
               variant="outline"
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSavingInProgress}
               className="bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-none"
             >
               <Save className="mr-1.5 h-4 w-4" />

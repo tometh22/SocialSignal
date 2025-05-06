@@ -74,6 +74,8 @@ interface OptimizedQuoteContextType {
   markupAmount: number;
   totalAmount: number;
   recommendedRoleIds: number[];
+  // Estado de guardado
+  isSavingInProgress: boolean;
   // Métodos paso 1
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
@@ -996,6 +998,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     markupAmount,
     totalAmount,
     recommendedRoleIds,
+    isSavingInProgress,
     updateClient,
     updateProjectName,
     updateProjectType,
