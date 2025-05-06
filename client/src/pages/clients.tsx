@@ -216,12 +216,8 @@ export default function Clients() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-subheading text-neutral-900">Clientes</h2>
-      </div>
-      
       <div className="flex-1 overflow-y-auto">
-        <div className="container-xl fade-in">
+        <div className="container-xl fade-in pt-4">
           <div className="section-sm">
             <Card className="shadow-soft">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -251,7 +247,6 @@ export default function Clients() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="border-b border-neutral-200">
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Logo</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Cliente</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Persona de Contacto</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Email</th>
@@ -262,24 +257,26 @@ export default function Clients() {
                       <tbody>
                         {filteredClients.map((client) => (
                           <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
-                            <td className="px-4 py-3 text-sm">
-                              {client.logoUrl ? (
-                                <div className="h-8 w-8 rounded overflow-hidden">
-                                  <img 
-                                    src={client.logoUrl} 
-                                    alt={`${client.name} logo`} 
-                                    className="h-full w-full object-contain"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center">
-                                  <span className="text-xs font-medium text-primary">
-                                    {client.name.substring(0, 2).toUpperCase()}
-                                  </span>
-                                </div>
-                              )}
+                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">
+                              <div className="flex items-center gap-3">
+                                {client.logoUrl ? (
+                                  <div className="h-8 w-8 rounded overflow-hidden flex-shrink-0">
+                                    <img 
+                                      src={client.logoUrl} 
+                                      alt={`${client.name} logo`} 
+                                      className="h-full w-full object-contain"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xs font-medium text-primary">
+                                      {client.name.substring(0, 2).toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <span>{client.name}</span>
+                              </div>
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">{client.name}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactPhone || "-"}</td>
