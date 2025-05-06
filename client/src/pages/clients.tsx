@@ -83,8 +83,16 @@ export default function Clients() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InsertClient> }) => 
-      apiRequest(`/api/clients/${id}`, "PATCH", data),
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertClient> }) => {
+      try {
+        console.log("Actualizando cliente:", id, data);
+        const response = await apiRequest(`/api/clients/${id}`, "PATCH", data);
+        return response;
+      } catch (error) {
+        console.error("Error detallado:", error);
+        throw error;
+      }
+    },
     onSuccess: async () => {
       // Invalidar la caché de consultas
       await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
@@ -97,7 +105,8 @@ export default function Clients() {
       setDialogOpen(false);
       form.reset();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error en updateMutation:", error);
       toast({
         title: "Error",
         description: "No se pudo actualizar el cliente.",
@@ -208,7 +217,15 @@ export default function Clients() {
 
   const onSubmit = (values: ClientFormValues) => {
     if (isEditing && currentClient) {
-      updateMutation.mutate({ id: currentClient.id, data: values });
+      // Si se ha cargado un logo nuevo, usamos la URL que ya está en el form
+      // Esto asegura que no perdemos la URL del logo actualizada
+      const dataToUpdate = {
+        ...values,
+        logoUrl: logoPreview || values.logoUrl // Usar logoPreview si existe, o mantener la URL actual
+      };
+      
+      console.log("Datos a actualizar:", dataToUpdate);
+      updateMutation.mutate({ id: currentClient.id, data: dataToUpdate });
     } else {
       createMutation.mutate(values);
     }
