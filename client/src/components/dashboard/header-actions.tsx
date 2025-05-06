@@ -6,7 +6,8 @@ import {
   Clock, 
   Edit2, 
   Save, 
-  ChevronLeft
+  ChevronLeft,
+  Loader2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export const HeaderActions = ({
 }: HeaderActionsProps) => {
   const [editing, setEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (projectName) {
@@ -53,19 +55,32 @@ export const HeaderActions = ({
     }
   }, [projectName]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = editedName.trim();
     if (trimmedName && trimmedName !== projectName) {
-      // Actualizamos localmente primero para mostrar el cambio inmediatamente
-      document.querySelectorAll('.project-name').forEach(el => {
-        (el as HTMLElement).innerText = trimmedName;
-      });
-      
-      // Después llamamos a la función que guardará el cambio en el servidor
-      onSaveProjectName(trimmedName);
-      
-      // Forzamos el cambio de estado a false antes de que se complete la operación
-      setEditing(false);
+      try {
+        // Establecer estado de carga
+        setIsSaving(true);
+        
+        // Actualizamos localmente primero para mostrar el cambio inmediatamente
+        document.querySelectorAll('.project-name').forEach(el => {
+          (el as HTMLElement).innerText = trimmedName;
+        });
+        
+        // Después llamamos a la función que guardará el cambio en el servidor
+        // Añadir pequeña espera artificial para que el usuario vea el estado de guardado
+        setTimeout(() => {
+          onSaveProjectName(trimmedName);
+          // Desactivar estado de carga tras un breve retraso para una mejor UX
+          setTimeout(() => {
+            setIsSaving(false);
+            setEditing(false);
+          }, 300);
+        }, 100);
+      } catch (error) {
+        console.error("Error al guardar el nombre:", error);
+        setIsSaving(false);
+      }
     } else {
       // Si no hay cambios, simplemente salimos del modo edición
       setEditing(false);
@@ -133,12 +148,29 @@ export const HeaderActions = ({
               value={editedName}
               onChange={(e) => setEditedName(e.target.value)}
               className="text-lg font-bold h-8 min-w-[250px]"
+              disabled={isSaving}
               autoFocus
             />
-            <Button size="icon" onClick={handleSave} variant="outline" className="h-7 w-7">
-              <Save className="h-3.5 w-3.5" />
+            <Button 
+              size="icon" 
+              onClick={handleSave} 
+              variant="outline" 
+              className="h-7 w-7" 
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
             </Button>
-            <Button size="icon" variant="ghost" onClick={handleCancel} className="h-7 w-7">
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              onClick={handleCancel} 
+              className="h-7 w-7"
+              disabled={isSaving}
+            >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
           </div>
