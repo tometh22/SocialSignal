@@ -201,7 +201,7 @@ const ProjectSummary = () => {
       console.log("URL:", `/api/projects/${parsedProjectId}/update-name`);
       console.log("Datos enviados:", { name: newName });
       
-      // Enviar la solicitud al servidor
+      // Enviar la solicitud al servidor inmediatamente sin retrasos
       await apiRequest(
         'PATCH', 
         `/api/projects/${parsedProjectId}/update-name`, 

@@ -81,20 +81,18 @@ export const HeaderActions = ({
       // Activar estado de carga
       setIsSaving(true);
       
-      // Guardar el nombre del proyecto
+      // Guardar el nombre del proyecto - esperar a que la operación se complete
       await onSaveProjectName(trimmedName);
+      
+      // Inmediatamente desactivar estado de carga y cerrar edición
+      setIsSaving(false);
+      setEditing(false);
       
       // Mostrar notificación de éxito
       toast({
         title: "Nombre actualizado",
         description: "El nombre del proyecto ha sido actualizado correctamente.",
       });
-      
-      // Retardo para mejorar la experiencia de usuario
-      saveTimeoutRef.current = setTimeout(() => {
-        setIsSaving(false);
-        setEditing(false);
-      }, 500);
       
     } catch (error) {
       console.error("Error al guardar el nombre:", error);
