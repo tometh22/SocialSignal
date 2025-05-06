@@ -1164,24 +1164,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log("Cotización encontrada, nombre anterior:", quotation.projectName);
-      console.log("Actualizando a nuevo nombre:", name.trim());
       
-      // Actualizar el nombre del proyecto en la cotización
-      const updatedQuotation = await storage.updateQuotation(project.quotationId, {
-        projectName: name.trim()
-      });
+      // Verificar si hay otros proyectos que usan la misma cotización
+      console.log("Verificando si hay otros proyectos usando la misma cotización...");
+      const projectsWithSameQuotation = await storage.getActiveProjectsByQuotationId(project.quotationId);
       
-      if (!updatedQuotation) {
-        console.log("Error al actualizar la cotización");
-        return res.status(500).json({ message: "Failed to update project name" });
+      if (projectsWithSameQuotation.length > 1) {
+        // Si hay más proyectos usando la misma cotización, crear una copia para este proyecto
+        console.log(`Encontrados ${projectsWithSameQuotation.length} proyectos con la misma cotización. Creando copia dedicada.`);
+        
+        // Crear una copia de la cotización con el nuevo nombre
+        const newQuotation = { ...quotation, projectName: name.trim() };
+        delete newQuotation.id; // Eliminar el ID para que se genere uno nuevo
+        
+        const createdQuotation = await storage.createQuotation(newQuotation);
+        if (!createdQuotation) {
+          console.log("Error al crear copia de la cotización");
+          return res.status(500).json({ message: "Failed to create quotation copy" });
+        }
+        
+        console.log(`Nueva cotización creada con ID: ${createdQuotation.id} y nombre: ${createdQuotation.projectName}`);
+        
+        // Actualizar el proyecto para usar la nueva cotización
+        const updatedProject = await storage.updateActiveProject(id, {
+          quotationId: createdQuotation.id
+        });
+        
+        if (!updatedProject) {
+          console.log("Error al actualizar la referencia del proyecto a la nueva cotización");
+          return res.status(500).json({ message: "Failed to update project" });
+        }
+        
+        console.log(`Proyecto ${id} actualizado para usar la cotización ${createdQuotation.id}`);
+        
+        // Obtener el proyecto actualizado para devolver
+        const finalProject = await storage.getActiveProject(id);
+        console.log("Retornando proyecto actualizado con nueva cotización");
+        return res.json(finalProject);
+      } else {
+        // Si solo este proyecto usa la cotización, actualizar normalmente
+        console.log("Solo un proyecto usa esta cotización. Actualizando directamente.");
+        console.log("Actualizando a nuevo nombre:", name.trim());
+        
+        // Actualizar el nombre del proyecto en la cotización
+        const updatedQuotation = await storage.updateQuotation(project.quotationId, {
+          projectName: name.trim()
+        });
+        
+        if (!updatedQuotation) {
+          console.log("Error al actualizar la cotización");
+          return res.status(500).json({ message: "Failed to update project name" });
+        }
+        
+        console.log("Cotización actualizada exitosamente:", updatedQuotation.projectName);
+        
+        // Obtenemos el proyecto actualizado
+        const updatedProject = await storage.getActiveProject(id);
+        console.log("Retornando proyecto actualizado");
+        return res.json(updatedProject);
       }
-      
-      console.log("Cotización actualizada exitosamente:", updatedQuotation.projectName);
-      
-      // Obtenemos el proyecto actualizado
-      const updatedProject = await storage.getActiveProject(id);
-      console.log("Retornando proyecto actualizado");
-      res.json(updatedProject);
     } catch (error) {
       console.error("Error updating project name:", error);
       res.status(500).json({ message: "Failed to update project name" });

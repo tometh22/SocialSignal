@@ -77,6 +77,7 @@ export interface IStorage {
   createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
   updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
   getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
+  getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
   deleteActiveProject(id: number): Promise<boolean>;
   
   // Time entry operations
