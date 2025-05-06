@@ -181,8 +181,8 @@ export default function Topbar() {
             <Search className="h-4.5 w-4.5" />
           </Button>
           
-          {/* Mensajes - Usando el componente MessagesPopup */}
-          <MessagesPopup />
+          {/* Mensajes - Temporalmente deshabilitado */}
+          {/* <MessagesPopup /> */}
           
           {/* Ayuda - Usando el componente HelpPopup */}
           <HelpPopup />

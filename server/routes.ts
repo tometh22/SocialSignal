@@ -18,7 +18,7 @@ import {
 } from "@shared/schema";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
-import { setupChat } from "./chat";
+// Temporalmente deshabilitado: import { setupChat } from "./chat";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create the HTTP server
@@ -27,8 +27,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication with storage
   setupAuth(app, storage);
   
-  // Setup chat websocket server
-  setupChat(app, httpServer);
+  // Temporalmente deshabilitado: Chat websocket server
+  // setupChat(app, httpServer);
   
   // Clients routes
   app.get("/api/clients", async (_, res) => {
