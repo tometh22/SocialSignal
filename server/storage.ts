@@ -1351,6 +1351,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(activeProjects.quotationId, quotationId));
   }
   
+  async getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
+    return await db
+      .select()
+      .from(activeProjects)
+      .where(eq(activeProjects.quotationId, quotationId));
+  }
+  
   async deleteActiveProject(id: number): Promise<boolean> {
     try {
       // 1. Verificar que el proyecto exista
