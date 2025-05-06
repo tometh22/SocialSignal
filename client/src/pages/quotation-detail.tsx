@@ -470,9 +470,30 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-neutral-500">Nombre</h3>
-                    <p className="mt-1">{client.name}</p>
+                  <div className="flex items-center gap-4">
+                    {client.logoUrl ? (
+                      <div className="h-12 w-12 rounded overflow-hidden border flex-shrink-0">
+                        <img 
+                          src={client.logoUrl} 
+                          alt={`${client.name} logo`} 
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            // Manejo de error si la imagen no se puede cargar
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          {client.name.substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-sm font-medium text-neutral-500">Nombre</h3>
+                      <p className="mt-1 font-medium">{client.name}</p>
+                    </div>
                   </div>
                   {client.contactName && (
                     <div>

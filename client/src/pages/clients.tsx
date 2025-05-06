@@ -183,6 +183,7 @@ export default function Clients() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="border-b border-neutral-200">
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Logo</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Cliente</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Persona de Contacto</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Email</th>
@@ -193,6 +194,23 @@ export default function Clients() {
                       <tbody>
                         {filteredClients.map((client) => (
                           <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
+                            <td className="px-4 py-3 text-sm">
+                              {client.logoUrl ? (
+                                <div className="h-8 w-8 rounded overflow-hidden">
+                                  <img 
+                                    src={client.logoUrl} 
+                                    alt={`${client.name} logo`} 
+                                    className="h-full w-full object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center">
+                                  <span className="text-xs font-medium text-primary">
+                                    {client.name.substring(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-sm font-medium text-neutral-900">{client.name}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
@@ -297,6 +315,36 @@ export default function Clients() {
                       <Input placeholder="Introduce el número de teléfono" {...field} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="logoUrl"
+                render={({ field }) => (
+                  <FormItem className="form-group">
+                    <FormLabel className="text-label">URL del Logo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://example.com/logo.png" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    {field.value && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-8 w-8 rounded overflow-hidden border">
+                          <img 
+                            src={field.value} 
+                            alt="Logo preview" 
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              // Manejo de error si la imagen no se puede cargar
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Vista previa</p>
+                      </div>
+                    )}
                   </FormItem>
                 )}
               />
