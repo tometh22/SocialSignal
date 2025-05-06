@@ -122,11 +122,11 @@ export default function AuthPage() {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 bg-gray-900 rounded-xl flex items-center justify-center">
+              <div className="h-16 w-16 flex items-center justify-center">
                 <img 
                   src={epicalLogoPath} 
                   alt="Epical Digital Logo" 
-                  className="h-12 w-12 object-contain" 
+                  className="h-16 w-16 object-contain rounded-sm" 
                 />
               </div>
             </div>
