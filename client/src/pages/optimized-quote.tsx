@@ -313,7 +313,7 @@ const OptimizedQuoteContent = () => {
             ) : (
               <Button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSavingInProgress}
                 className="bg-success text-success-foreground shadow-sm hover:shadow"
               >
                 <Check className="mr-1.5 h-4 w-4" />
