@@ -93,8 +93,28 @@ export default function ManageQuotes() {
     if (!selectedQuote) return;
     
     try {
+      console.log(`[CLIENT] Intentando eliminar cotización ID ${selectedQuote.id}`);
       const response = await apiRequest(`/api/quotations/${selectedQuote.id}`, "DELETE");
+      console.log(`[CLIENT] Respuesta del servidor:`, response.status);
+      
+      // Comprobar primero si hay un error basado en el código de estado
+      if (response.status === 409) {
+        console.log(`[CLIENT] La cotización está en uso (409 Conflict)`);
+        toast({
+          title: "No se puede eliminar",
+          description: "Esta cotización está siendo utilizada por proyectos activos y no puede ser eliminada.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!response.ok) {
+        console.log(`[CLIENT] Error del servidor: ${response.status}`);
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log(`[CLIENT] Datos recibidos:`, data);
       
       if (data.success) {
         toast({
@@ -104,11 +124,19 @@ export default function ManageQuotes() {
         
         refetch();
         setDeleteDialogOpen(false);
+      } else {
+        // Si el servidor responde con success: false
+        toast({
+          title: "Error",
+          description: data.message || "No se pudo eliminar la cotización.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
+      console.error(`[CLIENT] Error al eliminar cotización:`, error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar la cotización. Puede estar siendo utilizada por proyectos activos.",
+        description: "Ocurrió un error al intentar eliminar la cotización.",
         variant: "destructive",
       });
     }

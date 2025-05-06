@@ -1193,8 +1193,12 @@ export class DatabaseStorage implements IStorage {
   
   async deleteQuotation(id: number): Promise<boolean> {
     try {
+      console.log(`[DEBUG] Iniciando eliminación de cotización ID ${id}`);
+      
       // 1. Verificar que la cotización exista
       const quotation = await this.getQuotation(id);
+      console.log(`[DEBUG] Cotización encontrada:`, quotation ? 'Sí' : 'No');
+      
       if (!quotation) {
         console.log(`Cotización con ID ${id} no encontrada para eliminar`);
         return false;
@@ -1202,19 +1206,26 @@ export class DatabaseStorage implements IStorage {
       
       // 2. Verificar si la cotización está asociada a algún proyecto activo
       const activeProjects = await this.getActiveProjectsByQuotationId(id);
+      console.log(`[DEBUG] Proyectos activos asociados: ${activeProjects.length}`);
+      console.log(`[DEBUG] IDs de proyectos activos:`, activeProjects.map(p => p.id));
+      
       if (activeProjects.length > 0) {
         console.log(`No se puede eliminar la cotización ID ${id} porque está asociada a ${activeProjects.length} proyectos activos`);
         return false;
       }
       
+      console.log(`[DEBUG] Eliminando miembros del equipo de cotización`);
       // 3. Eliminar los miembros del equipo de cotización asociados
       await this.deleteQuotationTeamMembers(id);
       
+      console.log(`[DEBUG] Eliminando la cotización de la base de datos`);
       // 4. Eliminar la cotización
       await db.delete(quotations).where(eq(quotations.id, id));
       
       // 5. Verificar que la cotización haya sido eliminada
       const checkQuotation = await this.getQuotation(id);
+      console.log(`[DEBUG] Verificación final - Cotización aún existe:`, checkQuotation ? 'Sí' : 'No');
+      
       return checkQuotation === undefined;
     } catch (error) {
       console.error(`Error al eliminar la cotización ID ${id}:`, error);
@@ -1402,10 +1413,18 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
-    return await db
+    console.log(`[DEBUG] Buscando proyectos activos para la cotización ID ${quotationId}`);
+    const projects = await db
       .select()
       .from(activeProjects)
       .where(eq(activeProjects.quotationId, quotationId));
+    
+    console.log(`[DEBUG] Proyectos encontrados para cotización ${quotationId}:`, projects.length);
+    if (projects.length > 0) {
+      console.log(`[DEBUG] IDs de los proyectos encontrados:`, projects.map(p => p.id));
+    }
+    
+    return projects;
   }
   
   async deleteActiveProject(id: number): Promise<boolean> {
