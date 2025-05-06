@@ -149,9 +149,11 @@ const OptimizedQuoteContent = () => {
                   variant="outline" 
                   size="sm" 
                   className="text-xs h-8 border-primary/30 text-primary bg-primary/5"
-                  onClick={() => saveQuotation()}
+                  onClick={handleSave}
+                  disabled={isSaving}
                 >
-                  <Save className="h-3.5 w-3.5 mr-1.5" /> Guardar borrador
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> 
+                  {isSaving ? "Guardando..." : "Guardar borrador"}
                 </Button>
               </div>
             </div>

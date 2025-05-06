@@ -268,7 +268,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       }));
 
       // Cargar roles recomendados
-      apiRequest(`/api/template-roles/${template.id}`)
+      apiRequest(`/api/template-roles/${template.id}`, "GET")
         .then(response => {
           if (response && Array.isArray(response)) {
             const recommendedIds = response.map(assignment => assignment.roleId);
@@ -431,7 +431,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       } else {
         // Si no está disponible, intentar cargar de la API
         try {
-          const personnelList = await apiRequest('/api/personnel');
+          const personnelList = await apiRequest('/api/personnel', 'GET');
           if (personnelList && personnelList.length > 0) {
             defaultPersonnelId = personnelList[0].id;
           }
@@ -445,7 +445,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
       // Ahora cargar asignaciones de roles para obtener horas (si hay plantilla)
       let assignments = [];
       if (quotationData.template !== null) {
-        assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`);
+        assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`, 'GET');
       } else {
         // Caso "Sin plantilla": crear asignaciones básicas basadas en recommendedRoleIds
         console.log("Usando configuración de equipo personalizada...");
@@ -622,7 +622,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   // Cargar roles disponibles
   const loadRoles = useCallback(async () => {
     try {
-      const roles = await apiRequest('/api/roles');
+      const roles = await apiRequest('/api/roles', 'GET');
       setAvailableRoles(roles);
     } catch (error) {
       console.error("Error al cargar roles:", error);
@@ -632,7 +632,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   // Cargar personal disponible
   const loadPersonnel = useCallback(async () => {
     try {
-      const personnel = await apiRequest('/api/personnel');
+      const personnel = await apiRequest('/api/personnel', 'GET');
       setAvailablePersonnel(personnel);
     } catch (error) {
       console.error("Error al cargar personal:", error);
@@ -736,9 +736,19 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     }
   }, [quotationData.template]);
 
+  // Variable para rastrear si hay una operación de guardado en progreso
+  const [isSavingInProgress, setIsSavingInProgress] = useState(false);
+
   // Método simplificado para guardar la cotización
   const saveQuotation = useCallback(async () => {
     try {
+      // Evitar múltiples envíos simultáneos
+      if (isSavingInProgress) {
+        console.log("Ya hay una operación de guardado en progreso. Ignorando esta solicitud.");
+        return -1; // Retornar valor especial para indicar que no se realizó la operación
+      }
+      
+      setIsSavingInProgress(true);
       console.log("Iniciando proceso de guardar cotización...");
       
       // Validación básica
@@ -876,8 +886,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
     } catch (error) {
       console.error("Error completo:", error);
       throw error;
+    } finally {
+      // Asegurarse de restablecer el estado de guardado, tanto en éxito como en error
+      setIsSavingInProgress(false);
     }
-  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
+  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount, isSavingInProgress]);
 
   // Actualizar los cálculos financieros cuando cambian los factores
   useEffect(() => {
