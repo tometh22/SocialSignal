@@ -806,7 +806,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   // Variable para rastrear si hay una operación de guardado en progreso
   const [isSavingInProgress, setIsSavingInProgress] = useState(false);
 
-  // Método simplificado para guardar la cotización
+  // Método para guardar o actualizar la cotización
   const saveQuotation = useCallback(async () => {
     try {
       // Evitar múltiples envíos simultáneos
@@ -816,7 +816,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       }
       
       setIsSavingInProgress(true);
-      console.log("Iniciando proceso de guardar cotización...");
+      console.log(`Iniciando proceso de ${isEditing ? 'actualizar' : 'guardar'} cotización...`);
       
       // Validación básica
       if (!quotationData.client) {
@@ -835,8 +835,25 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         throw new Error("Debe completar la configuración de plantilla o seleccionar la opción personalizada");
       }
       
-      // Preparar datos
-      const payload = {
+      // Preparar datos comunes para crear o actualizar
+      const payload: {
+        clientId: number;
+        projectName: string;
+        projectType: string;
+        analysisType: string;
+        mentionsVolume: string;
+        countriesCovered: string;
+        clientEngagement: string;
+        templateId: number | null;
+        templateCustomization: string;
+        baseCost: number;
+        complexityAdjustment: number;
+        markupAmount: number;
+        totalAmount: number;
+        adjustmentReason: string;
+        additionalNotes: string;
+        status?: string; // Hacemos que status sea una propiedad opcional
+      } = {
         clientId: quotationData.client.id,
         projectName: quotationData.project.name,
         projectType: quotationData.project.type || "executive",
@@ -852,23 +869,50 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         complexityAdjustment: complexityAdjustment,
         markupAmount: markupAmount,
         totalAmount: totalAmount,
-        status: "draft",
         adjustmentReason: `Descuento: ${quotationData.financials.discount}%, Desviación: ${quotationData.financials.deviationPercentage}%`,
         additionalNotes: quotationData.template === null 
                         ? "Cotización personalizada sin plantilla predefinida"
-                        : "Generado desde cotización optimizada"
+                        : isRecotizacion 
+                          ? "Recotización de propuesta anterior"
+                          : isEditing 
+                            ? "Actualización de borrador"
+                            : "Generado desde cotización optimizada"
       };
+      
+      // Si es una recotización, siempre crear como nuevo
+      if (isRecotizacion) {
+        payload.status = "negotiation"; // Las recotizaciones siempre inician en negociación
+      } else if (!isEditing) {
+        payload.status = "draft"; // Nuevas cotizaciones siempre inician como borrador
+      }
       
       console.log("Payload a enviar:", payload);
       
-      // Crear cotización
-      console.log("Enviando solicitud POST a /api/quotations...");
-      const response = await fetch('/api/quotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        credentials: 'include'
-      });
+      let response;
+      let quotationId;
+      
+      // Lógica diferente según si es edición o nueva cotización
+      if (isEditing && editQuotationId && !isRecotizacion) {
+        // Actualizar cotización existente
+        console.log(`Actualizando cotización ID: ${editQuotationId}`);
+        response = await fetch(`/api/quotations/${editQuotationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'include'
+        });
+        
+        quotationId = editQuotationId;
+      } else {
+        // Crear cotización nueva (o recotización)
+        console.log("Creando nueva cotización...");
+        response = await fetch('/api/quotations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'include'
+        });
+      }
       
       console.log("Estado de respuesta:", response.status);
       
@@ -890,25 +934,41 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           console.error("Error al leer respuesta de error:", err);
         }
         
-        throw new Error(`Error al guardar cotización: ${errorMessage}`);
+        throw new Error(`Error al ${isEditing ? 'actualizar' : 'guardar'} cotización: ${errorMessage}`);
       }
       
-      let quotation;
-      try {
-        quotation = await response.json();
-        console.log("Cotización creada:", quotation);
-      } catch (err) {
-        console.error("Error al parsear respuesta como JSON:", err);
-        throw new Error("No se pudo leer la respuesta del servidor");
+      // Procesar respuesta diferente según el método
+      if (!isEditing || isRecotizacion) {
+        // Para nuevas cotizaciones o recotizaciones, obtener el ID de la respuesta
+        try {
+          const quotation = await response.json();
+          console.log("Cotización creada:", quotation);
+          
+          if (!quotation || !quotation.id) {
+            throw new Error("La respuesta no contiene un ID de cotización válido");
+          }
+          
+          quotationId = quotation.id;
+          console.log(`ID de cotización creada: ${quotationId}`);
+        } catch (err) {
+          console.error("Error al parsear respuesta como JSON:", err);
+          throw new Error("No se pudo leer la respuesta del servidor");
+        }
       }
       
-      if (!quotation || !quotation.id) {
-        throw new Error("La respuesta no contiene un ID de cotización válido");
+      // En edición, primero eliminamos los miembros del equipo anteriores
+      if (isEditing && !isRecotizacion) {
+        try {
+          console.log(`Eliminando miembros anteriores para cotización ${quotationId}`);
+          await fetch(`/api/quotation-team/by-quotation/${quotationId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+        } catch (err) {
+          console.error("Error al eliminar miembros anteriores:", err);
+          // Continuar a pesar del error
+        }
       }
-      
-      // Guardar equipo
-      const quotationId = quotation.id;
-      console.log(`ID de cotización creada: ${quotationId}`);
       
       // Usar el primer ID de personal como default
       const defaultPersonId = 39;
@@ -947,7 +1007,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         console.log("Miembro guardado:", savedMember);
       }
       
-      console.log("¡Cotización guardada con éxito!");
+      console.log(`¡Cotización ${isEditing ? 'actualizada' : 'guardada'} con éxito!`);
       return quotationId;
       
     } catch (error) {
@@ -957,7 +1017,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       // Asegurarse de restablecer el estado de guardado, tanto en éxito como en error
       setIsSavingInProgress(false);
     }
-  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount, isSavingInProgress]);
+  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount, 
+      isSavingInProgress, isEditing, isRecotizacion, editQuotationId]);
 
   // Actualizar los cálculos financieros cuando cambian los factores
   useEffect(() => {
@@ -1055,6 +1116,129 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     loadPersonnel();
   }, [loadRoles, loadPersonnel]);
 
+  // Efecto para cargar una cotización existente si hay quotationId
+  useEffect(() => {
+    if (quotationId) {
+      const loadExistingQuotation = async () => {
+        try {
+          console.log(`Cargando cotización existente ID: ${quotationId}`);
+          
+          // Obtener la cotización de la API
+          const quotation = await apiRequest(`/api/quotations/${quotationId}`, "GET");
+          if (!quotation) {
+            console.error("No se pudo cargar la cotización");
+            return;
+          }
+          
+          // Cargar el cliente
+          let cliente = null;
+          try {
+            cliente = await apiRequest(`/api/clients/${quotation.clientId}`, "GET");
+          } catch (err) {
+            console.error("Error al cargar cliente:", err);
+          }
+          
+          // Cargar la plantilla si existe
+          let template = null;
+          if (quotation.templateId) {
+            try {
+              template = await apiRequest(`/api/templates/${quotation.templateId}`, "GET");
+            } catch (err) {
+              console.error("Error al cargar plantilla:", err);
+            }
+          }
+          
+          // Cargar miembros del equipo
+          let teamMembers: TeamMember[] = [];
+          try {
+            const teamData = await apiRequest(`/api/quotation-team/${quotationId}`, "GET");
+            if (Array.isArray(teamData) && teamData.length > 0) {
+              // Convertir datos del API a formato TeamMember
+              teamMembers = teamData.map(member => ({
+                id: uuidv4(), // Generar nuevo ID para la interfaz
+                roleId: member.personnelId, // En el API se guarda como personnelId
+                personnelId: member.personnelId,
+                hours: member.hours,
+                rate: member.rate,
+                cost: member.cost
+              }));
+            }
+          } catch (err) {
+            console.error("Error al cargar equipo:", err);
+          }
+          
+          // Actualizar el estado con los datos cargados
+          setBaseCost(quotation.baseCost || 0);
+          setComplexityAdjustment(quotation.complexityAdjustment || 0);
+          setMarkupAmount(quotation.markupAmount || 0);
+          setTotalAmount(quotation.totalAmount || 0);
+          
+          // Extraer valores de ajuste financiero
+          let deviation = 0;
+          let discount = 0;
+          if (quotation.adjustmentReason) {
+            const deviationMatch = quotation.adjustmentReason.match(/Desviación: (\d+\.?\d*)%/);
+            if (deviationMatch && deviationMatch[1]) {
+              deviation = parseFloat(deviationMatch[1]);
+            }
+            
+            const discountMatch = quotation.adjustmentReason.match(/Descuento: (\d+\.?\d*)%/);
+            if (discountMatch && discountMatch[1]) {
+              discount = parseFloat(discountMatch[1]);
+            }
+          }
+          
+          // Análisis de complejidad desde campos personalizados
+          const getAnalysisTypeFromId = (id: number) => {
+            if (id === 1) return 'basic';
+            if (id === 2) return 'standard';
+            if (id === 3) return 'advanced';
+            return 'standard';
+          };
+          
+          const getMentionsVolumeFromId = (id: number) => {
+            if (id === 1) return 'low';
+            if (id === 2) return 'medium';
+            if (id === 3) return 'high';
+            return 'medium';
+          };
+          
+          // Actualizar quotationData completamente
+          setQuotationData({
+            client: cliente,
+            project: {
+              name: quotation.projectName || '',
+              type: quotation.projectType || 'executive',
+              duration: quotation.projectDuration as ProjectDuration || 'medium',
+            },
+            template: template,
+            complexity: quotation.complexity as 'low' | 'medium' | 'high' || 'medium',
+            customization: quotation.templateCustomization || '',
+            analysisType: getAnalysisTypeFromId(quotation.analysisTypeId || 2),
+            mentionsVolume: getMentionsVolumeFromId(quotation.mentionsVolumeId || 2),
+            countriesCovered: String(quotation.countriesCoveredId || 1),
+            clientEngagement: quotation.clientEngagementId === 1 ? 'minimum' : 
+                              quotation.clientEngagementId === 3 ? 'high' : 'medium',
+            teamOption: 'manual', // Por defecto asumimos manual en edición
+            teamMembers: teamMembers,
+            financials: {
+              platformCost: template?.platformCost || 0,
+              deviationPercentage: deviation,
+              discount: discount,
+              marginFactor: 1.0 // Valor por defecto
+            }
+          });
+          
+          console.log("Cotización cargada exitosamente");
+        } catch (error) {
+          console.error("Error al cargar la cotización:", error);
+        }
+      };
+      
+      loadExistingQuotation();
+    }
+  }, [quotationId]); // Solo se ejecuta cuando cambia quotationId
+
   // Valor del contexto
   const contextValue: OptimizedQuoteContextType = {
     quotationData,
@@ -1064,6 +1248,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     totalAmount,
     recommendedRoleIds,
     isSavingInProgress,
+    // Información de edición
+    isEditing: !!quotationId && !isRequote,
+    isRecotizacion: isRequote,
+    quotationId: editQuotationId,
+    // Métodos para actualización
     updateClient,
     updateProjectName,
     updateProjectType,
@@ -1071,7 +1260,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     updateTemplate,
     updateComplexity,
     updateCustomization,
-    // Nuevos métodos para configuración
+    // Métodos para configuración
     updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,

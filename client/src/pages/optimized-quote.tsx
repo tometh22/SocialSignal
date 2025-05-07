@@ -14,10 +14,16 @@ import OptimizedTemplateSelection from '@/components/optimized/template-selectio
 import OptimizedTeamConfig from '@/components/optimized/team-config';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 
+// Interfaces para los props
+interface OptimizedQuoteProps {
+  quotationId?: number;  // ID de cotización para editar
+  isRequote?: boolean;   // Indica si es una recotización
+}
+
 // Componente principal que contiene el flujo de cotización optimizado
-const OptimizedQuote = () => {
+const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
   return (
-    <OptimizedQuoteProvider>
+    <OptimizedQuoteProvider quotationId={quotationId} isRequote={isRequote}>
       <OptimizedQuoteContent />
     </OptimizedQuoteProvider>
   );
@@ -33,7 +39,10 @@ const OptimizedQuoteContent = () => {
     saveQuotation,
     quotationData,
     updateTemplate,
-    isSavingInProgress
+    isSavingInProgress,
+    isEditing,
+    isRecotizacion,
+    quotationId
   } = useOptimizedQuote();
   
   const [, setLocation] = useLocation();
@@ -142,13 +151,24 @@ const OptimizedQuoteContent = () => {
           <div className="flex flex-col">
             {/* Título principal */}
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-medium text-gray-800">Nueva Cotización</h1>
+              <h1 className="text-xl font-medium text-gray-800">
+                {isEditing 
+                  ? "Editar Borrador de Cotización" 
+                  : isRecotizacion 
+                    ? "Recotizar Propuesta" 
+                    : "Nueva Cotización"}
+                {quotationId && 
+                  <span className="ml-2 text-xs text-neutral-500">
+                    (ID: {quotationId})
+                  </span>
+                }
+              </h1>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="text-xs h-8 border-slate-200 text-slate-700"
-                  onClick={() => setLocation('/')}
+                  onClick={() => setLocation('/manage-quotes')}
                 >
                   Cancelar
                 </Button>
@@ -160,7 +180,13 @@ const OptimizedQuoteContent = () => {
                   disabled={isSavingInProgress}
                 >
                   <Save className="h-3.5 w-3.5 mr-1.5" /> 
-                  {isSavingInProgress ? "Guardando..." : "Guardar borrador"}
+                  {isSavingInProgress 
+                    ? "Guardando..." 
+                    : isEditing 
+                      ? "Actualizar Borrador" 
+                      : isRecotizacion 
+                        ? "Guardar Recotización" 
+                        : "Guardar Borrador"}
                 </Button>
               </div>
             </div>
@@ -303,7 +329,11 @@ const OptimizedQuoteContent = () => {
               className="bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-none"
             >
               <Save className="mr-1.5 h-4 w-4" />
-              Guardar Borrador
+              {isEditing 
+                ? "Actualizar Borrador" 
+                : isRecotizacion 
+                  ? "Guardar Recotización" 
+                  : "Guardar Borrador"}
             </Button>
             
             {currentStep < 4 ? (
@@ -321,7 +351,11 @@ const OptimizedQuoteContent = () => {
                 className="bg-success text-success-foreground shadow-sm hover:shadow"
               >
                 <Check className="mr-1.5 h-4 w-4" />
-                Finalizar Cotización
+                {isEditing 
+                  ? "Finalizar Actualización" 
+                  : isRecotizacion 
+                    ? "Finalizar Recotización" 
+                    : "Finalizar Cotización"}
               </Button>
             )}
           </div>
