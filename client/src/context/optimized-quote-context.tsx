@@ -1151,17 +1151,36 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           // Cargar miembros del equipo
           let teamMembers: TeamMember[] = [];
           try {
+            console.log(`Cargando equipo para cotización ID: ${quotationId}`);
             const teamData = await apiRequest(`/api/quotation-team/${quotationId}`, "GET");
+            console.log("Equipo recibido:", teamData);
+            
             if (Array.isArray(teamData) && teamData.length > 0) {
+              // Cargar personnel para obtener sus roles
+              const allPersonnel = await apiRequest("/api/personnel", "GET");
+              console.log("Personnel cargados:", allPersonnel);
+              
+              const personnelRoleMap = allPersonnel.reduce((map: Record<number, number>, p: any) => {
+                map[p.id] = p.roleId;
+                return map;
+              }, {});
+              
               // Convertir datos del API a formato TeamMember
-              teamMembers = teamData.map(member => ({
-                id: uuidv4(), // Generar nuevo ID para la interfaz
-                roleId: member.personnelId, // En el API se guarda como personnelId
-                personnelId: member.personnelId,
-                hours: member.hours,
-                rate: member.rate,
-                cost: member.cost
-              }));
+              teamMembers = teamData.map(member => {
+                const roleId = personnelRoleMap[member.personnelId] || 0;
+                console.log(`Miembro ${member.id}: personnelId=${member.personnelId}, roleId=${roleId}`);
+                
+                return {
+                  id: uuidv4(), // Generar nuevo ID para la interfaz
+                  roleId: roleId, // Obtener el roleId correcto basado en el personnelId
+                  personnelId: member.personnelId,
+                  hours: member.hours,
+                  rate: member.rate,
+                  cost: member.cost
+                };
+              });
+              
+              console.log("Equipo convertido:", teamMembers);
             }
           } catch (err) {
             console.error("Error al cargar equipo:", err);
