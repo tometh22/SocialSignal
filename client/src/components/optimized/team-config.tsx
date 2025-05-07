@@ -69,7 +69,7 @@ const OptimizedTeamConfig: React.FC = () => {
 
   // Filtrar personal por rol seleccionado
   const filteredPersonnel = availablePersonnel?.filter(
-    person => !newMember.roleId || person.roleId === newMember.roleId
+    person => person.roleId === newMember.roleId
   );
 
   // Verificar si un rol está recomendado
@@ -294,15 +294,21 @@ const OptimizedTeamConfig: React.FC = () => {
                       <SelectItem value="0" className="text-xs italic text-gray-500">
                         Cualquier persona con este rol
                       </SelectItem>
-                      {filteredPersonnel?.map(person => (
-                        <SelectItem 
-                          key={person.id} 
-                          value={String(person.id)}
-                          className="text-xs"
-                        >
-                          {person.name}
+                      {filteredPersonnel && filteredPersonnel.length > 0 ? (
+                        filteredPersonnel.map(person => (
+                          <SelectItem 
+                            key={person.id} 
+                            value={String(person.id)}
+                            className="text-xs"
+                          >
+                            {person.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem disabled value="no-personnel" className="text-xs text-gray-400 italic">
+                          No hay personal con este rol
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
