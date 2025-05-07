@@ -1152,23 +1152,43 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           let teamMembers: TeamMember[] = [];
           try {
             console.log(`Cargando equipo para cotización ID: ${quotationId}`);
-            const teamData = await apiRequest(`/api/quotation-team/${quotationId}`, "GET");
-            console.log("Equipo recibido:", teamData);
+            let teamData = await apiRequest(`/api/quotation-team/${quotationId}`, "GET");
+            console.log("Equipo recibido (sin procesar):", teamData);
             
             if (Array.isArray(teamData) && teamData.length > 0) {
+              // Limpiar duplicados en caso de error de persistencia
+              const seenMemberKeys = new Set<string>();
+              teamData = teamData.filter(member => {
+                const memberKey = `${member.personnelId}-${member.rate}-${member.hours}`;
+                // Si ya hemos visto este miembro exacto, filtrarlo
+                if (seenMemberKeys.has(memberKey)) {
+                  console.log(`Miembro duplicado detectado: ${memberKey}`);
+                  return false;
+                }
+                seenMemberKeys.add(memberKey);
+                return true;
+              });
+              
+              console.log("Equipo recibido (limpio):", teamData);
+              
               // Cargar personnel para obtener sus roles
               const allPersonnel = await apiRequest("/api/personnel", "GET");
               console.log("Personnel cargados:", allPersonnel);
               
-              const personnelRoleMap = allPersonnel.reduce((map: Record<number, number>, p: any) => {
-                map[p.id] = p.roleId;
-                return map;
-              }, {});
+              // Mapa para acceder rápidamente a los datos del personal
+              const personnelMap: Record<number, any> = {};
+              allPersonnel.forEach((p: any) => {
+                personnelMap[p.id] = p;
+              });
               
               // Convertir datos del API a formato TeamMember
               teamMembers = teamData.map(member => {
-                const roleId = personnelRoleMap[member.personnelId] || 0;
-                console.log(`Miembro ${member.id}: personnelId=${member.personnelId}, roleId=${roleId}`);
+                // Obtener información del personal
+                const person = personnelMap[member.personnelId];
+                const roleId = person ? person.roleId : 0;
+                const name = person ? person.name : "Desconocido";
+                
+                console.log(`Miembro ${member.id}: personnelId=${member.personnelId}, nombre=${name}, roleId=${roleId}`);
                 
                 return {
                   id: uuidv4(), // Generar nuevo ID para la interfaz
@@ -1180,7 +1200,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 };
               });
               
-              console.log("Equipo convertido:", teamMembers);
+              console.log("Equipo convertido (final):", teamMembers);
             }
           } catch (err) {
             console.error("Error al cargar equipo:", err);
@@ -1207,20 +1227,123 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             }
           }
           
-          // Análisis de complejidad desde campos personalizados
-          const getAnalysisTypeFromId = (id: number) => {
+          // Análisis de complejidad desde campos personalizados o textuales
+          const getAnalysisTypeFromIdOrText = (id?: number, text?: string) => {
+            // Primero intentar por texto exacto
+            if (text) {
+              const textLower = text.toLowerCase();
+              if (textLower.includes('basic') || textLower.includes('básico')) return 'basic';
+              if (textLower.includes('advanced') || textLower.includes('avanzado')) return 'advanced';
+              if (textLower.includes('standard') || textLower.includes('estándar')) return 'standard';
+            }
+            
+            // Si no hay texto o no se pudo determinar, intentar por ID
             if (id === 1) return 'basic';
-            if (id === 2) return 'standard';
             if (id === 3) return 'advanced';
-            return 'standard';
+            if (id === 2) return 'standard';
+            
+            // Buscar en campos directos
+            if (quotation.analysisType) {
+              return quotation.analysisType as 'basic' | 'standard' | 'advanced';
+            }
+            
+            return 'standard'; // Valor predeterminado
           };
           
-          const getMentionsVolumeFromId = (id: number) => {
+          const getMentionsVolumeFromIdOrText = (id?: number, text?: string) => {
+            // Primero intentar por texto exacto
+            if (text) {
+              const textLower = text.toLowerCase();
+              if (textLower.includes('low') || textLower.includes('bajo')) return 'low';
+              if (textLower.includes('high') || textLower.includes('alto')) return 'high';
+              if (textLower.includes('medium') || textLower.includes('medio')) return 'medium';
+            }
+            
+            // Si no hay texto o no se pudo determinar, intentar por ID
             if (id === 1) return 'low';
-            if (id === 2) return 'medium';
             if (id === 3) return 'high';
-            return 'medium';
+            if (id === 2) return 'medium';
+            
+            // Buscar en campos directos
+            if (quotation.mentionsVolume) {
+              return quotation.mentionsVolume as 'low' | 'medium' | 'high';
+            }
+            
+            return 'medium'; // Valor predeterminado
           };
+          
+          const getCountriesCoveredFromIdOrText = (id?: number, text?: string) => {
+            // Primero intentar por texto exacto
+            if (text === quotation.countriesCovered) return text;
+            if (text) {
+              const textLower = text.toLowerCase();
+              if (textLower.includes('1') || textLower.includes('one')) return '1';
+              if (textLower.includes('2-3')) return '2-3';
+              if (textLower.includes('4+') || textLower.includes('more')) return '4+';
+            }
+            
+            // Si hay un valor directo, usarlo
+            if (quotation.countriesCovered) return quotation.countriesCovered;
+            
+            // Si no hay texto o no se pudo determinar, intentar por ID
+            if (id === 1) return '1';
+            if (id === 2) return '2-3';
+            if (id === 3) return '4+';
+            
+            return '1'; // Valor predeterminado
+          };
+          
+          const getClientEngagementFromIdOrText = (id?: number, text?: string) => {
+            // Primero intentar por texto exacto
+            if (text) {
+              const textLower = text.toLowerCase();
+              if (textLower.includes('minimum') || textLower.includes('mínimo')) return 'minimum';
+              if (textLower.includes('high') || textLower.includes('alto')) return 'high';
+              if (textLower.includes('medium') || textLower.includes('medio')) return 'medium';
+            }
+            
+            // Si hay un valor directo, usarlo
+            if (quotation.clientEngagement) return quotation.clientEngagement;
+            
+            // Si no hay texto o no se pudo determinar, intentar por ID
+            if (id === 1) return 'minimum';
+            if (id === 3) return 'high';
+            if (id === 2) return 'medium';
+            
+            return 'medium'; // Valor predeterminado
+          };
+          
+          // Extraer complejidad directamente o de datos relacionados
+          const complexity = quotation.complexity || 
+                           (quotation.complexityAdjustment > 5000 ? 'high' : 
+                           quotation.complexityAdjustment > 2000 ? 'medium' : 'low');
+          
+          console.log("Análisis de los factores de complejidad de la cotización:", {
+            analysisType: {
+              fromId: getAnalysisTypeFromIdOrText(quotation.analysisTypeId),
+              fromText: getAnalysisTypeFromIdOrText(undefined, quotation.analysisType),
+              original: quotation.analysisType
+            },
+            mentionsVolume: {
+              fromId: getMentionsVolumeFromIdOrText(quotation.mentionsVolumeId),
+              fromText: getMentionsVolumeFromIdOrText(undefined, quotation.mentionsVolume),
+              original: quotation.mentionsVolume
+            },
+            countriesCovered: {
+              fromId: getCountriesCoveredFromIdOrText(quotation.countriesCoveredId),
+              fromText: getCountriesCoveredFromIdOrText(undefined, quotation.countriesCovered),
+              original: quotation.countriesCovered
+            },
+            clientEngagement: {
+              fromId: getClientEngagementFromIdOrText(quotation.clientEngagementId),
+              fromText: getClientEngagementFromIdOrText(undefined, quotation.clientEngagement),
+              original: quotation.clientEngagement
+            },
+            complexity: {
+              original: quotation.complexity,
+              calculated: complexity
+            }
+          });
           
           // Actualizar quotationData completamente
           setQuotationData({
@@ -1231,13 +1354,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
               duration: quotation.projectDuration as ProjectDuration || 'medium',
             },
             template: template,
-            complexity: quotation.complexity as 'low' | 'medium' | 'high' || 'medium',
+            complexity: complexity as 'low' | 'medium' | 'high', 
             customization: quotation.templateCustomization || '',
-            analysisType: getAnalysisTypeFromId(quotation.analysisTypeId || 2),
-            mentionsVolume: getMentionsVolumeFromId(quotation.mentionsVolumeId || 2),
-            countriesCovered: String(quotation.countriesCoveredId || 1),
-            clientEngagement: quotation.clientEngagementId === 1 ? 'minimum' : 
-                              quotation.clientEngagementId === 3 ? 'high' : 'medium',
+            analysisType: getAnalysisTypeFromIdOrText(quotation.analysisTypeId, quotation.analysisType),
+            mentionsVolume: getMentionsVolumeFromIdOrText(quotation.mentionsVolumeId, quotation.mentionsVolume),
+            countriesCovered: getCountriesCoveredFromIdOrText(quotation.countriesCoveredId, quotation.countriesCovered),
+            clientEngagement: getClientEngagementFromIdOrText(quotation.clientEngagementId, quotation.clientEngagement),
             teamOption: 'manual', // Por defecto asumimos manual en edición
             teamMembers: teamMembers,
             financials: {
