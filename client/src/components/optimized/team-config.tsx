@@ -278,11 +278,11 @@ const OptimizedTeamConfig: React.FC = () => {
                 <div>
                   <Label htmlFor="personnel-select" className="text-xs mb-1 inline-block">Personal específico</Label>
                   <Select
-                    value={newMember.personnelId ? String(newMember.personnelId) : ''}
+                    value={newMember.personnelId ? String(newMember.personnelId) : "0"}
                     onValueChange={(value) => {
                       setNewMember(prev => ({
                         ...prev,
-                        personnelId: value === '' ? null : parseInt(value)
+                        personnelId: value === "0" ? null : parseInt(value)
                       }));
                     }}
                     disabled={!newMember.roleId}
@@ -291,7 +291,7 @@ const OptimizedTeamConfig: React.FC = () => {
                       <SelectValue placeholder="Opcional - Cualquiera" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="" className="text-xs italic text-gray-500">
+                      <SelectItem value="0" className="text-xs italic text-gray-500">
                         Cualquier persona con este rol
                       </SelectItem>
                       {filteredPersonnel?.map(person => (
