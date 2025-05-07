@@ -122,8 +122,8 @@ const OptimizedQuoteContent = () => {
         description: `La cotización se ha guardado correctamente con ID: ${quotationId}`,
       });
       
-      // Redirigir a la página de detalle de la cotización
-      setLocation(`/quotation/${quotationId}`);
+      // Redirigir a la página de gestión de cotizaciones
+      setLocation('/quotations');
     } catch (error) {
       console.error("Error al guardar:", error);
       toast({
