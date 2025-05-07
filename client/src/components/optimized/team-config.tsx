@@ -813,12 +813,17 @@ const OptimizedTeamConfig: React.FC = () => {
                                       <Briefcase className="h-3 w-3 text-primary" />
                                     </div>
                                     <div>
-                                      <div className="text-xs font-medium">{role?.name || 'Rol desconocido'}</div>
+                                      <div className="text-xs font-medium">
+                                        {/* Intentar obtener el rol de varias maneras */}
+                                        {role?.name || 
+                                         (person?.roleId && availableRoles?.find(r => r.id === person.roleId)?.name) || 
+                                         'Rol desconocido'}
+                                      </div>
                                       {/* Solo mostramos el nombre del personal cuando:
                                           1) Existe un personnelId asignado Y
                                           2) Estamos en el modo de equipo personalizado (manual) 
                                       */}
-                                      {person && quotationData.teamOption === 'manual' && (
+                                      {person && (
                                         <div className="text-[10px] text-gray-500">{person.name}</div>
                                       )}
                                     </div>
