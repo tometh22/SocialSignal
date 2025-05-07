@@ -509,7 +509,7 @@ const OptimizedTeamConfig: React.FC = () => {
                     <span>{quotationData.teamMembers.length} {quotationData.teamMembers.length === 1 ? 'Rol' : 'Roles'}</span>
                   </Badge>
                   
-                  <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 gap-1 items-center h-6">
+                  <Badge variant="outline" className={`${workMode === 'hours' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-purple-50 border-purple-200 text-purple-700'} gap-1 items-center h-6`}>
                     {workMode === 'hours' ? (
                       <>
                         <Clock className="h-3 w-3" />
@@ -518,7 +518,7 @@ const OptimizedTeamConfig: React.FC = () => {
                     ) : (
                       <>
                         <BarChart2 className="h-3 w-3" />
-                        <span>{(totalHours / 160).toFixed(1)} FTE</span>
+                        <span className="font-medium">{(totalHours / 160).toFixed(1)} FTE</span>
                       </>
                     )}
                   </Badge>
@@ -538,6 +538,9 @@ const OptimizedTeamConfig: React.FC = () => {
                             <th className="text-center p-2 text-xs font-medium text-gray-500">
                               {workMode === 'hours' ? 'Horas' : 'Dedicación'}
                             </th>
+                            {workMode === 'fte' && (
+                              <th className="text-center p-2 text-xs font-medium text-gray-500">FTE</th>
+                            )}
                             <th className="text-center p-2 text-xs font-medium text-gray-500">Tarifa</th>
                             <th className="text-right p-2 text-xs font-medium text-gray-500">Costo</th>
                             <th className="text-right p-2 text-xs font-medium text-gray-500">Acciones</th>
@@ -604,6 +607,14 @@ const OptimizedTeamConfig: React.FC = () => {
                                     </span>
                                   )}
                                 </td>
+                                
+                                {workMode === 'fte' && (
+                                  <td className="p-2 text-center border-b border-gray-100">
+                                    <span className="text-xs font-medium text-purple-600">
+                                      {(member.hours / 160).toFixed(2)}
+                                    </span>
+                                  </td>
+                                )}
                                 
                                 <td className="p-2 text-center border-b border-gray-100">
                                   {isCurrentlyEditing ? (
