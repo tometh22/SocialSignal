@@ -210,11 +210,11 @@ const OptimizedTeamConfig: React.FC = () => {
   // Manejar cambio de tab y modo de equipo
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    if (value === 'recommended') {
-      setTeamOption('auto');
-    } else if (value === 'custom') {
-      setTeamOption('manual');
-    }
+    // Ya no cambiamos el teamOption automáticamente para preservar el estado actual del equipo
+    // Solo se establece el modo visual, pero el equipo sigue siendo el mismo
+    
+    // Actualizamos el contexto visual, pero no tocamos los datos
+    console.log(`Cambiando a pestaña: ${value} - Manteniendo la configuración de equipo actual`);
   };
   
   // Iniciar edición de miembro
