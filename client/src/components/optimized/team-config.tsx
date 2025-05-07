@@ -54,6 +54,17 @@ const OptimizedTeamConfig: React.FC = () => {
   // Estado para miembros en edición
   const [editingMember, setEditingMember] = useState<Record<string, {hours: number, rate: number}>>({});
   const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
+  
+  // Estado para selección múltiple de roles y personal
+  const [multipleSelection, setMultipleSelection] = useState<{
+    mode: 'single' | 'multiple';
+    selectedRoleIds: number[];
+    selectedPersonnelIds: number[];
+  }>({
+    mode: 'single',
+    selectedRoleIds: [],
+    selectedPersonnelIds: []
+  });
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
@@ -91,55 +102,108 @@ const OptimizedTeamConfig: React.FC = () => {
 
   // Manejar la adición de nuevo(s) miembro(s)
   const handleAddMember = () => {
-    // Validación: en modo 'Por Rol' necesitamos roleId, en modo 'Por Persona' necesitamos personnelId
-    const isValidForMode = 
-      (activeTab === 'recommended' && newMember.roleId > 0) || 
-      (activeTab === 'custom' && newMember.personnelId && newMember.personnelId > 0);
-    
-    // Validación específica según el modo de trabajo (horas o FTE)
-    const isValidForWorkMode = workMode === 'hours' 
-      ? newMember.hours > 0 
-      : newMember.dedication > 0;
-    
-    if (isValidForMode && isValidForWorkMode && newMember.rate > 0) {
-      let hours = newMember.hours;
-      let cost = 0;
-      
-      // Si estamos en modo FTE, calculamos las horas equivalentes
-      // Asumiendo un mes estándar de trabajo (160 horas = 1 FTE)
-      if (workMode === 'fte') {
-        // Calculamos horas basadas en la dedicación (porcentaje de FTE)
-        // 100% = 1 FTE = 160 horas mensuales (aproximado)
-        hours = Math.round((newMember.dedication / 100) * 160);
-      }
-      
-      // Calculamos el costo basado en las horas (reales o derivadas del FTE)
-      cost = hours * newMember.rate;
-      
-      // Añadir la cantidad especificada de miembros
-      const quantity = newMember.quantity || 1;
-      for (let i = 0; i < quantity; i++) {
-        addTeamMember({
-          ...newMember,
-          hours,
-          fte: newMember.dedication / 100,
-          cost
-        });
-      }
-      
-      // Limpiar formulario pero mantener el rol seleccionado
-      const currentRoleId = newMember.roleId;
-      const currentRate = newMember.rate;
-      setNewMember({
-        roleId: currentRoleId,
-        personnelId: null,
-        hours: 10,
-        rate: currentRate,
-        fte: 1,
-        dedication: 100,
-        quantity: 1
-      });
+    // Preparación de los parámetros comunes
+    let hours = newMember.hours;
+    if (workMode === 'fte') {
+      hours = Math.round((newMember.dedication / 100) * 160);
     }
+    
+    const rate = newMember.rate;
+    const cost = hours * rate;
+    const dedication = newMember.dedication;
+    const fte = dedication / 100;
+    
+    // Definir función para agregar un miembro con parámetros específicos
+    const addSingleMember = (roleId: number, personnelId: number | null) => {
+      addTeamMember({
+        roleId,
+        personnelId,
+        hours,
+        rate,
+        cost,
+        dedication,
+        fte
+      });
+    };
+    
+    // Verificamos si estamos en modo de selección múltiple
+    if (multipleSelection.mode === 'multiple') {
+      // Para selección múltiple basada en rol
+      if (activeTab === 'recommended' && multipleSelection.selectedRoleIds.length > 0) {
+        // Verificamos que haya tarifa y horas
+        if (rate > 0 && ((workMode === 'hours' && hours > 0) || (workMode === 'fte' && dedication > 0))) {
+          // Por cada rol seleccionado, agregamos un miembro
+          multipleSelection.selectedRoleIds.forEach(roleId => {
+            const quantity = newMember.quantity || 1;
+            for (let i = 0; i < quantity; i++) {
+              addSingleMember(roleId, null);
+            }
+          });
+          
+          // Limpiamos selección
+          setMultipleSelection(prev => ({
+            ...prev,
+            selectedRoleIds: []
+          }));
+        }
+      }
+      
+      // Para selección múltiple basada en personal
+      else if (activeTab === 'custom' && multipleSelection.selectedPersonnelIds.length > 0) {
+        // Verificamos que haya tarifa y horas
+        if (rate > 0 && ((workMode === 'hours' && hours > 0) || (workMode === 'fte' && dedication > 0))) {
+          // Por cada persona seleccionada, agregamos un miembro
+          multipleSelection.selectedPersonnelIds.forEach(personnelId => {
+            const person = availablePersonnel?.find(p => p.id === personnelId);
+            if (person) {
+              const quantity = newMember.quantity || 1;
+              for (let i = 0; i < quantity; i++) {
+                addSingleMember(person.roleId, personnelId);
+              }
+            }
+          });
+          
+          // Limpiamos selección
+          setMultipleSelection(prev => ({
+            ...prev,
+            selectedPersonnelIds: []
+          }));
+        }
+      }
+    }
+    // Modo de selección individual
+    else {
+      // Validación: en modo 'Por Rol' necesitamos roleId, en modo 'Por Persona' necesitamos personnelId
+      const isValidForMode = 
+        (activeTab === 'recommended' && newMember.roleId > 0) || 
+        (activeTab === 'custom' && newMember.personnelId && newMember.personnelId > 0);
+      
+      // Validación específica según el modo de trabajo (horas o FTE)
+      const isValidForWorkMode = workMode === 'hours' 
+        ? hours > 0 
+        : dedication > 0;
+      
+      if (isValidForMode && isValidForWorkMode && rate > 0) {
+        // Añadir la cantidad especificada de miembros
+        const quantity = newMember.quantity || 1;
+        for (let i = 0; i < quantity; i++) {
+          addSingleMember(newMember.roleId, newMember.personnelId);
+        }
+      }
+    }
+    
+    // Limpiar formulario pero mantener el rol/tarifa seleccionados
+    const currentRoleId = newMember.roleId;
+    const currentRate = newMember.rate;
+    setNewMember({
+      roleId: currentRoleId,
+      personnelId: null,
+      hours: 10,
+      rate: currentRate,
+      fte: 1,
+      dedication: 100,
+      quantity: 1
+    });
   };
 
   // Manejar cambio de tab y modo de equipo
@@ -273,30 +337,67 @@ const OptimizedTeamConfig: React.FC = () => {
                 Añadir Miembro al Equipo
               </h3>
               
-              {/* Selector de modo: Horas vs FTE */}
               <div className="flex items-center gap-2">
-                <Label className="text-xs text-gray-500">Modo:</Label>
-                <div className="flex space-x-1">
-                  <Button
-                    type="button"
-                    variant={workMode === 'hours' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`text-xs h-7 px-3 ${workMode === 'hours' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
-                    onClick={() => setWorkMode('hours')}
-                  >
-                    <Clock className="h-3.5 w-3.5 mr-1.5" />
-                    <span>Horas</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={workMode === 'fte' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`text-xs h-7 px-3 ${workMode === 'fte' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
-                    onClick={() => setWorkMode('fte')}
-                  >
-                    <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
-                    <span>FTE</span>
-                  </Button>
+                {/* Selector de modo de selección: Individual vs Múltiple */}
+                <div className="flex items-center mr-2">
+                  <Label className="text-xs text-gray-500 whitespace-nowrap mr-2">Selección:</Label>
+                  <div className="flex space-x-1">
+                    <Button
+                      type="button"
+                      variant={multipleSelection.mode === 'single' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`text-xs h-7 px-3 ${multipleSelection.mode === 'single' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
+                      onClick={() => setMultipleSelection({
+                        mode: 'single',
+                        selectedRoleIds: [],
+                        selectedPersonnelIds: []
+                      })}
+                    >
+                      <User className="h-3.5 w-3.5 mr-1.5" />
+                      <span>Individual</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={multipleSelection.mode === 'multiple' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`text-xs h-7 px-3 ${multipleSelection.mode === 'multiple' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
+                      onClick={() => setMultipleSelection({
+                        mode: 'multiple',
+                        selectedRoleIds: [],
+                        selectedPersonnelIds: []
+                      })}
+                    >
+                      <Users className="h-3.5 w-3.5 mr-1.5" />
+                      <span>Múltiple</span>
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Selector de modo: Horas vs FTE */}
+                <div className="flex items-center">
+                  <Label className="text-xs text-gray-500 whitespace-nowrap mr-2">Modo:</Label>
+                  <div className="flex space-x-1">
+                    <Button
+                      type="button"
+                      variant={workMode === 'hours' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`text-xs h-7 px-3 ${workMode === 'hours' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
+                      onClick={() => setWorkMode('hours')}
+                    >
+                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                      <span>Horas</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={workMode === 'fte' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`text-xs h-7 px-3 ${workMode === 'fte' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
+                      onClick={() => setWorkMode('fte')}
+                    >
+                      <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
+                      <span>FTE</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -308,39 +409,91 @@ const OptimizedTeamConfig: React.FC = () => {
                 {activeTab === 'recommended' && (
                   <div>
                     <Label htmlFor="role-select" className="text-xs mb-1 inline-block">Rol</Label>
-                    <Select
-                      value={newMember.roleId ? String(newMember.roleId) : ''}
-                      onValueChange={(value) => {
-                        setNewMember(prev => ({
-                          ...prev,
-                          roleId: parseInt(value),
-                          personnelId: null,
-                          rate: availableRoles?.find(r => r.id === parseInt(value))?.defaultRate || 0
-                        }));
-                      }}
-                    >
-                      <SelectTrigger id="role-select" className="h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableRoles?.map(role => (
-                          <SelectItem 
-                            key={role.id} 
-                            value={String(role.id)}
-                            className="flex items-center text-xs"
-                          >
-                            <div className="flex items-center">
-                              {role.name}
-                              {isRoleRecommended(role.id) && (
-                                <Badge className="ml-1 bg-primary/10 text-primary border-0 text-[9px] px-1 py-0">
-                                  Rec.
-                                </Badge>
-                              )}
+                    
+                    {multipleSelection.mode === 'single' ? (
+                      // Selector individual
+                      <Select
+                        value={newMember.roleId ? String(newMember.roleId) : ''}
+                        onValueChange={(value) => {
+                          setNewMember(prev => ({
+                            ...prev,
+                            roleId: parseInt(value),
+                            personnelId: null,
+                            rate: availableRoles?.find(r => r.id === parseInt(value))?.defaultRate || 0
+                          }));
+                        }}
+                      >
+                        <SelectTrigger id="role-select" className="h-8 text-xs">
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableRoles?.map(role => (
+                            <SelectItem 
+                              key={role.id} 
+                              value={String(role.id)}
+                              className="flex items-center text-xs"
+                            >
+                              <div className="flex items-center">
+                                {role.name}
+                                {isRoleRecommended(role.id) && (
+                                  <Badge className="ml-1 bg-primary/10 text-primary border-0 text-[9px] px-1 py-0">
+                                    Rec.
+                                  </Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      // Selector múltiple
+                      <div className="border border-gray-200 rounded-md h-24 overflow-y-auto p-2">
+                        <div className="flex flex-wrap gap-2">
+                          {availableRoles?.map(role => (
+                            <div
+                              key={role.id}
+                              onClick={() => {
+                                // Toggle the selection
+                                const isSelected = multipleSelection.selectedRoleIds.includes(role.id);
+                                if (isSelected) {
+                                  setMultipleSelection(prev => ({
+                                    ...prev,
+                                    selectedRoleIds: prev.selectedRoleIds.filter(id => id !== role.id)
+                                  }));
+                                } else {
+                                  setMultipleSelection(prev => ({
+                                    ...prev,
+                                    selectedRoleIds: [...prev.selectedRoleIds, role.id]
+                                  }));
+                                }
+                              }}
+                              className={`px-2 py-1 rounded text-xs cursor-pointer ${
+                                multipleSelection.selectedRoleIds.includes(role.id)
+                                  ? 'bg-primary text-white'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{role.name}</span>
+                                {isRoleRecommended(role.id) && (
+                                  <Badge className="ml-1 bg-primary/20 text-white border-0 text-[9px] px-1 py-0">
+                                    Rec.
+                                  </Badge>
+                                )}
+                                {multipleSelection.selectedRoleIds.includes(role.id) && (
+                                  <Check className="h-3 w-3" />
+                                )}
+                              </div>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          ))}
+                        </div>
+                        {multipleSelection.selectedRoleIds.length > 0 && (
+                          <div className="mt-2 text-[10px] text-gray-500">
+                            {multipleSelection.selectedRoleIds.length} roles seleccionados
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -348,47 +501,102 @@ const OptimizedTeamConfig: React.FC = () => {
                 {activeTab === 'custom' && (
                   <div>
                     <Label htmlFor="person-select" className="text-xs mb-1 inline-block">Personal</Label>
-                    <Select
-                      value={newMember.personnelId ? String(newMember.personnelId) : ''}
-                      onValueChange={(value) => {
-                        const personnelId = parseInt(value);
-                        const selectedPerson = availablePersonnel?.find(p => p.id === personnelId);
-                        const roleId = selectedPerson?.roleId || 0;
-                        const role = availableRoles?.find(r => r.id === roleId);
-                        
-                        setNewMember(prev => ({
-                          ...prev,
-                          personnelId,
-                          roleId,
-                          rate: role?.defaultRate || 0
-                        }));
-                      }}
-                    >
-                      <SelectTrigger id="person-select" className="h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePersonnel?.map(person => {
-                          const role = availableRoles?.find(r => r.id === person.roleId);
-                          return (
-                            <SelectItem 
-                              key={person.id} 
-                              value={String(person.id)}
-                              className="flex items-center text-xs"
-                            >
-                              <div>
-                                {person.name}
-                                {role && (
-                                  <span className="text-xs text-gray-500 ml-1">
-                                    ({role.name})
-                                  </span>
-                                )}
+                    
+                    {multipleSelection.mode === 'single' ? (
+                      // Selector individual
+                      <Select
+                        value={newMember.personnelId ? String(newMember.personnelId) : ''}
+                        onValueChange={(value) => {
+                          const personnelId = parseInt(value);
+                          const selectedPerson = availablePersonnel?.find(p => p.id === personnelId);
+                          const roleId = selectedPerson?.roleId || 0;
+                          const role = availableRoles?.find(r => r.id === roleId);
+                          
+                          setNewMember(prev => ({
+                            ...prev,
+                            personnelId,
+                            roleId,
+                            rate: role?.defaultRate || 0
+                          }));
+                        }}
+                      >
+                        <SelectTrigger id="person-select" className="h-8 text-xs">
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePersonnel?.map(person => {
+                            const role = availableRoles?.find(r => r.id === person.roleId);
+                            return (
+                              <SelectItem 
+                                key={person.id} 
+                                value={String(person.id)}
+                                className="flex items-center text-xs"
+                              >
+                                <div>
+                                  {person.name}
+                                  {role && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      ({role.name})
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      // Selector múltiple
+                      <div className="border border-gray-200 rounded-md h-24 overflow-y-auto p-2">
+                        <div className="flex flex-wrap gap-2">
+                          {availablePersonnel?.map(person => {
+                            const role = availableRoles?.find(r => r.id === person.roleId);
+                            return (
+                              <div
+                                key={person.id}
+                                onClick={() => {
+                                  // Toggle the selection
+                                  const isSelected = multipleSelection.selectedPersonnelIds.includes(person.id);
+                                  if (isSelected) {
+                                    setMultipleSelection(prev => ({
+                                      ...prev,
+                                      selectedPersonnelIds: prev.selectedPersonnelIds.filter(id => id !== person.id)
+                                    }));
+                                  } else {
+                                    setMultipleSelection(prev => ({
+                                      ...prev,
+                                      selectedPersonnelIds: [...prev.selectedPersonnelIds, person.id]
+                                    }));
+                                  }
+                                }}
+                                className={`px-2 py-1 rounded text-xs cursor-pointer ${
+                                  multipleSelection.selectedPersonnelIds.includes(person.id)
+                                    ? 'bg-primary text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>{person.name}</span>
+                                  {role && (
+                                    <Badge className="ml-1 bg-gray-200/80 text-gray-700 border-0 text-[9px] px-1 py-0">
+                                      {role.name}
+                                    </Badge>
+                                  )}
+                                  {multipleSelection.selectedPersonnelIds.includes(person.id) && (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                </div>
                               </div>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                            );
+                          })}
+                        </div>
+                        {multipleSelection.selectedPersonnelIds.length > 0 && (
+                          <div className="mt-2 text-[10px] text-gray-500">
+                            {multipleSelection.selectedPersonnelIds.length} personas seleccionadas
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -480,18 +688,59 @@ const OptimizedTeamConfig: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-end">
-                  <Button 
-                    onClick={handleAddMember}
-                    disabled={(activeTab === 'recommended' && !newMember.roleId) || 
-                              (activeTab === 'custom' && !newMember.personnelId) || 
-                              newMember.hours <= 0 || 
-                              newMember.rate <= 0} 
-                    className="w-full h-8 text-xs bg-primary/80 hover:bg-primary"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    Añadir
-                  </Button>
+                <div>
+                  <Label htmlFor="quantity-input" className="text-xs mb-1 inline-block">Cantidad</Label>
+                  <div className="flex gap-2">
+                    <div className="w-1/3">
+                      <Input
+                        id="quantity-input"
+                        type="number"
+                        min={1}
+                        max={10}
+                        className="h-8 text-xs"
+                        value={newMember.quantity || 1}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          setNewMember(prev => ({
+                            ...prev,
+                            quantity: isNaN(value) || value < 1 ? 1 : value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="w-2/3">
+                      <Button 
+                        onClick={handleAddMember}
+                        disabled={
+                          multipleSelection.mode === 'multiple' ? 
+                          (
+                            (activeTab === 'recommended' && multipleSelection.selectedRoleIds.length === 0) ||
+                            (activeTab === 'custom' && multipleSelection.selectedPersonnelIds.length === 0) ||
+                            newMember.hours <= 0 || 
+                            newMember.rate <= 0
+                          ) : 
+                          (
+                            (activeTab === 'recommended' && !newMember.roleId) || 
+                            (activeTab === 'custom' && !newMember.personnelId) || 
+                            newMember.hours <= 0 || 
+                            newMember.rate <= 0
+                          )
+                        } 
+                        className="w-full h-8 text-xs bg-primary/80 hover:bg-primary"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Añadir {
+                          multipleSelection.mode === 'multiple' ? 
+                          (
+                            activeTab === 'recommended' ? 
+                            `(${multipleSelection.selectedRoleIds.length} roles${newMember.quantity > 1 ? ` x ${newMember.quantity}` : ''})` : 
+                            `(${multipleSelection.selectedPersonnelIds.length} personas${newMember.quantity > 1 ? ` x ${newMember.quantity}` : ''})`
+                          ) : 
+                          (newMember.quantity > 1 ? `(${newMember.quantity})` : '')
+                        }
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
