@@ -123,7 +123,7 @@ const OptimizedQuoteContent = () => {
       });
       
       // Redirigir a la página de gestión de cotizaciones
-      setLocation('/quotations');
+      setLocation('/manage-quotes');
     } catch (error) {
       console.error("Error al guardar:", error);
       toast({
