@@ -172,6 +172,7 @@ export class MemStorage implements IStorage {
   private quotationTeamMembers: Map<number, QuotationTeamMember>;
   private templateRoleAssignments: Map<number, TemplateRoleAssignment>;
   private activeProjects: Map<number, ActiveProject>;
+  private projectComponents: Map<number, ProjectComponent>;
   private timeEntries: Map<number, TimeEntry>;
   private progressReports: Map<number, ProgressReport>;
   
@@ -1464,7 +1465,12 @@ export class DatabaseStorage implements IStorage {
         await pool.query(progressDeleteQuery, [id]);
         console.log(`Informes de progreso eliminados para el proyecto ${id}`);
         
-        // 4. Finalmente eliminar el proyecto
+        // 4. Eliminar componentes del proyecto
+        const componentsDeleteQuery = `DELETE FROM project_components WHERE project_id = $1`;
+        await pool.query(componentsDeleteQuery, [id]);
+        console.log(`Componentes eliminados para el proyecto ${id}`);
+        
+        // 5. Finalmente eliminar el proyecto
         const projectDeleteQuery = `DELETE FROM active_projects WHERE id = $1`;
         const result = await pool.query(projectDeleteQuery, [id]);
         console.log(`Resultado de eliminación SQL: ${result.rowCount} fila(s) eliminada(s)`);
@@ -1691,6 +1697,95 @@ export class DatabaseStorage implements IStorage {
       projectCount: projects.length,
       projectsData
     };
+  }
+  
+  // Project Component Operations
+  async getProjectComponents(projectId: number): Promise<ProjectComponent[]> {
+    const result = await db.select().from(projectComponents).where(eq(projectComponents.projectId, projectId));
+    return result;
+  }
+
+  async getProjectComponent(id: number): Promise<ProjectComponent | undefined> {
+    const [component] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
+    return component;
+  }
+
+  async createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent> {
+    // Si isDefault es true, primero establecemos todos los demás componentes como no predeterminados
+    if (component.isDefault) {
+      await db.update(projectComponents)
+        .set({ isDefault: false })
+        .where(eq(projectComponents.projectId, component.projectId));
+    }
+    
+    const [newComponent] = await db.insert(projectComponents).values(component).returning();
+    return newComponent;
+  }
+
+  async updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined> {
+    // Si isDefault es true, primero establecemos todos los demás componentes como no predeterminados
+    if (component.isDefault) {
+      // Obtener el componente para tener el projectId
+      const [currentComponent] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
+      if (currentComponent) {
+        await db.update(projectComponents)
+          .set({ isDefault: false })
+          .where(and(
+            eq(projectComponents.projectId, currentComponent.projectId),
+            ne(projectComponents.id, id)
+          ));
+      }
+    }
+    
+    const [updatedComponent] = await db.update(projectComponents)
+      .set(component)
+      .where(eq(projectComponents.id, id))
+      .returning();
+    
+    return updatedComponent;
+  }
+
+  async deleteProjectComponent(id: number): Promise<boolean> {
+    try {
+      // 1. Verificar si el componente existe
+      const [component] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
+      if (!component) {
+        return false;
+      }
+      
+      // 2. Comprobar si hay entradas de tiempo asociadas a este componente
+      const timeEntriesWithComponent = await db.select()
+        .from(timeEntries)
+        .where(eq(timeEntries.componentId, id));
+      
+      if (timeEntriesWithComponent.length > 0) {
+        // Hay entradas de tiempo, actualizar a NULL el componente en lugar de eliminar
+        await db.update(timeEntries)
+          .set({ componentId: null })
+          .where(eq(timeEntries.componentId, id));
+      }
+      
+      // 3. Eliminar el componente
+      const [deletedComponent] = await db.delete(projectComponents)
+        .where(eq(projectComponents.id, id))
+        .returning();
+      
+      return !!deletedComponent;
+    } catch (error) {
+      console.error(`Error al eliminar componente de proyecto ${id}:`, error);
+      return false;
+    }
+  }
+
+  async getDefaultProjectComponent(projectId: number): Promise<ProjectComponent | undefined> {
+    const [component] = await db.select()
+      .from(projectComponents)
+      .where(and(
+        eq(projectComponents.projectId, projectId),
+        eq(projectComponents.isDefault, true)
+      ));
+    
+    return component;
   }
 }
 
