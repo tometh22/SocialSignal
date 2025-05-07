@@ -195,11 +195,31 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
+// ==================== COMPONENTES DE PROYECTO ====================
+// Tabla para los componentes de un proyecto (por ej. informes semanales, mensuales, SOV, newsletter)
+export const projectComponents = pgTable("project_components", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  name: text("name").notNull(), // Ej: "Informe Semanal", "Informe Mensual", "SOV", "Newsletter"
+  description: text("description"),
+  isDefault: boolean("is_default").default(false), // Para identificar un componente por defecto
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const insertProjectComponentSchema = createInsertSchema(projectComponents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // ==================== REGISTRO DE HORAS ====================
 // Registro de horas
 export const timeEntries = pgTable("time_entries", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  componentId: integer("component_id").references(() => projectComponents.id), // Referencia opcional al componente
   personnelId: integer("personnel_id").notNull().references(() => personnel.id),
   date: timestamp("date").notNull(),
   hours: doublePrecision("hours").notNull(),
@@ -346,9 +366,17 @@ export const templateRoleAssignmentsRelations = relations(templateRoleAssignment
   role: one(roles, { fields: [templateRoleAssignments.roleId], references: [roles.id] }),
 }));
 
+// Relaciones de componentes de proyecto
+export const projectComponentsRelations = relations(projectComponents, ({ one, many }) => ({
+  project: one(activeProjects, { fields: [projectComponents.projectId], references: [activeProjects.id] }),
+  timeEntries: many(timeEntries),
+  creator: one(users, { fields: [projectComponents.createdBy], references: [users.id] }),
+}));
+
 // Relaciones de proyectos activos
 export const activeProjectsRelations = relations(activeProjects, ({ one, many }) => ({
   quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
+  components: many(projectComponents),
   timeEntries: many(timeEntries),
   progressReports: many(progressReports),
   creator: one(users, { fields: [activeProjects.createdBy], references: [users.id] }),
@@ -358,6 +386,7 @@ export const activeProjectsRelations = relations(activeProjects, ({ one, many })
 // Relaciones de registros de horas
 export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
   project: one(activeProjects, { fields: [timeEntries.projectId], references: [activeProjects.id] }),
+  component: one(projectComponents, { fields: [timeEntries.componentId], references: [projectComponents.id] }),
   personnel: one(personnel, { fields: [timeEntries.personnelId], references: [personnel.id] }),
   approver: one(personnel, { fields: [timeEntries.approvedBy], references: [personnel.id] }),
   creator: one(users, { fields: [timeEntries.createdBy], references: [users.id] }),
@@ -492,6 +521,9 @@ export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssi
 
 export type ActiveProject = typeof activeProjects.$inferSelect;
 export type InsertActiveProject = z.infer<typeof insertActiveProjectSchema>;
+
+export type ProjectComponent = typeof projectComponents.$inferSelect;
+export type InsertProjectComponent = z.infer<typeof insertProjectComponentSchema>;
 
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;

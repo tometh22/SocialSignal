@@ -7,11 +7,12 @@ import {
   type QuotationTeamMember, type InsertQuotationTeamMember,
   type TemplateRoleAssignment, type InsertTemplateRoleAssignment,
   type ActiveProject, type InsertActiveProject,
+  type ProjectComponent, type InsertProjectComponent,
   type TimeEntry, type InsertTimeEntry,
   type ProgressReport, type InsertProgressReport,
   type User, type InsertUser,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
-  activeProjects, timeEntries, progressReports, users,
+  activeProjects, projectComponents, timeEntries, progressReports, users,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants
@@ -80,6 +81,14 @@ export interface IStorage {
   getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
   getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
   deleteActiveProject(id: number): Promise<boolean>;
+  
+  // Project component operations
+  getProjectComponents(projectId: number): Promise<ProjectComponent[]>;
+  getProjectComponent(id: number): Promise<ProjectComponent | undefined>;
+  createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent>;
+  updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined>;
+  deleteProjectComponent(id: number): Promise<boolean>;
+  getDefaultProjectComponent(projectId: number): Promise<ProjectComponent | undefined>;
   
   // Time entry operations
   getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
