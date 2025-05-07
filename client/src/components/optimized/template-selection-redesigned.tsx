@@ -112,19 +112,12 @@ const TemplateSelectionRedesigned: React.FC = () => {
     updateTemplate(null);
     setTemplateSelected(true);
     
-    // Obtener la función goToStep del contexto para avanzar directamente al paso 3
-    // o avanzar a la pestaña de detalles si el usuario necesita personalizar los parámetros
-    setTimeout(() => {
-      // Para avanzar al paso de configuración de equipo (paso 3) usamos useOptimizedQuote
-      // pero esto está fuera del ámbito de esta función, así que obtendremos el contexto
-      // en el componente principal y lo manejaremos allí
-      setSelectedTab('details');
-      
-      // También agregamos un disparador para avanzar automáticamente al paso 3
-      document.dispatchEvent(new CustomEvent('advanceToTeamConfig', {
-        detail: { fromCustomTemplate: true }
-      }));
-    }, 300);
+    // Disparamos directamente el evento para avanzar al paso 3 sin cambiar la pestaña
+    // El cambio de pestaña lo hará el componente OptimizedQuoteContent al regresar 
+    // si el usuario vuelve al paso 2
+    document.dispatchEvent(new CustomEvent('advanceToTeamConfig', {
+      detail: { fromCustomTemplate: true }
+    }));
   };
 
   // Obtener color para niveles de complejidad
