@@ -554,33 +554,40 @@ const OptimizedFinancialReview: React.FC = () => {
                             <TableCell className="py-1.5 px-3 text-xs">{person?.name || 'No asignado'}</TableCell>
                             <TableCell className="py-1.5 px-3 text-xs text-right">
                               <Input
-                                type="number"
-                                value={member.hours}
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={member.hours === 0 ? "" : member.hours}
                                 onChange={(e) => {
-                                  const hours = parseInt(e.target.value) || 0;
-                                  updateTeamMember(member.id, { 
-                                    hours: hours,
-                                    cost: hours * member.rate
-                                  });
+                                  // Permitir campo vacío o sólo dígitos
+                                  if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
+                                    const hours = e.target.value === "" ? 0 : parseInt(e.target.value);
+                                    updateTeamMember(member.id, { 
+                                      hours: hours,
+                                      cost: hours * member.rate
+                                    });
+                                  }
                                 }}
                                 className="h-6 text-xs px-2 py-1 w-16 inline-block text-right"
-                                min="1"
                               />
                             </TableCell>
                             <TableCell className="py-1.5 px-3 text-xs text-right">
                               <Input
-                                type="number"
-                                value={member.rate}
+                                type="text"
+                                inputMode="decimal"
+                                pattern="[0-9]*(\.[0-9]+)?"
+                                value={member.rate === 0 ? "" : member.rate}
                                 onChange={(e) => {
-                                  const rate = parseFloat(e.target.value) || 0;
-                                  updateTeamMember(member.id, { 
-                                    rate: rate,
-                                    cost: member.hours * rate
-                                  });
+                                  // Permitir campo vacío o formato numérico con decimales
+                                  if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
+                                    const rate = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                    updateTeamMember(member.id, { 
+                                      rate: isNaN(rate) ? 0 : rate,
+                                      cost: member.hours * (isNaN(rate) ? 0 : rate)
+                                    });
+                                  }
                                 }}
                                 className="h-6 text-xs px-2 py-1 w-16 inline-block text-right"
-                                min="0"
-                                step="0.01"
                               />
                             </TableCell>
                             <TableCell className="py-1.5 px-3 text-xs text-right font-medium">

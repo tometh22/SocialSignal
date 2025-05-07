@@ -281,16 +281,21 @@ const OptimizedTeamConfig: React.FC = () => {
                     <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                     <Input
                       id="hours-input"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       min="1"
-                      value={newMember.hours}
                       className="h-8 pl-8 text-xs"
+                      value={newMember.hours === 0 ? "" : newMember.hours}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value);
-                        setNewMember(prev => ({
-                          ...prev,
-                          hours: isNaN(value) ? 0 : value
-                        }));
+                        // Permitir campo vacío o sólo dígitos
+                        if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
+                          const value = e.target.value === "" ? 0 : parseInt(e.target.value);
+                          setNewMember(prev => ({
+                            ...prev,
+                            hours: value
+                          }));
+                        }
                       }}
                     />
                   </div>
@@ -303,17 +308,20 @@ const OptimizedTeamConfig: React.FC = () => {
                     <DollarSign className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                     <Input
                       id="rate-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newMember.rate}
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*(\.[0-9]+)?"
                       className="h-8 pl-8 text-xs"
+                      value={newMember.rate === 0 ? "" : newMember.rate}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value);
-                        setNewMember(prev => ({
-                          ...prev,
-                          rate: isNaN(value) ? 0 : value
-                        }));
+                        // Permitir campo vacío o formato numérico con decimales
+                        if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
+                          const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                          setNewMember(prev => ({
+                            ...prev,
+                            rate: isNaN(value) ? 0 : value
+                          }));
+                        }
                       }}
                     />
                   </div>
@@ -400,19 +408,27 @@ const OptimizedTeamConfig: React.FC = () => {
                                 <td className="p-2 text-center border-b border-gray-100">
                                   {isCurrentlyEditing ? (
                                     <Input
-                                      type="number"
-                                      min="1"
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
                                       className="h-7 text-xs w-20 mx-auto"
-                                      value={editingMember[String(member.id)]?.hours || member.hours}
+                                      value={
+                                        editingMember[String(member.id)]?.hours === 0 
+                                          ? "" 
+                                          : editingMember[String(member.id)]?.hours || member.hours
+                                      }
                                       onChange={(e) => {
-                                        const value = parseInt(e.target.value) || 0;
-                                        setEditingMember({
-                                          ...editingMember,
-                                          [String(member.id)]: {
-                                            ...(editingMember[String(member.id)] || { rate: member.rate }),
-                                            hours: value
-                                          }
-                                        });
+                                        // Permitir campo vacío o sólo dígitos
+                                        if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
+                                          const value = e.target.value === "" ? 0 : parseInt(e.target.value);
+                                          setEditingMember({
+                                            ...editingMember,
+                                            [String(member.id)]: {
+                                              ...(editingMember[String(member.id)] || { rate: member.rate }),
+                                              hours: value
+                                            }
+                                          });
+                                        }
                                       }}
                                     />
                                   ) : (
@@ -425,20 +441,27 @@ const OptimizedTeamConfig: React.FC = () => {
                                     <div className="relative w-24 mx-auto">
                                       <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-[10px] text-gray-500">$</span>
                                       <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
+                                        type="text"
+                                        inputMode="decimal"
+                                        pattern="[0-9]*(\.[0-9]+)?"
                                         className="h-7 text-xs pl-6"
-                                        value={editingMember[String(member.id)]?.rate || member.rate}
+                                        value={
+                                          editingMember[String(member.id)]?.rate === 0
+                                            ? ""
+                                            : editingMember[String(member.id)]?.rate || member.rate
+                                        }
                                         onChange={(e) => {
-                                          const value = parseFloat(e.target.value) || 0;
-                                          setEditingMember({
-                                            ...editingMember,
-                                            [String(member.id)]: {
-                                              ...(editingMember[String(member.id)] || { hours: member.hours }),
-                                              rate: value
-                                            }
-                                          });
+                                          // Permitir campo vacío o formato numérico con decimales
+                                          if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
+                                            const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                            setEditingMember({
+                                              ...editingMember,
+                                              [String(member.id)]: {
+                                                ...(editingMember[String(member.id)] || { hours: member.hours }),
+                                                rate: isNaN(value) ? 0 : value
+                                              }
+                                            });
+                                          }
                                         }}
                                       />
                                     </div>
