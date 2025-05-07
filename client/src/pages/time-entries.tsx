@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
+import ComponentSelector from "@/components/project/component-selector";
 import {
   Card,
   CardContent,
@@ -106,6 +107,7 @@ interface TimeEntry {
   id: number;
   projectId: number;
   personnelId: number;
+  componentId: number | null;
   date: string;
   hours: number;
   description: string | null;
@@ -129,6 +131,7 @@ const formSchema = z.object({
   }).min(0.5, "Mínimo 0.5 horas").max(24, "Máximo 24 horas"),
   description: z.string().optional(),
   billable: z.boolean().default(true),
+  componentId: z.number().nullable().optional(),
 });
 
 // Componentes personalizados

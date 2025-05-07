@@ -3,13 +3,20 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
+import ComponentsManager from "@/components/project/components-manager";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 // Componentes del dashboard
 import {
@@ -690,6 +697,36 @@ const ProjectSummary = () => {
         title={showHelp.title}
         content={showHelp.content}
       />
+      
+      {/* Sección de configuración de proyecto */}
+      {project && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Configuración del Proyecto</h2>
+          
+          <Tabs defaultValue="components" className="w-full">
+            <TabsList>
+              <TabsTrigger value="components" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Componentes
+              </TabsTrigger>
+              {/* Se pueden agregar más pestañas de configuración aquí */}
+            </TabsList>
+            
+            <TabsContent value="components" className="mt-4">
+              <div className="bg-card rounded-lg border p-4">
+                <ComponentsManager 
+                  projectId={parsedProjectId || 0} 
+                  refreshTimeEntries={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: [`/api/time-entries/project/${parsedProjectId}`]
+                    });
+                  }}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
     </div>
   );
 };
