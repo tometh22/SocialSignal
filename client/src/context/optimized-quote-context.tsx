@@ -79,6 +79,12 @@ interface OptimizedQuoteContextType {
   recommendedRoleIds: number[];
   // Estado de guardado
   isSavingInProgress: boolean;
+  // Estado de edición
+  isEditing: boolean;
+  // Estado de recotización
+  isRecotizacion: boolean;
+  // ID de cotización si estamos editando
+  quotationId: number | null;
   // Métodos paso 1
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
@@ -144,8 +150,19 @@ const initialQuotationData: QuotationData = {
 // Crear el contexto
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
 
+// Definiciones de contexto
+export interface OptimizedQuoteProviderProps {
+  children: ReactNode;
+  quotationId?: number;  // ID opcional para cargar una cotización existente
+  isRequote?: boolean;   // Indica si es una recotización (clonar y modificar)
+}
+
 // Proveedor del contexto
-export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ children }) => {
+export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
+  children, 
+  quotationId, 
+  isRequote = false 
+}) => {
   // Estado principal
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   
@@ -158,6 +175,11 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
   const [currentStep, setCurrentStep] = useState(1);
   const [availableRoles, setAvailableRoles] = useState<Role[] | null>(null);
   const [availablePersonnel, setAvailablePersonnel] = useState<Personnel[] | null>(null);
+  
+  // Estados específicos para edición/recotización
+  const [isEditing, setIsEditing] = useState<boolean>(!!quotationId && !isRequote);
+  const [isRecotizacion, setIsRecotizacion] = useState<boolean>(!!isRequote);
+  const [editQuotationId, setEditQuotationId] = useState<number | null>(quotationId || null);
   
   // Cálculo de complejidad basado en el estado actual
   const complexityFactors = useMemo((): ComplexityFactors => {
