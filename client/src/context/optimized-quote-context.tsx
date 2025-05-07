@@ -510,52 +510,95 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   // Métodos para el Paso 4: Ajustes Financieros
   const updateFinancials = useCallback((updates: Partial<FinancialSettings>) => {
-    // Actualizar estado financiero inmediatamente
+    // Asegurarnos que las actualizaciones tengan valores numéricos válidos
+    const sanitizedUpdates: Partial<FinancialSettings> = {};
+    
+    // Copia las actualizaciones, pero verifica que los valores sean numéricos
+    if ('platformCost' in updates) {
+      const value = updates.platformCost;
+      sanitizedUpdates.platformCost = typeof value === 'number' && !isNaN(value) ? value : 0;
+    }
+    
+    if ('deviationPercentage' in updates) {
+      const value = updates.deviationPercentage;
+      sanitizedUpdates.deviationPercentage = typeof value === 'number' && !isNaN(value) ? value : 0;
+    }
+    
+    if ('discount' in updates) {
+      const value = updates.discount;
+      sanitizedUpdates.discount = typeof value === 'number' && !isNaN(value) ? value : 0;
+    }
+    
+    if ('marginFactor' in updates) {
+      const value = updates.marginFactor;
+      sanitizedUpdates.marginFactor = typeof value === 'number' && !isNaN(value) ? value : 1.0;
+    }
+    
+    console.log("Actualizaciones sanitizadas:", sanitizedUpdates);
+    
+    // Actualizar estado financiero con valores verificados
     setQuotationData(prev => {
       const newFinancials = {
         ...prev.financials,
-        ...updates
+        ...sanitizedUpdates
       };
       
       // Usar una función auxiliar para recalcular costos inmediatamente
       const recalculateNow = () => {
-        console.log("Actualizando financials en tiempo real:", updates);
-        
-        // Obtener los valores actualizados para cálculos inmediatos
-        const newBaseCost = baseCost || 0;
-        
-        // Recalcular el ajuste por complejidad
-        const newAdjustment = calculateComplexityAdjustment(
-          newBaseCost, 
-          complexityFactors
-        );
-        
-        // Recalcular el markup
-        const newMarkup = calculateMarkup(
-          newBaseCost + newAdjustment,
-          'marginFactor' in updates ? updates.marginFactor! : prev.financials.marginFactor || 1.0
-        );
-        
-        // Recalcular el total con los nuevos valores financieros
-        const newTotal = calculateTotalAmount(
-          newBaseCost,
-          newAdjustment,
-          newMarkup,
-          'platformCost' in updates ? updates.platformCost! : prev.financials.platformCost,
-          'deviationPercentage' in updates ? updates.deviationPercentage! : prev.financials.deviationPercentage
-        );
-        
-        // Actualizar estados inmediatamente
-        setComplexityAdjustment(newAdjustment);
-        setMarkupAmount(newMarkup);
-        setTotalAmount(newTotal);
-        
-        console.log("Nuevos valores calculados:", {
-          baseCost: newBaseCost,
-          adjustment: newAdjustment,
-          markup: newMarkup,
-          total: newTotal
-        });
+        try {
+          console.log("Actualizando financials en tiempo real:", sanitizedUpdates);
+          
+          // Obtener los valores actualizados para cálculos inmediatos
+          const newBaseCost = baseCost || 0;
+          
+          // Recalcular el ajuste por complejidad
+          const newAdjustment = calculateComplexityAdjustment(
+            newBaseCost, 
+            complexityFactors
+          );
+          
+          // Recalcular el markup
+          const newMarginFactor = 'marginFactor' in sanitizedUpdates 
+            ? sanitizedUpdates.marginFactor! 
+            : prev.financials.marginFactor || 1.0;
+            
+          const newMarkup = calculateMarkup(
+            newBaseCost + newAdjustment,
+            newMarginFactor
+          );
+          
+          // Recalcular el total con los nuevos valores financieros
+          const newPlatformCost = 'platformCost' in sanitizedUpdates 
+            ? sanitizedUpdates.platformCost! 
+            : prev.financials.platformCost;
+            
+          const newDeviationPercentage = 'deviationPercentage' in sanitizedUpdates 
+            ? sanitizedUpdates.deviationPercentage! 
+            : prev.financials.deviationPercentage;
+          
+          const newTotal = calculateTotalAmount(
+            newBaseCost,
+            newAdjustment,
+            newMarkup,
+            newPlatformCost,
+            newDeviationPercentage
+          );
+          
+          // Actualizar estados inmediatamente
+          setComplexityAdjustment(newAdjustment);
+          setMarkupAmount(newMarkup);
+          setTotalAmount(newTotal);
+          
+          console.log("Nuevos valores calculados:", {
+            baseCost: newBaseCost,
+            adjustment: newAdjustment,
+            markup: newMarkup,
+            total: newTotal,
+            deviationPercentage: newDeviationPercentage
+          });
+        } catch (error) {
+          console.error("Error al recalcular costos:", error);
+        }
       };
       
       // Ejecutar el recálculo después de actualizar el estado
