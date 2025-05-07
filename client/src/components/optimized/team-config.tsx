@@ -122,7 +122,8 @@ const OptimizedTeamConfig: React.FC = () => {
         rate,
         cost,
         dedication,
-        fte
+        fte,
+        quantity: 1
       });
     };
     
