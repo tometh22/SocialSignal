@@ -1007,9 +1007,20 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           console.log(`Usando personnel predeterminado: ${personnelId}`);
         }
         
+        // Asegurarnos de que el roleId coincida con el del personnel seleccionado
+        let updatedRoleId = member.roleId;
+        if (personnelId && availablePersonnel) {
+          const personnelInfo = availablePersonnel.find(p => p.id === personnelId);
+          if (personnelInfo) {
+            updatedRoleId = personnelInfo.roleId;
+            console.log(`Actualizando roleId al del personal seleccionado: ${personnelInfo.name} tiene roleId ${personnelInfo.roleId}`);
+          }
+        }
+
         const memberPayload = {
           quotationId: quotationId,
           personnelId: personnelId || 39, // Último recurso: user ID 39 como fallback
+          roleId: updatedRoleId, // Incluir roleId para mejor tracking
           hours: member.hours,
           rate: member.rate,
           cost: member.hours * member.rate

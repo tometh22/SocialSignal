@@ -643,7 +643,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
         console.log("Datos de miembro validados correctamente:", validatedData);
         
-        // Crear miembro del equipo
+        // Verificar si ya existe un miembro exactamente igual para evitar duplicados
+        const existingMembers = await storage.getQuotationTeamMembers(validatedData.quotationId);
+        
+        // Verificar duplicados exactos
+        const isDuplicate = existingMembers.some(existing => 
+          existing.personnelId === validatedData.personnelId && 
+          existing.hours === validatedData.hours && 
+          existing.rate === validatedData.rate
+        );
+        
+        if (isDuplicate) {
+          console.log("Miembro duplicado detectado, omitiendo creación:", validatedData);
+          // Simplemente devolver el primer miembro duplicado encontrado
+          const duplicateMember = existingMembers.find(existing => 
+            existing.personnelId === validatedData.personnelId && 
+            existing.hours === validatedData.hours && 
+            existing.rate === validatedData.rate
+          );
+          return res.status(200).json(duplicateMember);
+        }
+        
+        // Si no es duplicado, crear el nuevo miembro
         const member = await storage.createQuotationTeamMember(validatedData);
         console.log("Miembro del equipo creado exitosamente:", member);
         

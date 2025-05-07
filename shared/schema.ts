@@ -143,6 +143,7 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull(),
   personnelId: integer("personnel_id").notNull(),
+  roleId: integer("role_id"), // ID del rol (puede ser diferente del rol del personnel)
   hours: doublePrecision("hours").notNull(),
   rate: doublePrecision("rate").notNull(),
   cost: doublePrecision("cost").notNull(),
@@ -360,6 +361,7 @@ export const quotationsRelations = relations(quotations, ({ one, many }) => ({
 export const quotationTeamMembersRelations = relations(quotationTeamMembers, ({ one }) => ({
   quotation: one(quotations, { fields: [quotationTeamMembers.quotationId], references: [quotations.id] }),
   personnel: one(personnel, { fields: [quotationTeamMembers.personnelId], references: [personnel.id] }),
+  role: one(roles, { fields: [quotationTeamMembers.roleId], references: [roles.id] }),
 }));
 
 // Relaciones de asignaciones de roles en plantillas
