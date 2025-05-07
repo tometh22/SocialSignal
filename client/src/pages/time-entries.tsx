@@ -156,7 +156,8 @@ const DaySummary: React.FC<{
   date: Date;
   entries: TimeEntry[];
   personnel: Personnel[] | undefined;
-}> = ({ date, entries, personnel }) => {
+  projectComponents?: {id: number; name: string; projectId: number}[] | undefined;
+}> = ({ date, entries, personnel, projectComponents }) => {
   const dateStr = format(date, "yyyy-MM-dd");
   const dayEntries = entries.filter(
     (entry) => entry.date.substring(0, 10) === dateStr
@@ -178,6 +179,7 @@ const DaySummary: React.FC<{
       <div className="space-y-2">
         {dayEntries.map((entry) => {
           const person = personnel?.find((p) => p.id === entry.personnelId);
+          const component = projectComponents?.find(c => c.id === entry.componentId);
           return (
             <div
               key={entry.id}
@@ -187,8 +189,15 @@ const DaySummary: React.FC<{
                 <PersonAvatar name={person?.name || "Usuario"} />
                 <div>
                   <div className="font-medium text-sm">{person?.name}</div>
-                  <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                    {entry.description || "Sin descripción"}
+                  <div className="flex items-center gap-2">
+                    {component && (
+                      <Badge variant="secondary" className="h-5 text-xs mr-1">
+                        {component.name}
+                      </Badge>
+                    )}
+                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                      {entry.description || "Sin descripción"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -229,6 +238,7 @@ const TimeRegistrationForm: React.FC<{
       date: new Date(),
       hours: 1,
       billable: true,
+      componentId: null,
     },
   });
 
@@ -265,6 +275,7 @@ const TimeRegistrationForm: React.FC<{
         date: new Date(),
         hours: 1,
         billable: true,
+        componentId: null,
       });
       
       // Cerramos el diálogo después de procesar todo
@@ -433,6 +444,31 @@ const TimeRegistrationForm: React.FC<{
             />
           </div>
 
+          {/* Selector de componente */}
+          <FormField
+            control={form.control}
+            name="componentId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Componente (opcional)</FormLabel>
+                <div className="relative">
+                  <FormControl>
+                    <ComponentSelector
+                      projectId={projectId}
+                      value={field.value || null}
+                      onChange={field.onChange}
+                      disabled={isPending}
+                    />
+                  </FormControl>
+                </div>
+                <FormDescription className="text-xs">
+                  Selecciona un componente específico para este registro de horas
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="description"
@@ -537,6 +573,16 @@ const TimeEntries: React.FC = () => {
   // Obtener datos de roles
   const { data: roles } = useQuery({
     queryKey: ['/api/roles'],
+  });
+  
+  // Obtener componentes del proyecto
+  const { data: projectComponents } = useQuery({
+    queryKey: ['/api/project-components', projectId],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/project-components/${projectId}`);
+      return response.json();
+    },
+    enabled: projectId > 0,
   });
 
   // Mutación para eliminar registro de tiempo
