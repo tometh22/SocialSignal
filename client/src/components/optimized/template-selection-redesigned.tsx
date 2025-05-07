@@ -112,12 +112,16 @@ const TemplateSelectionRedesigned: React.FC = () => {
     updateTemplate(null);
     setTemplateSelected(true);
     
-    // Disparamos directamente el evento para avanzar al paso 3 sin cambiar la pestaña
-    // El cambio de pestaña lo hará el componente OptimizedQuoteContent al regresar 
-    // si el usuario vuelve al paso 2
-    document.dispatchEvent(new CustomEvent('advanceToTeamConfig', {
-      detail: { fromCustomTemplate: true }
-    }));
+    // Primero cambiamos a la pestaña "Detalles y Ajustes"
+    setSelectedTab('details');
+    
+    // Esperamos un momento para que se muestre la pestaña y luego avanzamos al paso 3
+    setTimeout(() => {
+      // Disparamos el evento para avanzar al paso 3
+      document.dispatchEvent(new CustomEvent('advanceToTeamConfig', {
+        detail: { fromCustomTemplate: true }
+      }));
+    }, 500); // Damos 500ms para que la pestaña se muestre brevemente
   };
 
   // Obtener color para niveles de complejidad
