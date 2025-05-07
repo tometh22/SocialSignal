@@ -265,6 +265,91 @@ const OptimizedTeamConfig: React.FC = () => {
               Define los roles y personal que trabajarán en este proyecto
             </p>
           </div>
+          
+          {/* Botón para aplicar la plantilla Warner */}
+          <div className="ml-auto">
+            <Button
+              onClick={() => {
+                // Aplicar la plantilla de Warner directamente
+                // Account Director - 50% dedicación (1)
+                addTeamMember({
+                  roleId: 20, // Account Director
+                  personnelId: null,
+                  hours: 80, // 50% de 160h mensuales
+                  rate: 15,
+                  cost: 80 * 15
+                });
+                
+                // Project Manager Lead - 100% dedicación (1)
+                addTeamMember({
+                  roleId: 12, // Lead Project Manager
+                  personnelId: null,
+                  hours: 160, // 100% de 160h mensuales
+                  rate: 15,
+                  cost: 160 * 15
+                });
+                
+                // Senior Analysts - 100% dedicación (3)
+                for (let i = 0; i < 3; i++) {
+                  addTeamMember({
+                    roleId: 9, // Analista Senior
+                    personnelId: null,
+                    hours: 160, // 100% de 160h mensuales
+                    rate: 15,
+                    cost: 160 * 15
+                  });
+                }
+                
+                // Semi Senior Analysts - 100% dedicación (2)
+                for (let i = 0; i < 2; i++) {
+                  addTeamMember({
+                    roleId: 11, // Analista Semi Senior
+                    personnelId: null,
+                    hours: 160, // 100% de 160h mensuales
+                    rate: 9,
+                    cost: 160 * 9
+                  });
+                }
+                
+                // Tech Leads - 75% dedicación (2)
+                for (let i = 0; i < 2; i++) {
+                  addTeamMember({
+                    roleId: 16, // Operations Lead (Tech Lead)
+                    personnelId: null,
+                    hours: 120, // 75% de 160h mensuales
+                    rate: 18,
+                    cost: 120 * 18
+                  });
+                }
+                
+                // Data Specialists - 75% dedicación (2)
+                for (let i = 0; i < 2; i++) {
+                  addTeamMember({
+                    roleId: 10, // Data Specialist
+                    personnelId: null,
+                    hours: 120, // 75% de 160h mensuales
+                    rate: 10,
+                    cost: 120 * 10
+                  });
+                }
+                
+                // Designer - 50% dedicación (1)
+                addTeamMember({
+                  roleId: 18, // Diseñador
+                  personnelId: null,
+                  hours: 80, // 50% de 160h mensuales
+                  rate: 12,
+                  cost: 80 * 12
+                });
+              }}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Aplicar Plantilla Warner
+            </Button>
+          </div>
         </div>
 
         {/* Tabs para elegir entre equipo recomendado y personalizado */}
