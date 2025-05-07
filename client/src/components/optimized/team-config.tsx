@@ -272,26 +272,26 @@ const OptimizedTeamConfig: React.FC = () => {
               {/* Selector de modo: Horas vs FTE */}
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-gray-500">Modo:</Label>
-                <div className="flex border rounded-md overflow-hidden h-7">
+                <div className="flex space-x-1">
                   <Button
                     type="button"
                     variant={workMode === 'hours' ? 'default' : 'outline'}
                     size="sm"
-                    className={`rounded-none h-7 text-xs px-2 py-0 ${workMode === 'hours' ? 'bg-primary/80' : ''}`}
+                    className={`text-xs h-7 px-3 ${workMode === 'hours' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
                     onClick={() => setWorkMode('hours')}
                   >
-                    <Clock className="h-3.5 w-3.5 mr-1" />
-                    Horas
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                    <span>Horas</span>
                   </Button>
                   <Button
                     type="button"
                     variant={workMode === 'fte' ? 'default' : 'outline'}
                     size="sm"
-                    className={`rounded-none h-7 text-xs px-2 py-0 ${workMode === 'fte' ? 'bg-primary/80' : ''}`}
+                    className={`text-xs h-7 px-3 ${workMode === 'fte' ? 'bg-primary/90 hover:bg-primary' : 'bg-background hover:bg-secondary/80'}`}
                     onClick={() => setWorkMode('fte')}
                   >
-                    <BarChart2 className="h-3.5 w-3.5 mr-1" />
-                    FTE
+                    <BarChart2 className="h-3.5 w-3.5 mr-1.5" />
+                    <span>FTE</span>
                   </Button>
                 </div>
               </div>
@@ -510,8 +510,17 @@ const OptimizedTeamConfig: React.FC = () => {
                   </Badge>
                   
                   <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 gap-1 items-center h-6">
-                    <Clock className="h-3 w-3" />
-                    <span>{totalHours} horas</span>
+                    {workMode === 'hours' ? (
+                      <>
+                        <Clock className="h-3 w-3" />
+                        <span>{totalHours} horas</span>
+                      </>
+                    ) : (
+                      <>
+                        <BarChart2 className="h-3 w-3" />
+                        <span>{(totalHours / 160).toFixed(1)} FTE</span>
+                      </>
+                    )}
                   </Badge>
                 </div>
               )}
@@ -526,7 +535,9 @@ const OptimizedTeamConfig: React.FC = () => {
                         <thead>
                           <tr className="border-b border-gray-200 bg-gray-50">
                             <th className="text-left p-2 text-xs font-medium text-gray-500">Rol</th>
-                            <th className="text-center p-2 text-xs font-medium text-gray-500">Horas</th>
+                            <th className="text-center p-2 text-xs font-medium text-gray-500">
+                              {workMode === 'hours' ? 'Horas' : 'Dedicación'}
+                            </th>
                             <th className="text-center p-2 text-xs font-medium text-gray-500">Tarifa</th>
                             <th className="text-right p-2 text-xs font-medium text-gray-500">Costo</th>
                             <th className="text-right p-2 text-xs font-medium text-gray-500">Acciones</th>
@@ -585,7 +596,12 @@ const OptimizedTeamConfig: React.FC = () => {
                                       }}
                                     />
                                   ) : (
-                                    <span className="text-xs">{member.hours}</span>
+                                    <span className="text-xs">
+                                      {workMode === 'hours' 
+                                        ? `${member.hours}h`
+                                        : `${member.dedication ? member.dedication.toFixed(0) : Math.round((member.hours / 160) * 100)}%`
+                                      }
+                                    </span>
                                   )}
                                 </td>
                                 
@@ -732,11 +748,21 @@ const OptimizedTeamConfig: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="bg-white border border-gray-200 rounded p-2 flex items-center justify-between">
                   <div>
-                    <div className="text-xs text-gray-500">Total Horas</div>
-                    <div className="text-sm font-medium">{totalHours}</div>
+                    <div className="text-xs text-gray-500">
+                      {workMode === 'hours' ? 'Total Horas' : 'Total FTE'}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {workMode === 'hours' 
+                        ? totalHours 
+                        : `${(totalHours / 160).toFixed(1)} (${totalHours}h)`
+                      }
+                    </div>
                   </div>
-                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-blue-600" />
+                  <div className={`h-8 w-8 rounded-full ${workMode === 'hours' ? 'bg-blue-50' : 'bg-purple-50'} flex items-center justify-center`}>
+                    {workMode === 'hours' 
+                      ? <Clock className="h-4 w-4 text-blue-600" />
+                      : <BarChart2 className="h-4 w-4 text-purple-600" />
+                    }
                   </div>
                 </div>
                 
