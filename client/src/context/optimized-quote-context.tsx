@@ -970,14 +970,44 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         }
       }
       
-      // Usar el primer ID de personal como default
-      const defaultPersonId = 39;
+      // Prevenir duplicados
+      const uniqueTeamMembers = new Map();
+      
+      // Filtrar duplicados antes de guardar
+      quotationData.teamMembers.forEach(member => {
+        const key = `${member.roleId}-${member.personnelId || 'none'}-${member.hours}-${member.rate}`;
+        if (!uniqueTeamMembers.has(key)) {
+          uniqueTeamMembers.set(key, member);
+        } else {
+          console.log(`Miembro duplicado detectado y omitido: ${key}`);
+        }
+      });
+      
+      console.log(`Equipo filtrado: ${uniqueTeamMembers.size} miembros únicos de ${quotationData.teamMembers.length} originales`);
       
       // Guardar cada miembro del equipo
-      for (const member of quotationData.teamMembers) {
+      for (const member of uniqueTeamMembers.values()) {
+        // Asegurarnos de que tengamos un roleId y personnelId coherentes
+        let personnelId = member.personnelId;
+        
+        // Si no tenemos personnelId pero tenemos roleId, buscar el primer personal con ese rol
+        if (!personnelId && member.roleId && availablePersonnel) {
+          const personnelWithRole = availablePersonnel.find(p => p.roleId === member.roleId);
+          if (personnelWithRole) {
+            personnelId = personnelWithRole.id;
+            console.log(`Asignando personnel ${personnelId} (${personnelWithRole.name}) al rol ${member.roleId}`);
+          }
+        }
+        
+        // Si aún no tenemos personnelId, usar el primer personnel disponible
+        if (!personnelId && availablePersonnel && availablePersonnel.length > 0) {
+          personnelId = availablePersonnel[0].id;
+          console.log(`Usando personnel predeterminado: ${personnelId}`);
+        }
+        
         const memberPayload = {
           quotationId: quotationId,
-          personnelId: member.personnelId || defaultPersonId,
+          personnelId: personnelId || 39, // Último recurso: user ID 39 como fallback
           hours: member.hours,
           rate: member.rate,
           cost: member.hours * member.rate
