@@ -303,8 +303,8 @@ const OptimizedTeamConfig: React.FC = () => {
                     roleId: 20, // Account Director
                     personnelId: null,
                     hours: 80, // 50% de 160h mensuales
-                    rate: 15,
-                    cost: 80 * 15
+                    rate: 18.8,
+                    cost: 80 * 18.8
                   });
                   
                   // Project Manager Lead - 100% dedicación (1)
@@ -312,8 +312,8 @@ const OptimizedTeamConfig: React.FC = () => {
                     roleId: 12, // Lead Project Manager
                     personnelId: null,
                     hours: 160, // 100% de 160h mensuales
-                    rate: 15,
-                    cost: 160 * 15
+                    rate: 10,
+                    cost: 160 * 10
                   });
                   
                   // Senior Analysts - 100% dedicación (3)
@@ -322,8 +322,8 @@ const OptimizedTeamConfig: React.FC = () => {
                       roleId: 9, // Analista Senior
                       personnelId: null,
                       hours: 160, // 100% de 160h mensuales
-                      rate: 15,
-                      cost: 160 * 15
+                      rate: 10,
+                      cost: 160 * 10
                     });
                   }
                   
@@ -333,21 +333,28 @@ const OptimizedTeamConfig: React.FC = () => {
                       roleId: 11, // Analista Semi Senior
                       personnelId: null,
                       hours: 160, // 100% de 160h mensuales
-                      rate: 9,
-                      cost: 160 * 9
+                      rate: 8.7,
+                      cost: 160 * 8.7
                     });
                   }
                   
-                  // Tech Leads - 75% dedicación (2)
-                  for (let i = 0; i < 2; i++) {
-                    addTeamMember({
-                      roleId: 16, // Operations Lead (Tech Lead)
-                      personnelId: null,
-                      hours: 120, // 75% de 160h mensuales
-                      rate: 18,
-                      cost: 120 * 18
-                    });
-                  }
+                  // 1 Operations Lead - 75% dedicación
+                  addTeamMember({
+                    roleId: 16, // Operations Lead
+                    personnelId: null,
+                    hours: 120, // 75% de 160h mensuales
+                    rate: 18,
+                    cost: 120 * 18
+                  });
+                  
+                  // 1 Tech Lead (nuevo rol) - 75% dedicación
+                  addTeamMember({
+                    roleId: 21, // Tech Lead
+                    personnelId: null,
+                    hours: 120, // 75% de 160h mensuales
+                    rate: 8.5,
+                    cost: 120 * 8.5
+                  });
                   
                   // Data Specialists - 75% dedicación (2)
                   for (let i = 0; i < 2; i++) {
@@ -355,8 +362,8 @@ const OptimizedTeamConfig: React.FC = () => {
                       roleId: 10, // Data Specialist
                       personnelId: null,
                       hours: 120, // 75% de 160h mensuales
-                      rate: 10,
-                      cost: 120 * 10
+                      rate: 9.2,
+                      cost: 120 * 9.2
                     });
                   }
                   
@@ -365,8 +372,8 @@ const OptimizedTeamConfig: React.FC = () => {
                     roleId: 18, // Diseñador
                     personnelId: null,
                     hours: 80, // 50% de 160h mensuales
-                    rate: 12,
-                    cost: 80 * 12
+                    rate: 14,
+                    cost: 80 * 14
                   });
                   
                   // Notificar al usuario
