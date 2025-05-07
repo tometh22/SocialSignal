@@ -339,20 +339,17 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
 
   // Función para verificar y evitar duplicados en el equipo
   const removeDuplicateMembers = useCallback((members: TeamMember[]): TeamMember[] => {
+    // Nuevo enfoque: permitir múltiples entradas del mismo rol pero con ID único
+    // Solo consideramos duplicado si el rol Y el personal son iguales (personas específicas)
     const uniqueMap = new Map();
     
     members.forEach(member => {
-      const key = `${member.roleId}_${member.personnelId || 'unassigned'}`;
+      // Si es el mismo rol pero con personal específico, usamos ID completo para permitir duplicados
+      const key = member.personnelId 
+        ? `${member.roleId}_${member.personnelId}` // Rol con persona específica
+        : `role_${member.id}`; // Sólo rol (permitir múltiples del mismo rol)
       
-      // Si ya existe, actualizar solo si tiene más horas
-      if (uniqueMap.has(key)) {
-        const existing = uniqueMap.get(key);
-        if (member.hours > existing.hours) {
-          uniqueMap.set(key, member);
-        }
-      } else {
-        uniqueMap.set(key, member);
-      }
+      uniqueMap.set(key, member);
     });
     
     return Array.from(uniqueMap.values());
