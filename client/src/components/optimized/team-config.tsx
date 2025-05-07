@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Personnel, Role } from '@shared/schema';
 import { 
   AlertCircle, Plus, Trash, UserPlus, Users, RefreshCcw, Clock, DollarSign,
-  Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles, Edit, Check, X
+  Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles, Edit, Check, X, Pencil,
+  Save, Trash2, User, Percent
 } from 'lucide-react';
 
 const OptimizedTeamConfig: React.FC = () => {
@@ -33,12 +34,17 @@ const OptimizedTeamConfig: React.FC = () => {
     baseCost
   } = useOptimizedQuote();
 
+  // Estado local para determinar si se trabajará por horas o por FTE
+  const [workMode, setWorkMode] = useState<'hours' | 'fte'>('hours');
+  
   // Estado local para el formulario de nuevo miembro
   const [newMember, setNewMember] = useState({
     roleId: 0,
     personnelId: null as number | null,
     hours: 10,
-    rate: 0
+    rate: 0,
+    fte: 1,
+    dedication: 100 // Porcentaje de dedicación (100% = 1 FTE)
   });
 
   // Estado para la vista activa
@@ -89,9 +95,25 @@ const OptimizedTeamConfig: React.FC = () => {
       (activeTab === 'recommended' && newMember.roleId > 0) || 
       (activeTab === 'custom' && newMember.personnelId && newMember.personnelId > 0);
     
-    if (isValidForMode && newMember.hours > 0 && newMember.rate > 0) {
-      // Calcular costo
-      const cost = newMember.hours * newMember.rate;
+    // Validación específica según el modo de trabajo (horas o FTE)
+    const isValidForWorkMode = workMode === 'hours' 
+      ? newMember.hours > 0 
+      : newMember.dedication > 0;
+    
+    if (isValidForMode && isValidForWorkMode && newMember.rate > 0) {
+      let hours = newMember.hours;
+      let cost = 0;
+      
+      // Si estamos en modo FTE, calculamos las horas equivalentes
+      // Asumiendo un mes estándar de trabajo (160 horas = 1 FTE)
+      if (workMode === 'fte') {
+        // Calculamos horas basadas en la dedicación (porcentaje de FTE)
+        // 100% = 1 FTE = 160 horas mensuales (aproximado)
+        hours = Math.round((newMember.dedication / 100) * 160);
+      }
+      
+      // Calculamos el costo basado en las horas (reales o derivadas del FTE)
+      cost = hours * newMember.rate;
       
       // En modo 'Por Rol' (recommended/auto): personnelId puede ser null (cualquier persona con ese rol)
       // En modo 'Por Persona' (custom/manual): debe tener un personnelId específico
@@ -99,6 +121,8 @@ const OptimizedTeamConfig: React.FC = () => {
       // Añadir miembro
       addTeamMember({
         ...newMember,
+        hours,
+        fte: newMember.dedication / 100,
         cost
       });
       
@@ -107,7 +131,9 @@ const OptimizedTeamConfig: React.FC = () => {
         roleId: 0,
         personnelId: null,
         hours: 10,
-        rate: 0
+        rate: 0,
+        fte: 1,
+        dedication: 100
       });
     }
   };
@@ -142,10 +168,15 @@ const OptimizedTeamConfig: React.FC = () => {
     if (editingMember[memberId]) {
       const hours = editingMember[memberId].hours;
       const rate = editingMember[memberId].rate;
+      const fte = hours / 160; // Convertimos horas a FTE (160 horas mensuales = 1 FTE)
+      const dedication = fte * 100; // Convertimos FTE a porcentaje (ej. 0.5 FTE = 50%)
+      
       updateTeamMember(member.id, {
         ...member,
         hours,
         rate,
+        fte,
+        dedication,
         cost: hours * rate
       });
       setIsEditing({...isEditing, [memberId]: false});
@@ -232,11 +263,38 @@ const OptimizedTeamConfig: React.FC = () => {
           
           {/* Formulario para añadir miembros (visible en ambas pestañas) */}
           <div className="mb-4 border border-gray-200 rounded-md overflow-hidden">
-            <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+            <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xs font-medium flex items-center">
                 <UserPlus className="h-3.5 w-3.5 mr-1.5 text-primary" />
                 Añadir Miembro al Equipo
               </h3>
+              
+              {/* Selector de modo: Horas vs FTE */}
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-gray-500">Modo:</Label>
+                <div className="flex border rounded-md overflow-hidden h-7">
+                  <Button
+                    type="button"
+                    variant={workMode === 'hours' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`rounded-none h-7 text-xs px-2 py-0 ${workMode === 'hours' ? 'bg-primary/80' : ''}`}
+                    onClick={() => setWorkMode('hours')}
+                  >
+                    <Clock className="h-3.5 w-3.5 mr-1" />
+                    Horas
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={workMode === 'fte' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`rounded-none h-7 text-xs px-2 py-0 ${workMode === 'fte' ? 'bg-primary/80' : ''}`}
+                    onClick={() => setWorkMode('fte')}
+                  >
+                    <Percent className="h-3.5 w-3.5 mr-1" />
+                    FTE
+                  </Button>
+                </div>
+              </div>
             </div>
             
             <div className="p-3">
@@ -330,31 +388,67 @@ const OptimizedTeamConfig: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Horas */}
+                {/* Campo condicional según modo: Horas o FTE */}
                 <div>
-                  <Label htmlFor="hours-input" className="text-xs mb-1 inline-block">Horas</Label>
-                  <div className="relative">
-                    <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                    <Input
-                      id="hours-input"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min="1"
-                      className="h-8 pl-8 text-xs"
-                      value={newMember.hours === 0 ? "" : newMember.hours}
-                      onChange={(e) => {
-                        // Permitir campo vacío o sólo dígitos
-                        if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
-                          const value = e.target.value === "" ? 0 : parseInt(e.target.value);
-                          setNewMember(prev => ({
-                            ...prev,
-                            hours: value
-                          }));
-                        }
-                      }}
-                    />
-                  </div>
+                  {workMode === 'hours' ? (
+                    <>
+                      <Label htmlFor="hours-input" className="text-xs mb-1 inline-block">Horas</Label>
+                      <div className="relative">
+                        <Clock className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                        <Input
+                          id="hours-input"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          min="1"
+                          className="h-8 pl-8 text-xs"
+                          value={newMember.hours === 0 ? "" : newMember.hours}
+                          onChange={(e) => {
+                            // Permitir campo vacío o sólo dígitos
+                            if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
+                              const value = e.target.value === "" ? 0 : parseInt(e.target.value);
+                              setNewMember(prev => ({
+                                ...prev,
+                                hours: value,
+                                dedication: Math.round((value / 160) * 100) // Actualizar dedicación (%) cuando cambian las horas
+                              }));
+                            }
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="dedication-input" className="text-xs mb-1 inline-block">Dedicación (%)</Label>
+                      <div className="relative">
+                        <Percent className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                        <Input
+                          id="dedication-input"
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*(\.[0-9]+)?"
+                          min="1"
+                          max="100"
+                          className="h-8 pl-8 text-xs"
+                          value={newMember.dedication === 0 ? "" : newMember.dedication}
+                          onChange={(e) => {
+                            // Permitir campo vacío o formato numérico con decimales
+                            if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
+                              const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                              if (isNaN(value) || value <= 100) { // Asegurar que no supere 100%
+                                setNewMember(prev => ({
+                                  ...prev,
+                                  dedication: isNaN(value) ? 0 : value,
+                                  fte: (isNaN(value) ? 0 : value) / 100,
+                                  hours: Math.round((isNaN(value) ? 0 : value) * 1.6) // 1% = 1.6 horas (160h/100)
+                                }));
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
                 
                 {/* Tarifa */}
