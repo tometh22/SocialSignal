@@ -24,6 +24,8 @@ export interface TeamMember {
   hours: number;
   rate: number;
   cost: number;
+  fte?: number;        // Fracción del tiempo completo (ej: 0.5 = medio tiempo)
+  dedication?: number; // Porcentaje de dedicación (ej: 50 = 50%)
 }
 
 export interface ComplexityFactors {
