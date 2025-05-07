@@ -971,22 +971,24 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       }
       
       // Prevenir duplicados
-      const uniqueTeamMembers = new Map();
+      const uniqueTeamMembers: TeamMember[] = [];
+      const seen = new Set<string>();
       
       // Filtrar duplicados antes de guardar
       quotationData.teamMembers.forEach(member => {
         const key = `${member.roleId}-${member.personnelId || 'none'}-${member.hours}-${member.rate}`;
-        if (!uniqueTeamMembers.has(key)) {
-          uniqueTeamMembers.set(key, member);
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueTeamMembers.push(member);
         } else {
           console.log(`Miembro duplicado detectado y omitido: ${key}`);
         }
       });
       
-      console.log(`Equipo filtrado: ${uniqueTeamMembers.size} miembros únicos de ${quotationData.teamMembers.length} originales`);
+      console.log(`Equipo filtrado: ${uniqueTeamMembers.length} miembros únicos de ${quotationData.teamMembers.length} originales`);
       
       // Guardar cada miembro del equipo
-      for (const member of uniqueTeamMembers.values()) {
+      for (const member of uniqueTeamMembers) {
         // Asegurarnos de que tengamos un roleId y personnelId coherentes
         let personnelId = member.personnelId;
         
@@ -1212,7 +1214,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
               });
               
               // Convertir datos del API a formato TeamMember
-              teamMembers = teamData.map(member => {
+              teamMembers = teamData.map((member: {id: number; personnelId: number; hours: number; rate: number; cost: number;}) => {
                 // Obtener información del personal
                 const person = personnelMap[member.personnelId];
                 const roleId = person ? person.roleId : 0;
