@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
@@ -24,6 +24,35 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useEffect } from "react";
 
+// Wrapper para procesar parámetros de consulta para OptimizedQuote
+function OptimizedQuoteWrapper() {
+  // Obtener los parámetros de consulta de la URL
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  
+  // Extraer parámetros para edición o recotización
+  const idParam = params.get('id');
+  const cloneParam = params.get('clone');
+  
+  // Convertir a números si existen
+  const quotationId = idParam ? parseInt(idParam) : undefined;
+  const cloneId = cloneParam ? parseInt(cloneParam) : undefined;
+  
+  // Determinar el modo: edición normal o recotización
+  const isRequote = !!cloneId;
+  const finalId = isRequote ? cloneId : quotationId;
+  
+  console.log(`OptimizedQuoteWrapper: id=${idParam}, clone=${cloneParam}, usando ID=${finalId}, isRequote=${isRequote}`);
+  
+  // Renderizar OptimizedQuote con los parámetros apropiados
+  return (
+    <OptimizedQuote 
+      quotationId={finalId} 
+      isRequote={isRequote} 
+    />
+  );
+}
+
 function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
   useEffect(() => {
@@ -48,7 +77,7 @@ function AppRoutes() {
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
                   <ProtectedRoute path="/" component={Dashboard} />
-                  <ProtectedRoute path="/optimized-quote" component={OptimizedQuote} />
+                  <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/new-quote">
                     <Redirect to="/optimized-quote" />
                   </ProtectedRoute>
