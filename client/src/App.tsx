@@ -15,6 +15,7 @@ import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
 import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
+import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -98,6 +99,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
                   <ProtectedRoute path="/project-summary/:projectId" component={ProjectSummary} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
+                  <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <Route component={NotFound} />
                 </Switch>
               </div>
