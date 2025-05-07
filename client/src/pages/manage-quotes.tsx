@@ -305,6 +305,17 @@ export default function ManageQuotes() {
                                     Editar
                                   </Button>
                                 )}
+                                {quote.status === 'in-negotiation' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="hover-lift bg-green-50 hover:bg-green-100 text-green-700"
+                                    onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
+                                  >
+                                    <FileText className="h-4 w-4 mr-1" />
+                                    Recotizar
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="outline" 
                                   size="sm"
