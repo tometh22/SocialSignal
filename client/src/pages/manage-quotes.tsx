@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2 } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -216,6 +216,7 @@ export default function ManageQuotes() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos los Estados</SelectItem>
+                        <SelectItem value="draft">Borrador</SelectItem>
                         <SelectItem value="pending">Pendiente</SelectItem>
                         <SelectItem value="approved">Aprobada</SelectItem>
                         <SelectItem value="rejected">Rechazada</SelectItem>
@@ -277,6 +278,12 @@ export default function ManageQuotes() {
                                   {translateStatus(quote.status)}
                                 </span>
                               )}
+                              {quote.status === 'draft' && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
+                                  <FileText className="h-3.5 w-3.5 mr-1" />
+                                  {translateStatus(quote.status)}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-neutral-900">
                               ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -287,11 +294,22 @@ export default function ManageQuotes() {
                                   <Edit className="h-4 w-4 mr-1" />
                                   Estado
                                 </Button>
+                                {quote.status === 'draft' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="hover-lift bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                    onClick={() => navigate(`/optimized-quote?id=${quote.id}`)}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="outline" 
                                   size="sm"
                                   className="hover-lift"
-                                  onClick={() => navigate(`/quote/${quote.id}`)}
+                                  onClick={() => navigate(`/quotation/${quote.id}`)}
                                 >
                                   <Eye className="h-4 w-4 mr-1" />
                                   Ver
