@@ -13,6 +13,7 @@ import {
   insertActiveProjectSchema,
   insertTimeEntrySchema,
   insertProgressReportSchema,
+  insertProjectComponentSchema,
   projectStatusOptions,
   trackingFrequencyOptions
 } from "@shared/schema";
@@ -972,6 +973,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting active project:", error);
       res.status(500).json({ message: "Failed to delete project", error: String(error) });
+    }
+  });
+  
+  // ---------- RUTAS PARA COMPONENTES DE PROYECTO ----------
+  
+  // Obtener todos los componentes de un proyecto
+  app.get("/api/project-components/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
+    
+    try {
+      const components = await storage.getProjectComponents(projectId);
+      res.json(components);
+    } catch (error) {
+      console.error(`Error al obtener componentes del proyecto ${projectId}:`, error);
+      res.status(500).json({ message: "Error al obtener componentes del proyecto" });
+    }
+  });
+  
+  // Obtener componente específico
+  app.get("/api/project-components/detail/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
+    
+    try {
+      const component = await storage.getProjectComponent(id);
+      if (!component) {
+        return res.status(404).json({ message: "Componente no encontrado" });
+      }
+      res.json(component);
+    } catch (error) {
+      console.error(`Error al obtener componente ${id}:`, error);
+      res.status(500).json({ message: "Error al obtener componente" });
+    }
+  });
+  
+  // Obtener componente predeterminado de un proyecto
+  app.get("/api/project-components/default/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
+    
+    try {
+      const component = await storage.getDefaultProjectComponent(projectId);
+      if (!component) {
+        return res.status(404).json({ message: "No hay componente predeterminado para este proyecto" });
+      }
+      res.json(component);
+    } catch (error) {
+      console.error(`Error al obtener componente predeterminado del proyecto ${projectId}:`, error);
+      res.status(500).json({ message: "Error al obtener componente predeterminado" });
+    }
+  });
+  
+  // Crear nuevo componente
+  app.post("/api/project-components", async (req, res) => {
+    try {
+      const validatedData = insertProjectComponentSchema.parse(req.body);
+      const component = await storage.createProjectComponent(validatedData);
+      res.status(201).json(component);
+    } catch (error) {
+      console.error("Error al crear componente:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Datos inválidos para el componente", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error al crear componente" });
+    }
+  });
+  
+  // Actualizar componente
+  app.patch("/api/project-components/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
+    
+    try {
+      const validatedData = insertProjectComponentSchema.partial().parse(req.body);
+      const updatedComponent = await storage.updateProjectComponent(id, validatedData);
+      
+      if (!updatedComponent) {
+        return res.status(404).json({ message: "Componente no encontrado" });
+      }
+      
+      res.json(updatedComponent);
+    } catch (error) {
+      console.error(`Error al actualizar componente ${id}:`, error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Datos inválidos para el componente", errors: error.errors });
+      }
+      res.status(500).json({ message: "Error al actualizar componente" });
+    }
+  });
+  
+  // Eliminar componente
+  app.delete("/api/project-components/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de componente inválido" });
+    
+    try {
+      const success = await storage.deleteProjectComponent(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Componente no encontrado o no se puede eliminar" });
+      }
+      
+      res.json({ success: true, message: "Componente eliminado correctamente" });
+    } catch (error) {
+      console.error(`Error al eliminar componente ${id}:`, error);
+      res.status(500).json({ message: "Error al eliminar componente" });
     }
   });
   
