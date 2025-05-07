@@ -112,16 +112,12 @@ const TemplateSelectionRedesigned: React.FC = () => {
     updateTemplate(null);
     setTemplateSelected(true);
     
-    // Primero cambiamos a la pestaña "Detalles y Ajustes"
+    // Cambiamos a la pestaña "Detalles y Ajustes" y nos quedamos ahí para permitir
+    // que el usuario modifique los factores de complejidad antes de continuar
     setSelectedTab('details');
     
-    // Esperamos un momento para que se muestre la pestaña y luego avanzamos al paso 3
-    setTimeout(() => {
-      // Disparamos el evento para avanzar al paso 3
-      document.dispatchEvent(new CustomEvent('advanceToTeamConfig', {
-        detail: { fromCustomTemplate: true }
-      }));
-    }, 500); // Damos 500ms para que la pestaña se muestre brevemente
+    // NO avanzamos automáticamente al paso 3, el usuario debe hacerlo manualmente
+    // cuando haya terminado de configurar los factores de complejidad
   };
 
   // Obtener color para niveles de complejidad

@@ -39,28 +39,9 @@ const OptimizedQuoteContent = () => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  // Escuchamos el evento personalizado para avanzar automáticamente al paso 3
-  // cuando se selecciona "Personalizado / Sin Plantilla"
-  React.useEffect(() => {
-    const handleAdvanceToTeamConfig = () => {
-      console.log("✅ Avanzando automáticamente al paso 3 desde 'Personalizado / Sin Plantilla'");
-      // Verificamos que estamos en el paso 2 antes de avanzar
-      if (currentStep === 2) {
-        // Esperamos un poco para que se apliquen los cambios de estado
-        setTimeout(() => {
-          goToStep(3);
-        }, 500);
-      }
-    };
-    
-    // Añadir listener para el evento personalizado
-    document.addEventListener('advanceToTeamConfig', handleAdvanceToTeamConfig);
-    
-    // Limpieza al desmontar
-    return () => {
-      document.removeEventListener('advanceToTeamConfig', handleAdvanceToTeamConfig);
-    };
-  }, [currentStep, goToStep]);
+  // Ya no necesitamos escuchar el evento personalizado para avanzar automáticamente
+  // ya que ahora queremos que el usuario permanezca en la pestaña "Detalles y Ajustes"
+  // y avance manualmente cuando esté listo
 
   // Validación por paso
   const validateCurrentStep = (): boolean => {
