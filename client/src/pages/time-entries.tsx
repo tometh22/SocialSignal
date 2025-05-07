@@ -1282,67 +1282,13 @@ const TimeEntries: React.FC = () => {
                             Array.from(groupEntriesByDate().entries())
                               .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
                               .map(([dateStr, entries]) => (
-                                <div key={dateStr} className="border rounded-md overflow-hidden">
-                                  <div className="flex items-center justify-between p-3 bg-muted/30 border-b">
-                                    <h4 className="text-sm font-semibold text-primary">
-                                      {format(new Date(dateStr), "EEEE dd 'de' MMMM yyyy", { locale: es })}
-                                    </h4>
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-4 w-4 text-muted-foreground" />
-                                      <Badge variant="outline" className="font-normal">
-                                        {entries.reduce((sum, entry) => sum + entry.hours, 0)} 
-                                        {entries.reduce((sum, entry) => sum + entry.hours, 0) === 1 ? " hora" : " horas"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  <div className="divide-y">
-                                    {entries.map((entry) => {
-                                      const person = personnel?.find(p => p.id === entry.personnelId);
-                                      return (
-                                        <div 
-                                          key={entry.id} 
-                                          className="flex items-center justify-between p-2.5 hover:bg-muted/10"
-                                        >
-                                          <div className="flex items-center space-x-2">
-                                            <div className="relative">
-                                              <PersonAvatar name={person?.name || "Usuario"} />
-                                              {entry.billable ? (
-                                                <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background" title="Facturable" />
-                                              ) : (
-                                                <div className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-amber-500 border-2 border-background" title="No Facturable" />
-                                              )}
-                                            </div>
-                                            <div>
-                                              <div className="font-medium text-sm flex items-center">
-                                                {person?.name}
-                                                <span className="text-xs text-muted-foreground ml-2">({getRoleNameById(person?.roleId || 0)})</span>
-                                              </div>
-                                              <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                                {entry.description || "Sin descripción"}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center space-x-3">
-                                            <Badge variant={entry.billable ? "default" : "outline"} className="font-medium">
-                                              {entry.hours} h
-                                            </Badge>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-7 w-7 p-0 opacity-70 hover:opacity-100"
-                                              onClick={() => {
-                                                setEntryToDelete(entry.id);
-                                                setDeleteDialogOpen(true);
-                                              }}
-                                            >
-                                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+                                <DaySummary
+                                  key={dateStr}
+                                  date={new Date(dateStr)}
+                                  entries={entries}
+                                  personnel={personnel}
+                                  projectComponents={projectComponents}
+                                />
                               ))
                           ) : (
                             <div className="text-center py-10 text-muted-foreground">
