@@ -146,6 +146,8 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
   hours: doublePrecision("hours").notNull(),
   rate: doublePrecision("rate").notNull(),
   cost: doublePrecision("cost").notNull(),
+  fte: doublePrecision("fte"), // Porcentaje en decimales (ej: 0.5 = 50%)
+  dedication: doublePrecision("dedication"), // Porcentaje en entero (ej: 50%)
 });
 
 export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers).omit({

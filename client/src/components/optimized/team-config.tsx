@@ -290,7 +290,7 @@ const OptimizedTeamConfig: React.FC = () => {
                     className={`rounded-none h-7 text-xs px-2 py-0 ${workMode === 'fte' ? 'bg-primary/80' : ''}`}
                     onClick={() => setWorkMode('fte')}
                   >
-                    <Percent className="h-3.5 w-3.5 mr-1" />
+                    <BarChart2 className="h-3.5 w-3.5 mr-1" />
                     FTE
                   </Button>
                 </div>
@@ -421,7 +421,7 @@ const OptimizedTeamConfig: React.FC = () => {
                     <>
                       <Label htmlFor="dedication-input" className="text-xs mb-1 inline-block">Dedicación (%)</Label>
                       <div className="relative">
-                        <Percent className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                        <BarChart2 className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                         <Input
                           id="dedication-input"
                           type="text"
