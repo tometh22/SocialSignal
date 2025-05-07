@@ -236,7 +236,7 @@ const OptimizedTeamConfig: React.FC = () => {
             </div>
             
             <div className="p-3">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {/* Rol */}
                 <div>
                   <Label htmlFor="role-select" className="text-xs mb-1 inline-block">Rol</Label>
@@ -268,6 +268,39 @@ const OptimizedTeamConfig: React.FC = () => {
                               </Badge>
                             )}
                           </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Personal específico */}
+                <div>
+                  <Label htmlFor="personnel-select" className="text-xs mb-1 inline-block">Personal específico</Label>
+                  <Select
+                    value={newMember.personnelId ? String(newMember.personnelId) : ''}
+                    onValueChange={(value) => {
+                      setNewMember(prev => ({
+                        ...prev,
+                        personnelId: value === '' ? null : parseInt(value)
+                      }));
+                    }}
+                    disabled={!newMember.roleId}
+                  >
+                    <SelectTrigger id="personnel-select" className="h-8 text-xs">
+                      <SelectValue placeholder="Opcional - Cualquiera" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="" className="text-xs italic text-gray-500">
+                        Cualquier persona con este rol
+                      </SelectItem>
+                      {filteredPersonnel?.map(person => (
+                        <SelectItem 
+                          key={person.id} 
+                          value={String(person.id)}
+                          className="text-xs"
+                        >
+                          {person.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
