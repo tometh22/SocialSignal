@@ -1225,17 +1225,28 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
               });
               
               // Convertir datos del API a formato TeamMember
-              teamMembers = teamData.map((member: {id: number; personnelId: number; hours: number; rate: number; cost: number;}) => {
+              teamMembers = teamData.map((member: {id: number; personnelId: number; roleId?: number; hours: number; rate: number; cost: number;}) => {
                 // Obtener información del personal
                 const person = personnelMap[member.personnelId];
-                const roleId = person ? person.roleId : 0;
-                const name = person ? person.name : "Desconocido";
                 
+                // Determinación inteligente del roleId (usando múltiples fuentes)
+                // Prioridad: 1. roleId en la BD, 2. roleId del personal, 3. Fallback a 0
+                let roleId = 0;
+                
+                if (member.roleId) {
+                  roleId = member.roleId;
+                  console.log(`Usando roleId guardado en BD: ${roleId}`);
+                } else if (person && person.roleId) {
+                  roleId = person.roleId;
+                  console.log(`Usando roleId basado en el personal: ${roleId} (${person.name})`);
+                }
+                
+                const name = person ? person.name : "Desconocido";
                 console.log(`Miembro ${member.id}: personnelId=${member.personnelId}, nombre=${name}, roleId=${roleId}`);
                 
                 return {
                   id: uuidv4(), // Generar nuevo ID para la interfaz
-                  roleId: roleId, // Obtener el roleId correcto basado en el personnelId
+                  roleId: roleId,
                   personnelId: member.personnelId,
                   hours: member.hours,
                   rate: member.rate,
