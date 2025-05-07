@@ -474,7 +474,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
           newTeamMembers.push({
             id: uuidv4(),
             roleId: role.id,
-            personnelId: defaultPersonnelId, // Usar ID de personal válido
+            personnelId: null, // No asignar personal específico en modo automático
             hours: 10, // Valor predeterminado
             rate: role.defaultRate,
             cost: 10 * role.defaultRate
@@ -486,7 +486,7 @@ export const OptimizedQuoteProvider: React.FC<{children: ReactNode}> = ({ childr
             newTeamMembers.push({
               id: uuidv4(),
               roleId: role.id,
-              personnelId: defaultPersonnelId, // Usar ID de personal válido
+              personnelId: null, // No asignar personal específico en modo automático
               hours: hours,
               rate: role.defaultRate,
               cost: hours * role.defaultRate

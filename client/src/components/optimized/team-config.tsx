@@ -88,21 +88,13 @@ const OptimizedTeamConfig: React.FC = () => {
       // Calcular costo
       const cost = newMember.hours * newMember.rate;
       
-      // Asegurarnos de tener un personnelId válido
-      let validPersonnelId = newMember.personnelId;
+      // Nuevo enfoque: Si se está trabajando por roles (teamOption = 'auto'), 
+      // permitimos que personnelId sea null para indicar "cualquier persona con este rol"
+      // Si se está trabajando con personas específicas, entonces sí requiere un personnelId
       
-      // Si no hay personal asignado, usamos el primer miembro disponible
-      if (!validPersonnelId && availablePersonnel && availablePersonnel.length > 0) {
-        validPersonnelId = availablePersonnel[0].id;
-      } else if (!validPersonnelId) {
-        // Si no hay personal disponible, usamos un ID conocido
-        validPersonnelId = 39;
-      }
-      
-      // Añadir miembro con ID válido
+      // Añadir miembro - ahora podemos mantener personnelId como null
       addTeamMember({
         ...newMember,
-        personnelId: validPersonnelId,
         cost
       });
       
@@ -394,7 +386,13 @@ const OptimizedTeamConfig: React.FC = () => {
                                     </div>
                                     <div>
                                       <div className="text-xs font-medium">{role?.name || 'Rol desconocido'}</div>
-                                      {person && <div className="text-[10px] text-gray-500">{person.name}</div>}
+                                      {/* Solo mostramos el nombre del personal cuando:
+                                          1) Existe un personnelId asignado Y
+                                          2) Estamos en el modo de equipo personalizado (manual) 
+                                      */}
+                                      {person && quotationData.teamOption === 'manual' && (
+                                        <div className="text-[10px] text-gray-500">{person.name}</div>
+                                      )}
                                     </div>
                                   </div>
                                 </td>
