@@ -177,7 +177,8 @@ export default function ManageQuotes() {
       'pending': 'Pendiente',
       'approved': 'Aprobada',
       'rejected': 'Rechazada',
-      'in-negotiation': 'En Negociación'
+      'in-negotiation': 'En Negociación',
+      'draft': 'Borrador'
     };
     return statusMap[status] || status;
   };
@@ -369,6 +370,7 @@ export default function ManageQuotes() {
                   <SelectValue placeholder="Seleccionar nuevo estado" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="pending">Pendiente</SelectItem>
                   <SelectItem value="approved">Aprobada</SelectItem>
                   <SelectItem value="rejected">Rechazada</SelectItem>
