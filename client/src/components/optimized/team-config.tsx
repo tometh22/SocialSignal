@@ -84,15 +84,19 @@ const OptimizedTeamConfig: React.FC = () => {
 
   // Manejar la adición de un nuevo miembro
   const handleAddMember = () => {
-    if (newMember.roleId > 0 && newMember.hours > 0 && newMember.rate > 0) {
+    // Validación: en modo 'Por Rol' necesitamos roleId, en modo 'Por Persona' necesitamos personnelId
+    const isValidForMode = 
+      (activeTab === 'recommended' && newMember.roleId > 0) || 
+      (activeTab === 'custom' && newMember.personnelId && newMember.personnelId > 0);
+    
+    if (isValidForMode && newMember.hours > 0 && newMember.rate > 0) {
       // Calcular costo
       const cost = newMember.hours * newMember.rate;
       
-      // Nuevo enfoque: Si se está trabajando por roles (teamOption = 'auto'), 
-      // permitimos que personnelId sea null para indicar "cualquier persona con este rol"
-      // Si se está trabajando con personas específicas, entonces sí requiere un personnelId
+      // En modo 'Por Rol' (recommended/auto): personnelId puede ser null (cualquier persona con ese rol)
+      // En modo 'Por Persona' (custom/manual): debe tener un personnelId específico
       
-      // Añadir miembro - ahora podemos mantener personnelId como null
+      // Añadir miembro
       addTeamMember({
         ...newMember,
         cost
@@ -172,11 +176,11 @@ const OptimizedTeamConfig: React.FC = () => {
           <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="recommended" className="flex items-center">
               <Sparkles className="h-4 w-4 mr-2" />
-              <span>Recomendado</span>
+              <span>Por Rol</span>
             </TabsTrigger>
             <TabsTrigger value="custom" className="flex items-center">
-              <Settings className="h-4 w-4 mr-2" />
-              <span>Personalizado</span>
+              <UserCheck className="h-4 w-4 mr-2" />
+              <span>Por Persona</span>
             </TabsTrigger>
           </TabsList>
 
@@ -236,82 +240,95 @@ const OptimizedTeamConfig: React.FC = () => {
             </div>
             
             <div className="p-3">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                {/* Rol */}
-                <div>
-                  <Label htmlFor="role-select" className="text-xs mb-1 inline-block">Rol</Label>
-                  <Select
-                    value={newMember.roleId ? String(newMember.roleId) : ''}
-                    onValueChange={(value) => {
-                      setNewMember(prev => ({
-                        ...prev,
-                        roleId: parseInt(value),
-                        personnelId: null
-                      }));
-                    }}
-                  >
-                    <SelectTrigger id="role-select" className="h-8 text-xs">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRoles?.map(role => (
-                        <SelectItem 
-                          key={role.id} 
-                          value={String(role.id)}
-                          className="flex items-center text-xs"
-                        >
-                          <div className="flex items-center">
-                            {role.name}
-                            {isRoleRecommended(role.id) && (
-                              <Badge className="ml-1 bg-primary/10 text-primary border-0 text-[9px] px-1 py-0">
-                                Rec.
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                 
-                {/* Personal específico */}
-                <div>
-                  <Label htmlFor="personnel-select" className="text-xs mb-1 inline-block">Personal específico</Label>
-                  <Select
-                    value={newMember.personnelId ? String(newMember.personnelId) : "0"}
-                    onValueChange={(value) => {
-                      setNewMember(prev => ({
-                        ...prev,
-                        personnelId: value === "0" ? null : parseInt(value)
-                      }));
-                    }}
-                    disabled={!newMember.roleId}
-                  >
-                    <SelectTrigger id="personnel-select" className="h-8 text-xs">
-                      <SelectValue placeholder="Opcional - Cualquiera" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0" className="text-xs italic text-gray-500">
-                        Cualquier persona con este rol
-                      </SelectItem>
-                      {filteredPersonnel && filteredPersonnel.length > 0 ? (
-                        filteredPersonnel.map(person => (
+                {/* Modo Por Rol: selector de rol */}
+                {activeTab === 'recommended' && (
+                  <div>
+                    <Label htmlFor="role-select" className="text-xs mb-1 inline-block">Rol</Label>
+                    <Select
+                      value={newMember.roleId ? String(newMember.roleId) : ''}
+                      onValueChange={(value) => {
+                        setNewMember(prev => ({
+                          ...prev,
+                          roleId: parseInt(value),
+                          personnelId: null,
+                          rate: availableRoles?.find(r => r.id === parseInt(value))?.defaultRate || 0
+                        }));
+                      }}
+                    >
+                      <SelectTrigger id="role-select" className="h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableRoles?.map(role => (
                           <SelectItem 
-                            key={person.id} 
-                            value={String(person.id)}
-                            className="text-xs"
+                            key={role.id} 
+                            value={String(role.id)}
+                            className="flex items-center text-xs"
                           >
-                            {person.name}
+                            <div className="flex items-center">
+                              {role.name}
+                              {isRoleRecommended(role.id) && (
+                                <Badge className="ml-1 bg-primary/10 text-primary border-0 text-[9px] px-1 py-0">
+                                  Rec.
+                                </Badge>
+                              )}
+                            </div>
                           </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem disabled value="no-personnel" className="text-xs text-gray-400 italic">
-                          No hay personal con este rol
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {/* Modo Por Persona: selector de personal directo */}
+                {activeTab === 'custom' && (
+                  <div>
+                    <Label htmlFor="person-select" className="text-xs mb-1 inline-block">Personal</Label>
+                    <Select
+                      value={newMember.personnelId ? String(newMember.personnelId) : ''}
+                      onValueChange={(value) => {
+                        const personnelId = parseInt(value);
+                        const selectedPerson = availablePersonnel?.find(p => p.id === personnelId);
+                        const roleId = selectedPerson?.roleId || 0;
+                        const role = availableRoles?.find(r => r.id === roleId);
+                        
+                        setNewMember(prev => ({
+                          ...prev,
+                          personnelId,
+                          roleId,
+                          rate: role?.defaultRate || 0
+                        }));
+                      }}
+                    >
+                      <SelectTrigger id="person-select" className="h-8 text-xs">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePersonnel?.map(person => {
+                          const role = availableRoles?.find(r => r.id === person.roleId);
+                          return (
+                            <SelectItem 
+                              key={person.id} 
+                              value={String(person.id)}
+                              className="flex items-center text-xs"
+                            >
+                              <div>
+                                {person.name}
+                                {role && (
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({role.name})
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 
                 {/* Horas */}
                 <div>
@@ -369,7 +386,10 @@ const OptimizedTeamConfig: React.FC = () => {
                 <div className="flex items-end">
                   <Button 
                     onClick={handleAddMember}
-                    disabled={!newMember.roleId || newMember.hours <= 0 || newMember.rate <= 0} 
+                    disabled={(activeTab === 'recommended' && !newMember.roleId) || 
+                              (activeTab === 'custom' && !newMember.personnelId) || 
+                              newMember.hours <= 0 || 
+                              newMember.rate <= 0} 
                     className="w-full h-8 text-xs bg-primary/80 hover:bg-primary"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
