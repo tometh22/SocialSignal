@@ -44,7 +44,8 @@ const OptimizedTeamConfig: React.FC = () => {
     hours: 10,
     rate: 0,
     fte: 1,
-    dedication: 100 // Porcentaje de dedicación (100% = 1 FTE)
+    dedication: 100, // Porcentaje de dedicación (100% = 1 FTE)
+    quantity: 1 // Cantidad de miembros a agregar
   });
 
   // Estado para la vista activa
@@ -88,7 +89,7 @@ const OptimizedTeamConfig: React.FC = () => {
   const totalTeamCost = quotationData.teamMembers.reduce((sum, member) => sum + member.cost, 0);
   const percentageOfBase = baseCost ? (totalTeamCost / baseCost) * 100 : 0;
 
-  // Manejar la adición de un nuevo miembro
+  // Manejar la adición de nuevo(s) miembro(s)
   const handleAddMember = () => {
     // Validación: en modo 'Por Rol' necesitamos roleId, en modo 'Por Persona' necesitamos personnelId
     const isValidForMode = 
@@ -115,25 +116,28 @@ const OptimizedTeamConfig: React.FC = () => {
       // Calculamos el costo basado en las horas (reales o derivadas del FTE)
       cost = hours * newMember.rate;
       
-      // En modo 'Por Rol' (recommended/auto): personnelId puede ser null (cualquier persona con ese rol)
-      // En modo 'Por Persona' (custom/manual): debe tener un personnelId específico
+      // Añadir la cantidad especificada de miembros
+      const quantity = newMember.quantity || 1;
+      for (let i = 0; i < quantity; i++) {
+        addTeamMember({
+          ...newMember,
+          hours,
+          fte: newMember.dedication / 100,
+          cost
+        });
+      }
       
-      // Añadir miembro
-      addTeamMember({
-        ...newMember,
-        hours,
-        fte: newMember.dedication / 100,
-        cost
-      });
-      
-      // Limpiar formulario
+      // Limpiar formulario pero mantener el rol seleccionado
+      const currentRoleId = newMember.roleId;
+      const currentRate = newMember.rate;
       setNewMember({
-        roleId: 0,
+        roleId: currentRoleId,
         personnelId: null,
         hours: 10,
-        rate: 0,
+        rate: currentRate,
         fte: 1,
-        dedication: 100
+        dedication: 100,
+        quantity: 1
       });
     }
   };
@@ -460,16 +464,15 @@ const OptimizedTeamConfig: React.FC = () => {
                       id="rate-input"
                       type="text"
                       inputMode="decimal"
-                      pattern="[0-9]*(\.[0-9]+)?"
                       className="h-8 pl-8 text-xs"
                       value={newMember.rate === 0 ? "" : newMember.rate}
                       onChange={(e) => {
                         // Permitir campo vacío o formato numérico con decimales
-                        if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
-                          const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                        const value = e.target.value;
+                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
                           setNewMember(prev => ({
                             ...prev,
-                            rate: isNaN(value) ? 0 : value
+                            rate: value === "" ? 0 : parseFloat(value)
                           }));
                         }
                       }}
@@ -632,13 +635,13 @@ const OptimizedTeamConfig: React.FC = () => {
                                         }
                                         onChange={(e) => {
                                           // Permitir campo vacío o formato numérico con decimales
-                                          if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
-                                            const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                          const value = e.target.value;
+                                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
                                             setEditingMember({
                                               ...editingMember,
                                               [String(member.id)]: {
                                                 ...(editingMember[String(member.id)] || { hours: member.hours }),
-                                                rate: isNaN(value) ? 0 : value
+                                                rate: value === "" ? 0 : parseFloat(value)
                                               }
                                             });
                                           }
