@@ -1,18 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Download, Printer, Mail, Edit, FileCheck, FileClock, Loader2 } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Personnel, Role } from '@shared/schema';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, Download, Printer, Edit, FileCheck, FileClock, Loader2 } from 'lucide-react';
 
 // Interfaces
-interface QuotationDetailProps {}
-
 interface TeamMember {
   id: number;
   quotationId: number;
@@ -60,7 +55,21 @@ interface Template {
   features: string | null;
 }
 
-const QuotationDetail: React.FC<QuotationDetailProps> = () => {
+interface Personnel {
+  id: number;
+  name: string;
+  roleId: number;
+  hourlyRate: number;
+}
+
+interface Role {
+  id: number;
+  name: string;
+  description: string;
+  hourlyRate: number;
+}
+
+const QuotationDetail: React.FC = () => {
   // Soporta ambas rutas: /quotation/:id y /quotations/:id 
   const [, quotationParams] = useRoute<{ id: string }>('/quotation/:id');
   const [, quotationsParams] = useRoute<{ id: string }>('/quotations/:id');
@@ -69,6 +78,82 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
   const { toast } = useToast();
   
   const quotationId = params?.id;
+
+  // Estado para almacenar datos
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [quotation, setQuotation] = useState<Quotation | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [client, setClient] = useState<ClientInfo | null>(null);
+  const [template, setTemplate] = useState<Template | null>(null);
+  const [personnel, setPersonnel] = useState<Personnel[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+
+  // Cargar los datos de la cotización
+  useEffect(() => {
+    if (!quotationId) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Obtener cotización
+        const quotationRes = await fetch(`/api/quotations/${quotationId}`);
+        if (!quotationRes.ok) throw new Error('Error al cargar la cotización');
+        const quotationData = await quotationRes.json();
+        setQuotation(quotationData);
+        
+        // Obtener equipo
+        const teamRes = await fetch(`/api/quotation-team/${quotationId}`);
+        if (!teamRes.ok) throw new Error('Error al cargar el equipo');
+        const teamData = await teamRes.json();
+        setTeamMembers(teamData);
+        
+        // Obtener datos del cliente
+        if (quotationData.clientId) {
+          const clientRes = await fetch(`/api/clients/${quotationData.clientId}`);
+          if (!clientRes.ok) throw new Error('Error al cargar el cliente');
+          const clientData = await clientRes.json();
+          setClient(clientData);
+        }
+        
+        // Obtener datos de la plantilla
+        if (quotationData.templateId) {
+          const templateRes = await fetch(`/api/templates/${quotationData.templateId}`);
+          if (templateRes.ok) {
+            const templateData = await templateRes.json();
+            setTemplate(templateData);
+          }
+        }
+        
+        // Obtener roles
+        const rolesRes = await fetch('/api/roles');
+        if (!rolesRes.ok) throw new Error('Error al cargar roles');
+        const rolesData = await rolesRes.json();
+        setRoles(rolesData);
+        
+        // Obtener personal
+        const personnelRes = await fetch('/api/personnel');
+        if (!personnelRes.ok) throw new Error('Error al cargar personal');
+        const personnelData = await personnelRes.json();
+        setPersonnel(personnelData);
+        
+      } catch (err) {
+        console.error('Error:', err);
+        setError(err instanceof Error ? err.message : 'Error desconocido');
+        toast({
+          title: "Error de carga",
+          description: err instanceof Error ? err.message : 'Error desconocido',
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [quotationId, toast]);
 
   // Si no hay ID válido, redireccionar
   if (!quotationId) {
@@ -79,77 +164,6 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
     });
     setLocation('/manage-quotes');
     return null;
-  }
-
-  // Consulta para obtener datos de la cotización
-  const { data: quotation, isLoading: isLoadingQuotation, error: quotationError } = useQuery<Quotation>({
-    queryKey: [`/api/quotations/${quotationId}`],
-    queryFn: async () => {
-      return await apiRequest(`/api/quotations/${quotationId}`) as Quotation;
-    },
-    staleTime: 30000, // 30 segundos
-  });
-
-  // Consulta para obtener miembros del equipo
-  const { data: teamMembers = [], isLoading: isLoadingTeam } = useQuery<TeamMember[]>({
-    queryKey: [`/api/quotation-team/${quotationId}`],
-    queryFn: async () => {
-      return await apiRequest(`/api/quotation-team/${quotationId}`) as TeamMember[];
-    },
-    staleTime: 30000, // 30 segundos
-    enabled: !!quotationId,
-  });
-
-  // Consulta para obtener datos del cliente
-  const { data: client, isLoading: isLoadingClient } = useQuery<ClientInfo>({
-    queryKey: [`/api/clients/${quotation?.clientId}`],
-    queryFn: async () => {
-      return await apiRequest(`/api/clients/${quotation?.clientId}`) as ClientInfo;
-    },
-    staleTime: 30000, // 30 segundos
-    enabled: !!quotation?.clientId,
-  });
-
-  // Consulta para obtener datos de la plantilla
-  const { data: template, isLoading: isLoadingTemplate } = useQuery<Template>({
-    queryKey: [`/api/templates/${quotation?.templateId}`],
-    queryFn: async () => {
-      return await apiRequest(`/api/templates/${quotation?.templateId}`) as Template;
-    },
-    staleTime: 30000, // 30 segundos
-    enabled: !!quotation?.templateId,
-  });
-
-  // Consulta para obtener roles
-  const { data: roles = [], isLoading: isLoadingRoles } = useQuery<Role[]>({
-    queryKey: ['/api/roles'],
-    queryFn: async () => {
-      return await apiRequest('/api/roles') as Role[];
-    },
-    staleTime: 30000, // 30 segundos
-  });
-
-  // Consulta para obtener personal
-  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
-    queryKey: ['/api/personnel'],
-    queryFn: async () => {
-      return await apiRequest('/api/personnel') as Personnel[];
-    },
-    staleTime: 30000, // 30 segundos
-  });
-
-  // Determinar si está cargando
-  const isLoading = isLoadingQuotation || isLoadingTeam || isLoadingClient || 
-                    isLoadingTemplate || isLoadingRoles || isLoadingPersonnel;
-
-  // Manejar error
-  if (quotationError) {
-    console.error("Error al cargar datos de la cotización:", quotationError);
-    toast({
-      title: "Error de carga",
-      description: "No se pudieron cargar los detalles de la cotización",
-      variant: "destructive",
-    });
   }
 
   // Formatear moneda
@@ -174,16 +188,16 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
 
   // Obtener nombre de personal por ID
   const getPersonnelName = (id: number) => {
-    const person = personnel.find((p: Personnel) => p.id === id);
+    const person = personnel.find(p => p.id === id);
     return person ? person.name : `Personal ID: ${id}`;
   };
 
   // Obtener nombre de rol por ID
   const getRoleName = (personnelId: number) => {
-    const person = personnel.find((p: Personnel) => p.id === personnelId);
+    const person = personnel.find(p => p.id === personnelId);
     if (!person) return 'Rol no encontrado';
     
-    const role = roles.find((r: Role) => r.id === person.roleId);
+    const role = roles.find(r => r.id === person.roleId);
     return role ? role.name : `Rol ID: ${person.roleId}`;
   };
 
@@ -279,11 +293,13 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
     );
   }
 
-  if (!quotation) {
+  if (error || !quotation) {
     return (
       <div className="container py-10">
         <div className="flex flex-col items-center justify-center h-64">
-          <h2 className="text-xl font-semibold text-neutral-800 mb-4">Cotización no encontrada</h2>
+          <h2 className="text-xl font-semibold text-neutral-800 mb-4">
+            {error || "Cotización no encontrada"}
+          </h2>
           <Button onClick={() => setLocation('/manage-quotes')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver al listado
@@ -407,36 +423,42 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
               {teamMembers.length > 0 ? (
                 <div className="overflow-auto border rounded-md" style={{ maxHeight: '300px' }}>
                   <Table>
-                    <TableHeader className="sticky top-0 bg-white z-10">
+                    <TableHeader>
                       <TableRow>
                         <TableHead>Rol</TableHead>
-                        <TableHead>Personal</TableHead>
+                        <TableHead>Persona</TableHead>
                         <TableHead className="text-right">Horas</TableHead>
                         <TableHead className="text-right">Tarifa</TableHead>
                         <TableHead className="text-right">Costo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {teamMembers.map((member) => (
+                      {teamMembers.map((member: TeamMember) => (
                         <TableRow key={member.id}>
                           <TableCell className="font-medium">{getRoleName(member.personnelId)}</TableCell>
                           <TableCell>{getPersonnelName(member.personnelId)}</TableCell>
                           <TableCell className="text-right">{member.hours}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(member.rate)}/h</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(member.cost)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(member.rate)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(member.cost)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <p className="text-neutral-500">No hay miembros del equipo asignados a esta cotización.</p>
+                <div className="text-center text-neutral-500 py-6">
+                  No hay miembros del equipo asignados a esta cotización
+                </div>
               )}
               
               {teamMembers.length > 0 && (
-                <div className="mt-4 flex justify-between items-center px-4 py-2 bg-neutral-50 rounded-md">
-                  <span className="font-medium">Total horas:</span>
-                  <span className="font-medium">{teamMembers.reduce((sum, member) => sum + member.hours, 0)}</span>
+                <div className="mt-4 text-right">
+                  <p className="text-sm font-medium text-neutral-500">
+                    Total de horas: <span className="font-bold">{teamMembers.reduce((sum, member) => sum + member.hours, 0)}</span>
+                  </p>
+                  <p className="font-medium">
+                    Total del equipo: <span className="font-bold">{formatCurrency(teamMembers.reduce((sum, member) => sum + member.cost, 0))}</span>
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -445,110 +467,79 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
 
         {/* Columna derecha */}
         <div className="space-y-6">
-          {/* Desglose de costos */}
-          <Card className="bg-white shadow-md">
-            <CardHeader className="pb-2 border-b">
-              <CardTitle className="text-lg">Resumen Financiero</CardTitle>
+          {/* Información del cliente */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Información del Cliente</CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Costo Base:</span>
-                  <span className="font-medium">{formatCurrency(quotation.baseCost)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Ajuste Complejidad:</span>
-                  <span className="font-medium">{formatCurrency(quotation.complexityAdjustment)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-600">Margen Operativo:</span>
-                  <span className="font-medium">{formatCurrency(quotation.markupAmount)}</span>
-                </div>
-                
-                {/* Sección ajustes */}
-                {quotation.adjustmentReason && (
-                  <div className="pt-4 mt-4 border-t border-dashed">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-neutral-500">Ajustes aplicados:</span>
-                      <span className="text-neutral-500">{quotation.adjustmentReason}</span>
+            <CardContent>
+              <div className="space-y-2">
+                {client && (
+                  <>
+                    <h3 className="font-bold text-lg">{client.name}</h3>
+                    <div className="text-sm">
+                      <p className="text-neutral-500">Contacto: {client.contactName}</p>
+                      <p className="text-neutral-500">Email: {client.contactEmail}</p>
+                      <p className="text-neutral-500">Teléfono: {client.contactPhone}</p>
                     </div>
-                  </div>
+                  </>
                 )}
-                
-                {/* Total */}
-                <div className="pt-4 mt-2 border-t flex justify-between items-center">
-                  <span className="text-lg font-bold">Total:</span>
-                  <span className="text-xl font-bold text-blue-700">{formatCurrency(quotation.totalAmount)}</span>
-                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Información del cliente */}
-          {client && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Información del Cliente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    {client.logoUrl ? (
-                      <div className="h-12 w-12 rounded overflow-hidden border flex-shrink-0">
-                        <img 
-                          src={client.logoUrl} 
-                          alt={`${client.name} logo`} 
-                          className="h-full w-full object-contain"
-                          onError={(e) => {
-                            // Manejo de error si la imagen no se puede cargar
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-12 w-12 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-medium text-primary">
-                          {client.name.substring(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-500">Nombre</h3>
-                      <p className="mt-1 font-medium">{client.name}</p>
-                    </div>
-                  </div>
-                  {client.contactName && (
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-500">Contacto</h3>
-                      <p className="mt-1">{client.contactName}</p>
-                    </div>
-                  )}
-                  {client.contactEmail && (
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-500">Email</h3>
-                      <p className="mt-1">{client.contactEmail}</p>
-                    </div>
-                  )}
-                  {client.contactPhone && (
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-500">Teléfono</h3>
-                      <p className="mt-1">{client.contactPhone}</p>
-                    </div>
-                  )}
+          {/* Resumen financiero */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Resumen Financiero</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-600">Costo base:</span>
+                  <span>{formatCurrency(quotation.baseCost)}</span>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-600">Ajuste complejidad:</span>
+                  <span>{formatCurrency(quotation.complexityAdjustment)}</span>
+                </div>
+                
+                {quotation.adjustmentReason && (
+                  <div className="text-xs text-neutral-500 italic pl-4">
+                    Razón: {quotation.adjustmentReason}
+                  </div>
+                )}
+                
+                <div className="border-t border-b py-2 my-2">
+                  <div className="flex justify-between items-center font-medium">
+                    <span>Subtotal operacional:</span>
+                    <span>
+                      {formatCurrency(quotation.baseCost + quotation.complexityAdjustment)}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-600">Margen:</span>
+                  <span>{formatCurrency(quotation.markupAmount)}</span>
+                </div>
+                
+                <div className="mt-4 border-t pt-3">
+                  <div className="flex justify-between items-center text-lg font-bold">
+                    <span>Total:</span>
+                    <span>{formatCurrency(quotation.totalAmount)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           {/* Acciones adicionales */}
-          <div className="space-y-3">
-            <Button className="w-full justify-start text-left">
-              <Mail className="mr-2 h-4 w-4" />
-              Enviar al Cliente
-            </Button>
-            <Button variant="outline" className="w-full justify-start text-left">
+          <div className="flex flex-col gap-2">
+            <Button variant="outline" className="w-full justify-start">
               <Edit className="mr-2 h-4 w-4" />
-              Duplicar Cotización
+              Editar Cotización
             </Button>
           </div>
         </div>
