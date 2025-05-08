@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Edit, Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { parseDecimal, formatNumericInput } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -192,14 +193,17 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         <TableCell>
           {isEditing ? (
             <Input 
-              type="number" 
-              min="0" 
-              step="0.01" 
-              value={editRate} 
-              onChange={(e) => setEditRate(parseFloat(e.target.value))} 
+              type="text" 
+              inputMode="decimal"
+              placeholder="0,00"
+              value={editRate.toString().replace('.', ',')} 
+              onChange={(e) => {
+                const value = parseDecimal(e.target.value);
+                setEditRate(isNaN(value) ? 0 : value);
+              }} 
               className="w-full h-9" // Altura fija
             />
-          ) : `$${updatedPerson.hourlyRate.toFixed(2)}/hr`}
+          ) : `$${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr`}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (
