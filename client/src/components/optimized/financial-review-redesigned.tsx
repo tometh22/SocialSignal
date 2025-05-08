@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { formatNumericInput, parseDecimal } from '@/lib/utils';
 
 const OptimizedFinancialReview: React.FC = () => {
   const {
@@ -232,12 +233,12 @@ const OptimizedFinancialReview: React.FC = () => {
                     <div className="flex space-x-2">
                       <Input
                         id="platform-cost"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={quotationData.financials.platformCost}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={quotationData.financials.platformCost.toString().replace('.', ',')}
                         onChange={(e) => {
-                          const value = parseFloat(e.target.value);
+                          const value = parseDecimal(e.target.value);
                           updateFinancials({ platformCost: isNaN(value) ? 0 : value });
                         }}
                         className="h-8 text-sm"
