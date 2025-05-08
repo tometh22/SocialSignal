@@ -94,10 +94,31 @@ export default function ManageQuotes() {
     
     try {
       console.log(`[CLIENT] Intentando eliminar cotización ID ${selectedQuote.id}`);
-      const response = await apiRequest(`/api/quotations/${selectedQuote.id}`, "DELETE");
+      
+      // Usamos fetch directamente en lugar de apiRequest para tener más control sobre el manejo de respuestas
+      const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
       console.log(`[CLIENT] Respuesta del servidor:`, response.status);
       
-      // Comprobar primero si hay un error basado en el código de estado
+      // Intentamos obtener la respuesta JSON, pero manejamos casos donde no sea posible
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('[CLIENT] Error al parsear respuesta JSON:', e);
+        // Si no hay JSON, creamos un objeto con el estado de la respuesta
+        data = { success: response.ok, message: response.statusText };
+      }
+      
+      console.log(`[CLIENT] Datos recibidos:`, data);
+      
+      // Manejar los diferentes casos según el código HTTP
       if (response.status === 409) {
         console.log(`[CLIENT] La cotización está en uso (409 Conflict)`);
         toast({
@@ -108,15 +129,7 @@ export default function ManageQuotes() {
         return;
       }
       
-      if (!response.ok) {
-        console.log(`[CLIENT] Error del servidor: ${response.status}`);
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log(`[CLIENT] Datos recibidos:`, data);
-      
-      if (data.success) {
+      if (response.ok && data.success) {
         toast({
           title: "Cotización eliminada",
           description: "La cotización ha sido eliminada correctamente.",
@@ -125,7 +138,7 @@ export default function ManageQuotes() {
         refetch();
         setDeleteDialogOpen(false);
       } else {
-        // Si el servidor responde con success: false
+        // Si hay un error del servidor o success: false
         toast({
           title: "Error",
           description: data.message || "No se pudo eliminar la cotización.",
