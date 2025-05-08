@@ -205,14 +205,17 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
         <TableCell>
           {isEditing ? (
             <Input 
-              type="number" 
-              min="0" 
-              step="0.01" 
-              value={editDefaultRate} 
-              onChange={(e) => setEditDefaultRate(parseFloat(e.target.value))} 
+              type="text" 
+              inputMode="decimal"
+              placeholder="0,00"
+              value={editDefaultRate.toString().replace('.', ',')} 
+              onChange={(e) => {
+                const value = parseDecimal(e.target.value);
+                setEditDefaultRate(isNaN(value) ? 0 : value);
+              }} 
               className="w-full h-9" // Altura fija
             />
-          ) : `$${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2)}/hr`}
+          ) : `$${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2).replace('.', ',')}/hr`}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (

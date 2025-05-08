@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Personnel, Role } from '@shared/schema';
+import { parseDecimal, formatNumericInput } from '@/lib/utils';
 import { 
   AlertCircle, Plus, Trash, UserPlus, Users, RefreshCcw, Clock, DollarSign,
   Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles, Edit, Check, X, Pencil,
@@ -736,21 +737,17 @@ const OptimizedTeamConfig: React.FC = () => {
                         <Input
                           id="hours-input"
                           type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          min="1"
+                          inputMode="decimal"
+                          placeholder="0,00"
                           className="h-8 pl-8 text-xs"
-                          value={newMember.hours === 0 ? "" : newMember.hours}
+                          value={newMember.hours === 0 ? "" : newMember.hours.toString().replace('.', ',')}
                           onChange={(e) => {
-                            // Permitir campo vacío o sólo dígitos
-                            if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
-                              const value = e.target.value === "" ? 0 : parseInt(e.target.value);
-                              setNewMember(prev => ({
-                                ...prev,
-                                hours: value,
-                                dedication: Math.round((value / 160) * 100) // Actualizar dedicación (%) cuando cambian las horas
-                              }));
-                            }
+                            const value = parseDecimal(e.target.value);
+                            setNewMember(prev => ({
+                              ...prev,
+                              hours: isNaN(value) ? 0 : value,
+                              dedication: Math.round((isNaN(value) ? 0 : value / 160) * 100) // Actualizar dedicación (%) cuando cambian las horas
+                            }));
                           }}
                         />
                       </div>
@@ -764,23 +761,19 @@ const OptimizedTeamConfig: React.FC = () => {
                           id="dedication-input"
                           type="text"
                           inputMode="decimal"
-                          pattern="[0-9]*(\.[0-9]+)?"
-                          min="1"
+                          placeholder="0,00"
                           max="100"
                           className="h-8 pl-8 text-xs"
-                          value={newMember.dedication === 0 ? "" : newMember.dedication}
+                          value={newMember.dedication === 0 ? "" : newMember.dedication.toString().replace('.', ',')}
                           onChange={(e) => {
-                            // Permitir campo vacío o formato numérico con decimales
-                            if (e.target.value === "" || /^[0-9]*(\.[0-9]*)?$/.test(e.target.value)) {
-                              const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                              if (isNaN(value) || value <= 100) { // Asegurar que no supere 100%
-                                setNewMember(prev => ({
-                                  ...prev,
-                                  dedication: isNaN(value) ? 0 : value,
-                                  fte: (isNaN(value) ? 0 : value) / 100,
-                                  hours: Math.round((isNaN(value) ? 0 : value) * 1.6) // 1% = 1.6 horas (160h/100)
-                                }));
-                              }
+                            const value = parseDecimal(e.target.value);
+                            if (isNaN(value) || value <= 100) { // Asegurar que no supere 100%
+                              setNewMember(prev => ({
+                                ...prev,
+                                dedication: isNaN(value) ? 0 : value,
+                                fte: (isNaN(value) ? 0 : value) / 100,
+                                hours: Math.round((isNaN(value) ? 0 : value) * 1.6) // 1% = 1.6 horas (160h/100)
+                              }));
                             }
                           }}
                         />
@@ -798,17 +791,15 @@ const OptimizedTeamConfig: React.FC = () => {
                       id="rate-input"
                       type="text"
                       inputMode="decimal"
+                      placeholder="0,00"
                       className="h-8 pl-8 text-xs"
-                      value={newMember.rate === 0 ? "" : newMember.rate}
+                      value={newMember.rate === 0 ? "" : newMember.rate.toString().replace('.', ',')}
                       onChange={(e) => {
-                        // Permitir campo vacío o formato numérico con decimales
-                        const value = e.target.value;
-                        if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                          setNewMember(prev => ({
-                            ...prev,
-                            rate: value === "" ? 0 : parseFloat(value)
-                          }));
-                        }
+                        const value = parseDecimal(e.target.value);
+                        setNewMember(prev => ({
+                          ...prev,
+                          rate: isNaN(value) ? 0 : value
+                        }));
                       }}
                     />
                   </div>
@@ -959,26 +950,23 @@ const OptimizedTeamConfig: React.FC = () => {
                                   {isCurrentlyEditing ? (
                                     <Input
                                       type="text"
-                                      inputMode="numeric"
-                                      pattern="[0-9]*"
+                                      inputMode="decimal"
+                                      placeholder="0,00"
                                       className="h-7 text-xs w-20 mx-auto"
                                       value={
                                         editingMember[String(member.id)]?.hours === 0 
                                           ? "" 
-                                          : editingMember[String(member.id)]?.hours || member.hours
+                                          : (editingMember[String(member.id)]?.hours || member.hours).toString().replace('.', ',')
                                       }
                                       onChange={(e) => {
-                                        // Permitir campo vacío o sólo dígitos
-                                        if (e.target.value === "" || /^[0-9]+$/.test(e.target.value)) {
-                                          const value = e.target.value === "" ? 0 : parseInt(e.target.value);
-                                          setEditingMember({
-                                            ...editingMember,
-                                            [String(member.id)]: {
-                                              ...(editingMember[String(member.id)] || { rate: member.rate }),
-                                              hours: value
-                                            }
-                                          });
-                                        }
+                                        const value = parseDecimal(e.target.value);
+                                        setEditingMember({
+                                          ...editingMember,
+                                          [String(member.id)]: {
+                                            ...(editingMember[String(member.id)] || { rate: member.rate }),
+                                            hours: isNaN(value) ? 0 : value
+                                          }
+                                        });
                                       }}
                                     />
                                   ) : (
