@@ -700,7 +700,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid team member ID" });
     
     try {
-      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+      // Usamos el método de storage para manejar la eliminación en lugar de acceder directamente a la base de datos
+      await storage.deleteQuotationTeamMemberById(id);
       res.status(204).send();
     } catch (error) {
       console.error(`Error al eliminar miembro del equipo ID ${id}:`, error);

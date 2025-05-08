@@ -1256,6 +1256,10 @@ export class DatabaseStorage implements IStorage {
   async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
     await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
   }
+  
+  async deleteQuotationTeamMemberById(id: number): Promise<void> {
+    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+  }
 
   // Template role assignments operations
   async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
