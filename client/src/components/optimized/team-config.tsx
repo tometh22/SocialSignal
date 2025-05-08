@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Personnel, Role } from '@shared/schema';
-import { parseDecimal, formatNumericInput } from '@/lib/utils';
+import { parseDecimalInput, formatNumberForInput } from '@/lib/number-utils';
 import { 
   AlertCircle, Plus, Trash, UserPlus, Users, RefreshCcw, Clock, DollarSign,
   Award, UserCheck, BarChart2, Settings, Briefcase, Sparkles, Edit, Check, X, Pencil,
@@ -740,9 +740,9 @@ const OptimizedTeamConfig: React.FC = () => {
                           inputMode="decimal"
                           placeholder="0,00"
                           className="h-8 pl-8 text-xs"
-                          value={newMember.hours === 0 ? "" : newMember.hours.toString().replace('.', ',')}
+                          value={newMember.hours === 0 ? "" : formatNumberForInput(newMember.hours)}
                           onChange={(e) => {
-                            const value = parseDecimal(e.target.value);
+                            const value = parseDecimalInput(e.target.value);
                             setNewMember(prev => ({
                               ...prev,
                               hours: isNaN(value) ? 0 : value,
@@ -764,9 +764,9 @@ const OptimizedTeamConfig: React.FC = () => {
                           placeholder="0,00"
                           max="100"
                           className="h-8 pl-8 text-xs"
-                          value={newMember.dedication === 0 ? "" : newMember.dedication.toString().replace('.', ',')}
+                          value={newMember.dedication === 0 ? "" : formatNumberForInput(newMember.dedication)}
                           onChange={(e) => {
-                            const value = parseDecimal(e.target.value);
+                            const value = parseDecimalInput(e.target.value);
                             if (isNaN(value) || value <= 100) { // Asegurar que no supere 100%
                               setNewMember(prev => ({
                                 ...prev,
@@ -793,9 +793,9 @@ const OptimizedTeamConfig: React.FC = () => {
                       inputMode="decimal"
                       placeholder="0,00"
                       className="h-8 pl-8 text-xs"
-                      value={newMember.rate === 0 ? "" : newMember.rate.toString().replace('.', ',')}
+                      value={newMember.rate === 0 ? "" : formatNumberForInput(newMember.rate)}
                       onChange={(e) => {
-                        const value = parseDecimal(e.target.value);
+                        const value = parseDecimalInput(e.target.value);
                         setNewMember(prev => ({
                           ...prev,
                           rate: isNaN(value) ? 0 : value
@@ -956,10 +956,10 @@ const OptimizedTeamConfig: React.FC = () => {
                                       value={
                                         editingMember[String(member.id)]?.hours === 0 
                                           ? "" 
-                                          : (editingMember[String(member.id)]?.hours || member.hours).toString().replace('.', ',')
+                                          : formatNumberForInput(editingMember[String(member.id)]?.hours || member.hours)
                                       }
                                       onChange={(e) => {
-                                        const value = parseDecimal(e.target.value);
+                                        const value = parseDecimalInput(e.target.value);
                                         setEditingMember({
                                           ...editingMember,
                                           [String(member.id)]: {
@@ -999,20 +999,17 @@ const OptimizedTeamConfig: React.FC = () => {
                                         value={
                                           editingMember[String(member.id)]?.rate === 0
                                             ? ""
-                                            : editingMember[String(member.id)]?.rate || member.rate
+                                            : formatNumberForInput(editingMember[String(member.id)]?.rate || member.rate)
                                         }
                                         onChange={(e) => {
-                                          // Permitir campo vacío o formato numérico con decimales
-                                          const value = e.target.value;
-                                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-                                            setEditingMember({
-                                              ...editingMember,
-                                              [String(member.id)]: {
-                                                ...(editingMember[String(member.id)] || { hours: member.hours }),
-                                                rate: value === "" ? 0 : parseFloat(value)
-                                              }
-                                            });
-                                          }
+                                          const value = parseDecimalInput(e.target.value);
+                                          setEditingMember({
+                                            ...editingMember,
+                                            [String(member.id)]: {
+                                              ...(editingMember[String(member.id)] || { hours: member.hours }),
+                                              rate: isNaN(value) ? 0 : value
+                                            }
+                                          });
                                         }}
                                       />
                                     </div>
