@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Download, Printer, Mail, Edit, FileCheck, FileClock } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+import { ArrowLeft, Download, Printer, Mail, Edit, FileCheck, FileClock, Loader2 } from 'lucide-react';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Personnel, Role } from '@shared/schema';
+import { useQuery } from '@tanstack/react-query';
 
 // Interfaces
 interface QuotationDetailProps {}
@@ -67,71 +68,89 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  const [quotation, setQuotation] = useState<Quotation | null>(null);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [client, setClient] = useState<ClientInfo | null>(null);
-  const [template, setTemplate] = useState<Template | null>(null);
-  const [personnel, setPersonnel] = useState<Personnel[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
+  const quotationId = params?.id;
 
-  useEffect(() => {
-    const quotationId = params?.id;
-    if (!quotationId) {
-      toast({
-        title: "Error",
-        description: "ID de cotización no válido",
-        variant: "destructive",
-      });
-      setLocation('/manage-quotes');
-      return;
-    }
+  // Si no hay ID válido, redireccionar
+  if (!quotationId) {
+    toast({
+      title: "Error",
+      description: "ID de cotización no válido",
+      variant: "destructive",
+    });
+    setLocation('/manage-quotes');
+    return null;
+  }
 
-    const fetchQuotationData = async () => {
-      try {
-        setLoading(true);
-        
-        // Cargar datos principales de la cotización
-        const quotationData = await apiRequest(`/api/quotations/${quotationId}`);
-        setQuotation(quotationData);
-        
-        // Cargar miembros del equipo
-        const teamData = await apiRequest(`/api/quotation-team/${quotationId}`);
-        setTeamMembers(teamData);
-        
-        // Cargar datos del cliente
-        if (quotationData.clientId) {
-          const clientData = await apiRequest(`/api/clients/${quotationData.clientId}`);
-          setClient(clientData);
-        }
-        
-        // Cargar datos de la plantilla si existe
-        if (quotationData.templateId) {
-          const templateData = await apiRequest(`/api/templates/${quotationData.templateId}`);
-          setTemplate(templateData);
-        }
-        
-        // Cargar catálogos para mapear IDs a nombres
-        const rolesData = await apiRequest('/api/roles');
-        setRoles(rolesData);
-        
-        const personnelData = await apiRequest('/api/personnel');
-        setPersonnel(personnelData);
-        
-      } catch (error) {
-        console.error("Error al cargar datos de la cotización:", error);
-        toast({
-          title: "Error de carga",
-          description: "No se pudieron cargar los detalles de la cotización",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Consulta para obtener datos de la cotización
+  const { data: quotation, isLoading: isLoadingQuotation, error: quotationError } = useQuery<Quotation>({
+    queryKey: [`/api/quotations/${quotationId}`],
+    queryFn: async () => {
+      return await apiRequest(`/api/quotations/${quotationId}`) as Quotation;
+    },
+    staleTime: 30000, // 30 segundos
+  });
 
-    fetchQuotationData();
-  }, [params, toast, setLocation]);
+  // Consulta para obtener miembros del equipo
+  const { data: teamMembers = [], isLoading: isLoadingTeam } = useQuery<TeamMember[]>({
+    queryKey: [`/api/quotation-team/${quotationId}`],
+    queryFn: async () => {
+      return await apiRequest(`/api/quotation-team/${quotationId}`) as TeamMember[];
+    },
+    staleTime: 30000, // 30 segundos
+    enabled: !!quotationId,
+  });
+
+  // Consulta para obtener datos del cliente
+  const { data: client, isLoading: isLoadingClient } = useQuery<ClientInfo>({
+    queryKey: [`/api/clients/${quotation?.clientId}`],
+    queryFn: async () => {
+      return await apiRequest(`/api/clients/${quotation?.clientId}`) as ClientInfo;
+    },
+    staleTime: 30000, // 30 segundos
+    enabled: !!quotation?.clientId,
+  });
+
+  // Consulta para obtener datos de la plantilla
+  const { data: template, isLoading: isLoadingTemplate } = useQuery<Template>({
+    queryKey: [`/api/templates/${quotation?.templateId}`],
+    queryFn: async () => {
+      return await apiRequest(`/api/templates/${quotation?.templateId}`) as Template;
+    },
+    staleTime: 30000, // 30 segundos
+    enabled: !!quotation?.templateId,
+  });
+
+  // Consulta para obtener roles
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery<Role[]>({
+    queryKey: ['/api/roles'],
+    queryFn: async () => {
+      return await apiRequest('/api/roles') as Role[];
+    },
+    staleTime: 30000, // 30 segundos
+  });
+
+  // Consulta para obtener personal
+  const { data: personnel = [], isLoading: isLoadingPersonnel } = useQuery<Personnel[]>({
+    queryKey: ['/api/personnel'],
+    queryFn: async () => {
+      return await apiRequest('/api/personnel') as Personnel[];
+    },
+    staleTime: 30000, // 30 segundos
+  });
+
+  // Determinar si está cargando
+  const isLoading = isLoadingQuotation || isLoadingTeam || isLoadingClient || 
+                    isLoadingTemplate || isLoadingRoles || isLoadingPersonnel;
+
+  // Manejar error
+  if (quotationError) {
+    console.error("Error al cargar datos de la cotización:", quotationError);
+    toast({
+      title: "Error de carga",
+      description: "No se pudieron cargar los detalles de la cotización",
+      variant: "destructive",
+    });
+  }
 
   // Formatear moneda
   const formatCurrency = (amount: number) => {
@@ -155,16 +174,16 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
 
   // Obtener nombre de personal por ID
   const getPersonnelName = (id: number) => {
-    const person = personnel.find(p => p.id === id);
+    const person = personnel.find((p: Personnel) => p.id === id);
     return person ? person.name : `Personal ID: ${id}`;
   };
 
   // Obtener nombre de rol por ID
   const getRoleName = (personnelId: number) => {
-    const person = personnel.find(p => p.id === personnelId);
+    const person = personnel.find((p: Personnel) => p.id === personnelId);
     if (!person) return 'Rol no encontrado';
     
-    const role = roles.find(r => r.id === person.roleId);
+    const role = roles.find((r: Role) => r.id === person.roleId);
     return role ? role.name : `Rol ID: ${person.roleId}`;
   };
 
@@ -247,11 +266,14 @@ const QuotationDetail: React.FC<QuotationDetailProps> = () => {
     return options[engagement] || engagement;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container py-10">
         <div className="flex justify-center items-center h-64">
-          <div className="animate-pulse text-xl text-neutral-500">Cargando detalles de la cotización...</div>
+          <div className="flex flex-col items-center text-xl text-neutral-500">
+            <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary/70" />
+            <div>Cargando detalles de la cotización...</div>
+          </div>
         </div>
       </div>
     );
