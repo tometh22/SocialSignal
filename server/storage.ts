@@ -71,6 +71,7 @@ export interface IStorage {
   getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
   createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
   deleteQuotationTeamMembers(quotationId: number): Promise<void>;
+  deleteQuotationTeamMemberById(id: number): Promise<void>;
 
   // Active project operations
   getActiveProjects(): Promise<ActiveProject[]>;
@@ -689,6 +690,10 @@ export class MemStorage implements IStorage {
         this.quotationTeamMembers.delete(id);
       }
     }
+  }
+  
+  async deleteQuotationTeamMemberById(id: number): Promise<void> {
+    this.quotationTeamMembers.delete(id);
   }
 
   // Template role assignments operations
