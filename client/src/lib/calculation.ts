@@ -165,11 +165,14 @@ export const calculateTotalAmount = (
   
   // El markupAmount ahora representa el margen operativo calculado
   
-  // Calcular el subtotal antes de aplicar el desvío
-  const subtotal = operativeCost + markupAmount;
+  // Calcular el subtotal con operaciones
+  const operativeSubtotal = operativeCost;
   
-  // Aplicar el porcentaje de desvío (si existe)
-  const deviationAmount = subtotal * (deviationPercentage / 100);
+  // Aplicar el porcentaje de desvío sobre el subtotal operativo (sin incluir el margen)
+  const deviationAmount = operativeSubtotal * (deviationPercentage / 100);
+  
+  // Calcular el subtotal incluyendo margen
+  const subtotal = operativeCost + markupAmount;
   
   console.log("Cálculo total:", {
     baseCost,
@@ -177,8 +180,9 @@ export const calculateTotalAmount = (
     adjustedBaseCost,
     platformCost,
     operativeCost,
+    operativeSubtotal,
     markupAmount,
-    deviationPercentage,
+    deviationPercentage: `${deviationPercentage}% (aplicado sobre subtotal operativo)`,
     subtotal,
     deviationAmount,
     total: subtotal + deviationAmount

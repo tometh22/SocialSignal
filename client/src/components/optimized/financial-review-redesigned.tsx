@@ -52,10 +52,11 @@ const OptimizedFinancialReview: React.FC = () => {
     const marginFactor = quotationData.financials.marginFactor || 1.0;
     const marginPercentage = ((marginFactor - 1.0) * 100).toFixed(1);
     
-    // Cálculo del monto de desviación
+    // Cálculo del monto de desviación (aplicado al subtotal operativo)
     const deviationPercentage = quotationData.financials.deviationPercentage;
     const subtotalWithMargin = operativeCost + markupAmount;
-    const deviationAmount = (subtotalWithMargin * deviationPercentage) / 100;
+    // La desviación ahora se aplica sobre el subtotal operativo, no sobre el subtotal con margen
+    const deviationAmount = (operativeCost * deviationPercentage) / 100;
     
     return [
       {
@@ -92,7 +93,7 @@ const OptimizedFinancialReview: React.FC = () => {
       },
       {
         name: `Desviación (${deviationPercentage.toFixed(1)}%)`,
-        description: 'Ajuste para cubrir posibles contingencias y desviaciones',
+        description: 'Ajuste para cubrir posibles contingencias y desviaciones (aplicado al subtotal operativo)',
         amount: deviationAmount,
         isDeviation: true
       }
@@ -284,7 +285,7 @@ const OptimizedFinancialReview: React.FC = () => {
                       <span className="text-xs text-gray-500">20%</span>
                     </div>
                     <p className="text-xs text-neutral-500">
-                      Ajuste para cubrir posibles contingencias en el proyecto
+                      Ajuste para cubrir posibles contingencias (aplicado al subtotal operativo)
                     </p>
                   </div>
                   
