@@ -960,10 +960,17 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       if (isEditing && !isRecotizacion) {
         try {
           console.log(`Eliminando miembros anteriores para cotización ${quotationId}`);
-          await fetch(`/api/quotation-team/by-quotation/${quotationId}`, {
+          // Uso directo del endpoint correcto
+          const deleteResponse = await fetch(`/api/quotation-team/${quotationId}`, {
             method: 'DELETE',
             credentials: 'include'
           });
+          
+          if (deleteResponse.ok) {
+            console.log("Miembros del equipo eliminados correctamente");
+          } else {
+            console.error(`Error al eliminar miembros del equipo: ${deleteResponse.status}`);
+          }
         } catch (err) {
           console.error("Error al eliminar miembros anteriores:", err);
           // Continuar a pesar del error

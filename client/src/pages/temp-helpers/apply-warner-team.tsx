@@ -114,14 +114,9 @@ const WarnerTeamTemplate: React.FC = () => {
       setError(null);
 
       // 1. Eliminar los miembros existentes (si los hay)
-      const teamResponse = await apiRequest('GET', `/api/quotation-team/${quotationId}`);
-      const existingTeam = await teamResponse.json();
-
-      if (existingTeam && existingTeam.length > 0) {
-        for (const member of existingTeam) {
-          await apiRequest('DELETE', `/api/quotation-team/${member.id}`);
-        }
-      }
+      console.log(`Eliminando todos los miembros del equipo para la cotización ${quotationId}`);
+      await apiRequest('DELETE', `/api/quotation-team/${quotationId}`);
+      console.log("Miembros del equipo eliminados correctamente");
 
       // 2. Crear nuevos miembros según la plantilla
       const newTeamMembers: TeamMember[] = [];

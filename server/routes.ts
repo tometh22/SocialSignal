@@ -685,10 +685,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Eliminar todos los miembros del equipo de una cotización
   app.delete("/api/quotation-team/:quotationId", async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
+    await storage.deleteQuotationTeamMembers(quotationId);
+    res.status(204).send();
+  });
+  
+  // Eliminar un miembro específico del equipo por su ID
+  app.delete("/api/quotation-team-member/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid team member ID" });
+    
+    try {
+      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+      res.status(204).send();
+    } catch (error) {
+      console.error(`Error al eliminar miembro del equipo ID ${id}:`, error);
+      res.status(500).json({ message: "Failed to delete team member" });
+    }
+  });
+
+  // Ruta alternativa para la misma funcionalidad (mantener compatibilidad con el cliente)
+  app.delete("/api/quotation-team/by-quotation/:quotationId", async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    console.log(`Eliminando miembros del equipo para cotización ${quotationId} (ruta alternativa)`);
     await storage.deleteQuotationTeamMembers(quotationId);
     res.status(204).send();
   });
@@ -1413,8 +1438,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Encontrados ${projectsWithSameQuotation.length} proyectos con la misma cotización. Creando copia dedicada.`);
         
         // Crear una copia de la cotización con el nuevo nombre
-        const newQuotation = { ...quotation, projectName: name.trim() };
-        delete newQuotation.id; // Eliminar el ID para que se genere uno nuevo
+        const { id, ...quotationWithoutId } = quotation;
+        const newQuotation = { ...quotationWithoutId, projectName: name.trim() };
         
         const createdQuotation = await storage.createQuotation(newQuotation);
         if (!createdQuotation) {
