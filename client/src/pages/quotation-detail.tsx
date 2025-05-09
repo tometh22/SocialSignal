@@ -332,23 +332,23 @@ const QuotationDetail: React.FC = () => {
   }
 
   return (
-    <div className="container py-5 max-w-7xl bg-[#f5f7ff]">
+    <div className="container py-5 max-w-7xl bg-[#f8f9ff]">
       {/* Encabezado y acciones - más compacto */}
-      <div className="flex justify-between items-center mb-5 bg-white z-10 shadow-sm rounded-lg px-4 py-3 border border-indigo-100">
+      <div className="flex justify-between items-center mb-5 bg-white z-10 shadow-sm rounded-lg px-4 py-3 border border-slate-200">
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
             size="sm"
-            className="rounded-full h-8 w-8 p-0 hover:bg-indigo-50"
+            className="rounded-full h-8 w-8 p-0 hover:bg-slate-50"
             onClick={() => setLocation('/manage-quotes')}
           >
-            <ArrowLeft className="h-4 w-4 text-indigo-700" />
+            <ArrowLeft className="h-4 w-4 text-slate-600" />
           </Button>
           
-          <h1 className="text-lg font-bold text-indigo-950">{quotation.projectName}</h1>
+          <h1 className="text-lg font-bold text-slate-800">{quotation.projectName}</h1>
           {getStatusBadge(quotation.status)}
           
-          <div className="text-indigo-600 text-xs ml-2 hidden md:block">
+          <div className="text-slate-500 text-xs ml-2 hidden md:block">
             <span className="flex items-center">
               <FileText className="h-3 w-3 mr-1 inline-block" />
               #{quotation.id} • {formatShortDate(quotation.createdAt)}
@@ -357,16 +357,16 @@ const QuotationDetail: React.FC = () => {
         </div>
 
         <div className="flex gap-1">
-          <Button variant="outline" size="sm" className="h-8 px-2 border-indigo-200 text-indigo-700">
+          <Button variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="h-8 px-2 border-indigo-200 text-indigo-700">
+          <Button variant="outline" size="sm" className="h-8 px-2 border-slate-200 text-slate-600">
             <Download className="h-4 w-4" />
           </Button>
           <Button 
             variant="default" 
             size="sm" 
-            className="h-8 px-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="h-8 px-2 bg-indigo-500 hover:bg-indigo-600 text-white"
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -376,120 +376,123 @@ const QuotationDetail: React.FC = () => {
       {/* Contenido principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Columna izquierda */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Detalles del proyecto - más compacto en grid */}
-          <Card className="overflow-hidden shadow-sm border-0">
-            <CardHeader className="bg-white py-2 px-4 border-b border-indigo-100 relative">
-              <div className="absolute inset-y-0 left-0 w-1 bg-indigo-600"></div>
-              <CardTitle className="text-sm flex items-center pl-2 text-indigo-800">
-                <FileCheck className="h-4 w-4 mr-1.5 text-indigo-600" />
-                Detalles del Proyecto
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Tipo de Proyecto</p>
-                    <p className="font-medium text-indigo-900 truncate">{getProjectTypeName(quotation.projectType)}</p>
-                  </div>
+        <div className="lg:col-span-2 space-y-6">
+          {/* Grid de información principal del proyecto - estilo minimalista */}
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-blue-50">
+                  <Briefcase className="text-blue-400 h-3.5 w-3.5" />
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <FileText className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Plantilla</p>
-                    <p className="font-medium text-indigo-900 truncate">
-                      {template ? template.name : 'Personalizado'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Layers className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Tipo de Análisis</p>
-                    <p className="font-medium text-indigo-900 truncate">{getAnalysisTypeInfo(quotation.analysisType)}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <PieChart className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Volumen</p>
-                    <p className="font-medium text-indigo-900 truncate">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Globe className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Países</p>
-                    <p className="font-medium text-indigo-900 truncate">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="text-indigo-600 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="text-xs text-indigo-400">Interacción</p>
-                    <p className="font-medium text-indigo-900 truncate">{getClientEngagementInfo(quotation.clientEngagement)}</p>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500">Tipo de Proyecto</p>
               </div>
-
-              {(quotation.templateCustomization || quotation.additionalNotes) && (
-                <div className="mt-4 bg-indigo-50/50 p-3 rounded-md border border-indigo-100 text-sm">
-                  {quotation.templateCustomization && (
-                    <div className="mb-2">
-                      <h3 className="text-xs font-semibold text-indigo-700 mb-1 flex items-center">
-                        <FileText className="h-3 w-3 mr-1 text-indigo-500" />
-                        Personalización
-                      </h3>
-                      <p className="text-xs text-indigo-900 line-clamp-2">{quotation.templateCustomization}</p>
-                    </div>
-                  )}
-                  
-                  {quotation.additionalNotes && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-indigo-700 mb-1 flex items-center">
-                        <MessageSquare className="h-3 w-3 mr-1 text-indigo-500" />
-                        Notas
-                      </h3>
-                      <p className="text-xs text-indigo-900 line-clamp-2">{quotation.additionalNotes}</p>
-                    </div>
-                  )}
+              <p className="font-medium text-slate-800">{getProjectTypeName(quotation.projectType)}</p>
+            </div>
+            
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-purple-50">
+                  <FileText className="text-purple-400 h-3.5 w-3.5" />
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <p className="text-xs text-slate-500">Plantilla</p>
+              </div>
+              <p className="font-medium text-slate-800 truncate">
+                {template ? template.name : 'Personalizado'}
+              </p>
+            </div>
+            
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-indigo-50">
+                  <Layers className="text-indigo-400 h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs text-slate-500">Tipo de Análisis</p>
+              </div>
+              <p className="font-medium text-slate-800 truncate">{getAnalysisTypeInfo(quotation.analysisType)}</p>
+            </div>
+            
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-amber-50">
+                  <PieChart className="text-amber-400 h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs text-slate-500">Volumen</p>
+              </div>
+              <p className="font-medium text-slate-800 truncate">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
+            </div>
+            
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-emerald-50">
+                  <Globe className="text-emerald-400 h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs text-slate-500">Países</p>
+              </div>
+              <p className="font-medium text-slate-800 truncate">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
+            </div>
+            
+            <div className="flex flex-col bg-white p-4 rounded-md border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="rounded-full p-1.5 bg-rose-50">
+                  <MessageSquare className="text-rose-400 h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs text-slate-500">Interacción</p>
+              </div>
+              <p className="font-medium text-slate-800 truncate">{getClientEngagementInfo(quotation.clientEngagement)}</p>
+            </div>
+          </div>
+
+          {(quotation.templateCustomization || quotation.additionalNotes) && (
+            <div className="bg-white p-4 rounded-md border border-slate-200 text-sm">
+              <div className="flex gap-6">
+                {quotation.templateCustomization && (
+                  <div className="flex-1">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-1 flex items-center">
+                      <FileText className="h-3 w-3 mr-1 text-slate-400" />
+                      Personalización
+                    </h3>
+                    <p className="text-xs text-slate-700 line-clamp-1">{quotation.templateCustomization}</p>
+                  </div>
+                )}
+                
+                {quotation.additionalNotes && (
+                  <div className="flex-1">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-1 flex items-center">
+                      <MessageSquare className="h-3 w-3 mr-1 text-slate-400" />
+                      Notas
+                    </h3>
+                    <p className="text-xs text-slate-700 line-clamp-1">{quotation.additionalNotes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tabla de miembros del equipo */}
-          <Card className="overflow-hidden shadow-md border-0">
-            <CardHeader className="bg-white py-2 px-4 border-b border-indigo-100 relative">
-              <div className="absolute inset-y-0 left-0 w-1 bg-indigo-600"></div>
-              <div className="flex justify-between items-center pl-2">
-                <CardTitle className="text-sm flex items-center text-indigo-800">
-                  <Users className="h-4 w-4 mr-1.5 text-indigo-600" />
-                  Equipo del Proyecto
-                </CardTitle>
-                <Badge variant="outline" className="ml-2 text-xs font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
-                  {teamMembers.length} miembros
-                </Badge>
+          <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 bg-white flex justify-between items-center border-b border-slate-200">
+              <div className="flex items-center gap-1.5">
+                <div className="rounded-full p-1.5 bg-blue-50">
+                  <Users className="text-blue-500 h-3.5 w-3.5" />
+                </div>
+                <h3 className="font-medium text-sm text-slate-800">Equipo del Proyecto</h3>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {teamMembers.length > 0 ? (
-                <div className="overflow-auto" style={{ maxHeight: '400px' }}>
+              <Badge variant="outline" className="text-xs font-medium bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100">
+                {teamMembers.length} miembros
+              </Badge>
+            </div>
+            
+            {teamMembers.length > 0 ? (
+              <div>
+                <div className="overflow-auto" style={{ maxHeight: '350px' }}>
                   <Table>
-                    <TableHeader className="bg-indigo-50/80">
-                      <TableRow className="border-b border-indigo-100">
-                        <TableHead className="font-semibold text-indigo-700 text-xs py-2">Rol</TableHead>
-                        <TableHead className="font-semibold text-indigo-700 text-xs py-2">Persona</TableHead>
-                        <TableHead className="text-right font-semibold text-indigo-700 text-xs py-2">Horas</TableHead>
-                        <TableHead className="text-right font-semibold text-indigo-700 text-xs py-2">Tarifa</TableHead>
-                        <TableHead className="text-right font-semibold text-indigo-700 text-xs py-2">Costo</TableHead>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50 border-b border-slate-200">
+                        <TableHead className="font-medium text-slate-600 text-xs py-2">Rol</TableHead>
+                        <TableHead className="font-medium text-slate-600 text-xs py-2">Persona</TableHead>
+                        <TableHead className="text-right font-medium text-slate-600 text-xs py-2">Horas</TableHead>
+                        <TableHead className="text-right font-medium text-slate-600 text-xs py-2">Tarifa</TableHead>
+                        <TableHead className="text-right font-medium text-slate-600 text-xs py-2">Costo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -497,183 +500,169 @@ const QuotationDetail: React.FC = () => {
                         <TableRow 
                           key={member.id}
                           className={cn(
-                            "transition-colors hover:bg-indigo-50/50",
-                            index % 2 === 0 ? "bg-white" : "bg-indigo-50/20"
+                            "transition-colors hover:bg-slate-50",
+                            index % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                           )}
                         >
-                          <TableCell className="font-medium text-indigo-900 py-2 text-sm">{getRoleName(member.personnelId)}</TableCell>
-                          <TableCell className="text-indigo-700 py-2 text-sm">{getPersonnelName(member.personnelId)}</TableCell>
-                          <TableCell className="text-right font-medium text-indigo-800 py-2 text-sm">{member.hours}</TableCell>
-                          <TableCell className="text-right text-indigo-700 py-2 text-sm">{formatCurrency(member.rate)}</TableCell>
-                          <TableCell className="text-right font-bold text-indigo-800 py-2 text-sm">{formatCurrency(member.cost)}</TableCell>
+                          <TableCell className="font-medium text-slate-700 py-2 text-sm">{getRoleName(member.personnelId)}</TableCell>
+                          <TableCell className="text-slate-600 py-2 text-sm">{getPersonnelName(member.personnelId)}</TableCell>
+                          <TableCell className="text-right font-medium text-slate-700 py-2 text-sm">{member.hours}</TableCell>
+                          <TableCell className="text-right text-slate-600 py-2 text-sm">{formatCurrency(member.rate)}</TableCell>
+                          <TableCell className="text-right font-bold text-slate-800 py-2 text-sm">{formatCurrency(member.cost)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              ) : (
-                <div className="text-center text-indigo-500 py-8 px-4 bg-gradient-to-b from-white to-indigo-50/30 rounded-b-lg">
-                  <div className="rounded-full h-12 w-12 bg-indigo-100 flex items-center justify-center mx-auto mb-2">
-                    <Users className="h-6 w-6 text-indigo-400" />
+                
+                <div className="py-3 px-4 border-t border-slate-200 bg-blue-50 flex justify-between items-center text-slate-800">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Total de horas asignadas:
+                    </p>
+                    <p className="text-sm font-bold flex items-center text-slate-800">
+                      <Clock className="mr-1 h-3 w-3 text-blue-500" />
+                      {teamMembers.reduce((sum, member) => sum + member.hours, 0)} horas
+                    </p>
                   </div>
-                  <p className="text-base font-semibold text-indigo-700">No hay miembros del equipo asignados</p>
-                  <p className="text-xs text-indigo-500 mt-0.5">Esta cotización no tiene recursos asignados</p>
-                </div>
-              )}
-              
-              {teamMembers.length > 0 && (
-                <div className="py-3 px-4 bg-gradient-to-br from-indigo-600 to-indigo-700 border-t border-indigo-500 rounded-b-lg text-white">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-xs font-medium text-indigo-200">
-                        Total de horas asignadas:
-                      </p>
-                      <p className="text-base font-bold mt-0.5 flex items-center">
-                        <Clock className="mr-1 h-3 w-3 text-indigo-300" />
-                        {teamMembers.reduce((sum, member) => sum + member.hours, 0)} horas
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-indigo-200">
-                        Total equipo:
-                      </p>
-                      <p className="text-base font-bold mt-0.5 flex items-center justify-end">
-                        <DollarSign className="mr-1 h-3 w-3 text-indigo-300" />
-                        {formatCurrency(teamMembers.reduce((sum, member) => sum + member.cost, 0))}
-                      </p>
-                    </div>
+                  <div className="text-right">
+                    <p className="text-xs font-medium text-slate-500">
+                      Total equipo:
+                    </p>
+                    <p className="text-sm font-bold flex items-center justify-end text-blue-700">
+                      <DollarSign className="mr-1 h-3 w-3 text-blue-500" />
+                      {formatCurrency(teamMembers.reduce((sum, member) => sum + member.cost, 0))}
+                    </p>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            ) : (
+              <div className="text-center text-slate-500 py-8 px-4 bg-white">
+                <div className="rounded-full h-12 w-12 bg-slate-100 flex items-center justify-center mx-auto mb-2">
+                  <Users className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="text-base font-medium text-slate-700">No hay miembros del equipo asignados</p>
+                <p className="text-xs text-slate-500 mt-0.5">Esta cotización no tiene recursos asignados</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Columna derecha */}
         <div className="space-y-5">
           {/* Información del cliente - más compacta */}
-          <Card className="overflow-hidden shadow-sm border-0">
-            <CardHeader className="bg-white py-2 px-4 border-b border-indigo-100 relative">
-              <div className="absolute inset-y-0 left-0 w-1 bg-indigo-600"></div>
-              <CardTitle className="text-sm flex items-center pl-2 text-indigo-800">
-                <Building className="h-4 w-4 mr-1.5 text-indigo-600" />
-                Información del Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
+          <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 flex items-center gap-1.5 border-b border-slate-200">
+              <div className="rounded-full p-1.5 bg-amber-50">
+                <Building className="text-amber-500 h-3.5 w-3.5" />
+              </div>
+              <h3 className="font-medium text-sm text-slate-800">Información del Cliente</h3>
+            </div>
+            
+            <div className="p-4">
               {client && (
                 <div>
-                  <div className="bg-white rounded-lg shadow-sm p-3 border border-indigo-100 mb-3">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mr-2 shrink-0">
-                        <Building className="h-4 w-4" />
+                  <div className="flex items-center mb-4">
+                    <div className="mr-3">
+                      <div className="h-10 w-10 rounded-md bg-amber-50 flex items-center justify-center text-amber-500">
+                        <Building className="h-5 w-5" />
                       </div>
-                      <div>
-                        <h3 className="font-bold text-base text-indigo-950">{client.name}</h3>
-                        <Badge variant="secondary" className="mt-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 text-xs">
-                          Cliente
-                        </Badge>
-                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base text-slate-800">{client.name}</h3>
+                      <Badge variant="secondary" className="mt-1 bg-amber-50 text-amber-600 border-amber-100 text-xs">
+                        Cliente
+                      </Badge>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-1 gap-2 text-sm">
-                    <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-md hover:bg-indigo-100 transition-colors">
-                      <Users className="h-4 w-4 text-indigo-600 shrink-0" />
-                      <span className="text-indigo-950 truncate">{client.contactName}</span>
+                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
+                      <Users className="h-4 w-4 text-slate-500 shrink-0" />
+                      <span className="text-slate-700 truncate">{client.contactName}</span>
                     </div>
                     
-                    <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-md hover:bg-indigo-100 transition-colors">
-                      <Mail className="h-4 w-4 text-indigo-600 shrink-0" />
-                      <a href={`mailto:${client.contactEmail}`} className="text-indigo-700 truncate hover:underline">
+                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
+                      <Mail className="h-4 w-4 text-slate-500 shrink-0" />
+                      <a href={`mailto:${client.contactEmail}`} className="text-blue-600 truncate hover:underline">
                         {client.contactEmail}
                       </a>
                     </div>
                     
-                    <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded-md hover:bg-indigo-100 transition-colors">
-                      <Phone className="h-4 w-4 text-indigo-600 shrink-0" />
-                      <a href={`tel:${client.contactPhone}`} className="text-indigo-900 truncate hover:underline">
+                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
+                      <Phone className="h-4 w-4 text-slate-500 shrink-0" />
+                      <a href={`tel:${client.contactPhone}`} className="text-slate-700 truncate hover:underline">
                         {client.contactPhone}
                       </a>
                     </div>
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Resumen financiero */}
-          <Card className="overflow-hidden shadow-md border-0">
-            <CardHeader className="bg-white py-2 px-4 border-b border-indigo-100 relative">
-              <div className="absolute inset-y-0 left-0 w-1 bg-indigo-600"></div>
-              <CardTitle className="text-sm flex items-center pl-2 text-indigo-800">
-                <DollarSign className="h-4 w-4 mr-1.5 text-indigo-600" />
-                Resumen Financiero
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="bg-white">
-                <div className="p-3 space-y-2 border-b border-indigo-50">
-                  <div className="flex justify-between items-center p-1.5 hover:bg-indigo-50 rounded transition-colors">
-                    <span className="text-indigo-700 flex items-center text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></div>
-                      Costo base:
-                    </span>
-                    <span className="font-medium text-indigo-900 text-sm">{formatCurrency(quotation.baseCost)}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center p-1.5 hover:bg-indigo-50 rounded transition-colors">
-                    <span className="text-indigo-700 flex items-center text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></div>
-                      Ajuste complejidad:
-                    </span>
-                    <span className="font-medium text-indigo-900 text-sm">{formatCurrency(quotation.complexityAdjustment)}</span>
-                  </div>
-                  
-                  {quotation.adjustmentReason && (
-                    <div className="ml-3 text-xs text-indigo-700 p-2 bg-indigo-50 rounded-md border border-indigo-200 text-xs">
-                      <span className="font-medium block mb-0.5 text-indigo-800">Razón del ajuste:</span>
-                      {quotation.adjustmentReason}
-                    </div>
-                  )}
+          <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 flex items-center gap-1.5 border-b border-slate-200">
+              <div className="rounded-full p-1.5 bg-green-50">
+                <DollarSign className="text-green-500 h-3.5 w-3.5" />
+              </div>
+              <h3 className="font-medium text-sm text-slate-800">Resumen Financiero</h3>
+            </div>
+            
+            <div className="divide-y divide-slate-100">
+              <div className="px-4 py-3 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 text-sm">Costo base:</span>
+                  <span className="font-medium text-slate-800 text-sm">{formatCurrency(quotation.baseCost)}</span>
                 </div>
                 
-                <div className="bg-indigo-50/80 p-3 border-b border-indigo-100">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-indigo-800 text-sm">Subtotal operacional:</span>
-                    <span className="font-semibold text-base text-indigo-900">
-                      {formatCurrency(calculateOperationalSubtotal())}
-                    </span>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 text-sm">Ajuste complejidad:</span>
+                  <span className="font-medium text-slate-800 text-sm">{formatCurrency(quotation.complexityAdjustment)}</span>
                 </div>
                 
-                <div className="p-3 border-b border-indigo-50">
-                  <div className="flex justify-between items-center p-1.5 hover:bg-indigo-50 rounded transition-colors">
-                    <span className="text-indigo-700 flex items-center text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5"></div>
-                      Margen aplicado:
-                    </span>
-                    <span className="font-medium text-indigo-900 text-sm">{formatCurrency(quotation.markupAmount)}</span>
+                {quotation.adjustmentReason && (
+                  <div className="text-xs text-slate-500 p-2 bg-slate-50 rounded-md border border-slate-200 mt-2">
+                    <span className="font-medium block mb-0.5 text-slate-700">Razón del ajuste:</span>
+                    {quotation.adjustmentReason}
                   </div>
+                )}
+              </div>
+              
+              <div className="px-4 py-3 bg-slate-50">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-slate-700 text-sm">Subtotal operacional:</span>
+                  <span className="font-bold text-slate-800 text-base">
+                    {formatCurrency(calculateOperationalSubtotal())}
+                  </span>
                 </div>
-                
-                <div className="bg-gradient-to-r from-indigo-700 to-indigo-800 p-4 text-white">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-white text-sm">TOTAL:</span>
-                    <div className="bg-white text-indigo-800 px-3 py-1.5 rounded-md shadow-sm">
-                      <span className="font-bold text-xl">
-                        {formatCurrency(quotation.totalAmount)}
-                      </span>
-                    </div>
+              </div>
+              
+              <div className="px-4 py-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 text-sm">Margen aplicado:</span>
+                  <span className="font-medium text-slate-800 text-sm">{formatCurrency(quotation.markupAmount)}</span>
+                </div>
+              </div>
+              
+              <div className="px-4 py-4 bg-green-50 border-t border-green-100">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-700 text-sm">TOTAL:</span>
+                  <div className="bg-white px-3 py-2 rounded-md shadow-sm border border-green-200">
+                    <span className="font-bold text-green-700 text-xl">
+                      {formatCurrency(quotation.totalAmount)}
+                    </span>
                   </div>
                 </div>
               </div>
-            </CardContent>
-            <CardFooter className="bg-indigo-50 border-t border-indigo-100 py-3 px-4 gap-2 flex-wrap">
+            </div>
+            
+            <div className="px-4 py-3 bg-white border-t border-slate-200 flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm"
-                className="w-full flex justify-center items-center gap-1.5 border-indigo-300 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 h-8 text-xs"
+                className="flex-1 flex justify-center items-center gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 h-8 text-xs"
               >
                 <Download className="h-3.5 w-3.5" />
                 Exportar
@@ -681,13 +670,13 @@ const QuotationDetail: React.FC = () => {
               <Button 
                 variant="default"
                 size="sm"
-                className="w-full flex justify-center items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white h-8 text-xs"
+                className="flex-1 flex justify-center items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
               >
                 <Edit className="h-3.5 w-3.5" />
                 Editar
               </Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>
