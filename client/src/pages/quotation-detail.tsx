@@ -345,14 +345,27 @@ const QuotationDetail: React.FC = () => {
             <ArrowLeft className="h-4 w-4 text-slate-600" />
           </Button>
           
-          <h1 className="text-lg font-bold text-slate-800">{quotation.projectName}</h1>
-          {getStatusBadge(quotation.status)}
-          
-          <div className="text-slate-500 text-xs ml-2 hidden md:block">
-            <span className="flex items-center">
-              <FileText className="h-3 w-3 mr-1 inline-block" />
-              #{quotation.id} • {formatShortDate(quotation.createdAt)}
-            </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-slate-800">{quotation.projectName}</h1>
+              {getStatusBadge(quotation.status)}
+            </div>
+            
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className="text-slate-500 text-xs">
+                <span className="flex items-center">
+                  <FileText className="h-3 w-3 mr-1 inline-block" />
+                  #{quotation.id} • {formatShortDate(quotation.createdAt)}
+                </span>
+              </div>
+              
+              {client && (
+                <div className="flex items-center bg-amber-50 rounded-full px-2 py-0.5 text-xs gap-1">
+                  <Building className="h-3 w-3 text-amber-500" />
+                  <span className="text-amber-700 font-medium truncate max-w-[120px]">{client.name}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -548,59 +561,8 @@ const QuotationDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Columna derecha */}
+        {/* Columna derecha - Resumen financiero */}
         <div className="space-y-5">
-          {/* Información del cliente - más compacta */}
-          <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
-            <div className="px-4 py-3 flex items-center gap-1.5 border-b border-slate-200">
-              <div className="rounded-full p-1.5 bg-amber-50">
-                <Building className="text-amber-500 h-3.5 w-3.5" />
-              </div>
-              <h3 className="font-medium text-sm text-slate-800">Información del Cliente</h3>
-            </div>
-            
-            <div className="p-4">
-              {client && (
-                <div>
-                  <div className="flex items-center mb-4">
-                    <div className="mr-3">
-                      <div className="h-10 w-10 rounded-md bg-amber-50 flex items-center justify-center text-amber-500">
-                        <Building className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-base text-slate-800">{client.name}</h3>
-                      <Badge variant="secondary" className="mt-1 bg-amber-50 text-amber-600 border-amber-100 text-xs">
-                        Cliente
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-2 text-sm">
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
-                      <Users className="h-4 w-4 text-slate-500 shrink-0" />
-                      <span className="text-slate-700 truncate">{client.contactName}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
-                      <Mail className="h-4 w-4 text-slate-500 shrink-0" />
-                      <a href={`mailto:${client.contactEmail}`} className="text-blue-600 truncate hover:underline">
-                        {client.contactEmail}
-                      </a>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
-                      <Phone className="h-4 w-4 text-slate-500 shrink-0" />
-                      <a href={`tel:${client.contactPhone}`} className="text-slate-700 truncate hover:underline">
-                        {client.contactPhone}
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Resumen financiero */}
           <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
             <div className="px-4 py-3 flex items-center gap-1.5 border-b border-slate-200">
@@ -677,6 +639,46 @@ const QuotationDetail: React.FC = () => {
               </Button>
             </div>
           </div>
+          
+          {/* Detalles de contacto del cliente (compacto) */}
+          {client && (
+            <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
+                <div className="flex items-center gap-1.5">
+                  <div className="rounded-full p-1.5 bg-amber-50">
+                    <Users className="text-amber-500 h-3.5 w-3.5" />
+                  </div>
+                  <h3 className="font-medium text-sm text-slate-800">Contacto del Cliente</h3>
+                </div>
+                <Badge variant="secondary" className="bg-amber-50 text-amber-600 text-xs border-amber-100">
+                  {client.name}
+                </Badge>
+              </div>
+              
+              <div className="p-3">
+                <div className="grid grid-cols-1 gap-1.5 text-sm">
+                  <div className="flex items-center gap-2 p-1.5">
+                    <Users className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <span className="text-slate-700 truncate">{client.contactName}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 p-1.5">
+                    <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <a href={`mailto:${client.contactEmail}`} className="text-blue-600 truncate hover:underline text-xs">
+                      {client.contactEmail}
+                    </a>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 p-1.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <a href={`tel:${client.contactPhone}`} className="text-slate-700 truncate hover:underline text-xs">
+                      {client.contactPhone}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
