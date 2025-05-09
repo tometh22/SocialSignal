@@ -268,130 +268,133 @@ const OptimizedTeamConfig: React.FC = () => {
           </div>
         </div>
         
-        {/* Plantillas y Opciones Especiales - Sección Siempre Visible */}
-        <div className="mb-4 bg-blue-50 p-3 rounded-md border border-blue-200">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-blue-700 flex items-center mb-1">
-                <Users className="h-4 w-4 mr-1.5" />
-                Plantillas de Equipo
-              </h3>
-              <p className="text-xs text-blue-600">
-                Aplica rápidamente configuraciones de equipo predefinidas para este proyecto
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {/* Botón Warner Bros */}
-              <Button
-                onClick={() => {
-                  // Primero limpiar equipo existente
-                  if (quotationData.teamMembers && quotationData.teamMembers.length > 0) {
-                    // Si hay miembros, confirmar antes de reemplazar
-                    if (!confirm("¿Estás seguro de reemplazar el equipo actual con la plantilla Warner?")) {
-                      return;
+        {/* Plantillas y Opciones Especiales - Solo visible si es relevante */}
+        {/* Verificamos primero si es cliente Warner o si tiene una plantilla relacionada con Warner */}
+        {(quotationData.clientId === 14 || 
+         (quotationData.template && quotationData.template.name && 
+          quotationData.template.name.toLowerCase().includes('warner'))) ? (
+          <div className="mb-4 bg-blue-50 p-3 rounded-md border border-blue-200">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-blue-700 flex items-center mb-1">
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Plantilla Warner Media
+                </h3>
+                <p className="text-xs text-blue-600">
+                  Aplica rápidamente la configuración de equipo Warner para este proyecto
+                </p>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {/* Botón Warner Bros */}
+                <Button
+                  onClick={() => {
+                    // Primero limpiar equipo existente
+                    if (quotationData.teamMembers && quotationData.teamMembers.length > 0) {
+                      // Si hay miembros, confirmar antes de reemplazar
+                      if (!confirm("¿Estás seguro de reemplazar el equipo actual con la plantilla Warner?")) {
+                        return;
+                      }
+                      
+                      // Borrar miembros actuales
+                      quotationData.teamMembers.forEach(member => {
+                        removeTeamMember(member.id);
+                      });
                     }
                     
-                    // Borrar miembros actuales
-                    quotationData.teamMembers.forEach(member => {
-                      removeTeamMember(member.id);
-                    });
-                  }
-                  
-                  // Aplicar la plantilla de Warner directamente
-                  // Account Director - 50% dedicación (1)
-                  addTeamMember({
-                    roleId: 20, // Account Director
-                    personnelId: null,
-                    hours: 80, // 50% de 160h mensuales
-                    rate: 18.8,
-                    cost: 80 * 18.8
-                  });
-                  
-                  // Project Manager Lead - 100% dedicación (1)
-                  addTeamMember({
-                    roleId: 12, // Lead Project Manager
-                    personnelId: null,
-                    hours: 160, // 100% de 160h mensuales
-                    rate: 10,
-                    cost: 160 * 10
-                  });
-                  
-                  // Senior Analysts - 100% dedicación (3)
-                  for (let i = 0; i < 3; i++) {
+                    // Aplicar la plantilla de Warner directamente
+                    // Account Director - 50% dedicación (1)
                     addTeamMember({
-                      roleId: 9, // Analista Senior
+                      roleId: 20, // Account Director
+                      personnelId: null,
+                      hours: 80, // 50% de 160h mensuales
+                      rate: 18.8,
+                      cost: 80 * 18.8
+                    });
+                    
+                    // Project Manager Lead - 100% dedicación (1)
+                    addTeamMember({
+                      roleId: 12, // Lead Project Manager
                       personnelId: null,
                       hours: 160, // 100% de 160h mensuales
                       rate: 10,
                       cost: 160 * 10
                     });
-                  }
-                  
-                  // Semi Senior Analysts - 100% dedicación (2)
-                  for (let i = 0; i < 2; i++) {
+                    
+                    // Senior Analysts - 100% dedicación (3)
+                    for (let i = 0; i < 3; i++) {
+                      addTeamMember({
+                        roleId: 9, // Analista Senior
+                        personnelId: null,
+                        hours: 160, // 100% de 160h mensuales
+                        rate: 10,
+                        cost: 160 * 10
+                      });
+                    }
+                    
+                    // Semi Senior Analysts - 100% dedicación (2)
+                    for (let i = 0; i < 2; i++) {
+                      addTeamMember({
+                        roleId: 11, // Analista Semi Senior
+                        personnelId: null,
+                        hours: 160, // 100% de 160h mensuales
+                        rate: 8.7,
+                        cost: 160 * 8.7
+                      });
+                    }
+                    
+                    // 1 Operations Lead - 75% dedicación
                     addTeamMember({
-                      roleId: 11, // Analista Semi Senior
-                      personnelId: null,
-                      hours: 160, // 100% de 160h mensuales
-                      rate: 8.7,
-                      cost: 160 * 8.7
-                    });
-                  }
-                  
-                  // 1 Operations Lead - 75% dedicación
-                  addTeamMember({
-                    roleId: 16, // Operations Lead
-                    personnelId: null,
-                    hours: 120, // 75% de 160h mensuales
-                    rate: 18,
-                    cost: 120 * 18
-                  });
-                  
-                  // 1 Tech Lead (nuevo rol) - 75% dedicación
-                  addTeamMember({
-                    roleId: 21, // Tech Lead
-                    personnelId: null,
-                    hours: 120, // 75% de 160h mensuales
-                    rate: 8.5,
-                    cost: 120 * 8.5
-                  });
-                  
-                  // Data Specialists - 75% dedicación (2)
-                  for (let i = 0; i < 2; i++) {
-                    addTeamMember({
-                      roleId: 10, // Data Specialist
+                      roleId: 16, // Operations Lead
                       personnelId: null,
                       hours: 120, // 75% de 160h mensuales
-                      rate: 9.2,
-                      cost: 120 * 9.2
+                      rate: 18,
+                      cost: 120 * 18
                     });
-                  }
-                  
-                  // Designer - 50% dedicación (1)
-                  addTeamMember({
-                    roleId: 18, // Diseñador
-                    personnelId: null,
-                    hours: 80, // 50% de 160h mensuales
-                    rate: 14,
-                    cost: 80 * 14
-                  });
-                  
-                  // Notificar al usuario
-                  alert("¡Plantilla Warner aplicada exitosamente! Se configuraron roles para Account Director, Project Manager Lead, Analysts, Tech Leads, Data Specialists y Designer.");
-                }}
-                variant="default"
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Briefcase className="h-4 w-4 mr-2" />
-                Aplicar Plantilla Warner
-              </Button>
-              
-              {/* Otros botones de plantillas podrían ir aquí en el futuro */}
+                    
+                    // 1 Tech Lead (nuevo rol) - 75% dedicación
+                    addTeamMember({
+                      roleId: 21, // Tech Lead
+                      personnelId: null,
+                      hours: 120, // 75% de 160h mensuales
+                      rate: 8.5,
+                      cost: 120 * 8.5
+                    });
+                    
+                    // Data Specialists - 75% dedicación (2)
+                    for (let i = 0; i < 2; i++) {
+                      addTeamMember({
+                        roleId: 10, // Data Specialist
+                        personnelId: null,
+                        hours: 120, // 75% de 160h mensuales
+                        rate: 9.2,
+                        cost: 120 * 9.2
+                      });
+                    }
+                    
+                    // Designer - 50% dedicación (1)
+                    addTeamMember({
+                      roleId: 18, // Diseñador
+                      personnelId: null,
+                      hours: 80, // 50% de 160h mensuales
+                      rate: 14,
+                      cost: 80 * 14
+                    });
+                    
+                    // Notificar al usuario
+                    alert("¡Plantilla Warner aplicada exitosamente! Se configuraron roles para Account Director, Project Manager Lead, Analysts, Tech Leads, Data Specialists y Designer.");
+                  }}
+                  variant="default"
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  Aplicar Plantilla Warner
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         {/* Tabs para elegir entre equipo recomendado y personalizado */}
         <Tabs 
