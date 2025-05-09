@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Download, Printer, Edit, FileCheck, FileClock, Loader2 } from 'lucide-react';
+import { 
+  ArrowLeft, Download, Printer, Edit, FileCheck, 
+  FileClock, Loader2, Building, Calendar, Clock, 
+  Mail, Phone, Briefcase, Users, Globe, DollarSign,
+  MessageSquare, FileText, Layers, PieChart 
+} from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 // Interfaces
 interface TeamMember {
@@ -185,6 +192,21 @@ const QuotationDetail: React.FC = () => {
       minute: '2-digit'
     });
   };
+  
+  // Formatear fecha corta
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+  
+  // Calcular el subtotal operacional
+  const calculateOperationalSubtotal = () => {
+    if (!quotation) return 0;
+    return quotation.baseCost + quotation.complexityAdjustment;
+  };
 
   // Obtener nombre de personal por ID
   const getPersonnelName = (id: number) => {
@@ -310,126 +332,177 @@ const QuotationDetail: React.FC = () => {
   }
 
   return (
-    <div className="container py-6">
+    <div className="container py-6 max-w-7xl">
       {/* Encabezado y acciones */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 mb-6 sticky top-0 bg-white z-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 mb-6 bg-white z-10 shadow-sm rounded-xl px-6 py-4 border">
         <div className="flex items-center">
           <Button 
-            variant="outline" 
+            variant="ghost" 
             size="sm"
-            className="mr-2"
+            className="mr-3 rounded-full hover:bg-neutral-100"
             onClick={() => setLocation('/manage-quotes')}
           >
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Volver
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{quotation.projectName}</h1>
-            <div className="flex items-center mt-1">
-              <p className="text-sm text-neutral-500 mr-2">Cotización #{quotation.id}</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{quotation.projectName}</h1>
               {getStatusBadge(quotation.status)}
+            </div>
+            <div className="flex items-center mt-1 text-neutral-500">
+              <p className="flex items-center text-sm">
+                <FileText className="h-3.5 w-3.5 mr-1 inline-block" />
+                Cotización #{quotation.id}
+              </p>
               <span className="mx-2 text-neutral-300">•</span>
-              <p className="text-sm text-neutral-500">{formatDate(quotation.createdAt)}</p>
+              <p className="flex items-center text-sm">
+                <Calendar className="h-3.5 w-3.5 mr-1 inline-block" />
+                {formatShortDate(quotation.createdAt)}
+              </p>
+              <span className="mx-2 text-neutral-300">•</span>
+              <p className="flex items-center text-sm">
+                <Clock className="h-3.5 w-3.5 mr-1 inline-block" />
+                {new Date(quotation.createdAt).toLocaleTimeString('es-MX', {hour: '2-digit', minute: '2-digit'})}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
-          <Button variant="outline" size="sm" className="h-8">
-            <Printer className="mr-1 h-4 w-4" />
+          <Button variant="outline" size="sm" className="h-9">
+            <Printer className="mr-1.5 h-4 w-4" />
             Imprimir
           </Button>
-          <Button variant="outline" size="sm" className="h-8">
-            <Download className="mr-1 h-4 w-4" />
+          <Button variant="outline" size="sm" className="h-9">
+            <Download className="mr-1.5 h-4 w-4" />
             PDF
           </Button>
-          <Button variant="default" size="sm" className="h-8">
-            <Edit className="mr-1 h-4 w-4" />
+          <Button variant="default" size="sm" className="h-9">
+            <Edit className="mr-1.5 h-4 w-4" />
             Editar
           </Button>
         </div>
       </div>
 
       {/* Contenido principal */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Columna izquierda */}
-        <div className="md:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Información del proyecto */}
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="overflow-hidden shadow-sm border border-neutral-200">
+            <CardHeader className="bg-white pb-2 border-b border-neutral-100">
               <CardTitle className="text-lg flex items-center">
-                <FileCheck className="h-5 w-5 mr-2 text-blue-600" />
+                <FileCheck className="h-5 w-5 mr-2 text-primary/90" />
                 Detalles del Proyecto
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Tipo de Proyecto</h3>
-                  <p className="mt-1">{getProjectTypeName(quotation.projectType)}</p>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                <div className="flex items-start">
+                  <Briefcase className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Tipo de Proyecto</h3>
+                    <p className="mt-1 font-medium">{getProjectTypeName(quotation.projectType)}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Plantilla</h3>
-                  <p className="mt-1">
-                    {template ? template.name : 'Personalizado / Sin Plantilla'}
-                  </p>
+                
+                <div className="flex items-start">
+                  <FileText className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Plantilla</h3>
+                    <p className="mt-1 font-medium">
+                      {template ? template.name : 'Personalizado / Sin Plantilla'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Tipo de Análisis</h3>
-                  <p className="mt-1">{getAnalysisTypeInfo(quotation.analysisType)}</p>
+                
+                <div className="flex items-start">
+                  <Layers className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Tipo de Análisis</h3>
+                    <p className="mt-1 font-medium">{getAnalysisTypeInfo(quotation.analysisType)}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Volumen de Menciones</h3>
-                  <p className="mt-1">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
+                
+                <div className="flex items-start">
+                  <PieChart className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Volumen de Menciones</h3>
+                    <p className="mt-1 font-medium">{getMentionsVolumeInfo(quotation.mentionsVolume)}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Países Cubiertos</h3>
-                  <p className="mt-1">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
+                
+                <div className="flex items-start">
+                  <Globe className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Países Cubiertos</h3>
+                    <p className="mt-1 font-medium">{getCountriesCoveredInfo(quotation.countriesCovered)}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-neutral-500">Interacción con Cliente</h3>
-                  <p className="mt-1">{getClientEngagementInfo(quotation.clientEngagement)}</p>
+                
+                <div className="flex items-start">
+                  <MessageSquare className="text-primary/70 h-5 w-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-neutral-500">Interacción con Cliente</h3>
+                    <p className="mt-1 font-medium">{getClientEngagementInfo(quotation.clientEngagement)}</p>
+                  </div>
                 </div>
               </div>
 
               {quotation.templateCustomization && (
-                <div className="mt-6 bg-neutral-50 p-4 rounded-md">
-                  <h3 className="text-sm font-medium text-neutral-500 mb-2">Personalización / Notas</h3>
-                  <p className="text-sm whitespace-pre-line">{quotation.templateCustomization}</p>
+                <div className="mt-6">
+                  <Separator className="mb-4" />
+                  <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                    <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center">
+                      <FileText className="h-4 w-4 mr-1.5 text-primary/70" />
+                      Personalización / Notas
+                    </h3>
+                    <p className="text-sm whitespace-pre-line text-neutral-700">{quotation.templateCustomization}</p>
+                  </div>
                 </div>
               )}
               
               {quotation.additionalNotes && (
-                <div className="mt-4 bg-neutral-50 p-4 rounded-md">
-                  <h3 className="text-sm font-medium text-neutral-500 mb-2">Notas Adicionales</h3>
-                  <p className="text-sm whitespace-pre-line">{quotation.additionalNotes}</p>
+                <div className="mt-4">
+                  <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                    <h3 className="text-sm font-medium text-neutral-700 mb-2 flex items-center">
+                      <MessageSquare className="h-4 w-4 mr-1.5 text-primary/70" />
+                      Notas Adicionales
+                    </h3>
+                    <p className="text-sm whitespace-pre-line text-neutral-700">{quotation.additionalNotes}</p>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
           {/* Tabla de miembros del equipo */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <FileClock className="h-5 w-5 mr-2 text-blue-600" />
-                Equipo del Proyecto
-              </CardTitle>
+          <Card className="overflow-hidden shadow-sm border border-neutral-200">
+            <CardHeader className="bg-white pb-2 border-b border-neutral-100">
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg flex items-center">
+                  <Users className="h-5 w-5 mr-2 text-primary/90" />
+                  Equipo del Proyecto
+                </CardTitle>
+                <Badge variant="outline" className="ml-2 font-semibold">
+                  {teamMembers.length} miembros
+                </Badge>
+              </div>
               <CardDescription>
-                Miembros del equipo asignados ({teamMembers.length})
+                Detalle de los recursos asignados a este proyecto
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {teamMembers.length > 0 ? (
-                <div className="overflow-auto border rounded-md" style={{ maxHeight: '300px' }}>
+                <div className="overflow-auto" style={{ maxHeight: '350px' }}>
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-neutral-50">
                       <TableRow>
-                        <TableHead>Rol</TableHead>
-                        <TableHead>Persona</TableHead>
-                        <TableHead className="text-right">Horas</TableHead>
-                        <TableHead className="text-right">Tarifa</TableHead>
-                        <TableHead className="text-right">Costo</TableHead>
+                        <TableHead className="font-semibold">Rol</TableHead>
+                        <TableHead className="font-semibold">Persona</TableHead>
+                        <TableHead className="text-right font-semibold">Horas</TableHead>
+                        <TableHead className="text-right font-semibold">Tarifa</TableHead>
+                        <TableHead className="text-right font-semibold">Costo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -439,26 +512,40 @@ const QuotationDetail: React.FC = () => {
                           <TableCell>{getPersonnelName(member.personnelId)}</TableCell>
                           <TableCell className="text-right">{member.hours}</TableCell>
                           <TableCell className="text-right">{formatCurrency(member.rate)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(member.cost)}</TableCell>
+                          <TableCell className="text-right font-medium text-primary-700">{formatCurrency(member.cost)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="text-center text-neutral-500 py-6">
-                  No hay miembros del equipo asignados a esta cotización
+                <div className="text-center text-neutral-500 py-12 px-4 bg-neutral-50/50">
+                  <Users className="h-12 w-12 mx-auto text-neutral-300 mb-2" />
+                  <p className="text-lg font-medium">No hay miembros del equipo asignados</p>
+                  <p className="text-sm text-neutral-500 mt-1">Esta cotización no tiene recursos asignados</p>
                 </div>
               )}
               
               {teamMembers.length > 0 && (
-                <div className="mt-4 text-right">
-                  <p className="text-sm font-medium text-neutral-500">
-                    Total de horas: <span className="font-bold">{teamMembers.reduce((sum, member) => sum + member.hours, 0)}</span>
-                  </p>
-                  <p className="font-medium">
-                    Total del equipo: <span className="font-bold">{formatCurrency(teamMembers.reduce((sum, member) => sum + member.cost, 0))}</span>
-                  </p>
+                <div className="px-6 py-4 bg-neutral-50 border-t">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-500">
+                        Total de horas asignadas:
+                      </p>
+                      <p className="text-xl font-bold mt-0.5">
+                        {teamMembers.reduce((sum, member) => sum + member.hours, 0)} horas
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-neutral-500">
+                        Total equipo:
+                      </p>
+                      <p className="text-xl font-bold mt-0.5 text-primary-700">
+                        {formatCurrency(teamMembers.reduce((sum, member) => sum + member.cost, 0))}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -468,80 +555,110 @@ const QuotationDetail: React.FC = () => {
         {/* Columna derecha */}
         <div className="space-y-6">
           {/* Información del cliente */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información del Cliente</CardTitle>
+          <Card className="overflow-hidden shadow-sm border border-neutral-200">
+            <CardHeader className="bg-white pb-2 border-b border-neutral-100">
+              <CardTitle className="text-lg flex items-center">
+                <Building className="h-5 w-5 mr-2 text-primary/90" />
+                Información del Cliente
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {client && (
-                  <>
-                    <h3 className="font-bold text-lg">{client.name}</h3>
-                    <div className="text-sm">
-                      <p className="text-neutral-500">Contacto: {client.contactName}</p>
-                      <p className="text-neutral-500">Email: {client.contactEmail}</p>
-                      <p className="text-neutral-500">Teléfono: {client.contactPhone}</p>
+            <CardContent className="pt-5">
+              {client && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-xl text-neutral-800">{client.name}</h3>
+                    <Badge variant="secondary" className="ml-2">Cliente</Badge>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 text-neutral-500 mr-2" />
+                      <span className="text-neutral-700 font-medium">{client.contactName}</span>
                     </div>
-                  </>
-                )}
-              </div>
+                    <div className="flex items-center">
+                      <Mail className="h-4 w-4 text-neutral-500 mr-2" />
+                      <a href={`mailto:${client.contactEmail}`} className="text-blue-600 hover:underline">
+                        {client.contactEmail}
+                      </a>
+                    </div>
+                    <div className="flex items-center">
+                      <Phone className="h-4 w-4 text-neutral-500 mr-2" />
+                      <a href={`tel:${client.contactPhone}`} className="text-neutral-700 hover:underline">
+                        {client.contactPhone}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Resumen financiero */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Resumen Financiero</CardTitle>
+          <Card className="overflow-hidden shadow-sm border border-neutral-200">
+            <CardHeader className="bg-white pb-2 border-b border-neutral-100">
+              <CardTitle className="text-lg flex items-center">
+                <DollarSign className="h-5 w-5 mr-2 text-primary/90" />
+                Resumen Financiero
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="pt-5">
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-neutral-600">Costo base:</span>
-                  <span>{formatCurrency(quotation.baseCost)}</span>
+                  <span className="font-medium">{formatCurrency(quotation.baseCost)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
                   <span className="text-neutral-600">Ajuste complejidad:</span>
-                  <span>{formatCurrency(quotation.complexityAdjustment)}</span>
+                  <span className="font-medium">{formatCurrency(quotation.complexityAdjustment)}</span>
                 </div>
                 
                 {quotation.adjustmentReason && (
-                  <div className="text-xs text-neutral-500 italic pl-4">
-                    Razón: {quotation.adjustmentReason}
+                  <div className="text-xs text-neutral-500 p-2 bg-neutral-50 rounded-md border ml-4">
+                    <span className="font-medium block mb-1">Razón del ajuste:</span>
+                    {quotation.adjustmentReason}
                   </div>
                 )}
                 
-                <div className="border-t border-b py-2 my-2">
-                  <div className="flex justify-between items-center font-medium">
-                    <span>Subtotal operacional:</span>
-                    <span>
-                      {formatCurrency(quotation.baseCost + quotation.complexityAdjustment)}
-                    </span>
-                  </div>
+                <Separator />
+                
+                <div className="flex justify-between items-center py-1">
+                  <span className="font-medium text-neutral-800">Subtotal operacional:</span>
+                  <span className="font-semibold text-lg">
+                    {formatCurrency(calculateOperationalSubtotal())}
+                  </span>
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-neutral-600">Margen:</span>
-                  <span>{formatCurrency(quotation.markupAmount)}</span>
+                  <span className="text-neutral-600">Margen aplicado:</span>
+                  <span className="font-medium">{formatCurrency(quotation.markupAmount)}</span>
                 </div>
                 
-                <div className="mt-4 border-t pt-3">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total:</span>
-                    <span>{formatCurrency(quotation.totalAmount)}</span>
+                <Separator />
+                
+                <div className="bg-primary/5 p-3 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-neutral-800 text-lg">TOTAL:</span>
+                    <span className="font-bold text-primary-900 text-2xl">
+                      {formatCurrency(quotation.totalAmount)}
+                    </span>
                   </div>
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="bg-neutral-50 border-t pt-4 pb-3 gap-3 flex-wrap">
+              <Button variant="outline" className="w-full flex justify-center items-center gap-2">
+                <Download className="h-4 w-4" />
+                Exportar Presupuesto
+              </Button>
+              <Button variant="default" className="w-full flex justify-center items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Editar Cotización
+              </Button>
+            </CardFooter>
           </Card>
-          
-          {/* Acciones adicionales */}
-          <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full justify-start">
-              <Edit className="mr-2 h-4 w-4" />
-              Editar Cotización
-            </Button>
-          </div>
         </div>
       </div>
     </div>
