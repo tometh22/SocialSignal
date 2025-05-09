@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -29,10 +29,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Interfaces para los datos del cliente
+interface Client {
+  id: number;
+  name: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+}
+
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
   const { data: quotations, isLoading, refetch } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
+  });
+  
+  // Cargamos la información de todos los clientes
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,6 +56,12 @@ export default function ManageQuotes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const { toast } = useToast();
+  
+  // Función auxiliar para obtener el nombre del cliente por ID
+  const getClientName = (clientId: number) => {
+    const client = clients.find(c => c.id === clientId);
+    return client ? client.name : `Cliente ID: ${clientId}`;
+  };
 
   // Filter quotations based on search term and status
   const filteredQuotations = quotations
@@ -249,8 +269,8 @@ export default function ManageQuotes() {
                       <thead>
                         <tr className="border-b border-neutral-200">
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Proyecto</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">ID Cliente</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Tipo de Análisis</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Cliente</th>
+                          <th className="px-4 py-3 text-left text-label text-neutral-500">Tipo de Proyecto</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Creación</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Estado</th>
                           <th className="px-4 py-3 text-left text-label text-neutral-500">Total</th>
@@ -261,8 +281,8 @@ export default function ManageQuotes() {
                         {filteredQuotations.map((quote) => (
                           <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
                             <td className="px-4 py-3 text-sm font-medium text-neutral-900">{quote.projectName}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.clientId}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.analysisType}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{getClientName(quote.clientId)}</td>
+                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.projectType || "Always On"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">
                               {new Date(quote.createdAt).toLocaleDateString()}
                             </td>
