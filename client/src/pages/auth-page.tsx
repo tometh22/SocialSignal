@@ -125,7 +125,7 @@ export default function AuthPage() {
             <div className="flex justify-center mb-4">
               <Logo size="lg" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Gestión - Epical</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Mind - Epical</h1>
             <p className="text-gray-600">
               Plataforma interna para la gestión de proyectos y cotizaciones
             </p>
