@@ -141,7 +141,7 @@ export default function Sidebar() {
               {!isCollapsed && (
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-sidebar-foreground tracking-wide">
-                    Sistema de Gestión
+                    Mind
                   </span>
                   <span className="text-[11px] text-sidebar-foreground/60">
                     Epical Digital

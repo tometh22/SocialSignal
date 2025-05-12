@@ -57,7 +57,7 @@ function OptimizedQuoteWrapper() {
 function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
   useEffect(() => {
-    document.title = "Sistema de Gestión | Epical";
+    document.title = "Mind | Epical";
     // Remover dark mode del documento general (para contenido principal)
     document.documentElement.classList.remove('dark');
     document.body.classList.remove('dark');

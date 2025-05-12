@@ -366,7 +366,7 @@ export default function AuthPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-gray-900">
         <div className="flex flex-col items-center justify-center w-full p-12 text-white">
           <div className="max-w-lg text-center">
-            <h2 className="text-4xl font-bold mb-6">Sistema Interno - Epical</h2>
+            <h2 className="text-4xl font-bold mb-6">Mind - Epical</h2>
             <p className="text-xl mb-8 text-gray-300">
               Plataforma completa para el equipo de Epical que facilita la gestión de proyectos, 
               cotizaciones y seguimiento de tiempo con comunicación interna integrada.

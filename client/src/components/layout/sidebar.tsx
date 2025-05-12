@@ -240,7 +240,7 @@ export default function Sidebar() {
               {!isCollapsed && (
                 <div>
                   <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-sidebar-accent bg-clip-text text-transparent">
-                    Sistema de Gestión
+                    Mind
                   </h1>
                   <p className="text-[11px] text-sidebar-foreground/60">Epical Digital</p>
                 </div>
