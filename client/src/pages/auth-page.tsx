@@ -78,66 +78,25 @@ export default function AuthPage() {
   });
 
   // Manejar envío del formulario de inicio de sesión
-  async function onLoginSubmit(data: LoginFormValues) {
-    try {
-      console.log("Iniciando login con:", data.email);
-      loginForm.setError("root", { message: "" }); // Limpiar errores previos
-      
-      // Usar fetch directamente en lugar de loginMutation
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-        credentials: "include"
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error en login:", errorText);
-        let errorMessage = "Error al iniciar sesión";
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // Error no es JSON, usar el texto tal cual
-          if (errorText) errorMessage = errorText;
-        }
-        
-        loginForm.setError("root", { message: errorMessage });
-        return;
-      }
-      
-      // Leer y procesar la respuesta
-      const responseText = await response.text();
-      if (!responseText.trim()) {
-        console.log("Respuesta vacía del servidor");
-        throw new Error("Respuesta vacía del servidor");
-      }
-      
-      // Parsear el JSON de la respuesta
-      try {
-        const user = JSON.parse(responseText);
+  function onLoginSubmit(data: LoginFormValues) {
+    console.log("Iniciando login con:", data.email);
+    // Limpiar errores previos
+    loginForm.setError("root", { message: "" });
+    
+    // Usar la mutación del hook de auth
+    loginMutation.mutate(data, {
+      onSuccess: (user) => {
         console.log("Login exitoso, redirigiendo...", user);
-        
-        // Actualizar el estado y redirigir
-        queryClient.setQueryData(["/api/current-user"], user);
         setRedirecting(true);
         navigate("/");
-      } catch (error) {
-        console.error("Error al procesar respuesta:", error);
+      },
+      onError: (error) => {
+        console.error("Error de login:", error);
         loginForm.setError("root", { 
-          message: "Error al procesar la respuesta del servidor" 
+          message: error instanceof Error ? error.message : "Error al iniciar sesión" 
         });
       }
-    } catch (error) {
-      console.error("Error en el proceso de login:", error);
-      loginForm.setError("root", { 
-        message: error instanceof Error ? error.message : "Error al iniciar sesión" 
-      });
-    }
+    });
   }
 
   // Manejar envío del formulario de registro

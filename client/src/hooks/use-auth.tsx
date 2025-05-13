@@ -39,8 +39,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      // La función apiRequest ya maneja la respuesta JSON, no es necesario llamar a .json()
-      return await apiRequest("POST", "/api/login", credentials);
+      // Usar fetch directamente en lugar de apiRequest
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(credentials),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = "Error al iniciar sesión";
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const responseText = await response.text();
+      if (!responseText.trim()) {
+        throw new Error("Respuesta vacía del servidor");
+      }
+      
+      try {
+        return JSON.parse(responseText);
+      } catch (error) {
+        console.error("Error al procesar JSON de respuesta:", error);
+        throw new Error("Error al procesar la respuesta del servidor");
+      }
     },
     onSuccess: (user: UserType) => {
       queryClient.setQueryData(["/api/current-user"], user);
