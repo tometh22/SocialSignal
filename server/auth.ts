@@ -31,16 +31,41 @@ async function hashPassword(password: string) {
 
 // Función para comparar contraseñas
 async function comparePasswords(supplied: string, stored: string) {
+  console.log("Comparando contraseñas:");
+  console.log("- Contraseña proporcionada:", supplied);
+  console.log("- Contraseña almacenada:", stored);
+  
+  // Verificar que stored tenga el formato correcto
+  if (!stored.includes(".")) {
+    console.error("Formato de hash incorrecto, no contiene separador '.'");
+    return false;
+  }
+  
   const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  console.log("- Hash extraído:", hashed.substring(0, 10) + "...");
+  console.log("- Salt extraída:", salt);
   
   try {
-    return timingSafeEqual(hashedBuf, suppliedBuf);
+    const hashedBuf = Buffer.from(hashed, "hex");
+    console.log("- Buffer de hash creado, longitud:", hashedBuf.length);
+    
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    console.log("- Buffer de contraseña cifrada, longitud:", suppliedBuf.length);
+    
+    try {
+      const result = timingSafeEqual(hashedBuf, suppliedBuf);
+      console.log("- Resultado de comparación:", result);
+      return result;
+    } catch (error) {
+      console.error("Error en timingSafeEqual:", error);
+      // Fallback en caso de error con timingSafeEqual
+      const result = Buffer.compare(hashedBuf, suppliedBuf) === 0;
+      console.log("- Resultado de comparación fallback:", result);
+      return result;
+    }
   } catch (error) {
-    console.error("Error en timingSafeEqual:", error);
-    // Fallback en caso de error con timingSafeEqual
-    return Buffer.compare(hashedBuf, suppliedBuf) === 0;
+    console.error("Error al comparar contraseñas:", error);
+    return false;
   }
 }
 
