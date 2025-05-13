@@ -61,21 +61,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Mutación para el inicio de sesión
   const loginMutation = useMutation<UserType, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-        credentials: "include"
-      });
+      console.log("Iniciando petición de inicio de sesión");
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(credentials),
+          credentials: "include"
+        });
 
-      if (!response.ok) {
+        // Si la respuesta es exitosa, procesar y devolver datos
+        if (response.ok) {
+          const userData = await response.json();
+          console.log("Login exitoso, datos recibidos:", userData);
+          return userData;
+        }
+        
+        // Si hay un error, manejarlo adecuadamente
         const errorData = await response.json().catch(() => ({ message: "Error al iniciar sesión" }));
         throw new Error(errorData.message || "Error al iniciar sesión");
+      } catch (error) {
+        console.error("Error en petición de login:", error);
+        // Re-lanzar el error para que sea capturado por onError
+        throw error;
       }
-
-      return await response.json();
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/current-user"], user);

@@ -204,8 +204,8 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
-                      {/* Mostrar errores generales solo cuando hay un mensaje real */}
-                      {loginForm.formState.errors.root?.message && (
+                      {/* Mostrar errores generales solo cuando hay un mensaje real y NO se está redirigiendo */}
+                      {loginForm.formState.errors.root?.message && !redirecting && (
                         <div className="p-3 my-2 text-sm text-white bg-destructive rounded-md">
                           {loginForm.formState.errors.root.message}
                         </div>
