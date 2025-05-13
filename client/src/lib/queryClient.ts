@@ -83,59 +83,67 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   };
 }
 
-// Generic function for API requests that handles both parameter orders for backward compatibility
+// Generic function for API requests
 export async function apiRequest(
-  arg1: string,    // Can be either endpoint or method
-  arg2: string,    // Can be either method or endpoint
+  method: string,
+  endpoint: string,
   data?: any
 ) {
-  // Determine which argument is the method and which is the endpoint
-  const isArg1Method = ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(arg1.toUpperCase());
-  
-  // Assign variables based on the detected order
-  const method = isArg1Method ? arg1 : arg2;
-  const endpoint = isArg1Method ? arg2 : arg1;
-  
   const url = endpoint;
   
   console.log(`API Request: ${method} ${url}`, data);
   
-  const options: RequestInit = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-  };
-  
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-  
   try {
+    const options: RequestInit = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    };
+    
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    
+    // Realizar la solicitud
     const response = await fetch(url, options);
     
+    // Manejar errores de respuesta
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
       
-      const errorMessage = (() => {
-        try {
-          const json = JSON.parse(errorText);
-          return json.message || errorText;
-        } catch (e) {
-          return errorText || "Error desconocido";
-        }
-      })();
+      let errorMessage;
+      try {
+        const json = JSON.parse(errorText);
+        errorMessage = json.message || errorText;
+      } catch (e) {
+        errorMessage = errorText || "Error desconocido";
+      }
       
       throw new Error(errorMessage);
     }
     
+    // Para respuestas vacías
     if (response.status === 204) {
       return null;
     }
     
-    return await response.json();
+    // Verificar si el cuerpo de la respuesta tiene contenido
+    const responseText = await response.text();
+    if (!responseText) {
+      console.log("Respuesta vacía de la API");
+      return null;
+    }
+    
+    // Intentar analizar la respuesta como JSON
+    try {
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error("Error al analizar respuesta JSON:", error);
+      throw new Error("Error al analizar la respuesta del servidor");
+    }
   } catch (error) {
     console.error(`Error en solicitud API ${method} ${url}:`, error);
     throw error;
