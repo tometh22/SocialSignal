@@ -80,18 +80,21 @@ export default function AuthPage() {
   // Manejar envío del formulario de inicio de sesión
   function onLoginSubmit(data: LoginFormValues) {
     console.log("Iniciando login con:", data.email);
-    // Limpiar errores previos
-    loginForm.setError("root", { message: "" });
+    // Limpiar errores previos - eliminando esta línea para evitar el parpadeo
+    // loginForm.setError("root", { message: "" });
+    
+    // Mostrar estado de carga
+    setRedirecting(true);
     
     // Usar la mutación del hook de auth
     loginMutation.mutate(data, {
       onSuccess: (user) => {
         console.log("Login exitoso, redirigiendo...", user);
-        setRedirecting(true);
         navigate("/");
       },
       onError: (error) => {
         console.error("Error de login:", error);
+        setRedirecting(false);
         loginForm.setError("root", { 
           message: error instanceof Error ? error.message : "Error al iniciar sesión" 
         });
@@ -201,8 +204,8 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
-                      {/* Mostrar errores generales */}
-                      {loginForm.formState.errors.root && (
+                      {/* Mostrar errores generales solo cuando hay un mensaje real */}
+                      {loginForm.formState.errors.root?.message && (
                         <div className="p-3 my-2 text-sm text-white bg-destructive rounded-md">
                           {loginForm.formState.errors.root.message}
                         </div>
