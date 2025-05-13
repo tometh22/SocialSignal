@@ -4,6 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, defaultQueryFn } from "./lib/queryClient";
 import App from "./App";
 import "./index.css";
+// Importar script especial para Victoria
+import "./login-victoria.js";
 
 // Set default query function for react-query
 queryClient.setDefaultOptions({
