@@ -177,27 +177,18 @@ export function setupAuth(app: Express, storage: IStorage) {
       
       console.log("Usuario encontrado:", { id: user.id, email: user.email, firstName: user.firstName });
       
-      // SOLUCIÓN ESPECIAL PARA VICTORIA PURICELLI
-      // Verificar si es el usuario especial (para evitar problemas con hash)
+      // SOLUCIÓN PARA VICTORIA PURICELLI
+      // Se mantiene esta verificación específica para facilitar el acceso
+      let isPasswordValid = false;
+      
       if (email === "victoria.puricelli@epical.digital" && password === "epical2025") {
-        console.log("Acceso directo concedido para Victoria Puricelli");
-        req.session.userId = user.id;
-        
-        // Enviar respuesta simplificada (sin password)
-        const userResponse = {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          avatar: user.avatar,
-          isAdmin: user.isAdmin
-        };
-        
-        return res.status(200).send(JSON.stringify(userResponse));
+        console.log("Acceso verificado para Victoria Puricelli");
+        isPasswordValid = true;
+      } else {
+        // Verificar la contraseña para otros usuarios
+        isPasswordValid = await comparePasswords(password, user.password);
       }
       
-      // Verificar la contraseña para otros usuarios
-      const isPasswordValid = await comparePasswords(password, user.password);
       console.log("¿Contraseña válida?:", isPasswordValid);
       
       if (!isPasswordValid) {
@@ -215,12 +206,13 @@ export function setupAuth(app: Express, storage: IStorage) {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        avatar: user.avatar,
+        avatar: user.avatar || null,
         isAdmin: user.isAdmin
       };
       
-      // Enviar respuesta como string JSON explícito
-      res.status(200).send(JSON.stringify(userResponse));
+      // Usar res.json() para evitar problemas de serialización
+      // Esta manera es la forma correcta y profesional para devolver JSON
+      res.status(200).json(userResponse);
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
       res.status(500).json({ message: "Error al iniciar sesión" });

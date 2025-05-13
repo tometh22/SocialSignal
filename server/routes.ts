@@ -19,7 +19,6 @@ import {
 } from "@shared/schema";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
-import { setupDirectAuth } from "./auth-direct";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
 import { upload, deleteOldFile } from "./upload";
 import path from 'path';
@@ -30,9 +29,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup authentication with storage
   setupAuth(app, storage);
-  
-  // Configurar autenticación directa para caso especial
-  setupDirectAuth(app, storage);
   
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
