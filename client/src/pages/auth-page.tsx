@@ -77,26 +77,51 @@ export default function AuthPage() {
     },
   });
 
-  // Manejar envío del formulario de inicio de sesión
-  function onLoginSubmit(data: LoginFormValues) {
-    console.log("Iniciando login con:", data.email);
-    // Limpiar errores previos
-    loginForm.setError("root", { message: "" });
-    
-    // Usar la mutación del hook de auth
-    loginMutation.mutate(data, {
-      onSuccess: (user) => {
-        console.log("Login exitoso, redirigiendo...", user);
-        setRedirecting(true);
-        navigate("/");
-      },
-      onError: (error) => {
-        console.error("Error de login:", error);
-        loginForm.setError("root", { 
-          message: error instanceof Error ? error.message : "Error al iniciar sesión" 
-        });
+  // Manejar envío del formulario de inicio de sesión (implementación básica con fetch)
+  async function onLoginSubmit(data: LoginFormValues) {
+    try {
+      // Mostrar estado de carga
+      loginForm.setError("root", { message: "" });
+      setRedirecting(true);
+      
+      console.log("Iniciando login directo con:", data.email);
+      
+      // Petición fetch simple y directa
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include"
+      });
+      
+      // Si hay un error en la respuesta
+      if (!response.ok) {
+        setRedirecting(false);
+        const errorText = await response.text();
+        let errorMessage = "Error al iniciar sesión";
+        
+        try {
+          const json = JSON.parse(errorText);
+          errorMessage = json.message || errorMessage;
+        } catch (e) {
+          // Usar el texto tal cual si no es JSON
+          if (errorText) errorMessage = errorText;
+        }
+        
+        loginForm.setError("root", { message: errorMessage });
+        return;
       }
-    });
+      
+      // Éxito - redireccionar al dashboard
+      console.log("Login exitoso, redirigiendo...");
+      window.location.href = "/"; // Redirección forzada para evitar problemas con estado
+    } catch (error) {
+      setRedirecting(false);
+      console.error("Error en login:", error);
+      loginForm.setError("root", { 
+        message: error instanceof Error ? error.message : "Error al conectar con el servidor" 
+      });
+    }
   }
 
   // Manejar envío del formulario de registro
