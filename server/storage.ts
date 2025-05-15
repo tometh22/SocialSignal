@@ -224,10 +224,16 @@ export class MemStorage implements IStorage {
   private progressReportId: number;
 
   constructor() {
-    // Usar MemoryStore para sesiones en memoria
-    const MemoryStore = require('memorystore')(session);
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // Limpiar sesiones expiradas cada 24h
+    // Usar PostgreSQL para almacenamiento persistente de sesiones
+    const PgStore = require('connect-pg-simple')(session);
+    this.sessionStore = new PgStore({
+      pool, // Usar la conexión de pool existente desde db.ts
+      tableName: 'sessions', // Tabla para almacenar sesiones
+      createTableIfMissing: true, // Crear la tabla si no existe
+      pruneSessionInterval: 3600, // Limpiar sesiones expiradas cada hora
+      // Configuración para alta disponibilidad y persistencia
+      disableTouch: false, // Actualizar fecha de expiración con cada request
+      errorLog: (err) => console.error('Error en PgSessionStore:', err)
     });
     this.clients = new Map();
     this.roles = new Map();

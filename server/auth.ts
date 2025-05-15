@@ -70,27 +70,25 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  // Configuración de la sesión optimizada para entorno multiusuario
+  // Configuración de la sesión optimizada para entorno multiusuario y trabajo prolongado
   const isProduction = process.env.NODE_ENV === 'production';
   const sessionConfig = {
-    secret: process.env.SESSION_SECRET || "epical-secret-key",
+    secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
     resave: false, // Solo guardar cuando se modifique
     saveUninitialized: false, // No guardar sesiones vacías para cumplir con GDPR
     rolling: true, // Renovar cookie en cada respuesta (mantiene la sesión activa con actividad)
     cookie: {
       secure: isProduction, // Usar 'true' en producción para HTTPS
-      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días para mayor permanencia
+      maxAge: 1000 * 60 * 60 * 24 * 90, // 90 días para asegurar que no se cierre durante uso intensivo
       sameSite: 'lax' as const, // Protección contra CSRF pero permite navegación normal
       httpOnly: true, // Previene acceso a la cookie mediante JavaScript
       path: '/', // Asegurar que la cookie sea accesible en todas las rutas
     },
-    name: 'epical.sid', // Nombre personalizado para la cookie
-    // Opciones adicionales para entorno multiusuario
+    name: 'epical.persistent.sid', // Nombre personalizado para la cookie
+    // Usar generador de ID más seguro
     genid: () => {
-      // Usar Math.random para generar identificadores de sesión
-      // Esta implementación es segura para el uso interno de la aplicación
-      return Math.random().toString(36).substring(2, 15) + 
-             Math.random().toString(36).substring(2, 15);
+      // Usar randomBytes para generar identificadores de sesión más seguros
+      return randomBytes(32).toString('hex');
     }
   };
 
