@@ -28,6 +28,9 @@ import {
   HeaderActions
 } from "@/components/dashboard";
 
+// Componente MODO
+import { ProjectModoMetrics } from "@/components/modo/project-modo-metrics";
+
 // Tipos e interfaces
 interface CostSummary {
   estimatedCost: number;
@@ -167,13 +170,20 @@ const ProjectSummary = () => {
     enabled: !!parsedProjectId,
   });
 
+  // Obtener datos MODO para el proyecto
+  const { data: deliverableData, isLoading: isLoadingDeliverable } = useQuery<any>({
+    queryKey: [`/api/modo/deliverables/project/${parsedProjectId}`],
+    enabled: !!parsedProjectId,
+  });
+
   // Estado de carga general
   const isLoading = 
     isLoadingProject || 
     isLoadingTimeEntries || 
     isLoadingRoles || 
     isLoadingPersonnel || 
-    isLoadingCostSummary;
+    isLoadingCostSummary ||
+    isLoadingDeliverable;
 
   // Función para actualizar el nombre del proyecto
   const handleSaveProjectName = async (newName: string): Promise<void> => {
