@@ -44,6 +44,9 @@ interface DeliverableData {
   operations_feedback: number;
   client_feedback: number;
   brief_compliance: number;
+  hours_available: number;
+  hours_real: number;
+  hours_compliance: number;
   notes?: string;
 }
 
@@ -405,6 +408,9 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     <TableHead className="text-center">FB Operaciones</TableHead>
                     <TableHead className="text-center">FB Cliente</TableHead>
                     <TableHead className="text-center">Brief</TableHead>
+                    <TableHead className="text-center">Horas Disp.</TableHead>
+                    <TableHead className="text-center">Horas Real</TableHead>
+                    <TableHead className="text-center">Cumplimiento</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
