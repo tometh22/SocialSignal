@@ -574,7 +574,7 @@ const ClientSummary = () => {
             Finanzas
           </TabsTrigger>
           <TabsTrigger value="modo">
-            <FileBarChart className="h-4 w-4 mr-1" />
+            <BarChart className="h-4 w-4 mr-1" />
             MODO
           </TabsTrigger>
         </TabsList>
@@ -960,6 +960,13 @@ const ClientSummary = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Pestaña de MODO (Sistema de Seguimiento Operacional) */}
+        <TabsContent value="modo" className="space-y-6">
+          {parsedClientId && (
+            <ModoTab clientId={parsedClientId} />
+          )}
         </TabsContent>
       </Tabs>
 
