@@ -1769,7 +1769,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             relevantInsights: 0,
             operationsFeedback: 0,
             clientFeedback: 0,
-            briefCompliance: 0
+            briefCompliance: 0,
+            hoursCompliance: 0
+          },
+          averageHours: {
+            available: 0,
+            real: 0,
+            compliance: 0
           },
           totalComments: 0
         });
@@ -1852,6 +1858,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sumBriefCompliance += Number(deliverable.brief_compliance);
           countBriefCompliance++;
         }
+        
+        // Datos de horas
+        if (deliverable.hours_compliance !== null && deliverable.hours_compliance !== undefined) {
+          sumHoursCompliance += Number(deliverable.hours_compliance);
+          countHoursCompliance++;
+        }
+        
+        if (deliverable.hours_available !== null && deliverable.hours_available !== undefined && 
+            deliverable.hours_real !== null && deliverable.hours_real !== undefined) {
+          sumHoursAvailable += Number(deliverable.hours_available);
+          sumHoursReal += Number(deliverable.hours_real);
+          countHoursData++;
+        }
       }
       
       // Calcular promedios
@@ -1862,6 +1881,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const averageOperationsFeedback = countOperationsFeedback > 0 ? sumOperationsFeedback / countOperationsFeedback : 0;
       const averageClientFeedback = countClientFeedback > 0 ? sumClientFeedback / countClientFeedback : 0;
       const averageBriefCompliance = countBriefCompliance > 0 ? sumBriefCompliance / countBriefCompliance : 0;
+      const averageHoursCompliance = countHoursCompliance > 0 ? sumHoursCompliance / countHoursCompliance : 0;
+      
+      // Calcular promedios de horas
+      const averageHoursAvailable = countHoursData > 0 ? sumHoursAvailable / countHoursData : 0;
+      const averageHoursReal = countHoursData > 0 ? sumHoursReal / countHoursData : 0;
       
       // Obtener comentarios MODO
       const { rows: comments } = await db.execute(
@@ -1884,7 +1908,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           relevantInsights: averageRelevantInsights,
           operationsFeedback: averageOperationsFeedback,
           clientFeedback: averageClientFeedback,
-          briefCompliance: averageBriefCompliance
+          briefCompliance: averageBriefCompliance,
+          hoursCompliance: averageHoursCompliance
+        },
+        averageHours: {
+          available: averageHoursAvailable,
+          real: averageHoursReal,
+          compliance: averageHoursCompliance
         },
         totalComments,
         latestComment
