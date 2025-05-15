@@ -9,132 +9,137 @@ async function insertModoData() {
     const deliverablesData = [
       // Entregable 1
       {
-        clientId: 17, // El ID del cliente MODO en la base de datos
-        name: "Ejecutivo Sony One",
-        deliveryMonth: "1", // Mes de entrega (Jan)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 4.0,
-        briefCompliance: 5.0,
-        hoursEstimated: 40,
-        hoursActual: 42.58
+        project_id: 1, // Asumimos un ID de proyecto básico
+        title: "Ejecutivo Sony One",
+        delivery_date: new Date(2023, 0, 15).toISOString(), // Enero 15, 2023
+        due_date: new Date(2023, 0, 15).toISOString(),      // Asumimos misma fecha
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 4.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 2
       {
-        clientId: 17,
-        name: "Mensual Enero",
-        deliveryMonth: "2", // Mes de entrega (Feb)
-        deliveryOnTime: true,
-        narrativeQuality: 3.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 4.0,
-        operationsFeedback: 4.25,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0,
-        hoursEstimated: 45,
-        hoursActual: 41
+        project_id: 1,
+        title: "Mensual Enero",
+        delivery_date: new Date(2023, 1, 15).toISOString(), // Febrero 15, 2023
+        due_date: new Date(2023, 1, 15).toISOString(),
+        on_time: true,
+        narrative_quality: 3.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 4.0,
+        operations_feedback: 4.25,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 3
       {
-        clientId: 17,
-        name: "Ejecutivo Telepase",
-        deliveryMonth: "1", // Mes de entrega (Jan)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0,
-        hoursEstimated: 40,
-        hoursActual: 12.33
+        project_id: 1,
+        title: "Ejecutivo Telepase",
+        delivery_date: new Date(2023, 0, 20).toISOString(), // Enero 20, 2023
+        due_date: new Date(2023, 0, 20).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 4
       {
-        clientId: 17,
-        name: "Mensual Febrero",
-        deliveryMonth: "3", // Mes de entrega (Mar)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0,
-        hoursActual: 74.33
+        project_id: 1,
+        title: "Mensual Febrero",
+        delivery_date: new Date(2023, 2, 15).toISOString(), // Marzo 15, 2023
+        due_date: new Date(2023, 2, 15).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 5
       {
-        clientId: 17,
-        name: "Ejecutivo NFC",
-        deliveryMonth: "3", // Mes de entrega (Mar)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 4.0,
-        briefCompliance: 4.0,
-        hoursEstimated: 40,
-        hoursActual: 32
+        project_id: 1,
+        title: "Ejecutivo NFC",
+        delivery_date: new Date(2023, 2, 20).toISOString(), // Marzo 20, 2023
+        due_date: new Date(2023, 2, 20).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 4.0,
+        brief_compliance: 4.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 6
       {
-        clientId: 17,
-        name: "Ejecutivo Sony One Febrero",
-        deliveryMonth: "3", // Mes de entrega (Mar)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0,
-        hoursEstimated: 40,
-        hoursActual: 32
+        project_id: 1,
+        title: "Ejecutivo Sony One Febrero",
+        delivery_date: new Date(2023, 2, 25).toISOString(), // Marzo 25, 2023
+        due_date: new Date(2023, 2, 25).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 7
       {
-        clientId: 17,
-        name: "Mensual Marzo",
-        deliveryMonth: "4", // Mes de entrega (Apr)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0
+        project_id: 1,
+        title: "Mensual Marzo",
+        delivery_date: new Date(2023, 3, 15).toISOString(), // Abril 15, 2023
+        due_date: new Date(2023, 3, 15).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       },
       // Entregable 8
       {
-        clientId: 17,
-        name: "Ejecutivo Comercios",
-        deliveryMonth: "4", // Mes de entrega (Apr)
-        deliveryOnTime: true,
-        narrativeQuality: 5.0,
-        graphicsEffectiveness: 5.0,
-        formatDesign: 5.0,
-        relevantInsights: 5.0,
-        operationsFeedback: 5.0,
-        clientFeedback: 5.0,
-        briefCompliance: 5.0
+        project_id: 1,
+        title: "Ejecutivo Comercios",
+        delivery_date: new Date(2023, 3, 25).toISOString(), // Abril 25, 2023
+        due_date: new Date(2023, 3, 25).toISOString(),
+        on_time: true,
+        narrative_quality: 5.0,
+        graphics_effectiveness: 5.0,
+        format_design: 5.0,
+        relevant_insights: 5.0,
+        operations_feedback: 5.0,
+        client_feedback: 5.0,
+        brief_compliance: 5.0,
+        notes: "Analistas: Vanu, Trini. PM: Vanu. Datos basados en Excel MODO."
       }
     ];
 
     // Agregando datos a la tabla de entregables
     for (const deliverable of deliverablesData) {
-      console.log(`Insertando entregable: ${deliverable.name}`);
+      console.log(`Insertando entregable: ${deliverable.title}`);
       await db.insert(deliverables).values(deliverable);
     }
     console.log("Entregables insertados correctamente.");
@@ -142,36 +147,18 @@ async function insertModoData() {
     // 2. Insertamos los comentarios del cliente
     const commentsData = [
       {
-        clientId: 17, // El ID del cliente MODO en la base de datos
-        comments: "En MODO necesitamos que la info sea mas visual. Ajustaria un poco la info para que no haya tanto texto y pueda visualizarse la informacion de manera que impacte más a las personas que toman decisiones",
+        client_id: 17, // El ID del cliente MODO en la base de datos
+        comment_text: "En MODO necesitamos que la info sea mas visual. Ajustaria un poco la info para que no haya tanto texto y pueda visualizarse la informacion de manera que impacte más a las personas que toman decisiones",
         year: 2023,
         quarter: 1,
-        totalScore: 4.83,
-        generalQuality: 5.0,
-        insightsClarity: 5.0,
-        presentation: 4.5,
-        nps: 5.0,
-        clientSurvey: 4.88,
-        operationsFeedback: 4.91,
-        hoursCompliance: 4.83,
-        clientFeedback: 4.71,
-        briefCompliance: 4.86
+        timestamp: new Date(2023, 2, 30).toISOString() // 30 de marzo, 2023
       },
       {
-        clientId: 17,
-        comments: "Bien: entrega y presentacion de los informes Refuerzo: tiempos. A veces necesitamos los informes esten antes para poder tomar otro tipo de decisión. Sin embargo, cada vez que necesitamos algo, estan ahi presentandolo :)",
+        client_id: 17,
+        comment_text: "Bien: entrega y presentacion de los informes Refuerzo: tiempos. A veces necesitamos los informes esten antes para poder tomar otro tipo de decisión. Sin embargo, cada vez que necesitamos algo, estan ahi presentandolo :)",
         year: 2023,
         quarter: 2,
-        totalScore: 4.84,
-        generalQuality: 5.0,
-        insightsClarity: 5.0,
-        presentation: 4.5,
-        nps: 5.0,
-        clientSurvey: 4.88,
-        operationsFeedback: 4.91,
-        hoursCompliance: 4.83,
-        clientFeedback: 4.71,
-        briefCompliance: 4.86
+        timestamp: new Date(2023, 5, 15).toISOString() // 15 de junio, 2023
       }
     ];
 
