@@ -1918,12 +1918,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<ClientModoComment | undefined> {
+    console.log(`Buscando comentario MODO para cliente ID: ${clientId}, Q${quarter} ${year}`);
     const [comment] = await db
       .select()
       .from(clientModoComments)
       .where(
         and(
-          eq(clientModoComments.clientId, clientId),
+          eq(clientModoComments.client_id, clientId),
           eq(clientModoComments.quarter, quarter),
           eq(clientModoComments.year, year)
         )
@@ -1931,8 +1932,21 @@ export class DatabaseStorage implements IStorage {
     return comment;
   }
   
-  async createClientModoComment(comment: InsertClientModoComment): Promise<ClientModoComment> {
-    const [newComment] = await db.insert(clientModoComments).values(comment).returning();
+  async createClientModoComment(comment: any): Promise<ClientModoComment> {
+    // Ajustamos para la estructura real de la tabla
+    console.log("Datos recibidos para crear comentario MODO:", comment);
+    
+    // Adaptamos los datos al esquema real de la tabla
+    const dataToInsert = {
+      client_id: comment.clientId || comment.client_id,
+      comment_text: comment.comment_text || comment.comments,
+      year: comment.year,
+      quarter: comment.quarter,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log("Datos a insertar:", dataToInsert);
+    const [newComment] = await db.insert(clientModoComments).values(dataToInsert).returning();
     return newComment;
   }
   
