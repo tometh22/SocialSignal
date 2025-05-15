@@ -2161,34 +2161,123 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable> {
+  async createDeliverable(deliverable: any): Promise<Deliverable> {
     try {
-      const [newDeliverable] = await db
-        .insert(deliverables)
-        .values({
-          ...deliverable,
-          created_at: new Date()
-        })
-        .returning();
+      console.log("Datos recibidos para crear entregable:", deliverable);
       
-      return newDeliverable;
+      // Adaptamos los datos al esquema real de la tabla
+      const dataToInsert = {
+        project_id: deliverable.projectId || deliverable.project_id,
+        title: deliverable.name || deliverable.title,
+        delivery_date: deliverable.deliveryDate || new Date().toISOString(),
+        due_date: deliverable.dueDate || deliverable.due_date || new Date().toISOString(),
+        on_time: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
+        narrative_quality: deliverable.narrativeQuality || deliverable.narrative_quality,
+        graphics_effectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness,
+        format_design: deliverable.formatDesign || deliverable.format_design,
+        relevant_insights: deliverable.relevantInsights || deliverable.relevant_insights,
+        operations_feedback: deliverable.operationsFeedback || deliverable.operations_feedback,
+        client_feedback: deliverable.clientFeedback || deliverable.client_feedback,
+        brief_compliance: deliverable.briefCompliance || deliverable.brief_compliance,
+        notes: deliverable.notes || "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log("Datos a insertar:", dataToInsert);
+      
+      // Usamos SQL directo para evitar problemas de mapeo con Drizzle
+      const { rows } = await db.execute(
+        `INSERT INTO deliverables (
+          project_id, title, delivery_date, due_date, on_time, 
+          narrative_quality, graphics_effectiveness, format_design, 
+          relevant_insights, operations_feedback, client_feedback, 
+          brief_compliance, notes, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+        ) RETURNING *`,
+        [
+          dataToInsert.project_id,
+          dataToInsert.title,
+          dataToInsert.delivery_date,
+          dataToInsert.due_date,
+          dataToInsert.on_time,
+          dataToInsert.narrative_quality,
+          dataToInsert.graphics_effectiveness,
+          dataToInsert.format_design,
+          dataToInsert.relevant_insights,
+          dataToInsert.operations_feedback,
+          dataToInsert.client_feedback,
+          dataToInsert.brief_compliance,
+          dataToInsert.notes,
+          dataToInsert.created_at,
+          dataToInsert.updated_at
+        ]
+      );
+      
+      return rows[0];
     } catch (error) {
       console.error("Error al crear entregable:", error);
       throw error;
     }
   }
   
-  async updateDeliverable(id: number, data: Partial<InsertDeliverable>): Promise<Deliverable | undefined> {
+  async updateDeliverable(id: number, data: any): Promise<Deliverable | undefined> {
     try {
-      const [updatedDeliverable] = await db
-        .update(deliverables)
-        .set(data)
-        .where(eq(deliverables.id, id))
-        .returning();
+      console.log(`Actualizando entregable ID ${id} con datos:`, data);
       
-      return updatedDeliverable;
+      // Preparamos los datos para actualizar según la estructura real de la tabla
+      const updateData: any = { updated_at: new Date().toISOString() };
+      
+      // Mapeamos los campos según corresponda en la estructura real
+      if (data.name !== undefined) updateData.title = data.name;
+      if (data.title !== undefined) updateData.title = data.title;
+      if (data.projectId !== undefined) updateData.project_id = data.projectId;
+      if (data.project_id !== undefined) updateData.project_id = data.project_id;
+      if (data.deliveryDate !== undefined) updateData.delivery_date = data.deliveryDate;
+      if (data.delivery_date !== undefined) updateData.delivery_date = data.delivery_date;
+      if (data.dueDate !== undefined) updateData.due_date = data.dueDate;
+      if (data.due_date !== undefined) updateData.due_date = data.due_date;
+      if (data.onTime !== undefined) updateData.on_time = data.onTime;
+      if (data.deliveryOnTime !== undefined) updateData.on_time = data.deliveryOnTime;
+      if (data.on_time !== undefined) updateData.on_time = data.on_time;
+      if (data.narrativeQuality !== undefined) updateData.narrative_quality = data.narrativeQuality;
+      if (data.narrative_quality !== undefined) updateData.narrative_quality = data.narrative_quality;
+      if (data.graphicsEffectiveness !== undefined) updateData.graphics_effectiveness = data.graphicsEffectiveness;
+      if (data.graphics_effectiveness !== undefined) updateData.graphics_effectiveness = data.graphics_effectiveness;
+      if (data.formatDesign !== undefined) updateData.format_design = data.formatDesign;
+      if (data.format_design !== undefined) updateData.format_design = data.format_design;
+      if (data.relevantInsights !== undefined) updateData.relevant_insights = data.relevantInsights;
+      if (data.relevant_insights !== undefined) updateData.relevant_insights = data.relevant_insights;
+      if (data.operationsFeedback !== undefined) updateData.operations_feedback = data.operationsFeedback;
+      if (data.operations_feedback !== undefined) updateData.operations_feedback = data.operations_feedback;
+      if (data.clientFeedback !== undefined) updateData.client_feedback = data.clientFeedback;
+      if (data.client_feedback !== undefined) updateData.client_feedback = data.client_feedback;
+      if (data.briefCompliance !== undefined) updateData.brief_compliance = data.briefCompliance;
+      if (data.brief_compliance !== undefined) updateData.brief_compliance = data.brief_compliance;
+      if (data.notes !== undefined) updateData.notes = data.notes;
+      
+      console.log("Datos de actualización preparados:", updateData);
+      
+      // Construimos un SET dinámico para la consulta SQL
+      const setClauses = Object.keys(updateData).map((key, index) => `${key} = $${index + 2}`).join(', ');
+      const values = [id, ...Object.values(updateData)];
+      
+      // Ejecutamos la consulta SQL directa
+      const { rows } = await db.execute(
+        `UPDATE deliverables SET ${setClauses} WHERE id = $1 RETURNING *`,
+        values
+      );
+      
+      if (rows.length === 0) {
+        console.log(`No se encontró el entregable con ID ${id}`);
+        return undefined;
+      }
+      
+      console.log(`Entregable ID ${id} actualizado correctamente`);
+      return rows[0];
     } catch (error) {
-      console.error("Error al actualizar entregable:", error);
+      console.error(`Error al actualizar entregable ID ${id}:`, error);
       throw error;
     }
   }
