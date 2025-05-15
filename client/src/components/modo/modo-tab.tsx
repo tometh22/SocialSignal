@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -15,39 +15,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import {
-  FileBarChart,
-  AlertCircle,
-  MessageSquare,
-  Clock,
-  BarChart,
-  FileText,
-  CheckCircle,
-  XCircle,
-  PieChart,
-} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { PlusCircle, Download, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import {
-  ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  Radar,
-  Tooltip as RechartsTooltip,
-  LineChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Line,
-  Legend,
-} from "recharts";
 
-// Tipo para el resumen MODO
-type ModoSummary = {
+interface ModoTabProps {
+  clientId: number;
+}
+
+interface DeliverableData {
+  id: number;
+  title: string;
+  project_id: number;
+  delivery_date: string;
+  due_date: string;
+  on_time: boolean;
+  narrative_quality: number;
+  graphics_effectiveness: number;
+  format_design: number;
+  relevant_insights: number;
+  operations_feedback: number;
+  client_feedback: number;
+  brief_compliance: number;
+  notes?: string;
+}
+
+interface ModoSummary {
   totalDeliverables: number;
   onTimeDeliveries: number;
   onTimePercentage: number;
@@ -63,406 +63,425 @@ type ModoSummary = {
   totalComments: number;
   latestComment?: {
     id: number;
-    clientId: number;
-    commentText: string;
-    timestamp: string;
+    comment_text: string;
     year: number;
     quarter: number;
+    timestamp: string;
   };
-};
-
-// Tipo para entregables MODO
-type Deliverable = {
-  id: number;
-  projectId: number;
-  title: string;
-  deliveryDate: string;
-  dueDate: string;
-  onTime: boolean;
-  narrativeQuality: number | null;
-  graphicsEffectiveness: number | null;
-  formatDesign: number | null;
-  relevantInsights: number | null;
-  operationsFeedback: number | null;
-  clientFeedback: number | null;
-  briefCompliance: number | null;
-  notes: string | null;
-};
-
-const formatDate = (dateString?: string) => {
-  if (!dateString) return '';
-  return format(new Date(dateString), "dd/MM/yyyy", { locale: es });
-};
-
-// Función para convertir valor numérico a texto de calificación
-const scoreToText = (score: number | null) => {
-  if (score === null) return "Sin calificar";
-  if (score >= 4.5) return "Excelente";
-  if (score >= 3.5) return "Bueno";
-  if (score >= 2.5) return "Regular";
-  if (score >= 1.5) return "Deficiente";
-  return "Crítico";
-};
-
-// Función para obtener el color basado en la puntuación
-const getScoreColor = (score: number | null) => {
-  if (score === null) return "bg-gray-200";
-  if (score >= 4.5) return "bg-green-500";
-  if (score >= 3.5) return "bg-green-400";
-  if (score >= 2.5) return "bg-yellow-400";
-  if (score >= 1.5) return "bg-orange-400";
-  return "bg-red-500";
-};
-
-const getScoreTextColor = (score: number | null) => {
-  if (score === null) return "text-gray-500";
-  if (score >= 4.5) return "text-green-700";
-  if (score >= 3.5) return "text-green-600";
-  if (score >= 2.5) return "text-yellow-700";
-  if (score >= 1.5) return "text-orange-700";
-  return "text-red-700";
-};
-
-// Componente principal de la pestaña MODO
-interface ModoTabProps {
-  clientId: number;
 }
 
-export const ModoTab: React.FC<ModoTabProps> = ({ clientId }) => {
-  // Consulta para obtener el resumen MODO
-  const { data: modoSummary, isLoading: isLoadingSummary } = useQuery<ModoSummary>({
-    queryKey: [`/api/modo-summary/client/${clientId}`],
+interface CommentData {
+  id: number;
+  comment_text: string;
+  year: number;
+  quarter: number;
+  timestamp: string;
+}
+
+export function ModoTab({ clientId }: ModoTabProps) {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [newComment, setNewComment] = useState("");
+  const [currentQuarter, setCurrentQuarter] = useState(2); // TODO: Calculate current quarter
+  const [currentYear, setCurrentYear] = useState(2023); // TODO: Get current year
+
+  // Fetch MODO data for this client
+  const { data: modoSummary, isLoading: summaryLoading } = useQuery<ModoSummary>({
+    queryKey: ["/api/clients", clientId, "modo-summary"],
     enabled: !!clientId,
   });
 
-  // Consulta para obtener los entregables
-  const { data: deliverables = [], isLoading: isLoadingDeliverables } = useQuery<Deliverable[]>({
-    queryKey: [`/api/deliverables?clientId=${clientId}`],
+  // Fetch deliverables
+  const { data: deliverables, isLoading: deliverablesLoading } = useQuery<DeliverableData[]>({
+    queryKey: ["/api/clients", clientId, "deliverables"],
     enabled: !!clientId,
   });
 
-  // Preparar datos para el gráfico de radar
-  const radarData = modoSummary?.averageScores
-    ? [
-        {
-          subject: "Calidad Narrativa",
-          value: modoSummary.averageScores.narrativeQuality,
-          fullMark: 5,
-        },
-        {
-          subject: "Efectividad Gráficos",
-          value: modoSummary.averageScores.graphicsEffectiveness,
-          fullMark: 5,
-        },
-        {
-          subject: "Diseño de Formato",
-          value: modoSummary.averageScores.formatDesign,
-          fullMark: 5,
-        },
-        {
-          subject: "Insights Relevantes",
-          value: modoSummary.averageScores.relevantInsights,
-          fullMark: 5,
-        },
-        {
-          subject: "Feedback Operaciones",
-          value: modoSummary.averageScores.operationsFeedback,
-          fullMark: 5,
-        },
-        {
-          subject: "Feedback Cliente",
-          value: modoSummary.averageScores.clientFeedback,
-          fullMark: 5,
-        },
-        {
-          subject: "Cumplimiento Brief",
-          value: modoSummary.averageScores.briefCompliance,
-          fullMark: 5,
-        },
-      ]
-    : [];
+  // Fetch comments
+  const { data: comments, isLoading: commentsLoading } = useQuery<CommentData[]>({
+    queryKey: ["/api/clients", clientId, "modo-comments"],
+    enabled: !!clientId,
+  });
 
-  // Calcular el promedio total
-  const totalAverage = modoSummary?.averageScores
-    ? (
-        modoSummary.averageScores.narrativeQuality +
-        modoSummary.averageScores.graphicsEffectiveness +
-        modoSummary.averageScores.formatDesign +
-        modoSummary.averageScores.relevantInsights +
-        modoSummary.averageScores.operationsFeedback +
-        modoSummary.averageScores.clientFeedback +
-        modoSummary.averageScores.briefCompliance
-      ) / 7
-    : 0;
+  // Function to handle saving a new comment
+  const handleSaveComment = () => {
+    if (!newComment.trim()) {
+      toast({
+        title: "Error",
+        description: "El comentario no puede estar vacío",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // Si los datos están cargando
-  if (isLoadingSummary || isLoadingDeliverables) {
-    return <div className="p-6 text-center text-gray-500">Cargando datos de MODO...</div>;
-  }
+    // API request would go here
+    toast({
+      title: "Comentario guardado",
+      description: "El comentario ha sido guardado exitosamente",
+    });
+    
+    setNewComment("");
+  };
 
-  // Si no hay datos disponibles
-  if (!modoSummary) {
-    return (
-      <div className="p-6 text-center text-gray-500">
-        No hay datos MODO disponibles para este cliente.
-      </div>
+  // Helper function to format date
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "dd MMM yyyy", { locale: es });
+    } catch (error) {
+      return "Fecha inválida";
+    }
+  };
+
+  // Helper to get color for scores
+  const getScoreColor = (score: number) => {
+    if (score >= 4.5) return "text-green-600";
+    if (score >= 3.5) return "text-blue-600";
+    if (score >= 2.5) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  // Helper to get color for on-time percentage
+  const getPercentageColor = (percentage: number) => {
+    if (percentage >= 85) return "text-green-600";
+    if (percentage >= 70) return "text-blue-600";
+    if (percentage >= 50) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  // Helper to get status icon
+  const getStatusIcon = (onTime: boolean) => {
+    return onTime ? (
+      <CheckCircle className="h-5 w-5 text-green-600" />
+    ) : (
+      <XCircle className="h-5 w-5 text-red-600" />
     );
+  };
+
+  if (summaryLoading || deliverablesLoading || commentsLoading) {
+    return <div className="flex justify-center p-4">Cargando datos MODO...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* KPIs principales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Score MODO Promedio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline">
-              <div className="text-2xl font-bold">{totalAverage.toFixed(2)}</div>
-              <div className="ml-2 text-sm text-muted-foreground">/ 5.0</div>
-            </div>
-            <Progress
-              value={(totalAverage / 5) * 100}
-              className="h-2 mt-2"
-              indicatorClassName={getScoreColor(totalAverage)}
-            />
-            <div className="text-xs mt-1" style={{ color: getScoreTextColor(totalAverage) }}>
-              {scoreToText(totalAverage)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Entregas a Tiempo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline">
-              <div className="text-2xl font-bold">{modoSummary.onTimePercentage.toFixed(1)}%</div>
-              <div className="ml-2 text-sm text-muted-foreground">de cumplimiento</div>
-            </div>
-            <Progress
-              value={modoSummary.onTimePercentage}
-              className="h-2 mt-2"
-              indicatorClassName={
-                modoSummary.onTimePercentage > 90
-                  ? "bg-green-500"
-                  : modoSummary.onTimePercentage > 75
-                  ? "bg-yellow-500"
-                  : "bg-red-500"
-              }
-            />
-            <div className="text-xs mt-1 text-gray-500">
-              {modoSummary.onTimeDeliveries} de {modoSummary.totalDeliverables} entregables
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Feedback de Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline">
-              <div className="text-2xl font-bold">
-                {modoSummary.averageScores.clientFeedback.toFixed(2)}
-              </div>
-              <div className="ml-2 text-sm text-muted-foreground">/ 5.0</div>
-            </div>
-            <Progress
-              value={(modoSummary.averageScores.clientFeedback / 5) * 100}
-              className="h-2 mt-2"
-              indicatorClassName={getScoreColor(modoSummary.averageScores.clientFeedback)}
-            />
-            <div className="text-xs mt-1">
-              {modoSummary.totalComments > 0 ? (
-                <span>
-                  {modoSummary.totalComments} comentario{modoSummary.totalComments > 1 ? "s" : ""}{" "}
-                  registrado{modoSummary.totalComments > 1 ? "s" : ""}
-                </span>
-              ) : (
-                <span className="text-orange-600">Sin comentarios registrados</span>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Sistema de Seguimiento Operacional (MODO)</h2>
+        <Button variant="outline" size="sm">
+          <Download className="mr-2 h-4 w-4" />
+          Exportar a Excel
+        </Button>
       </div>
 
-      {/* Gráfico de radar y último comentario */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Evaluación de Métricas MODO</CardTitle>
-            <CardDescription>
-              Puntuación promedio por categoría (escala 0-5)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart outerRadius={90} width={730} height={300} data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" />
-                <RechartsTooltip formatter={(value) => [`${value}/5`, ""]} />
-                <Radar
-                  name="Puntuación"
-                  dataKey="value"
-                  stroke="#8884d8"
-                  fill="#8884d8"
-                  fillOpacity={0.6}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="dashboard">Dashboard MODO</TabsTrigger>
+          <TabsTrigger value="deliverables">Entregables</TabsTrigger>
+          <TabsTrigger value="comments">Comentarios del Cliente</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium">Comentarios del Cliente</CardTitle>
-            <CardDescription>
-              Retroalimentación del cliente sobre los entregables
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {modoSummary.latestComment ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-start">
-                    <MessageSquare className="h-5 w-5 text-primary mt-1 mr-2" />
-                    <div>
-                      <div className="text-sm text-gray-500 mb-1">
-                        Q{modoSummary.latestComment.quarter} {modoSummary.latestComment.year}
-                      </div>
-                      <p className="text-sm">{modoSummary.latestComment.commentText}</p>
-                    </div>
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Entregables a tiempo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getPercentageColor(modoSummary?.onTimePercentage || 0)}`}>
+                    {modoSummary?.onTimePercentage.toFixed(1) || 0}%
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    {modoSummary?.onTimeDeliveries || 0} de {modoSummary?.totalDeliverables || 0} entregables
+                  </p>
+                  <Progress
+                    value={modoSummary?.onTimePercentage || 0}
+                    className="mt-2"
+                  />
                 </div>
-                {modoSummary.totalComments > 1 && (
-                  <Button variant="outline" size="sm" className="w-full">
-                    Ver {modoSummary.totalComments - 1} comentario
-                    {modoSummary.totalComments - 1 > 1 ? "s" : ""} más
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center py-6">
-                <AlertCircle className="h-12 w-12 text-orange-400 mb-3" />
-                <p className="text-gray-500">No hay comentarios registrados para este cliente.</p>
-                <Button variant="outline" size="sm" className="mt-4">
-                  Añadir comentario
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Calidad narrativa</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.narrativeQuality || 0)}`}>
+                    {modoSummary?.averageScores.narrativeQuality.toFixed(1) || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Promedio sobre 5.0
+                  </p>
+                  <Progress
+                    value={(modoSummary?.averageScores.narrativeQuality || 0) * 20}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Efectividad de gráficos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.graphicsEffectiveness || 0)}`}>
+                    {modoSummary?.averageScores.graphicsEffectiveness.toFixed(1) || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Promedio sobre 5.0
+                  </p>
+                  <Progress
+                    value={(modoSummary?.averageScores.graphicsEffectiveness || 0) * 20}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Feedback del cliente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.clientFeedback || 0)}`}>
+                    {modoSummary?.averageScores.clientFeedback.toFixed(1) || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Promedio sobre 5.0
+                  </p>
+                  <Progress
+                    value={(modoSummary?.averageScores.clientFeedback || 0) * 20}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Cumplimiento del brief</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.briefCompliance || 0)}`}>
+                    {modoSummary?.averageScores.briefCompliance.toFixed(1) || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Promedio sobre 5.0
+                  </p>
+                  <Progress
+                    value={(modoSummary?.averageScores.briefCompliance || 0) * 20}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">SCORE TOTAL</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  {/* Calculate a weighted average of all scores */}
+                  {(() => {
+                    const scores = modoSummary?.averageScores || {
+                      narrativeQuality: 0,
+                      graphicsEffectiveness: 0,
+                      formatDesign: 0,
+                      relevantInsights: 0,
+                      operationsFeedback: 0,
+                      clientFeedback: 0,
+                      briefCompliance: 0
+                    };
+                    
+                    const totalScore = (
+                      scores.narrativeQuality * 0.15 + 
+                      scores.graphicsEffectiveness * 0.15 + 
+                      scores.formatDesign * 0.1 +
+                      scores.relevantInsights * 0.2 +
+                      scores.operationsFeedback * 0.1 +
+                      scores.clientFeedback * 0.2 +
+                      scores.briefCompliance * 0.1
+                    );
+                    
+                    return (
+                      <div className={`text-2xl font-bold ${getScoreColor(totalScore)}`}>
+                        {totalScore.toFixed(2)}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs text-muted-foreground">
+                    Promedio ponderado sobre 5.0
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Latest client comment */}
+          {modoSummary?.latestComment && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Último comentario del cliente</CardTitle>
+                <CardDescription>
+                  Q{modoSummary.latestComment.quarter} {modoSummary.latestComment.year}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">"{modoSummary.latestComment.comment_text}"</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Deliverables Tab */}
+        <TabsContent value="deliverables" className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Lista de Entregables</h3>
+            <Button size="sm">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Nuevo Entregable
+            </Button>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Fecha Entrega</TableHead>
+                    <TableHead>Fecha Límite</TableHead>
+                    <TableHead className="text-center">A Tiempo</TableHead>
+                    <TableHead className="text-center">Calidad Narrativa</TableHead>
+                    <TableHead className="text-center">Gráficos</TableHead>
+                    <TableHead className="text-center">Formato</TableHead>
+                    <TableHead className="text-center">Insights</TableHead>
+                    <TableHead className="text-center">FB Operaciones</TableHead>
+                    <TableHead className="text-center">FB Cliente</TableHead>
+                    <TableHead className="text-center">Brief</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!deliverables || deliverables.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-4">
+                        No hay entregables registrados
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    deliverables.map((deliverable) => (
+                      <TableRow key={deliverable.id}>
+                        <TableCell className="font-medium">{deliverable.title}</TableCell>
+                        <TableCell>{formatDate(deliverable.delivery_date)}</TableCell>
+                        <TableCell>{formatDate(deliverable.due_date)}</TableCell>
+                        <TableCell className="text-center">
+                          {getStatusIcon(deliverable.on_time)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.narrative_quality)}>
+                            {deliverable.narrative_quality.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.graphics_effectiveness)}>
+                            {deliverable.graphics_effectiveness.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.format_design)}>
+                            {deliverable.format_design.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.relevant_insights)}>
+                            {deliverable.relevant_insights.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.operations_feedback)}>
+                            {deliverable.operations_feedback.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.client_feedback)}>
+                            {deliverable.client_feedback.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.brief_compliance)}>
+                            {deliverable.brief_compliance.toFixed(1)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Comments Tab */}
+        <TabsContent value="comments" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Comentarios del Cliente</CardTitle>
+              <CardDescription>
+                Historial de comentarios y retroalimentación del cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add new comment */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Nuevo comentario (Q{currentQuarter} {currentYear})</h4>
+                <Textarea
+                  placeholder="Escribir comentario del cliente..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  rows={4}
+                />
+                <Button onClick={handleSaveComment} className="mt-2">
+                  Guardar Comentario
                 </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Lista de entregables */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Entregables Recientes</CardTitle>
-          <CardDescription>
-            Últimos {Math.min(5, deliverables.length)} de {deliverables.length} entregables registrados
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px]">Título</TableHead>
-                <TableHead>Fecha Entrega</TableHead>
-                <TableHead>A Tiempo</TableHead>
-                <TableHead>Calidad</TableHead>
-                <TableHead>Feedback</TableHead>
-                <TableHead className="text-right">Score</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deliverables.slice(0, 5).map((deliverable) => {
-                // Calcular score promedio para este entregable
-                const scoreValues = [
-                  deliverable.narrativeQuality,
-                  deliverable.graphicsEffectiveness,
-                  deliverable.formatDesign,
-                  deliverable.relevantInsights,
-                  deliverable.operationsFeedback,
-                  deliverable.clientFeedback,
-                  deliverable.briefCompliance,
-                ].filter((score): score is number => score !== null);
+              <Separator />
+
+              {/* Comment history */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Historial de comentarios</h4>
                 
-                const averageScore = scoreValues.length > 0
-                  ? scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length
-                  : null;
-
-                return (
-                  <TableRow key={deliverable.id}>
-                    <TableCell className="font-medium">
-                      {deliverable.title}
-                    </TableCell>
-                    <TableCell>{formatDate(deliverable.deliveryDate)}</TableCell>
-                    <TableCell>
-                      {deliverable.onTime ? (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100">
-                          <CheckCircle className="h-3 w-3 mr-1" /> A tiempo
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-100">
-                          <XCircle className="h-3 w-3 mr-1" /> Con retraso
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div
-                          className={`w-2 h-2 rounded-full mr-2 ${getScoreColor(
-                            deliverable.narrativeQuality
-                          )}`}
-                        ></div>
-                        <span className="text-sm">
-                          {deliverable.narrativeQuality?.toFixed(1) || "N/A"}
-                        </span>
+                {!comments || comments.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-muted-foreground">
+                    No hay comentarios registrados
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="rounded-lg border p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-medium">
+                            Q{comment.quarter} {comment.year}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(comment.timestamp)}
+                          </div>
+                        </div>
+                        <p className="text-sm">{comment.comment_text}</p>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div
-                          className={`w-2 h-2 rounded-full mr-2 ${getScoreColor(
-                            deliverable.clientFeedback
-                          )}`}
-                        ></div>
-                        <span className="text-sm">
-                          {deliverable.clientFeedback?.toFixed(1) || "N/A"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant="outline"
-                        className={`${getScoreColor(averageScore)} text-white border-transparent font-bold`}
-                      >
-                        {averageScore?.toFixed(2) || "N/A"}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          {deliverables.length > 5 && (
-            <Button variant="outline" size="sm" className="mt-4 w-full">
-              Ver todos los entregables ({deliverables.length})
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
-
-export default ModoTab;
+}

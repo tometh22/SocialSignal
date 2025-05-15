@@ -1739,5 +1739,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /* MODO Routes START */
+  app.get("/api/clients/:id/modo-summary", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Cliente ID inválido" });
+      }
+
+      const modoSummary = await storage.getClientModoSummary(clientId);
+      res.json(modoSummary);
+    } catch (error) {
+      console.error("Error al obtener resumen MODO:", error);
+      res.status(500).json({ message: "Error al obtener resumen MODO" });
+    }
+  });
+
+  app.get("/api/clients/:id/deliverables", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Cliente ID inválido" });
+      }
+
+      // Obtener proyectos del cliente
+      const projects = await storage.getActiveProjectsByClient(clientId);
+      const projectIds = projects.map(p => p.id);
+
+      // Si no hay proyectos, devolver lista vacía
+      if (projectIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Obtener entregables de los proyectos del cliente
+      const deliverables = await storage.getDeliverablesByProjects(projectIds);
+      res.json(deliverables);
+    } catch (error) {
+      console.error("Error al obtener entregables:", error);
+      res.status(500).json({ message: "Error al obtener entregables" });
+    }
+  });
+
+  app.get("/api/clients/:id/modo-comments", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Cliente ID inválido" });
+      }
+
+      const comments = await storage.getClientModoComments(clientId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error al obtener comentarios MODO:", error);
+      res.status(500).json({ message: "Error al obtener comentarios MODO" });
+    }
+  });
+
+  app.post("/api/clients/:id/modo-comments", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Cliente ID inválido" });
+      }
+
+      const currentUser = req.user as any;
+      if (!currentUser) {
+        return res.status(401).json({ message: "Acceso no autorizado" });
+      }
+
+      const schema = insertClientModoCommentSchema.parse({
+        ...req.body,
+        clientId,
+        createdBy: currentUser.id
+      });
+
+      const comment = await storage.createClientModoComment(schema);
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error al crear comentario MODO:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: "Error al crear comentario MODO" });
+    }
+  });
+
+  app.post("/api/deliverables", async (req, res) => {
+    try {
+      const currentUser = req.user as any;
+      if (!currentUser) {
+        return res.status(401).json({ message: "Acceso no autorizado" });
+      }
+
+      // Validar datos
+      const schema = insertDeliverableSchema.parse({
+        ...req.body,
+        createdBy: currentUser.id
+      });
+
+      const deliverable = await storage.createDeliverable(schema);
+      res.status(201).json(deliverable);
+    } catch (error) {
+      console.error("Error al crear entregable:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: "Error al crear entregable" });
+    }
+  });
+
+  app.put("/api/deliverables/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "ID de entregable inválido" });
+      }
+
+      const currentUser = req.user as any;
+      if (!currentUser) {
+        return res.status(401).json({ message: "Acceso no autorizado" });
+      }
+
+      // Actualizar solo los campos enviados
+      const deliverable = await storage.updateDeliverable(id, {
+        ...req.body,
+        updatedAt: new Date()
+      });
+
+      if (!deliverable) {
+        return res.status(404).json({ message: "Entregable no encontrado" });
+      }
+
+      res.json(deliverable);
+    } catch (error) {
+      console.error("Error al actualizar entregable:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: "Error al actualizar entregable" });
+    }
+  });
+  /* MODO Routes END */
+
   return httpServer;
 }
