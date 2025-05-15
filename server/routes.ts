@@ -1748,10 +1748,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cliente ID inválido" });
       }
 
-      // Obtener entregables directamente
-      const { rows: deliverables } = await db.execute(
-        `SELECT * FROM deliverables WHERE project_id = ${clientId}`
+      // Obtener entregables a través de proyectos activos relacionados con el cliente
+      const { rows: activeProjects } = await db.execute(
+        `SELECT ap.id FROM active_projects ap
+         JOIN quotations q ON ap.quotation_id = q.id
+         WHERE q.client_id = ${clientId}`
       );
+      
+      // Si no hay proyectos, devolver resultado vacío
+      if (!activeProjects.length) {
+        console.log(`No hay proyectos activos para el cliente ID ${clientId}`);
+        return res.json({
+          totalDeliverables: 0,
+          onTimeDeliveries: 0,
+          onTimePercentage: 0,
+          averageScores: {
+            narrativeQuality: 0,
+            graphicsEffectiveness: 0,
+            formatDesign: 0,
+            relevantInsights: 0,
+            operationsFeedback: 0,
+            clientFeedback: 0,
+            briefCompliance: 0
+          },
+          totalComments: 0
+        });
+      }
+      
+      // Crear lista de IDs de proyectos para usar en IN clause
+      const projectIds = activeProjects.map(p => p.id).join(',');
+      
+      // Obtener entregables usando los IDs de proyectos activos
+      const { rows: deliverables } = await db.execute(
+        `SELECT * FROM deliverables WHERE project_id IN (${projectIds})`
+      );
+      
+      console.log(`Obtenidos ${deliverables.length} entregables para proyectos: ${projectIds}`);
       
       console.log(`Calculando resumen MODO para cliente ID ${clientId}: ${deliverables.length} entregables`);
       
@@ -1865,16 +1897,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cliente ID inválido" });
       }
 
-      // Obtener entregables directamente por el client_id (project_id)
-      // En el caso de MODO, los entregables están asociados directamente al cliente
-      const deliverables = await db.execute(
+      // Obtener proyectos activos relacionados con el cliente
+      const { rows: activeProjects } = await db.execute(
+        `SELECT ap.id FROM active_projects ap
+         JOIN quotations q ON ap.quotation_id = q.id
+         WHERE q.client_id = ${clientId}`
+      );
+      
+      // Si no hay proyectos, devolver array vacío
+      if (!activeProjects.length) {
+        console.log(`No hay proyectos activos para el cliente ID ${clientId}`);
+        return res.json([]);
+      }
+      
+      // Crear lista de IDs de proyectos para usar en IN clause
+      const projectIds = activeProjects.map(p => p.id).join(',');
+      
+      // Obtener entregables usando los IDs de proyectos activos
+      const { rows } = await db.execute(
         `SELECT * FROM deliverables 
-         WHERE project_id = ${clientId} 
+         WHERE project_id IN (${projectIds})
          ORDER BY delivery_date DESC`
       );
       
-      console.log(`Encontrados ${deliverables.rows.length} entregables para cliente ID ${clientId}`);
-      res.json(deliverables.rows);
+      console.log(`Obtenidos ${rows.length} entregables para el cliente ID ${clientId} en proyectos: ${projectIds}`);
+      res.json(rows);
     } catch (error) {
       console.error("Error al obtener entregables:", error);
       res.status(500).json({ message: "Error al obtener entregables" });
@@ -1897,20 +1944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener entregables para un cliente específico
-  app.get("/api/clients/:id/deliverables", async (req, res) => {
-    try {
-      const clientId = parseInt(req.params.id);
-      if (isNaN(clientId)) {
-        return res.status(400).json({ message: "Cliente ID inválido" });
-      }
-
-      const deliverables = await storage.getDeliverables(clientId);
-      res.json(deliverables);
-    } catch (error) {
-      console.error("Error al obtener entregables del cliente:", error);
-      res.status(500).json({ message: "Error al obtener entregables del cliente" });
-    }
-  });
+  /* Esta ruta está duplicada y no se usa */
 
   app.post("/api/clients/:id/modo-comments", async (req, res) => {
     try {
