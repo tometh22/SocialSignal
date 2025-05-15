@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { ChevronLeft, Layers } from "lucide-react";
+import { ChevronLeft, Layers, BaggageClaim } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -719,6 +719,10 @@ const ProjectSummary = () => {
                 <Layers className="h-4 w-4" />
                 Componentes
               </TabsTrigger>
+              <TabsTrigger value="modo" className="flex items-center gap-2">
+                <BaggageClaim className="h-4 w-4" />
+                MODO Metrics
+              </TabsTrigger>
               {/* Se pueden agregar más pestañas de configuración aquí */}
             </TabsList>
             
@@ -733,6 +737,13 @@ const ProjectSummary = () => {
                   }}
                 />
               </div>
+            </TabsContent>
+            
+            <TabsContent value="modo" className="mt-4">
+              <ProjectModoMetrics 
+                deliverable={deliverableData} 
+                projectId={parsedProjectId || 0} 
+              />
             </TabsContent>
           </Tabs>
         </div>
