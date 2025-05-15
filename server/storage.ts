@@ -812,19 +812,21 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
   
   constructor() {
-    // Crear store para sesiones usando PostgreSQL con configuración optimizada para multiusuario
+    // Crear store para sesiones usando PostgreSQL con configuración optimizada para alta disponibilidad
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
       pool,
-      tableName: 'session',
+      tableName: 'sessions', // Estandarizado a 'sessions' con 's' para consistencia
       createTableIfMissing: true,
-      // Configuración mejorada para persistencia y rendimiento
-      pruneSessionInterval: 3600, // Limpiar sesiones expiradas cada hora (más eficiente)
-      errorLog: (err) => console.error('Error en PgSessionStore:', err),
-      // Configuración para optimizar uso intensivo
-      disableTouch: false, // Mantener actualizada la fecha de expiración con cada request
-      touchAfter: 5, // Solo actualizar si pasaron al menos 5 segundos (evita sobrecarga)
-      ttl: 60 * 60 * 24 * 90 // 90 días (consistente con la configuración de cookie)
+      // Configuración crítica para asegurar persistencia extrema
+      pruneSessionInterval: 86400, // Limpiar solo una vez al día (cada 24 horas)
+      errorLog: (err) => {
+        console.error('ERROR CRÍTICO EN SESSION STORE:', err);
+        // Registrar errores críticos para solucionar problemas rápidamente
+      },
+      // Configuración para operaciones prolongadas y formas intensivas
+      disableTouch: false, // Actualizar consistentemente la fecha de expiración
+      ttl: 60 * 60 * 24 * 180, // 180 días (6 meses) para máxima persistencia
     });
   }
 

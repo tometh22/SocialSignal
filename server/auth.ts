@@ -76,10 +76,10 @@ export function setupAuth(app: Express, storage: IStorage) {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
     resave: false, // Solo guardar cuando se modifique
     saveUninitialized: false, // No guardar sesiones vacías para cumplir con GDPR
-    rolling: true, // Renovar cookie en cada respuesta (mantiene la sesión activa con actividad)
+    rolling: true, // CRÍTICO: Renovar cookie en cada respuesta para mantener la sesión activa
     cookie: {
       secure: isProduction, // Usar 'true' en producción para HTTPS
-      maxAge: 1000 * 60 * 60 * 24 * 90, // 90 días para asegurar que no se cierre durante uso intensivo
+      maxAge: 1000 * 60 * 60 * 24 * 180, // 180 días (6 meses) para máxima persistencia
       sameSite: 'lax' as const, // Protección contra CSRF pero permite navegación normal
       httpOnly: true, // Previene acceso a la cookie mediante JavaScript
       path: '/', // Asegurar que la cookie sea accesible en todas las rutas
@@ -87,8 +87,8 @@ export function setupAuth(app: Express, storage: IStorage) {
     name: 'epical.persistent.sid', // Nombre personalizado para la cookie
     // Usar generador de ID más seguro
     genid: () => {
-      // Usar randomBytes para generar identificadores de sesión más seguros
-      return randomBytes(32).toString('hex');
+      // Usar randomBytes para generar identificadores de sesión más seguros con mayor entropía
+      return randomBytes(64).toString('hex'); // Aumentado a 64 bytes para mayor seguridad
     }
   };
 
