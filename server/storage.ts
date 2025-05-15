@@ -818,11 +818,13 @@ export class DatabaseStorage implements IStorage {
       pool,
       tableName: 'session',
       createTableIfMissing: true,
-      // Configuración para optimizar sesiones concurrentes
-      pruneSessionInterval: 60, // Limpiar sesiones expiradas cada 60 segundos (1 minuto)
-      errorLog: console.error.bind(console),
-      // No fijar el ID de sesión manualmente para permitir rotación natural de sesiones
-      disableTouch: false, // Permitir actualización de tiempo de sesión con cada actividad
+      // Configuración mejorada para persistencia y rendimiento
+      pruneSessionInterval: 3600, // Limpiar sesiones expiradas cada hora (más eficiente)
+      errorLog: (err) => console.error('Error en PgSessionStore:', err),
+      // Configuración para optimizar uso intensivo
+      disableTouch: false, // Mantener actualizada la fecha de expiración con cada request
+      touchAfter: 5, // Solo actualizar si pasaron al menos 5 segundos (evita sobrecarga)
+      ttl: 60 * 60 * 24 * 90 // 90 días (consistente con la configuración de cookie)
     });
   }
 
