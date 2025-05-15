@@ -1800,6 +1800,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let sumOperationsFeedback = 0;
       let sumClientFeedback = 0;
       let sumBriefCompliance = 0;
+      let sumHoursCompliance = 0;
+      
+      // Variables para horas
+      let sumHoursAvailable = 0;
+      let sumHoursReal = 0;
       
       let countNarrativeQuality = 0;
       let countGraphicsEffectiveness = 0;
@@ -1808,6 +1813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let countOperationsFeedback = 0;
       let countClientFeedback = 0;
       let countBriefCompliance = 0;
+      let countHoursCompliance = 0;
+      let countHoursData = 0;
       
       // Sumar valores para cada categoría (ignorando null/undefined)
       for (const deliverable of deliverables) {

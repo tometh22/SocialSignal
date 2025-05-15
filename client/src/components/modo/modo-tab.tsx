@@ -62,6 +62,12 @@ interface ModoSummary {
     operationsFeedback: number;
     clientFeedback: number;
     briefCompliance: number;
+    hoursCompliance: number;
+  };
+  averageHours: {
+    available: number;
+    real: number;
+    compliance: number;
   };
   totalComments: number;
   latestComment?: {
@@ -326,6 +332,26 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
 
             <Card>
               <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Cumplimiento de horas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores?.hoursCompliance || 0)}`}>
+                    {modoSummary?.averageScores?.hoursCompliance ? modoSummary.averageScores.hoursCompliance.toFixed(1) : '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {modoSummary?.averageHours?.real || 0} de {modoSummary?.averageHours?.available || 0} horas promedio
+                  </p>
+                  <Progress
+                    value={(modoSummary?.averageScores?.hoursCompliance || 0) * 20}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">SCORE TOTAL</CardTitle>
               </CardHeader>
               <CardContent>
@@ -339,7 +365,8 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                       relevantInsights: 0,
                       operationsFeedback: 0,
                       clientFeedback: 0,
-                      briefCompliance: 0
+                      briefCompliance: 0,
+                      hoursCompliance: 0
                     };
                     
                     const totalScore = (
@@ -361,6 +388,26 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                   <p className="text-xs text-muted-foreground">
                     Promedio ponderado sobre 5.0
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Horas totales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col">
+                  <div className="text-2xl font-bold">
+                    {modoSummary?.averageHours?.real || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tiempo promedio por informe (horas)
+                  </p>
+                  <div className="flex justify-between items-center mt-2 text-sm">
+                    <span>Disponible: {modoSummary?.averageHours?.available || 0}h</span>
+                    <span>Real: {modoSummary?.averageHours?.real || 0}h</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -416,7 +463,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                 <TableBody>
                   {!deliverables || deliverables.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-4">
+                      <TableCell colSpan={14} className="text-center py-4">
                         No hay entregables registrados
                       </TableCell>
                     </TableRow>
@@ -462,6 +509,17 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                         <TableCell className="text-center">
                           <Badge variant="outline" className={getScoreColor(deliverable.brief_compliance || 0)}>
                             {deliverable.brief_compliance !== undefined && deliverable.brief_compliance !== null ? deliverable.brief_compliance.toFixed(1) : '0.0'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {deliverable.hours_available !== undefined && deliverable.hours_available !== null ? deliverable.hours_available : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {deliverable.hours_real !== undefined && deliverable.hours_real !== null ? deliverable.hours_real : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={getScoreColor(deliverable.hours_compliance || 0)}>
+                            {deliverable.hours_compliance !== undefined && deliverable.hours_compliance !== null ? deliverable.hours_compliance.toFixed(1) : '-'}
                           </Badge>
                         </TableCell>
                       </TableRow>
