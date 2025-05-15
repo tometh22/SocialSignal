@@ -11,11 +11,14 @@ import {
   type TimeEntry, type InsertTimeEntry,
   type ProgressReport, type InsertProgressReport,
   type User, type InsertUser,
+  type Deliverable, type InsertDeliverable,
+  type ClientModoComment, type InsertClientModoComment,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
-  chatConversations, chatMessages, chatConversationParticipants
+  chatConversations, chatMessages, chatConversationParticipants,
+  deliverables, clientModoComments
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray } from "drizzle-orm";
@@ -160,6 +163,38 @@ export interface IStorage {
   
   // Session store
   sessionStore: session.Store;
+  
+  // MODO operations
+  getDeliverables(clientId?: number): Promise<Deliverable[]>;
+  getDeliverable(id: number): Promise<Deliverable | undefined>;
+  createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable>;
+  updateDeliverable(id: number, deliverable: Partial<InsertDeliverable>): Promise<Deliverable | undefined>;
+  deleteDeliverable(id: number): Promise<boolean>;
+  
+  getClientModoComments(clientId: number): Promise<ClientModoComment[]>;
+  getClientModoComment(id: number): Promise<ClientModoComment | undefined>;
+  getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<ClientModoComment | undefined>;
+  createClientModoComment(comment: InsertClientModoComment): Promise<ClientModoComment>;
+  updateClientModoComment(id: number, comment: Partial<InsertClientModoComment>): Promise<ClientModoComment | undefined>;
+  deleteClientModoComment(id: number): Promise<boolean>;
+  
+  // MODO analytics
+  getClientModoSummary(clientId: number): Promise<{
+    totalDeliverables: number;
+    onTimeDeliveries: number;
+    onTimePercentage: number;
+    averageScores: {
+      narrativeQuality: number;
+      graphicsEffectiveness: number;
+      formatDesign: number;
+      relevantInsights: number;
+      operationsFeedback: number;
+      clientFeedback: number;
+      briefCompliance: number;
+    };
+    totalComments: number;
+    latestComment?: ClientModoComment;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -1795,6 +1830,256 @@ export class DatabaseStorage implements IStorage {
       ));
     
     return component;
+  }
+  
+  // MODO operations
+  async getDeliverables(clientId?: number): Promise<Deliverable[]> {
+    let query = db.select().from(deliverables);
+    
+    if (clientId) {
+      query = query.where(eq(deliverables.clientId, clientId));
+    }
+    
+    return await query.orderBy(deliverables.deliveryMonth);
+  }
+  
+  async getDeliverable(id: number): Promise<Deliverable | undefined> {
+    const [deliverable] = await db.select().from(deliverables).where(eq(deliverables.id, id));
+    return deliverable;
+  }
+  
+  async createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable> {
+    const [newDeliverable] = await db.insert(deliverables).values(deliverable).returning();
+    return newDeliverable;
+  }
+  
+  async updateDeliverable(id: number, deliverable: Partial<InsertDeliverable>): Promise<Deliverable | undefined> {
+    try {
+      const existingDeliverable = await this.getDeliverable(id);
+      if (!existingDeliverable) {
+        return undefined;
+      }
+      
+      const [updatedDeliverable] = await db
+        .update(deliverables)
+        .set({
+          ...deliverable,
+          updatedAt: new Date()
+        })
+        .where(eq(deliverables.id, id))
+        .returning();
+      
+      return updatedDeliverable;
+    } catch (error) {
+      console.error("Error updating deliverable:", error);
+      throw error;
+    }
+  }
+  
+  async deleteDeliverable(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(deliverables).where(eq(deliverables.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error("Error deleting deliverable:", error);
+      return false;
+    }
+  }
+  
+  async getClientModoComments(clientId: number): Promise<ClientModoComment[]> {
+    return await db
+      .select()
+      .from(clientModoComments)
+      .where(eq(clientModoComments.clientId, clientId))
+      .orderBy(clientModoComments.year, "desc")
+      .orderBy(clientModoComments.quarter, "desc");
+  }
+  
+  async getClientModoComment(id: number): Promise<ClientModoComment | undefined> {
+    const [comment] = await db.select().from(clientModoComments).where(eq(clientModoComments.id, id));
+    return comment;
+  }
+  
+  async getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<ClientModoComment | undefined> {
+    const [comment] = await db
+      .select()
+      .from(clientModoComments)
+      .where(
+        and(
+          eq(clientModoComments.clientId, clientId),
+          eq(clientModoComments.quarter, quarter),
+          eq(clientModoComments.year, year)
+        )
+      );
+    return comment;
+  }
+  
+  async createClientModoComment(comment: InsertClientModoComment): Promise<ClientModoComment> {
+    const [newComment] = await db.insert(clientModoComments).values(comment).returning();
+    return newComment;
+  }
+  
+  async updateClientModoComment(id: number, comment: Partial<InsertClientModoComment>): Promise<ClientModoComment | undefined> {
+    try {
+      const existingComment = await this.getClientModoComment(id);
+      if (!existingComment) {
+        return undefined;
+      }
+      
+      const [updatedComment] = await db
+        .update(clientModoComments)
+        .set({
+          ...comment,
+          updatedAt: new Date()
+        })
+        .where(eq(clientModoComments.id, id))
+        .returning();
+      
+      return updatedComment;
+    } catch (error) {
+      console.error("Error updating MODO comment:", error);
+      throw error;
+    }
+  }
+  
+  async deleteClientModoComment(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(clientModoComments).where(eq(clientModoComments.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error("Error deleting MODO comment:", error);
+      return false;
+    }
+  }
+  
+  async getClientModoSummary(clientId: number): Promise<{
+    totalDeliverables: number;
+    onTimeDeliveries: number;
+    onTimePercentage: number;
+    averageScores: {
+      narrativeQuality: number;
+      graphicsEffectiveness: number;
+      formatDesign: number;
+      relevantInsights: number;
+      operationsFeedback: number;
+      clientFeedback: number;
+      briefCompliance: number;
+    };
+    totalComments: number;
+    latestComment?: ClientModoComment;
+  }> {
+    // Obtener todos los entregables del cliente
+    const clientDeliverables = await db
+      .select({
+        id: deliverables.id,
+        deliveryOnTime: deliverables.deliveryOnTime,
+        narrativeQuality: deliverables.narrativeQuality,
+        graphicsEffectiveness: deliverables.graphicsEffectiveness,
+        formatDesign: deliverables.formatDesign,
+        relevantInsights: deliverables.relevantInsights,
+        operationsFeedback: deliverables.operationsFeedback,
+        clientFeedback: deliverables.clientFeedback,
+        briefCompliance: deliverables.briefCompliance
+      })
+      .from(deliverables)
+      .where(eq(deliverables.clientId, clientId));
+    
+    // Calcular métricas
+    const totalDeliverables = clientDeliverables.length;
+    const onTimeDeliveries = clientDeliverables.filter(d => d.deliveryOnTime).length;
+    const onTimePercentage = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
+    
+    // Inicializar sumas para promedios
+    let sumNarrativeQuality = 0;
+    let sumGraphicsEffectiveness = 0;
+    let sumFormatDesign = 0;
+    let sumRelevantInsights = 0;
+    let sumOperationsFeedback = 0;
+    let sumClientFeedback = 0;
+    let sumBriefCompliance = 0;
+    
+    let countNarrativeQuality = 0;
+    let countGraphicsEffectiveness = 0;
+    let countFormatDesign = 0;
+    let countRelevantInsights = 0;
+    let countOperationsFeedback = 0;
+    let countClientFeedback = 0;
+    let countBriefCompliance = 0;
+    
+    // Sumar valores para cada categoría (ignorando null/undefined)
+    for (const deliverable of clientDeliverables) {
+      if (deliverable.narrativeQuality !== null && deliverable.narrativeQuality !== undefined) {
+        sumNarrativeQuality += Number(deliverable.narrativeQuality);
+        countNarrativeQuality++;
+      }
+      
+      if (deliverable.graphicsEffectiveness !== null && deliverable.graphicsEffectiveness !== undefined) {
+        sumGraphicsEffectiveness += Number(deliverable.graphicsEffectiveness);
+        countGraphicsEffectiveness++;
+      }
+      
+      if (deliverable.formatDesign !== null && deliverable.formatDesign !== undefined) {
+        sumFormatDesign += Number(deliverable.formatDesign);
+        countFormatDesign++;
+      }
+      
+      if (deliverable.relevantInsights !== null && deliverable.relevantInsights !== undefined) {
+        sumRelevantInsights += Number(deliverable.relevantInsights);
+        countRelevantInsights++;
+      }
+      
+      if (deliverable.operationsFeedback !== null && deliverable.operationsFeedback !== undefined) {
+        sumOperationsFeedback += Number(deliverable.operationsFeedback);
+        countOperationsFeedback++;
+      }
+      
+      if (deliverable.clientFeedback !== null && deliverable.clientFeedback !== undefined) {
+        sumClientFeedback += Number(deliverable.clientFeedback);
+        countClientFeedback++;
+      }
+      
+      if (deliverable.briefCompliance !== null && deliverable.briefCompliance !== undefined) {
+        sumBriefCompliance += Number(deliverable.briefCompliance);
+        countBriefCompliance++;
+      }
+    }
+    
+    // Calcular promedios
+    const averageNarrativeQuality = countNarrativeQuality > 0 ? sumNarrativeQuality / countNarrativeQuality : 0;
+    const averageGraphicsEffectiveness = countGraphicsEffectiveness > 0 ? sumGraphicsEffectiveness / countGraphicsEffectiveness : 0;
+    const averageFormatDesign = countFormatDesign > 0 ? sumFormatDesign / countFormatDesign : 0;
+    const averageRelevantInsights = countRelevantInsights > 0 ? sumRelevantInsights / countRelevantInsights : 0;
+    const averageOperationsFeedback = countOperationsFeedback > 0 ? sumOperationsFeedback / countOperationsFeedback : 0;
+    const averageClientFeedback = countClientFeedback > 0 ? sumClientFeedback / countClientFeedback : 0;
+    const averageBriefCompliance = countBriefCompliance > 0 ? sumBriefCompliance / countBriefCompliance : 0;
+    
+    // Obtener comentarios MODO
+    const comments = await db
+      .select()
+      .from(clientModoComments)
+      .where(eq(clientModoComments.clientId, clientId))
+      .orderBy(clientModoComments.year, "desc")
+      .orderBy(clientModoComments.quarter, "desc");
+    
+    const totalComments = comments.length;
+    const latestComment = comments.length > 0 ? comments[0] : undefined;
+    
+    return {
+      totalDeliverables,
+      onTimeDeliveries,
+      onTimePercentage,
+      averageScores: {
+        narrativeQuality: averageNarrativeQuality,
+        graphicsEffectiveness: averageGraphicsEffectiveness,
+        formatDesign: averageFormatDesign,
+        relevantInsights: averageRelevantInsights,
+        operationsFeedback: averageOperationsFeedback,
+        clientFeedback: averageClientFeedback,
+        briefCompliance: averageBriefCompliance
+      },
+      totalComments,
+      latestComment
+    };
   }
 }
 

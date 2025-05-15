@@ -543,3 +543,84 @@ export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 
 export type ChatParticipant = typeof chatConversationParticipants.$inferSelect;
 export type InsertChatParticipant = z.infer<typeof insertChatParticipantSchema>;
+
+// ==================== SEGUIMIENTO OPERACIONES (MODO) ====================
+// Tabla de entregables
+export const deliverables = pgTable("deliverables", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  name: text("name").notNull(),
+  deliveryMonth: text("delivery_month").notNull(),
+  analystId: integer("analyst_id").references(() => personnel.id),
+  pmId: integer("pm_id").references(() => personnel.id),
+  deliveryOnTime: boolean("delivery_on_time").default(false),
+  delay: integer("delay"),
+  narrativeQuality: numeric("narrative_quality", { precision: 3, scale: 2 }),
+  graphicsEffectiveness: numeric("graphics_effectiveness", { precision: 3, scale: 2 }),
+  formatDesign: numeric("format_design", { precision: 3, scale: 2 }),
+  relevantInsights: numeric("relevant_insights", { precision: 3, scale: 2 }),
+  operationsFeedback: numeric("operations_feedback", { precision: 3, scale: 2 }),
+  hoursEstimated: numeric("hours_estimated", { precision: 5, scale: 2 }),
+  hoursActual: numeric("hours_actual", { precision: 5, scale: 2 }),
+  clientFeedback: numeric("client_feedback", { precision: 3, scale: 2 }),
+  briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+// Relaciones de entregables
+export const deliverablesRelations = relations(deliverables, ({ one }) => ({
+  client: one(clients, { fields: [deliverables.clientId], references: [clients.id] }),
+  analyst: one(personnel, { fields: [deliverables.analystId], references: [personnel.id] }),
+  pm: one(personnel, { fields: [deliverables.pmId], references: [personnel.id] }),
+  creator: one(users, { fields: [deliverables.createdBy], references: [users.id] }),
+}));
+
+// Esquema para agregar entregables
+export const insertDeliverableSchema = createInsertSchema(deliverables).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Tabla de comentarios del cliente sobre MODO
+export const clientModoComments = pgTable("client_modo_comments", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  quarter: integer("quarter").notNull(),
+  year: integer("year").notNull(),
+  generalQuality: numeric("general_quality", { precision: 3, scale: 2 }),
+  insightsClarity: numeric("insights_clarity", { precision: 3, scale: 2 }),
+  presentation: numeric("presentation", { precision: 3, scale: 2 }),
+  nps: numeric("nps", { precision: 3, scale: 2 }),
+  clientSurvey: numeric("client_survey", { precision: 3, scale: 2 }),
+  operationsFeedback: numeric("operations_feedback", { precision: 3, scale: 2 }),
+  hoursCompliance: numeric("hours_compliance", { precision: 3, scale: 2 }),
+  clientFeedback: numeric("client_feedback", { precision: 3, scale: 2 }),
+  briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
+  totalScore: numeric("total_score", { precision: 4, scale: 2 }).notNull(),
+  comments: text("comments"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+// Relaciones de comentarios MODO
+export const clientModoCommentsRelations = relations(clientModoComments, ({ one }) => ({
+  client: one(clients, { fields: [clientModoComments.clientId], references: [clients.id] }),
+  creator: one(users, { fields: [clientModoComments.createdBy], references: [users.id] }),
+}));
+
+// Esquema para agregar comentarios MODO
+export const insertClientModoCommentSchema = createInsertSchema(clientModoComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Deliverable = typeof deliverables.$inferSelect;
+export type InsertDeliverable = z.infer<typeof insertDeliverableSchema>;
+
+export type ClientModoComment = typeof clientModoComments.$inferSelect;
+export type InsertClientModoComment = z.infer<typeof insertClientModoCommentSchema>;
