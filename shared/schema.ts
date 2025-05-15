@@ -551,10 +551,12 @@ export const deliverables = pgTable("deliverables", {
   clientId: integer("client_id").notNull().references(() => clients.id),
   name: text("name").notNull(),
   deliveryMonth: text("delivery_month").notNull(),
+  mes_entrega: integer("mes_entrega"), // Nuevo: número de mes (1-12)
   analystId: integer("analyst_id").references(() => personnel.id),
   pmId: integer("pm_id").references(() => personnel.id),
   deliveryOnTime: boolean("delivery_on_time").default(false),
   delay: integer("delay"),
+  retrabajo: boolean("retrabajo").default(false), // Nuevo: si requirió retrabajo
   narrativeQuality: numeric("narrative_quality", { precision: 3, scale: 2 }),
   graphicsEffectiveness: numeric("graphics_effectiveness", { precision: 3, scale: 2 }),
   formatDesign: numeric("format_design", { precision: 3, scale: 2 }),
@@ -563,10 +565,14 @@ export const deliverables = pgTable("deliverables", {
   hoursEstimated: numeric("hours_estimated", { precision: 5, scale: 2 }),
   hoursActual: numeric("hours_actual", { precision: 5, scale: 2 }),
   clientFeedback: numeric("client_feedback", { precision: 3, scale: 2 }),
+  feedback_general_cliente: numeric("feedback_general_cliente", { precision: 3, scale: 2 }), // Nuevo: feedback general del cliente (escala 1-5)
   briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
+  project_id: integer("project_id").references(() => activeProjects.id), // Vinculación con proyecto
+  delivery_date: timestamp("delivery_date"), // Fecha real de entrega
+  due_date: timestamp("due_date"), // Fecha límite de entrega
 });
 
 // Relaciones de entregables
@@ -575,6 +581,7 @@ export const deliverablesRelations = relations(deliverables, ({ one }) => ({
   analyst: one(personnel, { fields: [deliverables.analystId], references: [personnel.id] }),
   pm: one(personnel, { fields: [deliverables.pmId], references: [personnel.id] }),
   creator: one(users, { fields: [deliverables.createdBy], references: [users.id] }),
+  project: one(activeProjects, { fields: [deliverables.project_id], references: [activeProjects.id] }),
 }));
 
 // Esquema para agregar entregables
