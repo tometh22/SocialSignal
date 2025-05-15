@@ -1932,23 +1932,7 @@ export class DatabaseStorage implements IStorage {
     return comment;
   }
   
-  async createClientModoComment(comment: any): Promise<ClientModoComment> {
-    // Ajustamos para la estructura real de la tabla
-    console.log("Datos recibidos para crear comentario MODO:", comment);
-    
-    // Adaptamos los datos al esquema real de la tabla
-    const dataToInsert = {
-      client_id: comment.clientId || comment.client_id,
-      comment_text: comment.comment_text || comment.comments,
-      year: comment.year,
-      quarter: comment.quarter,
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log("Datos a insertar:", dataToInsert);
-    const [newComment] = await db.insert(clientModoComments).values(dataToInsert).returning();
-    return newComment;
-  }
+
   
   async updateClientModoComment(id: number, comment: Partial<InsertClientModoComment>): Promise<ClientModoComment | undefined> {
     try {
@@ -2003,12 +1987,14 @@ export class DatabaseStorage implements IStorage {
       console.log(`Obteniendo datos MODO para cliente ID: ${clientId}`);
       
       // Obtener todos los entregables - por ahora usamos todos los entregables
-      // independientemente del cliente porque nuestra tabla no tiene relación con clientes
+      // independientemente del cliente porque nuestra tabla no tiene relación con clientes directamente
       const clientDeliverables = await db
         .select()
         .from(deliverables);
         
-      console.log(`Encontrados ${clientDeliverables.length} entregables`);
+      console.log(`Encontrados ${clientDeliverables.length} entregables en total`);
+      // En una implementación futura, filtraríamos por project_id donde el proyecto pertenezca al cliente
+      // Por ahora usamos todos los entregables para prueba
       
     
       // Calcular métricas
@@ -2116,12 +2102,14 @@ export class DatabaseStorage implements IStorage {
   
   async getClientModoComments(clientId: number): Promise<ClientModoComment[]> {
     try {
+      console.log(`Obteniendo comentarios MODO para cliente ID: ${clientId}`);
       const comments = await db
         .select()
         .from(clientModoComments)
-        .where(eq(clientModoComments.clientId, clientId))
+        .where(eq(clientModoComments.client_id, clientId))
         .orderBy(desc(clientModoComments.year), desc(clientModoComments.quarter));
       
+      console.log(`Encontrados ${comments.length} comentarios MODO`);
       return comments;
     } catch (error) {
       console.error("Error al obtener comentarios MODO:", error);
@@ -2129,15 +2117,21 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async createClientModoComment(comment: InsertClientModoComment): Promise<ClientModoComment> {
+  async createClientModoComment(comment: any): Promise<ClientModoComment> {
     try {
-      const [newComment] = await db
-        .insert(clientModoComments)
-        .values({
-          ...comment,
-          timestamp: new Date()
-        })
-        .returning();
+      console.log("Datos recibidos para crear comentario MODO:", comment);
+      
+      // Adaptamos los datos al esquema real de la tabla
+      const dataToInsert = {
+        client_id: comment.clientId || comment.client_id,
+        comment_text: comment.comments || comment.comment_text,
+        year: comment.year,
+        quarter: comment.quarter,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log("Datos a insertar:", dataToInsert);
+      const [newComment] = await db.insert(clientModoComments).values(dataToInsert).returning();
       
       return newComment;
     } catch (error) {
@@ -2150,13 +2144,17 @@ export class DatabaseStorage implements IStorage {
     try {
       if (projectIds.length === 0) return [];
       
-      const projectDeliverables = await db
-        .select()
-        .from(deliverables)
-        .where(inArray(deliverables.project_id, projectIds))
-        .orderBy(desc(deliverables.delivery_date));
+      console.log(`Obteniendo entregables para los proyectos: ${projectIds.join(", ")}`);
       
-      return projectDeliverables;
+      // Ejecutamos una consulta SQL directa para obtener los entregables
+      const { rows } = await db.execute(
+        `SELECT * FROM deliverables 
+         WHERE project_id IN (${projectIds.join(',')}) 
+         ORDER BY delivery_date DESC`
+      );
+      
+      console.log(`Encontrados ${rows.length} entregables`);
+      return rows;
     } catch (error) {
       console.error("Error al obtener entregables:", error);
       throw error;
