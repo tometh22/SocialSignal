@@ -228,7 +228,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
               <CardContent>
                 <div className="flex flex-col">
                   <div className={`text-2xl font-bold ${getPercentageColor(modoSummary?.onTimePercentage || 0)}`}>
-                    {modoSummary?.onTimePercentage.toFixed(1) || 0}%
+                    {modoSummary?.onTimePercentage ? modoSummary.onTimePercentage.toFixed(1) : '0'}%
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {modoSummary?.onTimeDeliveries || 0} de {modoSummary?.totalDeliverables || 0} entregables
@@ -247,8 +247,8 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col">
-                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.narrativeQuality || 0)}`}>
-                    {modoSummary?.averageScores.narrativeQuality.toFixed(1) || 0}
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores?.narrativeQuality || 0)}`}>
+                    {modoSummary?.averageScores?.narrativeQuality ? modoSummary.averageScores.narrativeQuality.toFixed(1) : '0'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Promedio sobre 5.0
@@ -267,8 +267,8 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col">
-                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.graphicsEffectiveness || 0)}`}>
-                    {modoSummary?.averageScores.graphicsEffectiveness.toFixed(1) || 0}
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores?.graphicsEffectiveness || 0)}`}>
+                    {modoSummary?.averageScores?.graphicsEffectiveness ? modoSummary.averageScores.graphicsEffectiveness.toFixed(1) : '0'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Promedio sobre 5.0
@@ -287,8 +287,8 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col">
-                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.clientFeedback || 0)}`}>
-                    {modoSummary?.averageScores.clientFeedback.toFixed(1) || 0}
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores?.clientFeedback || 0)}`}>
+                    {modoSummary?.averageScores?.clientFeedback ? modoSummary.averageScores.clientFeedback.toFixed(1) : '0'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Promedio sobre 5.0
@@ -307,8 +307,8 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col">
-                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores.briefCompliance || 0)}`}>
-                    {modoSummary?.averageScores.briefCompliance.toFixed(1) || 0}
+                  <div className={`text-2xl font-bold ${getScoreColor(modoSummary?.averageScores?.briefCompliance || 0)}`}>
+                    {modoSummary?.averageScores?.briefCompliance ? modoSummary.averageScores.briefCompliance.toFixed(1) : '0'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Promedio sobre 5.0
