@@ -48,6 +48,9 @@ interface DeliverableData {
   hours_real: number;
   hours_compliance: number;
   notes?: string;
+  retrabajo?: boolean;
+  feedback_general_cliente?: number;
+  mes_entrega?: number;
 }
 
 interface ModoSummary {
@@ -445,9 +448,11 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Título</TableHead>
+                    <TableHead className="text-center">Mes</TableHead>
                     <TableHead>Fecha Entrega</TableHead>
                     <TableHead>Fecha Límite</TableHead>
                     <TableHead className="text-center">A Tiempo</TableHead>
+                    <TableHead className="text-center">Retrabajo</TableHead>
                     <TableHead className="text-center">Calidad Narrativa</TableHead>
                     <TableHead className="text-center">Gráficos</TableHead>
                     <TableHead className="text-center">Formato</TableHead>
@@ -463,7 +468,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                 <TableBody>
                   {!deliverables || deliverables.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center py-4">
+                      <TableCell colSpan={16} className="text-center py-4">
                         No hay entregables registrados
                       </TableCell>
                     </TableRow>
@@ -471,10 +476,19 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     deliverables.map((deliverable) => (
                       <TableRow key={deliverable.id}>
                         <TableCell className="font-medium">{deliverable.title}</TableCell>
+                        <TableCell className="text-center">
+                          {deliverable.mes_entrega || "-"}
+                        </TableCell>
                         <TableCell>{formatDate(deliverable.delivery_date)}</TableCell>
                         <TableCell>{formatDate(deliverable.due_date)}</TableCell>
                         <TableCell className="text-center">
                           {getStatusIcon(deliverable.on_time)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {deliverable.retrabajo !== undefined ? (deliverable.retrabajo ? 
+                            <CheckCircle className="h-5 w-5 text-red-600" /> : 
+                            <XCircle className="h-5 w-5 text-green-600" />
+                          ) : "-"}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={getScoreColor(deliverable.narrative_quality || 0)}>
