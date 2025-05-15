@@ -1900,12 +1900,16 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getClientModoComments(clientId: number): Promise<ClientModoComment[]> {
-    return await db
+    console.log(`Buscando comentarios MODO para cliente ID: ${clientId}`);
+    const comments = await db
       .select()
       .from(clientModoComments)
-      .where(eq(clientModoComments.clientId, clientId))
+      .where(eq(clientModoComments.client_id, clientId))
       .orderBy(clientModoComments.year, "desc")
       .orderBy(clientModoComments.quarter, "desc");
+    
+    console.log(`Encontrados ${comments.length} comentarios MODO`);
+    return comments;
   }
   
   async getClientModoComment(id: number): Promise<ClientModoComment | undefined> {
@@ -1982,30 +1986,16 @@ export class DatabaseStorage implements IStorage {
     latestComment?: ClientModoComment;
   }> {
     try {
-      // Obtener todos los entregables - temporalmente omitimos el filtro por cliente
-      // ya que estamos usando una tabla creada manualmente que no tiene esa columna
+      console.log(`Obteniendo datos MODO para cliente ID: ${clientId}`);
+      
+      // Obtener todos los entregables - por ahora usamos todos los entregables
+      // independientemente del cliente porque nuestra tabla no tiene relación con clientes
       const clientDeliverables = await db
         .select()
         .from(deliverables);
+        
+      console.log(`Encontrados ${clientDeliverables.length} entregables`);
       
-      // Una vez que tengamos la estructura correcta de la base de datos,
-      // se puede descomentar este código:
-      /*
-      const clientDeliverables = await db
-        .select({
-          id: deliverables.id,
-          deliveryOnTime: deliverables.deliveryOnTime,
-          narrativeQuality: deliverables.narrativeQuality,
-          graphicsEffectiveness: deliverables.graphicsEffectiveness,
-          formatDesign: deliverables.formatDesign,
-          relevantInsights: deliverables.relevantInsights,
-          operationsFeedback: deliverables.operationsFeedback,
-          clientFeedback: deliverables.clientFeedback,
-          briefCompliance: deliverables.briefCompliance
-        })
-        .from(deliverables)
-        .where(eq(deliverables.clientId, clientId));
-      */
     
       // Calcular métricas
       const totalDeliverables = clientDeliverables.length;
@@ -2080,8 +2070,10 @@ export class DatabaseStorage implements IStorage {
       const comments = await db
         .select()
         .from(clientModoComments)
-        .where(eq(clientModoComments.clientId, clientId))
+        .where(eq(clientModoComments.client_id, clientId))
         .orderBy(desc(clientModoComments.year));
+      
+      console.log(`Encontrados ${comments.length} comentarios para el cliente ID: ${clientId}`);
       
       const totalComments = comments.length;
       const latestComment = comments.length > 0 ? comments[0] : undefined;

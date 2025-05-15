@@ -1794,6 +1794,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al obtener comentarios MODO" });
     }
   });
+  
+  // Obtener entregables para un cliente específico
+  app.get("/api/clients/:id/deliverables", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Cliente ID inválido" });
+      }
+
+      const deliverables = await storage.getDeliverables(clientId);
+      res.json(deliverables);
+    } catch (error) {
+      console.error("Error al obtener entregables del cliente:", error);
+      res.status(500).json({ message: "Error al obtener entregables del cliente" });
+    }
+  });
 
   app.post("/api/clients/:id/modo-comments", async (req, res) => {
     try {
