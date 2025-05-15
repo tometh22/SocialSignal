@@ -14,6 +14,8 @@ import {
   insertTimeEntrySchema,
   insertProgressReportSchema,
   insertProjectComponentSchema,
+  insertDeliverableSchema,
+  insertClientModoCommentSchema,
   projectStatusOptions,
   trackingFrequencyOptions
 } from "@shared/schema";
@@ -1526,6 +1528,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reinitializing database:", error);
       res.status(500).json({ message: "Failed to reinitialize database" });
+    }
+  });
+
+  // =========== RUTAS PARA MODO (SEGUIMIENTO OPERACIONES) ===========
+  
+  // Obtener todos los entregables (opcionalmente filtrados por cliente)
+  app.get("/api/deliverables", async (req, res) => {
+    try {
+      const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
+      const deliverables = await storage.getDeliverables(clientId);
+      res.json(deliverables);
+    } catch (error) {
+      console.error("Error fetching deliverables:", error);
+      res.status(500).json({ message: "Failed to fetch deliverables" });
+    }
+  });
+  
+  // Obtener un entregable por ID
+  app.get("/api/deliverables/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    
+    try {
+      const deliverable = await storage.getDeliverable(id);
+      if (!deliverable) {
+        return res.status(404).json({ message: "Deliverable not found" });
+      }
+      res.json(deliverable);
+    } catch (error) {
+      console.error("Error fetching deliverable:", error);
+      res.status(500).json({ message: "Failed to fetch deliverable" });
+    }
+  });
+  
+  // Crear un nuevo entregable
+  app.post("/api/deliverables", async (req, res) => {
+    try {
+      const validatedData = insertDeliverableSchema.parse(req.body);
+      const deliverable = await storage.createDeliverable(validatedData);
+      res.status(201).json(deliverable);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid deliverable data", errors: error.errors });
+      }
+      console.error("Error creating deliverable:", error);
+      res.status(500).json({ message: "Failed to create deliverable" });
+    }
+  });
+  
+  // Actualizar un entregable
+  app.patch("/api/deliverables/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    
+    try {
+      const validatedData = insertDeliverableSchema.partial().parse(req.body);
+      const updatedDeliverable = await storage.updateDeliverable(id, validatedData);
+      
+      if (!updatedDeliverable) {
+        return res.status(404).json({ message: "Deliverable not found" });
+      }
+      
+      res.json(updatedDeliverable);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid deliverable data", errors: error.errors });
+      }
+      console.error("Error updating deliverable:", error);
+      res.status(500).json({ message: "Failed to update deliverable" });
+    }
+  });
+  
+  // Eliminar un entregable
+  app.delete("/api/deliverables/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    
+    try {
+      const success = await storage.deleteDeliverable(id);
+      if (!success) {
+        return res.status(404).json({ message: "Deliverable not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting deliverable:", error);
+      res.status(500).json({ message: "Failed to delete deliverable" });
+    }
+  });
+  
+  // Obtener comentarios MODO por cliente
+  app.get("/api/modo-comments/client/:clientId", async (req, res) => {
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    
+    try {
+      const comments = await storage.getClientModoComments(clientId);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching MODO comments:", error);
+      res.status(500).json({ message: "Failed to fetch MODO comments" });
+    }
+  });
+  
+  // Obtener un comentario MODO por ID
+  app.get("/api/modo-comments/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    
+    try {
+      const comment = await storage.getClientModoComment(id);
+      if (!comment) {
+        return res.status(404).json({ message: "MODO comment not found" });
+      }
+      res.json(comment);
+    } catch (error) {
+      console.error("Error fetching MODO comment:", error);
+      res.status(500).json({ message: "Failed to fetch MODO comment" });
+    }
+  });
+  
+  // Buscar comentario MODO por trimestre/año
+  app.get("/api/modo-comments/quarter", async (req, res) => {
+    const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : null;
+    const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : null;
+    const year = req.query.year ? parseInt(req.query.year as string) : null;
+    
+    if (!clientId || !quarter || !year || isNaN(clientId) || isNaN(quarter) || isNaN(year)) {
+      return res.status(400).json({ message: "Missing or invalid parameters. Required: clientId, quarter, year" });
+    }
+    
+    try {
+      const comment = await storage.getClientModoCommentByQuarter(clientId, quarter, year);
+      if (!comment) {
+        return res.status(404).json({ message: "MODO comment not found for the specified quarter" });
+      }
+      res.json(comment);
+    } catch (error) {
+      console.error("Error fetching MODO comment by quarter:", error);
+      res.status(500).json({ message: "Failed to fetch MODO comment" });
+    }
+  });
+  
+  // Crear un nuevo comentario MODO
+  app.post("/api/modo-comments", async (req, res) => {
+    try {
+      const validatedData = insertClientModoCommentSchema.parse(req.body);
+      const comment = await storage.createClientModoComment(validatedData);
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid MODO comment data", errors: error.errors });
+      }
+      console.error("Error creating MODO comment:", error);
+      res.status(500).json({ message: "Failed to create MODO comment" });
+    }
+  });
+  
+  // Actualizar un comentario MODO
+  app.patch("/api/modo-comments/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    
+    try {
+      const validatedData = insertClientModoCommentSchema.partial().parse(req.body);
+      const updatedComment = await storage.updateClientModoComment(id, validatedData);
+      
+      if (!updatedComment) {
+        return res.status(404).json({ message: "MODO comment not found" });
+      }
+      
+      res.json(updatedComment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid MODO comment data", errors: error.errors });
+      }
+      console.error("Error updating MODO comment:", error);
+      res.status(500).json({ message: "Failed to update MODO comment" });
+    }
+  });
+  
+  // Eliminar un comentario MODO
+  app.delete("/api/modo-comments/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
+    
+    try {
+      const success = await storage.deleteClientModoComment(id);
+      if (!success) {
+        return res.status(404).json({ message: "MODO comment not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting MODO comment:", error);
+      res.status(500).json({ message: "Failed to delete MODO comment" });
+    }
+  });
+  
+  // Obtener resumen MODO por cliente
+  app.get("/api/modo-summary/client/:clientId", async (req, res) => {
+    const clientId = parseInt(req.params.clientId);
+    if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
+    
+    try {
+      const summary = await storage.getClientModoSummary(clientId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching MODO summary:", error);
+      res.status(500).json({ message: "Failed to fetch MODO summary" });
     }
   });
 
