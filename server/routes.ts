@@ -1,6 +1,7 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { z } from "zod";
 import { 
   insertClientSchema, 
@@ -1747,7 +1748,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cliente ID inválido" });
       }
 
-      const modoSummary = await storage.getClientModoSummary(clientId);
+      // Obtener entregables directamente
+      const { rows: deliverables } = await db.execute(
+        `SELECT * FROM deliverables WHERE project_id = ${clientId}`
+      );
+      
+      console.log(`Calculando resumen MODO para cliente ID ${clientId}: ${deliverables.length} entregables`);
+      
+      // Calcular métricas
+      const totalDeliverables = deliverables.length;
+      const onTimeDeliveries = deliverables.filter(d => d.on_time).length;
+      const onTimePercentage = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
+      
+      // Inicializar sumas para promedios
+      let sumNarrativeQuality = 0;
+      let sumGraphicsEffectiveness = 0;
+      let sumFormatDesign = 0;
+      let sumRelevantInsights = 0;
+      let sumOperationsFeedback = 0;
+      let sumClientFeedback = 0;
+      let sumBriefCompliance = 0;
+      
+      let countNarrativeQuality = 0;
+      let countGraphicsEffectiveness = 0;
+      let countFormatDesign = 0;
+      let countRelevantInsights = 0;
+      let countOperationsFeedback = 0;
+      let countClientFeedback = 0;
+      let countBriefCompliance = 0;
+      
+      // Sumar valores para cada categoría (ignorando null/undefined)
+      for (const deliverable of deliverables) {
+        if (deliverable.narrative_quality !== null && deliverable.narrative_quality !== undefined) {
+          sumNarrativeQuality += Number(deliverable.narrative_quality);
+          countNarrativeQuality++;
+        }
+        
+        if (deliverable.graphics_effectiveness !== null && deliverable.graphics_effectiveness !== undefined) {
+          sumGraphicsEffectiveness += Number(deliverable.graphics_effectiveness);
+          countGraphicsEffectiveness++;
+        }
+        
+        if (deliverable.format_design !== null && deliverable.format_design !== undefined) {
+          sumFormatDesign += Number(deliverable.format_design);
+          countFormatDesign++;
+        }
+        
+        if (deliverable.relevant_insights !== null && deliverable.relevant_insights !== undefined) {
+          sumRelevantInsights += Number(deliverable.relevant_insights);
+          countRelevantInsights++;
+        }
+        
+        if (deliverable.operations_feedback !== null && deliverable.operations_feedback !== undefined) {
+          sumOperationsFeedback += Number(deliverable.operations_feedback);
+          countOperationsFeedback++;
+        }
+        
+        if (deliverable.client_feedback !== null && deliverable.client_feedback !== undefined) {
+          sumClientFeedback += Number(deliverable.client_feedback);
+          countClientFeedback++;
+        }
+        
+        if (deliverable.brief_compliance !== null && deliverable.brief_compliance !== undefined) {
+          sumBriefCompliance += Number(deliverable.brief_compliance);
+          countBriefCompliance++;
+        }
+      }
+      
+      // Calcular promedios
+      const averageNarrativeQuality = countNarrativeQuality > 0 ? sumNarrativeQuality / countNarrativeQuality : 0;
+      const averageGraphicsEffectiveness = countGraphicsEffectiveness > 0 ? sumGraphicsEffectiveness / countGraphicsEffectiveness : 0;
+      const averageFormatDesign = countFormatDesign > 0 ? sumFormatDesign / countFormatDesign : 0;
+      const averageRelevantInsights = countRelevantInsights > 0 ? sumRelevantInsights / countRelevantInsights : 0;
+      const averageOperationsFeedback = countOperationsFeedback > 0 ? sumOperationsFeedback / countOperationsFeedback : 0;
+      const averageClientFeedback = countClientFeedback > 0 ? sumClientFeedback / countClientFeedback : 0;
+      const averageBriefCompliance = countBriefCompliance > 0 ? sumBriefCompliance / countBriefCompliance : 0;
+      
+      // Obtener comentarios MODO
+      const { rows: comments } = await db.execute(
+        `SELECT * FROM client_modo_comments 
+         WHERE client_id = ${clientId} 
+         ORDER BY year DESC, quarter DESC`
+      );
+      
+      const totalComments = comments.length;
+      const latestComment = comments.length > 0 ? comments[0] : undefined;
+      
+      const modoSummary = {
+        totalDeliverables,
+        onTimeDeliveries,
+        onTimePercentage,
+        averageScores: {
+          narrativeQuality: averageNarrativeQuality,
+          graphicsEffectiveness: averageGraphicsEffectiveness,
+          formatDesign: averageFormatDesign,
+          relevantInsights: averageRelevantInsights,
+          operationsFeedback: averageOperationsFeedback,
+          clientFeedback: averageClientFeedback,
+          briefCompliance: averageBriefCompliance
+        },
+        totalComments,
+        latestComment
+      };
+      
       res.json(modoSummary);
     } catch (error) {
       console.error("Error al obtener resumen MODO:", error);
@@ -1762,18 +1865,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cliente ID inválido" });
       }
 
-      // Obtener proyectos del cliente
-      const projects = await storage.getActiveProjectsByClient(clientId);
-      const projectIds = projects.map(p => p.id);
-
-      // Si no hay proyectos, devolver lista vacía
-      if (projectIds.length === 0) {
-        return res.json([]);
-      }
-
-      // Obtener entregables de los proyectos del cliente
-      const deliverables = await storage.getDeliverablesByProjects(projectIds);
-      res.json(deliverables);
+      // Obtener entregables directamente por el client_id (project_id)
+      // En el caso de MODO, los entregables están asociados directamente al cliente
+      const deliverables = await db.execute(
+        `SELECT * FROM deliverables 
+         WHERE project_id = ${clientId} 
+         ORDER BY delivery_date DESC`
+      );
+      
+      console.log(`Encontrados ${deliverables.rows.length} entregables para cliente ID ${clientId}`);
+      res.json(deliverables.rows);
     } catch (error) {
       console.error("Error al obtener entregables:", error);
       res.status(500).json({ message: "Error al obtener entregables" });
