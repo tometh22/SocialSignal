@@ -20,7 +20,11 @@ import {
   X,
   Maximize2,
   Minimize2,
+  FileBarChart,
 } from "lucide-react";
+
+// Importar componente de la pestaña MODO
+import ModoTab from "@/components/modo/modo-tab";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -568,6 +572,10 @@ const ClientSummary = () => {
           <TabsTrigger value="finances">
             <TrendingUp className="h-4 w-4 mr-1" />
             Finanzas
+          </TabsTrigger>
+          <TabsTrigger value="modo">
+            <FileBarChart className="h-4 w-4 mr-1" />
+            MODO
           </TabsTrigger>
         </TabsList>
 
