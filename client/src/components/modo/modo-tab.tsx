@@ -254,7 +254,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     Promedio sobre 5.0
                   </p>
                   <Progress
-                    value={(modoSummary?.averageScores.narrativeQuality || 0) * 20}
+                    value={(modoSummary?.averageScores?.narrativeQuality || 0) * 20}
                     className="mt-2"
                   />
                 </div>
@@ -274,7 +274,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     Promedio sobre 5.0
                   </p>
                   <Progress
-                    value={(modoSummary?.averageScores.graphicsEffectiveness || 0) * 20}
+                    value={(modoSummary?.averageScores?.graphicsEffectiveness || 0) * 20}
                     className="mt-2"
                   />
                 </div>
@@ -294,7 +294,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     Promedio sobre 5.0
                   </p>
                   <Progress
-                    value={(modoSummary?.averageScores.clientFeedback || 0) * 20}
+                    value={(modoSummary?.averageScores?.clientFeedback || 0) * 20}
                     className="mt-2"
                   />
                 </div>
@@ -314,7 +314,7 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                     Promedio sobre 5.0
                   </p>
                   <Progress
-                    value={(modoSummary?.averageScores.briefCompliance || 0) * 20}
+                    value={(modoSummary?.averageScores?.briefCompliance || 0) * 20}
                     className="mt-2"
                   />
                 </div>
