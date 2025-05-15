@@ -1,6 +1,5 @@
 import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
-import { db } from '../server/db';
 import { pool } from '../server/db';
 
 // Definir estructura de los datos
@@ -43,9 +42,9 @@ async function importModoData() {
     });
     
     // Encontrar el ID del cliente MODO
-    const { rows: clientRows } = await db.execute(
-      'SELECT id FROM clients WHERE name = $1',
-      ['MODO']
+    // Primero verificamos si existe la tabla y luego ejecutamos la consulta
+    const { rows: clientRows } = await pool.query(
+      "SELECT id FROM clients WHERE name = 'MODO'"
     );
     
     if (clientRows.length === 0) {
@@ -56,7 +55,7 @@ async function importModoData() {
     console.log(`Cliente MODO encontrado con ID: ${clientId}`);
     
     // Buscar personal (analistas y PM)
-    const { rows: personnelRows } = await db.execute(
+    const { rows: personnelRows } = await pool.query(
       'SELECT id, name FROM personnel'
     );
     
@@ -71,7 +70,7 @@ async function importModoData() {
     const processedEntregables = new Set<string>();
     
     // Convertir registros y guardar en la base de datos
-    const validRecords = [];
+    const validRecords: Partial<ModoRow>[] = [];
     
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
@@ -137,8 +136,8 @@ async function importModoData() {
       const briefCompliance = parseFloat(rowData.cumplimientoBrief?.replace(',', '.') || '0');
       
       // Determinar analista principal y PM
-      let analystId = null;
-      let pmId = null;
+      let analystId: string | number | null = null;
+      let pmId: string | number | null = null;
       
       if (rowData.analistas) {
         const analistas = rowData.analistas.split(',').map(a => a.trim());
@@ -154,7 +153,10 @@ async function importModoData() {
       
       // Guardar en la base de datos - Entregable
       try {
-        const { rows } = await db.execute(
+        // Convertir el mes a formato de 2 dígitos
+        const mesStr = rowData.mesEntrega ? rowData.mesEntrega.padStart(2, '0') : '01';
+        
+        const { rows } = await pool.query(
           `INSERT INTO deliverables (
             project_id, title, delivery_date, due_date, on_time, 
             narrative_quality, graphics_effectiveness, format_design, 
@@ -166,8 +168,8 @@ async function importModoData() {
           [
             clientId, // project_id - Usamos el ID del cliente como project_id por ahora
             rowData.entregable,
-            `2023-${rowData.mesEntrega.padStart(2, '0')}-15`, // Fecha de entrega (mes-15)
-            `2023-${rowData.mesEntrega.padStart(2, '0')}-10`, // Fecha límite (mes-10)
+            `2023-${mesStr}-15`, // Fecha de entrega (mes-15)
+            `2023-${mesStr}-10`, // Fecha límite (mes-10)
             rowData.entregaATiempo?.toLowerCase() === 'si',
             narrativeQuality,
             graphicsEffectiveness,
@@ -190,7 +192,7 @@ async function importModoData() {
     console.log(`Total entregables procesados: ${validRecords.length}`);
     
     // Agregar comentarios por trimestre
-    const { rows: modoComments } = await db.execute(
+    const { rows: modoComments } = await pool.query(
       'SELECT comment_text FROM client_modo_comments WHERE client_id = $1',
       [clientId]
     );
@@ -199,7 +201,7 @@ async function importModoData() {
     if (modoComments.length === 0) {
       const comentario = 'En MODO necesitamos que la info sea más visual. Ajustar un poco la info para que no haya tanto texto y pueda visualizarse la información de manera que impacte más a las personas que toman decisiones.';
       
-      await db.execute(
+      await pool.query(
         `INSERT INTO client_modo_comments (
           client_id, comment_text, year, quarter, created_at, updated_at
         ) VALUES (
