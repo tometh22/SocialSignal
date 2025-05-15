@@ -78,11 +78,18 @@ interface CommentData {
   timestamp: string;
 }
 
-export function ModoTab({ clientId }: ModoTabProps) {
+const ModoTab = ({ clientId }: ModoTabProps) => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [newComment, setNewComment] = useState("");
-  const [currentQuarter, setCurrentQuarter] = useState(2); // TODO: Calculate current quarter
-  const [currentYear, setCurrentYear] = useState(2023); // TODO: Get current year
+  
+  // Calcular trimestre y año actual
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentQuarterValue = Math.floor(currentMonth / 3) + 1;
+  const currentYearValue = today.getFullYear();
+  
+  const [currentQuarter, setCurrentQuarter] = useState(currentQuarterValue);
+  const [currentYear, setCurrentYear] = useState(currentYearValue);
 
   // Fetch MODO data for this client
   const { data: modoSummary, isLoading: summaryLoading } = useQuery<ModoSummary>({
@@ -103,7 +110,7 @@ export function ModoTab({ clientId }: ModoTabProps) {
   });
 
   // Function to handle saving a new comment
-  const handleSaveComment = () => {
+  const handleSaveComment = async () => {
     if (!newComment.trim()) {
       toast({
         title: "Error",
@@ -113,13 +120,47 @@ export function ModoTab({ clientId }: ModoTabProps) {
       return;
     }
 
-    // API request would go here
-    toast({
-      title: "Comentario guardado",
-      description: "El comentario ha sido guardado exitosamente",
-    });
-    
-    setNewComment("");
+    try {
+      const response = await fetch(`/api/clients/${clientId}/modo-comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          comment_text: newComment,
+          year: currentYear,
+          quarter: currentQuarter,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al guardar el comentario");
+      }
+
+      // Invalidar consultas para actualizar la interfaz
+      // Nota: si estuvieras usando react-query mutations, podrías usar queryClient.invalidateQueries aquí
+      
+      toast({
+        title: "Comentario guardado",
+        description: "El comentario ha sido guardado exitosamente",
+      });
+      
+      // Limpiar campo y refrescar datos
+      setNewComment("");
+      
+      // Refrescar la consulta manualmente (alternativa a invalidateQueries)
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error("Error al guardar el comentario:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al guardar el comentario",
+        variant: "destructive",
+      });
+    }
   };
 
   // Helper function to format date
@@ -485,3 +526,5 @@ export function ModoTab({ clientId }: ModoTabProps) {
     </div>
   );
 }
+
+export default ModoTab;
