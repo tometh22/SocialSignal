@@ -424,38 +424,38 @@ const ModoTab = ({ clientId }: ModoTabProps) => {
                           {getStatusIcon(deliverable.on_time)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.narrative_quality)}>
-                            {deliverable.narrative_quality.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.narrative_quality || 0)}>
+                            {deliverable.narrative_quality !== undefined && deliverable.narrative_quality !== null ? deliverable.narrative_quality.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.graphics_effectiveness)}>
-                            {deliverable.graphics_effectiveness.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.graphics_effectiveness || 0)}>
+                            {deliverable.graphics_effectiveness !== undefined && deliverable.graphics_effectiveness !== null ? deliverable.graphics_effectiveness.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.format_design)}>
-                            {deliverable.format_design.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.format_design || 0)}>
+                            {deliverable.format_design !== undefined && deliverable.format_design !== null ? deliverable.format_design.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.relevant_insights)}>
-                            {deliverable.relevant_insights.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.relevant_insights || 0)}>
+                            {deliverable.relevant_insights !== undefined && deliverable.relevant_insights !== null ? deliverable.relevant_insights.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.operations_feedback)}>
-                            {deliverable.operations_feedback.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.operations_feedback || 0)}>
+                            {deliverable.operations_feedback !== undefined && deliverable.operations_feedback !== null ? deliverable.operations_feedback.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.client_feedback)}>
-                            {deliverable.client_feedback.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.client_feedback || 0)}>
+                            {deliverable.client_feedback !== undefined && deliverable.client_feedback !== null ? deliverable.client_feedback.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={getScoreColor(deliverable.brief_compliance)}>
-                            {deliverable.brief_compliance.toFixed(1)}
+                          <Badge variant="outline" className={getScoreColor(deliverable.brief_compliance || 0)}>
+                            {deliverable.brief_compliance !== undefined && deliverable.brief_compliance !== null ? deliverable.brief_compliance.toFixed(1) : '0.0'}
                           </Badge>
                         </TableCell>
                       </TableRow>
