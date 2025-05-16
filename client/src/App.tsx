@@ -102,7 +102,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/new" component={NewActiveProject} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
-                  <ProtectedRoute path="/project-summary/:projectId" component={ProjectSummary} />
+                  {/* Redirección de la ruta antigua a la nueva */}
+                  <ProtectedRoute path="/project-summary/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/project-summary-new/:projectId" component={ProjectSummaryImproved} />
                   <ProtectedRoute path="/project-summary-super/:projectId" component={ProjectSummarySuper} />
                   <ProtectedRoute path="/project-summary-fixed/:projectId" component={ProjectSummaryFixed} />
