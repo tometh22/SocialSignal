@@ -115,12 +115,14 @@ export default function EditDeliverable() {
   
   // Filtrar personal por rol (analistas y PMs)
   const analysts = personnel?.filter(p => {
-    const roleIds = [1, 2, 3, 4, 5, 6, 8]; // IDs de roles tipo analista
+    // Roles de analistas: Analista Junior, Analista Senior, Analista Semi Senior, Data Specialist
+    const roleIds = [15, 9, 11, 10]; 
     return roleIds.includes(p.roleId);
   }) || [];
   
   const projectManagers = personnel?.filter(p => {
-    const roleIds = [7, 9, 10]; // IDs de roles tipo PM
+    // Roles de PM: Project Manager, Lead Project Manager, Operations Lead, COO, CEO
+    const roleIds = [17, 12, 16, 14, 13]; 
     return roleIds.includes(p.roleId);
   }) || [];
 
