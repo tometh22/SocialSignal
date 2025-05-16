@@ -459,8 +459,43 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                     </Button>
                     <Button 
                       type="button" 
-                      onClick={handleSaveIndicators}
-                      disabled={false}
+                      onClick={() => {
+                        // Enviar una petición directa al nuevo endpoint
+                        fetch(`/api/deliverables/${deliverable.id}/indicators`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            mes_entrega: editableValues.month,
+                            analysts: editableValues.analysts,
+                            pm: editableValues.pm,
+                            delivery_on_time: editableValues.deliveryOnTime,
+                            retrabajo: editableValues.retrabajo,
+                            narrative_quality: editableValues.narrativeQuality,
+                            graphics_effectiveness: editableValues.graphicsEffectiveness,
+                            format_design: editableValues.formatDesign,
+                            relevant_insights: editableValues.relevantInsights,
+                            operations_feedback: editableValues.operationsFeedback,
+                            hours_estimated: editableValues.hoursEstimated
+                          })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                          toast({
+                            title: "Éxito",
+                            description: "Indicadores actualizados correctamente",
+                          });
+                          setIsDialogOpen(false);
+                          queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${projectId}`] });
+                        })
+                        .catch(error => {
+                          console.error("Error al actualizar indicadores:", error);
+                          toast({
+                            title: "Error",
+                            description: "No se pudo actualizar los indicadores",
+                            variant: "destructive"
+                          });
+                        });
+                      }}
                     >
                       <>
                         <Save className="h-4 w-4 mr-2" />
