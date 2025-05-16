@@ -115,32 +115,30 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
     }
   }, [deliverable]);
   
-  // Mutación para actualizar el entregable
+  // Mutación para actualizar el entregable usando la nueva ruta de indicadores
   const updateDeliverableMutation = useMutation({
     mutationFn: async (data: any) => {
       // Mapeo para el backend - usar EXACTAMENTE los nombres de campos que esperamos
-      const serverData: Record<string, any> = {};
+      const serverData: Record<string, any> = {
+        // Convertir los nombres de los campos al formato esperado por la base de datos
+        mes_entrega: data.mes_entrega,
+        analysts: data.analysts,
+        pm: data.pm,
+        delivery_on_time: data.deliveryOnTime,
+        retrabajo: data.retrabajo,
+        narrative_quality: data.narrative_quality,
+        graphics_effectiveness: data.graphics_effectiveness,
+        format_design: data.format_design,
+        relevant_insights: data.relevant_insights,
+        operations_feedback: data.operations_feedback,
+        hours_estimated: data.hoursEstimated
+      };
       
-      // Sólo enviamos los campos que estamos modificando
-      if (data.mes_entrega !== undefined) serverData.mes_entrega = data.mes_entrega;
-      if (data.analysts !== undefined) serverData.analysts = data.analysts;
-      if (data.pm !== undefined) serverData.pm = data.pm;
-      if (data.deliveryOnTime !== undefined) serverData.delivery_on_time = data.deliveryOnTime;
-      if (data.retrabajo !== undefined) serverData.retrabajo = data.retrabajo;
-      if (data.narrative_quality !== undefined) serverData.narrative_quality = data.narrative_quality;
-      if (data.graphics_effectiveness !== undefined) serverData.graphics_effectiveness = data.graphics_effectiveness;
-      if (data.format_design !== undefined) serverData.format_design = data.format_design;
-      if (data.relevant_insights !== undefined) serverData.relevant_insights = data.relevant_insights;
-      if (data.operations_feedback !== undefined) serverData.operations_feedback = data.operations_feedback;
-      if (data.hoursEstimated !== undefined) serverData.hours_estimated = data.hoursEstimated;
+      console.log("Enviando datos al servidor (nueva ruta):", serverData);
       
-      // Aseguramos que updated_at esté establecido para la base de datos
-      serverData.updated_at = new Date().toISOString();
-      
-      console.log("Enviando datos al servidor:", serverData);
-      
-      const response = await fetch(`/api/deliverables/${deliverable.id}`, {
-        method: "PATCH",
+      // Usar la nueva ruta especializada para indicadores
+      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(serverData)
       });

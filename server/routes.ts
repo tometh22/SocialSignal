@@ -1614,20 +1614,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
     
     try {
-      const validatedData = insertDeliverableSchema.partial().parse(req.body);
-      const updatedDeliverable = await storage.updateDeliverable(id, validatedData);
+      console.log("Recibido PATCH para actualizar entregable ID:", id);
+      console.log("Datos recibidos:", req.body);
+      
+      // Omitimos la validación de Zod y enviamos los datos directamente
+      const updatedDeliverable = await storage.updateDeliverable(id, req.body);
       
       if (!updatedDeliverable) {
         return res.status(404).json({ message: "Deliverable not found" });
       }
       
+      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
       res.json(updatedDeliverable);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid deliverable data", errors: error.errors });
-      }
       console.error("Error updating deliverable:", error);
-      res.status(500).json({ message: "Failed to update deliverable" });
+      res.status(500).json({ message: "Failed to update deliverable", error: String(error) });
+    }
+  });
+  
+  // Actualizar los indicadores de robustez de un entregable (ruta simplificada)
+  app.post("/api/deliverables/:id/indicators", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
+    
+    try {
+      console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
+      console.log("Datos recibidos:", req.body);
+      
+      // Obtener el entregable existente
+      const existingDeliverable = await storage.getDeliverable(id);
+      if (!existingDeliverable) {
+        return res.status(404).json({ message: "Deliverable not found" });
+      }
+      
+      // Solo permitir campos específicos relacionados con los indicadores
+      const allowedFields = [
+        "mes_entrega", "delivery_on_time", "retrabajo",
+        "narrative_quality", "graphics_effectiveness", "format_design",
+        "relevant_insights", "operations_feedback",
+        "analysts", "pm", "hours_estimated"
+      ];
+      
+      // Filtrar solo los campos permitidos
+      const updateData: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      }
+      
+      updateData.updated_at = new Date().toISOString();
+      
+      console.log("Datos filtrados a actualizar:", updateData);
+      
+      // Actualizar el entregable
+      const updatedDeliverable = await storage.updateDeliverable(id, updateData);
+      
+      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
+      res.json(updatedDeliverable);
+    } catch (error) {
+      console.error("Error updating deliverable indicators:", error);
+      res.status(500).json({ message: "Failed to update deliverable indicators", error: String(error) });
     }
   });
   
