@@ -708,26 +708,44 @@ const ProjectSummary = () => {
         content={showHelp.content}
       />
       
-      {/* Sección de configuración de proyecto */}
+      {/* Sección principal de MODO y Configuración */}
       {project && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Configuración del Proyecto</h2>
-          
-          <Tabs defaultValue="components" className="w-full">
-            <TabsList>
+        <div className="container mx-auto px-4 mt-6">
+          <Tabs defaultValue="modo" className="w-full">
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="modo" className="flex items-center gap-2 font-semibold">
+                <BaggageClaim className="h-4 w-4" />
+                Métricas MODO
+              </TabsTrigger>
               <TabsTrigger value="components" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
                 Componentes
               </TabsTrigger>
-              <TabsTrigger value="modo" className="flex items-center gap-2">
-                <BaggageClaim className="h-4 w-4" />
-                MODO Metrics
-              </TabsTrigger>
               {/* Se pueden agregar más pestañas de configuración aquí */}
             </TabsList>
             
+            {/* Destacamos la pestaña de MODO poniéndola primera y por defecto */}
+            <TabsContent value="modo" className="mt-4">
+              <div className="bg-card rounded-lg border p-4 shadow-sm">
+                <div className="mb-3 flex justify-between items-center">
+                  <h2 className="text-xl font-semibold text-primary">Métricas MODO del Proyecto</h2>
+                  {/* Indicador visual si el proyecto es de MODO */}
+                  {project?.quotation?.clientId === 17 && (
+                    <span className="bg-primary/10 text-primary text-sm px-3 py-1 rounded-full font-medium">
+                      Proyecto MODO
+                    </span>
+                  )}
+                </div>
+                <ProjectModoMetrics 
+                  deliverable={deliverableData} 
+                  projectId={parsedProjectId || 0} 
+                />
+              </div>
+            </TabsContent>
+            
             <TabsContent value="components" className="mt-4">
               <div className="bg-card rounded-lg border p-4">
+                <h2 className="text-xl font-semibold mb-3">Componentes del Proyecto</h2>
                 <ComponentsManager 
                   projectId={parsedProjectId || 0} 
                   refreshTimeEntries={() => {
@@ -737,13 +755,6 @@ const ProjectSummary = () => {
                   }}
                 />
               </div>
-            </TabsContent>
-            
-            <TabsContent value="modo" className="mt-4">
-              <ProjectModoMetrics 
-                deliverable={deliverableData} 
-                projectId={parsedProjectId || 0} 
-              />
             </TabsContent>
           </Tabs>
         </div>
