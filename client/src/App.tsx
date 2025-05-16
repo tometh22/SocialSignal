@@ -13,6 +13,7 @@ import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
+import ProjectSummaryImproved from "@/pages/project-summary-improved";
 import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
