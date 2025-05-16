@@ -35,10 +35,10 @@ import {
   LineChart,
   PieChart,
   RefreshCw,
+  Settings,
   Shield,
   Star,
   Timer,
-  Toggles,
   TrendingDown,
   TrendingUp,
   Users,
@@ -901,7 +901,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         <p className="text-xs text-muted-foreground">Moderado</p>
                       </div>
                     </div>
-                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                    <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
                   
                   <div className="space-y-3 pt-2">
@@ -961,7 +961,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         <p className="text-xs text-muted-foreground">Bajo</p>
                       </div>
                     </div>
-                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                    <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
                   
                   <div className="space-y-3 pt-2">
@@ -1023,7 +1023,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         <p className="text-xs text-muted-foreground">Moderado</p>
                       </div>
                     </div>
-                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                    <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
                   
                   <div className="space-y-3 pt-2">
@@ -1083,7 +1083,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         <p className="text-xs text-muted-foreground">Excelente</p>
                       </div>
                     </div>
-                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                    <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
                   
                   <div className="space-y-3 pt-2">
