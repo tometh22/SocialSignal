@@ -472,35 +472,68 @@ export default function EditDeliverable() {
                             </TooltipProvider>
                           </FormLabel>
                           <FormControl>
-                            <div className="relative">
-                              <Input {...field} placeholder="Nombres de analistas" />
-                              {analysts.length > 0 && (
-                                <div className="absolute right-2 top-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {analysts.length} analista(s) activo(s)
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
-                          </FormControl>
-                          {analysts.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {analysts.map((analyst, idx) => (
-                                <Badge 
-                                  key={idx} 
-                                  variant="secondary" 
-                                  className="text-xs cursor-pointer"
-                                  onClick={() => {
+                            <div className="space-y-2">
+                              <div className="relative">
+                                <Select
+                                  value={field.value || ""}
+                                  onValueChange={(selectedAnalyst) => {
+                                    // Si ya hay analistas, añadir el nuevo separado por coma
                                     const currentAnalysts = field.value ? field.value.split(", ").filter(Boolean) : [];
-                                    if (!currentAnalysts.includes(analyst.name)) {
+                                    if (selectedAnalyst && !currentAnalysts.includes(selectedAnalyst)) {
                                       const newValue = currentAnalysts.length > 0 
-                                        ? `${field.value}, ${analyst.name}` 
-                                        : analyst.name;
+                                        ? `${field.value}, ${selectedAnalyst}` 
+                                        : selectedAnalyst;
                                       field.onChange(newValue);
                                     }
                                   }}
                                 >
-                                  {analyst.name}
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Seleccionar analista para agregar" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {analysts.map((analyst) => (
+                                      <SelectItem key={analyst.id} value={analyst.name}>
+                                        {analyst.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {analysts.length > 0 && (
+                                  <div className="absolute right-10 top-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {analysts.length} analista(s) activo(s)
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Campo para mostrar y editar analistas seleccionados */}
+                              <Input 
+                                {...field} 
+                                placeholder="Analistas seleccionados" 
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(e.target.value)}
+                              />
+                            </div>
+                          </FormControl>
+                          
+                          {/* Mostrar los analistas actuales como badges */}
+                          {field.value && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {field.value.split(", ").filter(Boolean).map((analystName, idx) => (
+                                <Badge 
+                                  key={idx} 
+                                  variant="secondary" 
+                                  className="text-xs cursor-pointer flex items-center gap-1"
+                                  onClick={() => {
+                                    // Eliminar este analista
+                                    const currentAnalysts = field.value.split(", ").filter(Boolean);
+                                    const updatedAnalysts = currentAnalysts.filter(name => name !== analystName);
+                                    field.onChange(updatedAnalysts.join(", "));
+                                  }}
+                                >
+                                  {analystName}
+                                  <span className="text-[10px]">✕</span>
                                 </Badge>
                               ))}
                             </div>
