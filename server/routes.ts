@@ -1641,47 +1641,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
       console.log("Datos recibidos:", req.body);
       
-      // Usamos SQL directo para evitar problemas de validación
-      const updateQuery = `
+      // Solución directa utilizando SQL simple
+      await db.execute(`
         UPDATE deliverables 
         SET 
-          narrative_quality = $1,
-          graphics_effectiveness = $2,
-          format_design = $3,
-          relevant_insights = $4,
-          operations_feedback = $5,
-          retrabajo = $6,
-          mes_entrega = $7,
-          analysts = $8,
-          pm = $9,
-          delivery_on_time = $10,
-          hours_estimated = $11,
+          narrative_quality = ${req.body.narrative_quality || 0},
+          graphics_effectiveness = ${req.body.graphics_effectiveness || 0},
+          format_design = ${req.body.format_design || 0},
+          relevant_insights = ${req.body.relevant_insights || 0},
+          operations_feedback = ${req.body.operations_feedback || 0},
           updated_at = NOW()
-        WHERE id = $12
-        RETURNING *
-      `;
+        WHERE id = ${id}
+      `);
       
-      const { rows } = await db.execute(updateQuery, [
-        req.body.narrative_quality || 0,
-        req.body.graphics_effectiveness || 0,
-        req.body.format_design || 0,
-        req.body.relevant_insights || 0, 
-        req.body.operations_feedback || 0,
-        req.body.retrabajo || false,
-        req.body.mes_entrega || 1,
-        req.body.analysts || "",
-        req.body.pm || "",
-        req.body.delivery_on_time || false,
-        req.body.hours_estimated || 0,
-        id
-      ]);
+      // Obtener el entregable actualizado
+      const [updatedDeliverable] = await db.select().from('deliverables').where({ id }).limit(1);
       
-      if (rows.length === 0) {
+      if (!updatedDeliverable) {
         return res.status(404).json({ message: "Deliverable not found" });
       }
       
-      console.log("Entregable actualizado exitosamente:", rows[0]);
-      res.json(rows[0]);
+      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
+      res.json(updatedDeliverable);
     } catch (error) {
       console.error("Error updating deliverable indicators:", error);
       res.status(500).json({ message: "Failed to update deliverable indicators", error: String(error) });
