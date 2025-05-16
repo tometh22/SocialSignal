@@ -472,10 +472,10 @@ export default function EditDeliverable() {
                             </TooltipProvider>
                           </FormLabel>
                           <FormControl>
-                            <div className="space-y-2">
-                              <div className="relative">
+                            <div>
+                              {/* Usamos un único select para añadir analistas */}
+                              <div className="flex items-center gap-2">
                                 <Select
-                                  value={field.value || ""}
                                   onValueChange={(selectedAnalyst) => {
                                     // Si ya hay analistas, añadir el nuevo separado por coma
                                     const currentAnalysts = field.value ? field.value.split(", ").filter(Boolean) : [];
@@ -488,7 +488,7 @@ export default function EditDeliverable() {
                                   }}
                                 >
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Seleccionar analista para agregar" />
+                                    <SelectValue placeholder="+ Añadir analista" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {analysts.map((analyst) => (
@@ -498,45 +498,34 @@ export default function EditDeliverable() {
                                     ))}
                                   </SelectContent>
                                 </Select>
-                                {/* El contador de analistas lo mostramos en otro lugar para evitar superposición */}
-                              </div>
-                              
-                              {/* Campo para mostrar y editar analistas seleccionados */}
-                              <div className="relative">
+                                
+                                {/* Campo oculto que mantiene el valor real */}
                                 <Input 
+                                  type="hidden"
                                   {...field} 
-                                  placeholder="Analistas seleccionados" 
                                   value={field.value || ""}
-                                  onChange={(e) => field.onChange(e.target.value)}
                                 />
-                                {analysts.length > 0 && (
-                                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                    <Badge variant="outline" className="text-xs bg-primary/5">
-                                      {analysts.length} analista(s)
-                                    </Badge>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </FormControl>
                           
                           {/* Mostrar los analistas actuales como badges */}
                           {field.value && (
-                            <div className="mt-1 flex flex-wrap gap-1">
+                            <div className="mt-2 flex flex-wrap gap-2">
                               {field.value.split(", ").filter(Boolean).map((analystName, idx) => (
                                 <Badge 
                                   key={idx} 
                                   variant="secondary" 
-                                  className="text-xs cursor-pointer flex items-center gap-1"
+                                  className="text-sm px-3 py-1 cursor-pointer flex items-center gap-1"
                                   onClick={() => {
                                     // Eliminar este analista
-                                    const currentAnalysts = field.value.split(", ").filter(Boolean);
+                                    const currentAnalysts = field.value ? field.value.split(", ").filter(Boolean) : [];
                                     const updatedAnalysts = currentAnalysts.filter(name => name !== analystName);
                                     field.onChange(updatedAnalysts.join(", "));
                                   }}
                                 >
                                   {analystName}
-                                  <span className="text-[10px]">✕</span>
+                                  <span className="text-xs ml-1">✕</span>
                                 </Badge>
                               ))}
                             </div>
@@ -565,21 +554,29 @@ export default function EditDeliverable() {
                             </TooltipProvider>
                           </FormLabel>
                           <FormControl>
-                            <Select
-                              value={field.value || ""}
-                              onValueChange={field.onChange}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar PM" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {projectManagers.map((pm) => (
-                                  <SelectItem key={pm.id} value={pm.name}>
-                                    {pm.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex space-x-2">
+                              <Select
+                                value={field.value || ""}
+                                onValueChange={field.onChange}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Seleccionar PM" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {projectManagers.map((pm) => (
+                                    <SelectItem key={pm.id} value={pm.name}>
+                                      {pm.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              
+                              {field.value && (
+                                <Badge className="h-10 flex items-center px-3 bg-primary/5">
+                                  PM asignado
+                                </Badge>
+                              )}
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
