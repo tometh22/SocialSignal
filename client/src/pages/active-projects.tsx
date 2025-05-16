@@ -319,9 +319,9 @@ export default function ActiveProjects() {
                       className="h-6 w-6 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setLocation(`/project-summary-selector/${project.id}`);
+                        setLocation(`/project-analytics/${project.id}`);
                       }}
-                      title="Ver resumen del proyecto (con opciones de visualización)"
+                      title="Ver análisis completo del proyecto"
                     >
                       <BarChart2 className="h-3.5 w-3.5" />
                     </Button>
