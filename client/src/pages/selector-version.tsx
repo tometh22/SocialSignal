@@ -19,6 +19,10 @@ const VersionSelector = () => {
   const handleSuperVersion = () => {
     setLocation(`/project-summary-super/${projectId}`);
   };
+  
+  const handleFixedVersion = () => {
+    setLocation(`/project-summary-fixed/${projectId}`);
+  };
 
   const handleBack = () => {
     setLocation("/active-projects");
@@ -38,81 +42,103 @@ const VersionSelector = () => {
         Elige entre la versión original o la versión mejorada con visualización de datos optimizada
       </p>
 
-      <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      <div className="grid md:grid-cols-4 gap-4 max-w-6xl mx-auto">
         <Card className="border shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-              <Code className="h-4 w-4 text-primary" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
+              <Code className="h-3.5 w-3.5 text-primary" />
               Versión Original
             </CardTitle>
-            <CardDescription className="text-xs">
-              Dashboard con la disposición inicial
+            <CardDescription className="text-[10px]">
+              Dashboard inicial
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
+          <CardContent className="p-3">
+            <div className="bg-slate-100 rounded-md p-3 mb-2 h-28 flex items-center justify-center">
               <div className="text-center text-slate-400">
-                <p className="text-xs">Vista previa no disponible</p>
-                <p className="text-[10px]">Visualización básica inicial</p>
+                <p className="text-[10px]">Vista básica inicial</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
-              La versión original incluye los datos principales del proyecto pero con problemas de superposición y jerarquía visual que dificultan el análisis efectivo.
+            <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
+              Versión original con problemas de superposición y visualización de componentes.
             </p>
-            <Button onClick={handleOriginalVersion} size="sm" className="w-full">
-              Ver Versión Original
+            <Button onClick={handleOriginalVersion} size="sm" className="w-full h-7 text-xs">
+              Ver Original
             </Button>
           </CardContent>
         </Card>
 
         <Card className="border shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Versión Mejorada
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              1ra Mejora
             </CardTitle>
-            <CardDescription className="text-xs">
-              Primera mejora de diseño y estructura
+            <CardDescription className="text-[10px]">
+              Mejor estructura
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
+          <CardContent className="p-3">
+            <div className="bg-slate-100 rounded-md p-3 mb-2 h-28 flex items-center justify-center">
               <div className="text-center text-slate-400">
-                <p className="text-xs">Vista previa no disponible</p>
-                <p className="text-[10px]">Diseño mejorado con mejor jerarquía</p>
+                <p className="text-[10px]">Jerarquía mejorada</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
-              Esta versión mejorada presenta mejor disposición de componentes, esquema visual más claro y distribución más intuitiva. Resuelve parcialmente los problemas de diseño.
+            <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
+              Primera mejora con mejor disposición pero mantiene algunos problemas de espaciado.
             </p>
-            <Button onClick={handleImprovedVersion} size="sm" className="w-full">
-              Ver Primera Versión Mejorada
+            <Button onClick={handleImprovedVersion} size="sm" className="w-full h-7 text-xs">
+              Ver 1ra Mejora
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="border shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              2da Mejora
+            </CardTitle>
+            <CardDescription className="text-[10px]">
+              Organización en pestañas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="bg-slate-100 rounded-md p-3 mb-2 h-28 flex items-center justify-center">
+              <div className="text-center text-slate-400">
+                <p className="text-[10px]">Diseño por secciones</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
+              Versión con navegación por pestañas y mejor separación. Resuelve la mayor parte de los problemas.
+            </p>
+            <Button onClick={handleSuperVersion} size="sm" className="w-full h-7 text-xs">
+              Ver 2da Mejora
             </Button>
           </CardContent>
         </Card>
         
         <Card className="border-2 shadow-md hover:shadow-lg transition-shadow border-primary/40 bg-primary/5">
-          <CardHeader className="pb-3 bg-primary/10">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Versión Optimizada
+          <CardHeader className="pb-2 bg-primary/10">
+            <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Versión Final
             </CardTitle>
-            <CardDescription className="text-xs">
-              Solución completa a problemas visuales
+            <CardDescription className="text-[10px]">
+              Solución completa
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
+          <CardContent className="p-3">
+            <div className="bg-slate-100 rounded-md p-3 mb-2 h-28 flex items-center justify-center">
               <div className="text-center text-slate-400">
-                <p className="text-xs">Vista previa no disponible</p>
-                <p className="text-[10px]">Diseño completamente rediseñado</p>
+                <p className="text-[10px]">Diseño profesional</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
-              Versión totalmente renovada con una interfaz tipo "dashboard profesional". Utiliza pestañas para separar claramente las secciones, mejora el espaciado y elimina completamente las superposiciones. Incluye tooltips y mejor organización visual.
+            <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
+              Versión final perfeccionada. Espaciado óptimo, estructura clara, sin superposición de elementos. Con tooltips y mejor organización.
             </p>
-            <Button onClick={handleSuperVersion} variant="default" size="sm" className="w-full relative overflow-hidden group">
-              <span className="relative z-10">Ver Versión Optimizada</span>
+            <Button onClick={handleFixedVersion} variant="default" size="sm" className="w-full h-7 text-xs relative overflow-hidden group">
+              <span className="relative z-10">Ver Versión Final</span>
               <span className="absolute inset-0 bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
             </Button>
           </CardContent>

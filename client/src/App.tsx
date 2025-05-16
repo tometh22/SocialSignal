@@ -15,6 +15,7 @@ import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
 import ProjectSummaryImproved from "@/pages/project-summary-improved";
 import ProjectSummarySuper from "@/pages/project-summary-super";
+import ProjectSummaryFixed from "@/pages/project-summary-fixed";
 import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
@@ -103,6 +104,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/project-summary/:projectId" component={ProjectSummary} />
                   <ProtectedRoute path="/project-summary-new/:projectId" component={ProjectSummaryImproved} />
                   <ProtectedRoute path="/project-summary-super/:projectId" component={ProjectSummarySuper} />
+                  <ProtectedRoute path="/project-summary-fixed/:projectId" component={ProjectSummaryFixed} />
                   <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
