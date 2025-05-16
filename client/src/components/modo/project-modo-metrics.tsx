@@ -283,6 +283,17 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
               </Badge>
             </CardTitle>
             
+            <div className="mt-2">
+              <Button 
+                size="sm" 
+                variant="secondary"
+                onClick={() => setLocation(`/edit-indicators/${deliverable.id}`)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar Indicadores
+              </Button>
+            </div>
+            
             {/* Dialog para editar los valores */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -460,7 +471,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                         variant="secondary"
                         onClick={() => {
                           setIsDialogOpen(false);
-                          setLocation(`/edit-indicators/${deliverable.id}`);
+                          window.location.href = `/edit-indicators/${deliverable.id}`;
                         }}
                       >
                         Abrir Editor Completo
@@ -472,7 +483,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                       </Button>
                       <Button 
                         type="button" 
-                        onClick={() => setLocation(`/edit-indicators/${deliverable.id}`)}
+                        onClick={() => window.location.href = `/edit-indicators/${deliverable.id}`}
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Ir a Editor

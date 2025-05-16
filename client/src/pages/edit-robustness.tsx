@@ -1,42 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'wouter';
-import { useToast } from '@/hooks/use-toast';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  Card, 
-  CardHeader, 
-  CardContent, 
-  CardTitle,
-  CardDescription,
-  CardFooter
-} from '@/components/ui/card';
+import { useRoute, useLocation } from 'wouter';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ArrowLeft, Save } from 'lucide-react';
+import { SelectValue, SelectTrigger, SelectItem, SelectContent, Select } from '@/components/ui/select';
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
-const EditRobustnessPage: React.FC = () => {
-  const { id } = useParams();
-  const parsedId = id ? parseInt(id) : null;
-  const [, setLocation] = useLocation();
+const EditRobustnessPage = () => {
+  const [, params] = useRoute('/edit-indicators/:id');
+  const id = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Estado para los valores editables
+  // Estado para almacenar todos los valores editables
   const [formData, setFormData] = useState({
-    month: 1,
+    mes_entrega: 1,
     analysts: "",
+    analystId: null,
     pm: "",
+    pmId: null,
     deliveryOnTime: false,
     retrabajo: false,
     narrativeQuality: 0,
@@ -44,355 +32,522 @@ const EditRobustnessPage: React.FC = () => {
     formatDesign: 0,
     relevantInsights: 0,
     operationsFeedback: 0,
-    hoursEstimated: 0
+    hoursEstimated: 40,
+    hoursActual: 0
   });
   
-  // Obtener los datos del entregable
-  const { data: deliverable, isLoading, error } = useQuery({
-    queryKey: ['/api/deliverables', parsedId],
-    queryFn: async () => {
-      if (!parsedId) return null;
-      const response = await fetch(`/api/deliverables/${parsedId}`);
-      if (!response.ok) {
-        throw new Error('No se pudo cargar el entregable');
-      }
-      return response.json();
-    },
-    enabled: !!parsedId
+  // Consultar los datos del entregable
+  const { data: deliverable, isLoading } = useQuery<any>({
+    queryKey: [`/api/deliverables/${id}`],
+    enabled: !!id
   });
   
-  // Inicializar los valores editables cuando cambia el entregable
+  // Consultar personal disponible
+  const { data: personnel } = useQuery({
+    queryKey: ['/api/personnel'],
+    enabled: !!id
+  });
+  
+  // Consultar roles
+  const { data: roles } = useQuery({
+    queryKey: ['/api/roles'],
+    enabled: !!id
+  });
+  
+  // Consultar entradas de tiempo
+  const { data: timeEntries } = useQuery({
+    queryKey: [`/api/time-entries/project/${deliverable?.project_id}`],
+    enabled: !!deliverable?.project_id
+  });
+  
+  // Actualizar formulario cuando se carguen los datos
   useEffect(() => {
     if (deliverable) {
       setFormData({
-        month: deliverable.mes_entrega || 1,
+        mes_entrega: deliverable.mes_entrega || 1,
         analysts: deliverable.analysts || "",
+        analystId: null,
         pm: deliverable.pm || "",
-        deliveryOnTime: deliverable.delivery_on_time || false,
+        pmId: null,
+        deliveryOnTime: deliverable.deliveryOnTime || false,
         retrabajo: deliverable.retrabajo || false,
         narrativeQuality: deliverable.narrative_quality || 0,
         graphicsEffectiveness: deliverable.graphics_effectiveness || 0,
         formatDesign: deliverable.format_design || 0,
         relevantInsights: deliverable.relevant_insights || 0,
         operationsFeedback: deliverable.operations_feedback || 0,
-        hoursEstimated: deliverable.hours_estimated || 40
+        hoursEstimated: deliverable.hoursEstimated || 40,
+        hoursActual: calculateTotalHours(timeEntries || [])
       });
     }
-  }, [deliverable]);
-
-  // Función para guardar cambios directamente
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      // Formatear los datos para la API
-      const apiData = {
-        mes_entrega: formData.month,
-        analysts: formData.analysts,
-        pm: formData.pm,
-        delivery_on_time: formData.deliveryOnTime,
-        retrabajo: formData.retrabajo,
-        narrative_quality: formData.narrativeQuality,
-        graphics_effectiveness: formData.graphicsEffectiveness,
-        format_design: formData.formatDesign,
-        relevant_insights: formData.relevantInsights,
-        operations_feedback: formData.operationsFeedback,
-        hours_estimated: formData.hoursEstimated
-      };
-
-      console.log('Enviando datos al servidor:', apiData);
-
-      // Usar la API directa que creamos
-      const response = await fetch(`/api/deliverables/${parsedId}/indicators`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(apiData)
-      });
-
-      // Leer la respuesta
-      const data = await response.json();
-
-      // Verificar si hubo error
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al actualizar indicadores');
-      }
-
-      // Mostrar mensaje de éxito
-      toast({
-        title: 'Éxito',
-        description: 'Los indicadores se han actualizado correctamente'
-      });
-
-      // Redirigir a la página del proyecto
-      if (deliverable?.project_id) {
-        // Invalidar caché para actualizar los datos
-        queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${deliverable.project_id}`] });
-        // Redirigir
-        setLocation(`/project-analytics/${deliverable.project_id}`);
-      } else {
-        setLocation(`/active-projects`);
-      }
-    } catch (error: any) {
-      console.error('Error al guardar los indicadores:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudieron actualizar los indicadores',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  }, [deliverable, timeEntries]);
+  
+  // Función para calcular horas totales
+  const calculateTotalHours = (entries: any[]) => {
+    return entries.reduce((total, entry) => total + entry.hours, 0);
   };
-
-  // Obtener nombre del mes según su número
-  const getMonthName = (monthNumber: number): string => {
-    const months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  
+  // Calcular puntuación total
+  const calculateTotalScore = () => {
+    const scores = [
+      formData.narrativeQuality,
+      formData.graphicsEffectiveness,
+      formData.formatDesign,
+      formData.relevantInsights,
+      formData.operationsFeedback
     ];
-    return months[monthNumber - 1] || 'Desconocido';
+    
+    // Calcular promedio de valores no cero
+    const validScores = scores.filter(score => score > 0);
+    if (validScores.length === 0) return 0;
+    
+    return validScores.reduce((a, b) => a + b, 0) / validScores.length;
   };
-
+  
+  // Función para obtener color según puntuación
+  const getScoreColor = (score: number) => {
+    if (score >= 4) return "bg-green-100 text-green-800 hover:bg-green-200";
+    if (score >= 3) return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
+    return "bg-red-100 text-red-800 hover:bg-red-200";
+  };
+  
+  // Mutación para guardar los cambios directamente mediante el nuevo endpoint
+  const updateIndicatorsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Mapear los datos del formulario al formato que espera el backend
+      const serverData = {
+        mes_entrega: data.mes_entrega,
+        analysts: data.analysts,
+        pm: data.pm,
+        delivery_on_time: data.deliveryOnTime,
+        retrabajo: data.retrabajo,
+        narrative_quality: data.narrativeQuality,
+        graphics_effectiveness: data.graphicsEffectiveness,
+        format_design: data.formatDesign,
+        relevant_insights: data.relevantInsights,
+        operations_feedback: data.operationsFeedback,
+        hours_estimated: data.hoursEstimated
+      };
+      
+      console.log("Enviando datos al servidor:", serverData);
+      
+      // Usar la nueva ruta especializada para indicadores
+      return fetch(`/api/deliverables/${id}/indicators`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(serverData)
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error('Error al actualizar los indicadores');
+        }
+        return response.json();
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Indicadores actualizados correctamente",
+      });
+      // Invalidar consultas para refrescar datos
+      queryClient.invalidateQueries({ queryKey: [`/api/deliverables/${id}`] });
+      if (deliverable?.project_id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${deliverable.project_id}`] });
+      }
+      
+      // Redirigir a la página anterior
+      window.history.back();
+    },
+    onError: (error) => {
+      console.error("Error al actualizar indicadores:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar los indicadores. Intenta nuevamente.",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Función para manejar el envío del formulario
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateIndicatorsMutation.mutate(formData);
+  };
+  
+  // Función para actualizar campos del formulario
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
   if (isLoading) {
     return (
-      <div className="container py-10">
-        <Card>
-          <CardContent className="py-10 text-center">
-            Cargando entregable...
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-2">Cargando datos...</span>
       </div>
     );
   }
-
-  if (error || !deliverable) {
+  
+  if (!deliverable) {
     return (
-      <div className="container py-10">
-        <Card>
-          <CardContent className="py-10 text-center">
-            No se pudo cargar el entregable. Intente nuevamente.
-          </CardContent>
-        </Card>
+      <div className="flex flex-col items-center justify-center h-96">
+        <h2 className="text-xl font-bold mb-2">Entregable no encontrado</h2>
+        <p className="text-muted-foreground mb-4">No se encontró el entregable solicitado</p>
+        <Button onClick={() => window.history.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver
+        </Button>
       </div>
     );
   }
-
+  
+  // Calcular la puntuación total
+  const totalScore = calculateTotalScore();
+  
   return (
-    <div className="container py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setLocation(`/project-analytics/${deliverable.project_id}`)}
-            className="mr-4"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver al proyecto
-          </Button>
-          <h1 className="text-2xl font-bold">Editar Indicadores de Robustez</h1>
-        </div>
-        
+    <div className="container mx-auto py-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-sm text-muted-foreground">
-            Proyecto: <span className="font-medium">{deliverable.title || deliverable.name}</span>
+          <h1 className="text-2xl font-bold">Editar Indicadores de Robustez</h1>
+          <p className="text-muted-foreground">
+            Proyecto: {deliverable.title} (ID: {deliverable.id})
           </p>
         </div>
+        <Button variant="outline" onClick={() => window.history.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver
+        </Button>
       </div>
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Indicadores de Robustez</CardTitle>
-          <CardDescription>
-            Actualiza los valores para mejorar el seguimiento del proyecto
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Información del proyecto */}
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Información del Proyecto</CardTitle>
+            <CardDescription>Detalles básicos del entregable</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="projectId">ID del Proyecto</Label>
+                <Input id="projectId" value={deliverable.project_id} disabled />
+              </div>
+              <div>
+                <Label htmlFor="deliverableId">ID del Entregable</Label>
+                <Input id="deliverableId" value={deliverable.id} disabled />
+              </div>
+              <div>
+                <Label htmlFor="title">Título</Label>
+                <Input id="title" value={deliverable.title} disabled />
+              </div>
+              <div>
                 <Label htmlFor="month">Mes de Entrega</Label>
                 <Select 
-                  value={String(formData.month)}
-                  onValueChange={(value) => setFormData({...formData, month: parseInt(value)})}
+                  value={formData.mes_entrega.toString()} 
+                  onValueChange={(value) => handleInputChange('mes_entrega', parseInt(value))}
                 >
-                  <SelectTrigger id="month">
+                  <SelectTrigger>
                     <SelectValue placeholder="Seleccionar mes" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={String(month)}>
-                        {getMonthName(month)}
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
+                      <SelectItem key={month} value={month.toString()}>
+                        Mes {month}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="hoursEstimated">Horas Disponibles</Label>
-                <Input 
-                  id="hoursEstimated"
-                  type="number" 
-                  value={formData.hoursEstimated} 
-                  onChange={(e) => setFormData({
-                    ...formData, 
-                    hoursEstimated: parseFloat(e.target.value || "0")
-                  })}
-                />
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="totalScore">Puntuación Total</Label>
+                  <Badge variant="outline" className={getScoreColor(totalScore)}>
+                    {totalScore.toFixed(2)} / 5.0
+                  </Badge>
+                </div>
+                <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${totalScore >= 4 ? 'bg-green-500' : totalScore >= 3 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                    style={{ width: `${(totalScore / 5) * 100}%` }}
+                  ></div>
+                </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="analysts">Analistas</Label>
-                <Input 
-                  id="analysts"
-                  value={formData.analysts}
-                  onChange={(e) => setFormData({...formData, analysts: e.target.value})}
-                  placeholder="Nombres separados por coma"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="pm">Project Manager</Label>
-                <Input 
-                  id="pm"
-                  value={formData.pm}
-                  onChange={(e) => setFormData({...formData, pm: e.target.value})}
-                  placeholder="Nombre del PM"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="deliveryOnTime"
-                  checked={formData.deliveryOnTime}
-                  onCheckedChange={(checked) => 
-                    setFormData({...formData, deliveryOnTime: checked})
-                  }
-                />
-                <Label htmlFor="deliveryOnTime">Entrega a Tiempo</Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="retrabajo"
-                  checked={formData.retrabajo}
-                  onCheckedChange={(checked) => 
-                    setFormData({...formData, retrabajo: checked})
-                  }
-                />
-                <Label htmlFor="retrabajo">Requirió Retrabajo</Label>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Evaluación de Calidad (0-5)</h3>
-              
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <Label htmlFor="narrativeQuality">Calidad Narrativa</Label>
-                    <span className="text-sm font-medium">{formData.narrativeQuality.toFixed(1)}</span>
+          </CardContent>
+        </Card>
+        
+        {/* Formulario principal */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Editar Indicadores</CardTitle>
+            <CardDescription>Actualiza los valores de robustez para este entregable</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Equipo */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Equipo de Proyecto</h3>
+                  <div>
+                    <Label htmlFor="analysts">Analistas</Label>
+                    <div className="flex space-x-2">
+                      <Select 
+                        value={formData.analystId || ""} 
+                        onValueChange={(value) => {
+                          if (value) {
+                            const analyst = personnel?.find(p => p.id === parseInt(value));
+                            if (analyst) {
+                              handleInputChange('analysts', analyst.name);
+                              handleInputChange('analystId', analyst.id);
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Seleccionar analista" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {personnel?.filter(p => {
+                            const role = roles?.find(r => r.id === p.roleId);
+                            return role && (role.name.includes('Analista') || role.name.includes('Analyst'));
+                          }).map((analyst) => (
+                            <SelectItem key={analyst.id} value={analyst.id.toString()}>
+                              {analyst.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        id="analysts"
+                        value={formData.analysts}
+                        onChange={(e) => handleInputChange('analysts', e.target.value)}
+                        placeholder="Nombre del analista"
+                      />
+                    </div>
                   </div>
-                  <Slider 
+                  <div>
+                    <Label htmlFor="pm">Project Manager</Label>
+                    <div className="flex space-x-2">
+                      <Select 
+                        value={formData.pmId || ""} 
+                        onValueChange={(value) => {
+                          if (value) {
+                            const manager = personnel?.find(p => p.id === parseInt(value));
+                            if (manager) {
+                              handleInputChange('pm', manager.name);
+                              handleInputChange('pmId', manager.id);
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Seleccionar PM" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {personnel?.filter(p => {
+                            const role = roles?.find(r => r.id === p.roleId);
+                            return role && (role.name.includes('PM') || role.name.includes('Project Manager'));
+                          }).map((manager) => (
+                            <SelectItem key={manager.id} value={manager.id.toString()}>
+                              {manager.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        id="pm"
+                        value={formData.pm}
+                        onChange={(e) => handleInputChange('pm', e.target.value)}
+                        placeholder="Nombre del PM"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex space-x-6">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="deliveryOnTime"
+                        checked={formData.deliveryOnTime}
+                        onCheckedChange={(checked) => handleInputChange('deliveryOnTime', checked)}
+                      />
+                      <Label htmlFor="deliveryOnTime">Entrega a tiempo</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="retrabajo"
+                        checked={formData.retrabajo}
+                        onCheckedChange={(checked) => handleInputChange('retrabajo', checked)}
+                      />
+                      <Label htmlFor="retrabajo">Requirió retrabajo</Label>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Horas */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Horas y Estimación</h3>
+                  <div>
+                    <Label htmlFor="hoursEstimated">Horas Estimadas</Label>
+                    <Input
+                      id="hoursEstimated"
+                      type="number"
+                      value={formData.hoursEstimated}
+                      onChange={(e) => handleInputChange('hoursEstimated', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="hoursActual">Horas Registradas</Label>
+                    <Input
+                      id="hoursActual"
+                      type="number"
+                      value={formData.hoursActual}
+                      disabled
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total de horas registradas en el sistema de tiempo
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Eficiencia de Tiempo</Label>
+                    <div className="flex items-center mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            formData.hoursActual <= formData.hoursEstimated 
+                              ? 'bg-green-500' 
+                              : formData.hoursActual <= formData.hoursEstimated * 1.2 
+                                ? 'bg-yellow-500' 
+                                : 'bg-red-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(
+                              (formData.hoursActual / Math.max(formData.hoursEstimated, 1)) * 100, 
+                              100
+                            )}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <span className="text-sm">
+                        {Math.round((formData.hoursActual / Math.max(formData.hoursEstimated, 1)) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Métricas de calidad */}
+              <div className="pt-4 border-t space-y-6">
+                <h3 className="text-lg font-medium">Métricas de Calidad</h3>
+                
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <Label htmlFor="narrativeQuality">Calidad de Narrativa</Label>
+                    <span className="text-sm font-medium">{formData.narrativeQuality}</span>
+                  </div>
+                  <Slider
                     id="narrativeQuality"
+                    min={0}
+                    max={5}
+                    step={0.5}
                     value={[formData.narrativeQuality]}
-                    min={0}
-                    max={5}
-                    step={0.1}
-                    onValueChange={(value) => setFormData({...formData, narrativeQuality: value[0]})}
+                    onValueChange={(value) => handleInputChange('narrativeQuality', value[0])}
                   />
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <Label htmlFor="graphicsEffectiveness">Efectividad de Gráficos</Label>
-                    <span className="text-sm font-medium">{formData.graphicsEffectiveness.toFixed(1)}</span>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <Label htmlFor="graphicsEffectiveness">Efectividad Gráfica</Label>
+                    <span className="text-sm font-medium">{formData.graphicsEffectiveness}</span>
                   </div>
-                  <Slider 
+                  <Slider
                     id="graphicsEffectiveness"
+                    min={0}
+                    max={5}
+                    step={0.5}
                     value={[formData.graphicsEffectiveness]}
-                    min={0}
-                    max={5}
-                    step={0.1}
-                    onValueChange={(value) => setFormData({...formData, graphicsEffectiveness: value[0]})}
+                    onValueChange={(value) => handleInputChange('graphicsEffectiveness', value[0])}
                   />
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <Label htmlFor="formatDesign">Formato y Diseño</Label>
-                    <span className="text-sm font-medium">{formData.formatDesign.toFixed(1)}</span>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <Label htmlFor="formatDesign">Diseño de Formato</Label>
+                    <span className="text-sm font-medium">{formData.formatDesign}</span>
                   </div>
-                  <Slider 
+                  <Slider
                     id="formatDesign"
+                    min={0}
+                    max={5}
+                    step={0.5}
                     value={[formData.formatDesign]}
-                    min={0}
-                    max={5}
-                    step={0.1}
-                    onValueChange={(value) => setFormData({...formData, formatDesign: value[0]})}
+                    onValueChange={(value) => handleInputChange('formatDesign', value[0])}
                   />
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex justify-between">
+                <div>
+                  <div className="flex justify-between mb-2">
                     <Label htmlFor="relevantInsights">Insights Relevantes</Label>
-                    <span className="text-sm font-medium">{formData.relevantInsights.toFixed(1)}</span>
+                    <span className="text-sm font-medium">{formData.relevantInsights}</span>
                   </div>
-                  <Slider 
+                  <Slider
                     id="relevantInsights"
-                    value={[formData.relevantInsights]}
                     min={0}
                     max={5}
-                    step={0.1}
-                    onValueChange={(value) => setFormData({...formData, relevantInsights: value[0]})}
+                    step={0.5}
+                    value={[formData.relevantInsights]}
+                    onValueChange={(value) => handleInputChange('relevantInsights', value[0])}
                   />
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <Label htmlFor="operationsFeedback">Feedback Operaciones</Label>
-                    <span className="text-sm font-medium">{formData.operationsFeedback.toFixed(1)}</span>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <Label htmlFor="operationsFeedback">Feedback Operacional</Label>
+                    <span className="text-sm font-medium">{formData.operationsFeedback}</span>
                   </div>
-                  <Slider 
+                  <Slider
                     id="operationsFeedback"
-                    value={[formData.operationsFeedback]}
                     min={0}
                     max={5}
-                    step={0.1}
-                    onValueChange={(value) => setFormData({...formData, operationsFeedback: value[0]})}
+                    step={0.5}
+                    value={[formData.operationsFeedback]}
+                    onValueChange={(value) => handleInputChange('operationsFeedback', value[0])}
                   />
                 </div>
               </div>
-            </div>
-            
-            <div className="flex justify-end gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setLocation(`/project-analytics/${deliverable.project_id}`)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Guardando...' : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar Cambios
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              
+              <div className="pt-6 flex justify-between">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => window.history.back()}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={updateIndicatorsMutation.isPending}
+                >
+                  {updateIndicatorsMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Guardar Cambios
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
