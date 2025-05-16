@@ -198,8 +198,11 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
     // Actualizar el estado para reflejar los datos de la imagen
     setEditableValues(sonyOneValues);
     
-    // Guardar inmediatamente los cambios
-    updateDeliverableMutation.mutate(sonyOneValues);
+    // Mostrar mensaje de éxito 
+    toast({
+      title: "Datos cargados",
+      description: "Los datos de Sony One se han cargado correctamente. Haz clic en 'Guardar Cambios' para aplicarlos.",
+    });
   };
 
   // Si no hay entregable, muestra un mensaje
