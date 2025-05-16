@@ -208,20 +208,41 @@ export default function EditDeliverable() {
   // Mutación para actualizar el entregable
   const updateDeliverableMutation = useMutation({
     mutationFn: async (data: DeliverableFormValues) => {
+      // Convertir los nombres de campos del formulario a los nombres esperados por el servidor
+      const serverData = {
+        name: data.title,
+        deliveryMonth: String(data.month), // Convertir a string como espera el servidor
+        mes_entrega: data.month,
+        analystId: null, // Se manejan como strings en el frontend
+        pmId: null, // Se manejan como strings en el frontend
+        deliveryOnTime: data.on_time,
+        retrabajo: data.retrabajo,
+        narrativeQuality: data.narrative_quality,
+        graphicsEffectiveness: data.graphics_effectiveness,
+        formatDesign: data.format_design,
+        relevantInsights: data.relevant_insights,
+        operationsFeedback: data.operations_feedback,
+        clientFeedback: data.client_feedback,
+        feedback_general_cliente: data.client_feedback_average,
+        briefCompliance: data.brief_compliance,
+        hoursEstimated: data.hours_available,
+        hoursActual: data.hours_real,
+        delivery_date: formattedDates.delivery_date
+          ? new Date(formattedDates.delivery_date).toISOString()
+          : null,
+        due_date: formattedDates.due_date
+          ? new Date(formattedDates.due_date).toISOString()
+          : null,
+      };
+      
+      console.log("Datos enviados al servidor:", serverData);
+      
       const response = await fetch(`/api/deliverables/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...data,
-          delivery_date: formattedDates.delivery_date
-            ? new Date(formattedDates.delivery_date).toISOString()
-            : null,
-          due_date: formattedDates.due_date
-            ? new Date(formattedDates.due_date).toISOString()
-            : null,
-        }),
+        body: JSON.stringify(serverData),
       });
       
       if (!response.ok) {
