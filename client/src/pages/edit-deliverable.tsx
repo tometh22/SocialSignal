@@ -493,10 +493,12 @@ export default function EditDeliverable() {
                 </div>
               </div>
 
-              {/* Sección de indicadores de robustez */}
-              <div className="pt-4">
-                <h3 className="text-lg font-medium border-b pb-2 mb-4">Indicadores de Robustez</h3>
-                <div className="space-y-6">
+              {/* Sección de indicadores de robustez - Dos columnas */}
+              <div className="pt-6">
+                <h3 className="text-lg font-medium border-b pb-2 mb-6">Indicadores de Robustez</h3>
+                
+                <h4 className="font-medium text-base mb-4">Feedback Operaciones (20%)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <FormField
                     control={form.control}
                     name="narrative_quality"

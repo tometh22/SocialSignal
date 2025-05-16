@@ -1867,8 +1867,16 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getDeliverable(id: number): Promise<Deliverable | undefined> {
-    const [deliverable] = await db.select().from(deliverables).where(eq(deliverables.id, id));
-    return deliverable;
+    try {
+      const [deliverable] = await db
+        .select()
+        .from(deliverables)
+        .where(eq(deliverables.id, id));
+      return deliverable;
+    } catch (error) {
+      console.error("Error fetching deliverable:", error);
+      return undefined;
+    }
   }
   
   async createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable> {
