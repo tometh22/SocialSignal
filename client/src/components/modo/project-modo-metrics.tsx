@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Card, 
   CardHeader, 
@@ -20,7 +22,26 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Edit, PenSquare } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CheckCircle, XCircle, Edit, PenSquare, Save } from 'lucide-react';
 
 interface ProjectModoMetricsProps {
   deliverable: any; // Usamos any porque la estructura puede variar
@@ -52,6 +73,109 @@ const calculateProgress = (value: number, max: number = 5) => {
 
 export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetricsProps) {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Estado para los valores editables
+  const [editableValues, setEditableValues] = useState({
+    month: deliverable?.mes_entrega || 1,
+    analystId: null,
+    analysts: deliverable?.analysts || "",
+    pmId: null,
+    pm: deliverable?.pm || "",
+    deliveryOnTime: deliverable?.deliveryOnTime || false,
+    retrabajo: deliverable?.retrabajo || false,
+    narrativeQuality: deliverable?.narrative_quality || 0,
+    graphicsEffectiveness: deliverable?.graphics_effectiveness || 0,
+    formatDesign: deliverable?.format_design || 0,
+    relevantInsights: deliverable?.relevant_insights || 0,
+    operationsFeedback: deliverable?.operations_feedback || 0,
+    hoursEstimated: deliverable?.hoursEstimated || 40
+  });
+  
+  // Actualizar valores editables cuando cambie el entregable
+  React.useEffect(() => {
+    if (deliverable) {
+      setEditableValues({
+        month: deliverable.mes_entrega || 1,
+        analystId: null,
+        analysts: deliverable.analysts || "",
+        pmId: null,
+        pm: deliverable.pm || "",
+        deliveryOnTime: deliverable.deliveryOnTime || false,
+        retrabajo: deliverable.retrabajo || false,
+        narrativeQuality: deliverable.narrative_quality || 0,
+        graphicsEffectiveness: deliverable.graphics_effectiveness || 0,
+        formatDesign: deliverable.format_design || 0,
+        relevantInsights: deliverable.relevant_insights || 0,
+        operationsFeedback: deliverable.operations_feedback || 0,
+        hoursEstimated: deliverable.hoursEstimated || 40
+      });
+    }
+  }, [deliverable]);
+  
+  // Mutación para actualizar el entregable
+  const updateDeliverableMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Mapeo para el backend
+      const serverData = {
+        name: deliverable.name,
+        deliveryMonth: String(data.month),
+        mes_entrega: data.month,
+        analystId: data.analystId,
+        analysts: data.analysts,
+        pmId: data.pmId,
+        pm: data.pm,
+        deliveryOnTime: data.deliveryOnTime,
+        retrabajo: data.retrabajo,
+        narrativeQuality: data.narrativeQuality,
+        graphicsEffectiveness: data.graphicsEffectiveness,
+        formatDesign: data.formatDesign,
+        relevantInsights: data.relevantInsights,
+        operationsFeedback: data.operationsFeedback,
+        hoursEstimated: data.hoursEstimated,
+      };
+      
+      console.log("Enviando datos al servidor:", serverData);
+      
+      const response = await fetch(`/api/deliverables/${deliverable.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(serverData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al actualizar el entregable");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Indicadores actualizados correctamente",
+      });
+      // Cerrar el diálogo
+      setIsDialogOpen(false);
+      // Actualizar los datos
+      queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${projectId}`] });
+    },
+    onError: (error: any) => {
+      console.error("Error al actualizar indicadores:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar los indicadores",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Manejar el guardado de valores
+  const handleSaveValues = () => {
+    updateDeliverableMutation.mutate(editableValues);
+  };
 
   // Si no hay entregable, muestra un mensaje
   if (!deliverable) {
@@ -104,6 +228,197 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                 {totalScore.toFixed(2)} / 5.0
               </Badge>
             </CardTitle>
+            
+            {/* Dialog para editar los valores */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="mt-2">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar Indicadores
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Editar Indicadores de Robustez</DialogTitle>
+                  <DialogDescription>
+                    Modifica los valores de los indicadores para el proyecto {deliverable.name}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="grid gap-4 py-4">
+                  {/* Datos básicos */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Mes de Entrega</label>
+                      <Select 
+                        value={String(editableValues.month)}
+                        onValueChange={(value) => setEditableValues({...editableValues, month: parseInt(value)})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar mes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                            <SelectItem key={month} value={String(month)}>
+                              {getMonthName(month)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Horas Disponibles</label>
+                      <Input 
+                        type="number" 
+                        value={editableValues.hoursEstimated} 
+                        onChange={(e) => setEditableValues({
+                          ...editableValues, 
+                          hoursEstimated: parseFloat(e.target.value || "0")
+                        })}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Analistas</label>
+                      <Input 
+                        value={editableValues.analysts}
+                        onChange={(e) => setEditableValues({...editableValues, analysts: e.target.value})}
+                        placeholder="Nombres separados por coma"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Project Manager</label>
+                      <Input 
+                        value={editableValues.pm}
+                        onChange={(e) => setEditableValues({...editableValues, pm: e.target.value})}
+                        placeholder="Nombre del PM"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={editableValues.deliveryOnTime}
+                        onCheckedChange={(checked) => 
+                          setEditableValues({...editableValues, deliveryOnTime: checked})
+                        }
+                      />
+                      <label className="text-sm font-medium">Entrega a Tiempo</label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={editableValues.retrabajo}
+                        onCheckedChange={(checked) => 
+                          setEditableValues({...editableValues, retrabajo: checked})
+                        }
+                      />
+                      <label className="text-sm font-medium">Requirió Retrabajo</label>
+                    </div>
+                  </div>
+                  
+                  {/* Métricas */}
+                  <h3 className="font-medium text-sm pt-2">Evaluación de Calidad (0-5)</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-sm">Calidad Narrativa</label>
+                        <span className="text-sm font-medium">{editableValues.narrativeQuality.toFixed(1)}</span>
+                      </div>
+                      <Slider 
+                        value={[editableValues.narrativeQuality]}
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        onValueChange={(value) => setEditableValues({...editableValues, narrativeQuality: value[0]})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-sm">Efectividad de Gráficos</label>
+                        <span className="text-sm font-medium">{editableValues.graphicsEffectiveness.toFixed(1)}</span>
+                      </div>
+                      <Slider 
+                        value={[editableValues.graphicsEffectiveness]}
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        onValueChange={(value) => setEditableValues({...editableValues, graphicsEffectiveness: value[0]})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-sm">Formato y Diseño</label>
+                        <span className="text-sm font-medium">{editableValues.formatDesign.toFixed(1)}</span>
+                      </div>
+                      <Slider 
+                        value={[editableValues.formatDesign]}
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        onValueChange={(value) => setEditableValues({...editableValues, formatDesign: value[0]})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-sm">Insights Relevantes</label>
+                        <span className="text-sm font-medium">{editableValues.relevantInsights.toFixed(1)}</span>
+                      </div>
+                      <Slider 
+                        value={[editableValues.relevantInsights]}
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        onValueChange={(value) => setEditableValues({...editableValues, relevantInsights: value[0]})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <label className="text-sm">Feedback Operaciones</label>
+                        <span className="text-sm font-medium">{editableValues.operationsFeedback.toFixed(1)}</span>
+                      </div>
+                      <Slider 
+                        value={[editableValues.operationsFeedback]}
+                        min={0}
+                        max={5}
+                        step={0.1}
+                        onValueChange={(value) => setEditableValues({...editableValues, operationsFeedback: value[0]})}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={handleSaveValues}
+                    disabled={updateDeliverableMutation.isPending}
+                  >
+                    {updateDeliverableMutation.isPending ? (
+                      <>Guardando...</>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar Cambios
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <CardDescription>
               Métricas del Sistema de Seguimiento Operacional para este entregable
             </CardDescription>
