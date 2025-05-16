@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, LineChartIcon, PenSquare } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -337,6 +337,44 @@ export default function ActiveProjects() {
                     >
                       <Clock className="h-3.5 w-3.5" />
                     </Button>
+                    {/* Botón para Editar Indicadores de Robustez - Solo para proyectos MODO */}
+                    {project.quotation?.clientId === 17 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            // Obtener el ID del entregable para este proyecto
+                            const response = await fetch(`/api/modo/deliverables/project/${project.id}`);
+                            if (!response.ok) {
+                              throw new Error('No se pudo obtener el entregable');
+                            }
+                            const deliverable = await response.json();
+                            if (deliverable && deliverable.id) {
+                              setLocation(`/edit-deliverable/${deliverable.id}`);
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: "No se encontró el entregable para este proyecto",
+                                variant: "destructive",
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Error al buscar el entregable:', error);
+                            toast({
+                              title: "Error",
+                              description: "No se pudo acceder a los indicadores de robustez",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        title="Editar Indicadores de Robustez"
+                      >
+                        <PenSquare className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
