@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
+import { useLocation } from 'wouter';
 import { 
   Card, 
   CardHeader, 
   CardContent, 
   CardTitle,
-  CardDescription 
+  CardDescription,
+  CardFooter
 } from '@/components/ui/card';
 import { 
   Table, 
@@ -17,7 +19,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, XCircle, Edit, PenSquare } from 'lucide-react';
 
 interface ProjectModoMetricsProps {
   deliverable: any; // Usamos any porque la estructura puede variar
@@ -48,6 +51,8 @@ const calculateProgress = (value: number, max: number = 5) => {
 };
 
 export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetricsProps) {
+  const [, setLocation] = useLocation();
+
   // Si no hay entregable, muestra un mensaje
   if (!deliverable) {
     return (

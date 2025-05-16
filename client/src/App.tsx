@@ -21,6 +21,7 @@ import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
+import EditDeliverable from "@/pages/edit-deliverable";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -111,6 +112,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
+                  <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <Route component={NotFound} />
                 </Switch>
               </div>

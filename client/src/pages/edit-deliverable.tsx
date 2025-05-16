@@ -1,0 +1,585 @@
+import { useState, useEffect } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, ArrowLeft, Save } from "lucide-react";
+
+// Esquema de validación para los datos del entregable
+const deliverableSchema = z.object({
+  title: z.string().min(2, "El título debe tener al menos 2 caracteres"),
+  delivery_date: z.string().optional(),
+  due_date: z.string().optional(),
+  on_time: z.boolean().default(true),
+  narrative_quality: z.number().min(0).max(5).default(0),
+  graphics_effectiveness: z.number().min(0).max(5).default(0),
+  format_design: z.number().min(0).max(5).default(0),
+  relevant_insights: z.number().min(0).max(5).default(0),
+  operations_feedback: z.number().min(0).max(5).default(0),
+  client_feedback: z.number().min(0).max(5).default(0),
+  brief_compliance: z.number().min(0).max(5).default(0),
+  hours_available: z.number().min(0).default(0),
+  hours_real: z.number().min(0).default(0),
+  retrabajo: z.boolean().default(false),
+  notes: z.string().optional(),
+});
+
+type DeliverableFormValues = z.infer<typeof deliverableSchema>;
+
+export default function EditDeliverable() {
+  const { id } = useParams();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [formattedDates, setFormattedDates] = useState({
+    delivery_date: "",
+    due_date: "",
+  });
+
+  // Consulta para obtener los datos del entregable
+  const { data: deliverable, isLoading } = useQuery({
+    queryKey: ["/api/deliverables", id],
+    queryFn: () => fetch(`/api/deliverables/${id}`).then((res) => res.json()),
+    enabled: !!id,
+  });
+
+  // Formulario
+  const form = useForm<DeliverableFormValues>({
+    resolver: zodResolver(deliverableSchema),
+    defaultValues: {
+      title: "",
+      delivery_date: "",
+      due_date: "",
+      on_time: true,
+      narrative_quality: 0,
+      graphics_effectiveness: 0,
+      format_design: 0,
+      relevant_insights: 0,
+      operations_feedback: 0,
+      client_feedback: 0,
+      brief_compliance: 0,
+      hours_available: 0,
+      hours_real: 0,
+      retrabajo: false,
+      notes: "",
+    },
+  });
+
+  // Cuando los datos están disponibles, establecer los valores del formulario
+  useEffect(() => {
+    if (deliverable) {
+      // Formatear fechas para el input de tipo date
+      const formatDate = (dateString: string) => {
+        if (!dateString) return "";
+        return new Date(dateString).toISOString().split("T")[0];
+      };
+
+      const deliveryDate = formatDate(deliverable.delivery_date);
+      const dueDate = formatDate(deliverable.due_date);
+
+      setFormattedDates({
+        delivery_date: deliveryDate,
+        due_date: dueDate,
+      });
+
+      // Configurar valores del formulario
+      form.reset({
+        title: deliverable.title || "",
+        on_time: deliverable.on_time || false,
+        narrative_quality: deliverable.narrative_quality || 0,
+        graphics_effectiveness: deliverable.graphics_effectiveness || 0,
+        format_design: deliverable.format_design || 0,
+        relevant_insights: deliverable.relevant_insights || 0,
+        operations_feedback: deliverable.operations_feedback || 0,
+        client_feedback: deliverable.client_feedback || 0,
+        brief_compliance: deliverable.brief_compliance || 0,
+        hours_available: deliverable.hours_available || 0,
+        hours_real: deliverable.hours_real || 0,
+        retrabajo: deliverable.retrabajo || false,
+        notes: deliverable.notes || "",
+      });
+    }
+  }, [deliverable, form]);
+
+  // Mutación para actualizar el entregable
+  const updateDeliverableMutation = useMutation({
+    mutationFn: (data: DeliverableFormValues) => {
+      return apiRequest(`/api/deliverables/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...data,
+          delivery_date: formattedDates.delivery_date
+            ? new Date(formattedDates.delivery_date).toISOString()
+            : null,
+          due_date: formattedDates.due_date
+            ? new Date(formattedDates.due_date).toISOString()
+            : null,
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Entregable actualizado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/deliverables", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modo/deliverables/project"] });
+      // Redirigir a la página del proyecto
+      if (deliverable?.project_id) {
+        setLocation(`/project-analytics/${deliverable.project_id}`);
+      } else {
+        setLocation("/active-projects");
+      }
+    },
+    onError: (error) => {
+      console.error("Error al actualizar el entregable:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el entregable",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Manejar la presentación del formulario
+  const onSubmit = (data: DeliverableFormValues) => {
+    updateDeliverableMutation.mutate(data);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6 max-w-4xl">
+      <div className="mb-6 flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (deliverable?.project_id) {
+              setLocation(`/project-analytics/${deliverable.project_id}`);
+            } else {
+              setLocation("/active-projects");
+            }
+          }}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Button>
+        <h1 className="text-2xl font-bold">Editar Entregable MODO</h1>
+      </div>
+
+      <Card className="border shadow-sm">
+        <CardHeader>
+          <CardTitle>Editar Indicadores y Datos</CardTitle>
+          <CardDescription>
+            Modifica los indicadores de robustez y datos generales del entregable
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-6"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Sección de datos básicos */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Datos Básicos</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Título del Entregable</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <FormLabel>Fecha de Entrega</FormLabel>
+                      <Input
+                        type="date"
+                        value={formattedDates.delivery_date}
+                        onChange={(e) =>
+                          setFormattedDates({
+                            ...formattedDates,
+                            delivery_date: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <FormLabel>Fecha Límite</FormLabel>
+                      <Input
+                        type="date"
+                        value={formattedDates.due_date}
+                        onChange={(e) =>
+                          setFormattedDates({
+                            ...formattedDates,
+                            due_date: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="on_time"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Entregado a Tiempo</FormLabel>
+                          <FormDescription>
+                            Indica si el entregable se completó en la fecha límite
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="retrabajo"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Requirió Retrabajo</FormLabel>
+                          <FormDescription>
+                            Indica si el entregable necesitó correcciones adicionales
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Sección de horas */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Control de Horas</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="hours_available"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horas Disponibles</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="hours_real"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Horas Reales</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notas y Comentarios</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Ingresa cualquier nota o comentario adicional"
+                            className="min-h-32"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Sección de indicadores de robustez */}
+              <div className="pt-4">
+                <h3 className="text-lg font-medium border-b pb-2 mb-4">Indicadores de Robustez</h3>
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="narrative_quality"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Calidad Narrativa</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Califica la claridad y efectividad de la narrativa del entregable
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="graphics_effectiveness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Efectividad de Gráficos</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Evalúa si los gráficos y visualizaciones son claros y efectivos
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="format_design"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Formato y Diseño</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Califica la calidad del diseño y el formato del documento
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="relevant_insights"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Insights Relevantes</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Evalúa si los insights proporcionados son relevantes para el cliente
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="operations_feedback"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Feedback de Operaciones</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Calificación del equipo de operaciones
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="client_feedback"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Feedback del Cliente</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Calificación proporcionada por el cliente
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="brief_compliance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Cumplimiento del Brief</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Evalúa en qué medida el entregable cumple con los requisitos del brief
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button 
+                  type="submit"
+                  className="gap-2"
+                  disabled={updateDeliverableMutation.isPending}
+                >
+                  {updateDeliverableMutation.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  <Save className="h-4 w-4" />
+                  Guardar Cambios
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
