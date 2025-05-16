@@ -287,7 +287,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
               <Button 
                 size="sm" 
                 variant="secondary"
-                onClick={() => setLocation(`/edit-indicators/${deliverable.id}`)}
+                onClick={() => window.location.href = `/edit-indicators/${deliverable.id}`}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar Indicadores
