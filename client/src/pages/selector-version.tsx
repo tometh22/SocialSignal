@@ -2,7 +2,7 @@ import React from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Sparkles, Code } from "lucide-react";
+import { ArrowLeft, Sparkles, Code, BarChart4 } from "lucide-react";
 
 const VersionSelector = () => {
   const { projectId } = useParams();

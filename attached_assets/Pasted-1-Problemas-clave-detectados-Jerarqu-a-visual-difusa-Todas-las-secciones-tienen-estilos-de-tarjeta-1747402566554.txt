@@ -1,0 +1,74 @@
+1. Problemas clave detectados
+
+Jerarquía visual difusa
+Todas las secciones tienen estilos de tarjeta muy similares: cuesta priorizar qué ver primero.
+Los títulos de sección (“Métricas Críticas”, “Indicadores de Robustez”, etc.) no destacan lo suficiente.
+Superposición y pérdida de información
+El scroll vertical obliga a desplazarse demasiado para ver el contenido clave.
+Algunos componentes (gráficos, tablas) se “aplastan” o quedan fuera de viewport en pantallas medianas.
+Tabs de “Análisis y Tendencias” / “Recursos y Distribución” / “Componentes…” no aclaran qué muestran hasta hacer clic.
+Distribución de columnas caótica
+Las métricas críticas (3 tarjetas) ocupan el mismo peso visual que la robustez completa, cuando probablemente interesan más las primeras.
+Gráficos y monitores de desviaciones compiten por espacio sin un orden lógico.
+Falta de progresión y agrupamiento
+No hay separación clara entre “Resumen ejecutivo” y “Detalle operativo”.
+Los filtros y acciones (selector de fecha, “Registrar horas”) están dispersos y pierden contexto.
+2. Recomendaciones de rediseño
+
+A. Definir 3 grandes zonas de la pantalla
+Header / Resumen ejecutivo
+Logo, ruta de navegación, acciones globales (fecha, vista, registrar horas).
+Bajo ello, un único “Hero” con métricas críticas (horas, costo, tiempo restante) con mayor tamaño y contraste.
+Zona de análisis principal (columna izquierda, ~2/3 ancho)
+Indicadores de Robustez: presentar inicialmente sólo el score global (6.01/5.0), luego un acordeón o pestañas para “Horas de trabajo” vs “Detalle de calidad”.
+Análisis de Desviaciones: colocar justo abajo, con tarjetas compactas y tooltip explicativo.
+Tendencias y evolución: gráfico de línea con toggle para “Costo” / “Horas” y leyenda clara.
+Zona de apoyo / Recursos (columna derecha, ~1/3 ancho)
+Distribución de Horas por Personal y Facturable vs No en mini-widgets.
+Asignación de Recursos: avatar + rol + pie chart de rol.
+Botones de acción contextuales (“Ver detalles”, “Registrar horas”).
+B. Mejorar jerarquía tipográfica y de color
+Titulares (H2/H3) más grandes y con color oscuro; sub-títulos en gris suave.
+Tarjetas clave (métricas críticas) con fondo blanco puro y sombra sutil, texto en 24-32 px.
+Secciones secundarias (gráficos de apoyo) con tamaño de fuente 14-16 px y fondo gris muy claro.
+C. Uso de componentes de colapsado y pestañas
+En “Indicadores de Robustez”, agrupar “Información General” y “Calidad” en pestañas internas o acordeones.
+Pestañas globales (Análisis / Recursos / Componentes) deben indicar con un badge cuántos elementos hay y mantenerse siempre visibles al hacer scroll (sticky).
+D. Optimizar espacio y evitar scroll innecesario
+Implementar un layout de grid responsive:
+Desktop: 2 columnas como se sugirió.
+Tablet/Móvil: 1 columna apilada con secciones plegables.
+Reducir la altura de cada widget gráfico a su “essence”: añadir un botón “Expandir” para verlo en detalle.
+E. Clarificar acciones y filtros
+Agrupar los selectores de fecha, filtro de estado y vista en un toolbar pegado al top del contenido.
+Un único botón “Registrar horas” fijo (sticky) en la esquina superior derecha del contenido, nunca en mitad de la pantalla.
+3. Propuesta de nueva disposición (wireframe conceptual)
+
+┌─────────────────────────────────────────────────────────────────┐
+│ [Logo] > Proyectos > Ejecutivo 1      [Fecha ▼] [Vista ▼] [➕] │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌───────────┬───────────────────────────────────────────────┐  │
+│ │ Métricas  │ Indicadores de Robustez      [6.01/5.0 ⭐]     │  │
+│ │ Críticas  │ ───────────────────────────────────────────── │  │
+│ │ (hero)    │ [   GLOBAL  ] [ Horas   ] [ Calidad ]        │  │
+│ └───────────┴───────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────┐ ┌─────────────────────────┐  │
+│  │ Análisis de Desviaciones      │ │ Distribución Horas eq.  │  │
+│  │ ┌ Costo +775%  ┌ Riesgo 31%   │ │           ■ Trinidad    │  │
+│  └───────────────────────────────┘ └─────────────────────────┘  │
+│                                                               │
+│  ┌───────────────────────────────┐ ┌─────────────────────────┐  │
+│  │ Evolución Tiempo vs Costo     │ │ Facturable vs No        │  │
+│  │ [gráfico línea]               │ │ [donut chart]           │  │
+│  └───────────────────────────────┘ └─────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│  [Tabs: Recursos y Distribución | Componentes y Configuración ] │
+│  (al cambiar, recargar solo la columna derecha)                │
+└─────────────────────────────────────────────────────────────────┘
+Con este rediseño:
+
+El usuario absorbe primero el resumen clave (hero).
+Luego procesa el análisis principal sin distraerse por gráficos de menor prioridad.
+A la derecha, los datos de equipo y acciones siempre accesibles.
+Todo el contenido queda organizado en un grid responsivo, sin superposiciones ni scroll excesivo.

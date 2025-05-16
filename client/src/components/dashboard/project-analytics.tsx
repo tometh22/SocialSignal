@@ -30,11 +30,15 @@ import {
   DollarSign,
   Download,
   FileText,
+  Gauge,
   HelpCircle,
   LineChart,
   PieChart,
   RefreshCw,
+  Shield,
+  Star,
   Timer,
+  Toggles,
   TrendingDown,
   TrendingUp,
   Users,
@@ -452,9 +456,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
         onValueChange={setActiveTab}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-4 mb-6">
+        <TabsList className="grid grid-cols-5 mb-6">
           <TabsTrigger value="overview" className="text-xs">
             Vista General
+          </TabsTrigger>
+          <TabsTrigger value="robustness" className="text-xs">
+            Indicadores de Robustez
           </TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">
             Análisis Detallado
@@ -750,6 +757,437 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             {/* Equipo asignado (versión condensada) */}
             {renderTeamCard()}
           </div>
+        </TabsContent>
+        
+        {/* Contenido: Análisis Detallado */}
+        {/* Contenido: Indicadores de Robustez */}
+        <TabsContent value="robustness" className="mt-0 space-y-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" />
+                Indicadores de Robustez
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Métricas detalladas sobre la fortaleza del proyecto y áreas de mejora
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => onHelpRequest('robustnessHelp')}
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      <span>Ayuda</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Obtén más información sobre estos indicadores y cómo se calculan</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          
+          {/* Puntuación de Robustez Global */}
+          <Card className="shadow-sm border-2 border-primary/10">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    Puntuación Global de Robustez
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Evaluación compuesta basada en múltiples parámetros del proyecto
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-4xl font-bold flex items-center">
+                    6.01
+                    <span className="text-muted-foreground text-sm ml-1">/10</span>
+                  </span>
+                  <Star className="h-8 w-8 text-amber-400 fill-amber-400" />
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>Bajo</span>
+                  <span>Moderado</span>
+                  <span>Alto</span>
+                  <span>Excelente</span>
+                </div>
+                <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-red-500 via-amber-500 to-green-500"
+                    style={{ width: '60.1%' }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <div className="p-4 rounded-lg bg-green-50 border border-green-100">
+                  <h4 className="text-sm font-medium text-green-800 flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    Puntos fuertes
+                  </h4>
+                  <ul className="text-xs space-y-1.5 text-green-700">
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Calidad de documentación: 8.2/10</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Precisión de estimaciones: 7.5/10</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Satisfacción del cliente: 8.0/10</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-red-50 border border-red-100">
+                  <h4 className="text-sm font-medium text-red-800 flex items-center gap-1.5 mb-1">
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                    Áreas de mejora
+                  </h4>
+                  <ul className="text-xs space-y-1.5 text-red-700">
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Control de costos: 4.2/10</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Adherencia al cronograma: 5.1/10</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Distribución de cargas de trabajo: 4.8/10</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Categorías de Robustez */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  Robustez en Gestión de Horas
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Análisis de la distribución y eficiencia de horas
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">5.3</span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium">Puntuación</h4>
+                        <p className="text-xs text-muted-foreground">Moderado</p>
+                      </div>
+                    </div>
+                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    {[
+                      { name: "Distribución por rol", score: 4.8, percentage: 48 },
+                      { name: "Eficiencia de horas facturables", score: 6.2, percentage: 62 },
+                      { name: "Consistencia de registro", score: 5.9, percentage: 59 },
+                      { name: "Previsibilidad de carga", score: 4.5, percentage: 45 }
+                    ].map((metric, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>{metric.name}</span>
+                          <span className={
+                            metric.score >= 7 ? "text-green-600 font-medium" :
+                            metric.score >= 5 ? "text-amber-600 font-medium" :
+                            "text-red-600 font-medium"
+                          }>
+                            {metric.score}/10
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={
+                              metric.score >= 7 ? "bg-green-500" :
+                              metric.score >= 5 ? "bg-amber-500" :
+                              "bg-red-500"
+                            }
+                            style={{ width: `${metric.percentage}%`, height: '100%' }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  Robustez Financiera
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Análisis de la gestión financiera del proyecto
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">4.2</span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium">Puntuación</h4>
+                        <p className="text-xs text-muted-foreground">Bajo</p>
+                      </div>
+                    </div>
+                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    {[
+                      { name: "Control de costos", score: 3.5, percentage: 35 },
+                      { name: "Previsibilidad financiera", score: 4.0, percentage: 40 },
+                      { name: "Margen operativo", score: 5.5, percentage: 55 },
+                      { name: "Variaciones presupuestarias", score: 3.8, percentage: 38 }
+                    ].map((metric, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>{metric.name}</span>
+                          <span className={
+                            metric.score >= 7 ? "text-green-600 font-medium" :
+                            metric.score >= 5 ? "text-amber-600 font-medium" :
+                            "text-red-600 font-medium"
+                          }>
+                            {metric.score}/10
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={
+                              metric.score >= 7 ? "bg-green-500" :
+                              metric.score >= 5 ? "bg-amber-500" :
+                              "bg-red-500"
+                            }
+                            style={{ width: `${metric.percentage}%`, height: '100%' }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-primary" />
+                  Robustez de Planificación Temporal
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Análisis de la gestión del cronograma
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">5.1</span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium">Puntuación</h4>
+                        <p className="text-xs text-muted-foreground">Moderado</p>
+                      </div>
+                    </div>
+                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    {[
+                      { name: "Adherencia a fechas", score: 4.7, percentage: 47 },
+                      { name: "Calidad de planificación", score: 5.8, percentage: 58 },
+                      { name: "Velocidad de entrega", score: 5.3, percentage: 53 },
+                      { name: "Cumplimiento de hitos", score: 4.6, percentage: 46 }
+                    ].map((metric, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>{metric.name}</span>
+                          <span className={
+                            metric.score >= 7 ? "text-green-600 font-medium" :
+                            metric.score >= 5 ? "text-amber-600 font-medium" :
+                            "text-red-600 font-medium"
+                          }>
+                            {metric.score}/10
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={
+                              metric.score >= 7 ? "bg-green-500" :
+                              metric.score >= 5 ? "bg-amber-500" :
+                              "bg-red-500"
+                            }
+                            style={{ width: `${metric.percentage}%`, height: '100%' }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Robustez de Calidad
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Análisis de la calidad de entregables
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="font-semibold text-primary">8.2</span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium">Puntuación</h4>
+                        <p className="text-xs text-muted-foreground">Excelente</p>
+                      </div>
+                    </div>
+                    <Toggles className="h-5 w-5 text-muted-foreground opacity-70" />
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    {[
+                      { name: "Calidad de documentación", score: 8.2, percentage: 82 },
+                      { name: "Precisión de entregables", score: 7.8, percentage: 78 },
+                      { name: "Satisfacción del cliente", score: 8.0, percentage: 80 },
+                      { name: "Adherencia a estándares", score: 8.8, percentage: 88 }
+                    ].map((metric, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>{metric.name}</span>
+                          <span className={
+                            metric.score >= 7 ? "text-green-600 font-medium" :
+                            metric.score >= 5 ? "text-amber-600 font-medium" :
+                            "text-red-600 font-medium"
+                          }>
+                            {metric.score}/10
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={
+                              metric.score >= 7 ? "bg-green-500" :
+                              metric.score >= 5 ? "bg-amber-500" :
+                              "bg-red-500"
+                            }
+                            style={{ width: `${metric.percentage}%`, height: '100%' }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Recomendaciones automáticas */}
+          <Card className="shadow-sm border-amber-100">
+            <CardHeader className="p-4 pb-2 bg-amber-50 border-b border-amber-100">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                Recomendaciones Automáticas
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Acciones sugeridas basadas en el análisis de robustez
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-red-50 border border-red-100">
+                  <h4 className="text-sm font-medium text-red-800 flex items-center gap-1.5 mb-1">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    Alta Prioridad
+                  </h4>
+                  <ul className="text-xs space-y-1.5 text-red-700">
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Revisar y ajustar el presupuesto para el control de costos.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Implementar un seguimiento diario de gastos para detectar desviaciones.</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+                  <h4 className="text-sm font-medium text-amber-800 flex items-center gap-1.5 mb-1">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    Media Prioridad
+                  </h4>
+                  <ul className="text-xs space-y-1.5 text-amber-700">
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Reequilibrar las cargas de trabajo entre el equipo.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Revisar el cronograma y ajustar fechas críticas si es necesario.</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="p-3 rounded-lg bg-green-50 border border-green-100">
+                  <h4 className="text-sm font-medium text-green-800 flex items-center gap-1.5 mb-1">
+                    <FileText className="h-4 w-4 text-green-600" />
+                    Mantener y Potenciar
+                  </h4>
+                  <ul className="text-xs space-y-1.5 text-green-700">
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Continuar con los altos estándares de documentación y calidad.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="mt-0.5">•</span>
+                      <span>Mantener el enfoque en la satisfacción del cliente como punto fuerte.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
         
         {/* Contenido: Análisis Detallado */}
