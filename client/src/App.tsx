@@ -22,6 +22,7 @@ import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
 import EditDeliverable from "@/pages/edit-deliverable";
+import EditRobustnessPage from "@/pages/edit-robustness";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -113,6 +114,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
+                  <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <Route component={NotFound} />
                 </Switch>
               </div>

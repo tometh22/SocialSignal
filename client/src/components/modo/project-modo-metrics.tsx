@@ -453,55 +453,31 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                 </div>
                 
                 <DialogFooter>
-                  <div className="flex space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button 
-                      type="button" 
-                      onClick={() => {
-                        // Enviar una petición directa al nuevo endpoint
-                        fetch(`/api/deliverables/${deliverable.id}/indicators`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            mes_entrega: editableValues.month,
-                            analysts: editableValues.analysts,
-                            pm: editableValues.pm,
-                            delivery_on_time: editableValues.deliveryOnTime,
-                            retrabajo: editableValues.retrabajo,
-                            narrative_quality: editableValues.narrativeQuality,
-                            graphics_effectiveness: editableValues.graphicsEffectiveness,
-                            format_design: editableValues.formatDesign,
-                            relevant_insights: editableValues.relevantInsights,
-                            operations_feedback: editableValues.operationsFeedback,
-                            hours_estimated: editableValues.hoursEstimated
-                          })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                          toast({
-                            title: "Éxito",
-                            description: "Indicadores actualizados correctamente",
-                          });
+                  <div className="flex justify-between w-full">
+                    <div>
+                      <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={() => {
                           setIsDialogOpen(false);
-                          queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${projectId}`] });
-                        })
-                        .catch(error => {
-                          console.error("Error al actualizar indicadores:", error);
-                          toast({
-                            title: "Error",
-                            description: "No se pudo actualizar los indicadores",
-                            variant: "destructive"
-                          });
-                        });
-                      }}
-                    >
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Guardar Cambios
-                      </>
-                    </Button>
+                          setLocation(`/edit-indicators/${deliverable.id}`);
+                        }}
+                      >
+                        Abrir Editor Completo
+                      </Button>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button 
+                        type="button" 
+                        onClick={() => setLocation(`/edit-indicators/${deliverable.id}`)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Ir a Editor
+                      </Button>
+                    </div>
                   </div>
                 </DialogFooter>
               </DialogContent>
