@@ -3,7 +3,15 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { queryClient } from "@/lib/queryClient";
-import { ChevronLeft, Layers, BaggageClaim } from "lucide-react";
+import { 
+  ChevronLeft,
+  Layers, 
+  BaggageClaim,
+  LineChart,
+  AlertTriangle,
+  Users,
+  BarChart3
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -613,7 +621,8 @@ const ProjectSummary = () => {
 
   return (
     <div style={{ height: '100vh', overflow: 'auto' }}>
-      <div className="container mx-auto px-4 py-4">
+      {/* 1. ENCABEZADO CON INFORMACIÓN DE IDENTIDAD */}
+      <div className="container mx-auto px-4 py-4 bg-card border-b">
         {/* Breadcrumbs - Navegación */}
         <Breadcrumb
           items={[
@@ -638,108 +647,132 @@ const ProjectSummary = () => {
         />
       </div>
 
-      {/* Sección de Indicadores de Robustez - Para todos los proyectos */}
-      {project && (
-        <div className="container mx-auto px-4 mt-3 mb-6">
-          <div className="bg-primary/5 rounded-lg border border-primary/20 p-5 shadow-md">
-            <div className="mb-3 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
-                <BaggageClaim className="h-5 w-5" />
-                Indicadores de Robustez
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 2. MÉTRICAS CRÍTICAS (VISTA RÁPIDA) */}
+          <div className="lg:col-span-3">
+            <div className="bg-card rounded-lg border shadow p-5 mb-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <LineChart className="h-5 w-5 text-primary" />
+                Métricas Críticas del Proyecto
               </h2>
-              {project?.quotation?.clientId === 17 && (
-                <span className="bg-primary/15 text-primary text-sm px-3 py-1 rounded-full font-medium">
-                  Proyecto MODO
-                </span>
+              
+              {dashboardState.showSections.kpi && (
+                <KpiRibbon
+                  totalHours={totalHours}
+                  billableHours={billableHours}
+                  nonBillableHours={nonBillableHours}
+                  costData={{
+                    actualCost: costSummary?.actualCost || 0,
+                    estimatedCost: costSummary?.estimatedCost || 0,
+                    percentageUsed: costSummary?.percentageUsed || 0
+                  }}
+                  timeData={{
+                    daysRemaining,
+                    daysTotal: projectMetrics.daysTotal,
+                    progressPercentage: projectMetrics.progressPercentage
+                  }}
+                  onHelpClick={handleOpenHelpDialog}
+                />
               )}
             </div>
-            <ProjectModoMetrics 
-              deliverable={deliverableData} 
-              projectId={parsedProjectId || 0} 
-            />
           </div>
-        </div>
-      )}
 
-      {/* Panel de métricas críticas y seguimiento */}
-      <div className="container mx-auto px-4 mb-6">
-        <div className="grid grid-cols-1 gap-6">
-          {/* KPI Ribbon - Los 3 KPIs críticos */}
-          {dashboardState.showSections.kpi && (
-            <div className="bg-card rounded-lg border shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-3">Resumen del Proyecto</h2>
-              <KpiRibbon
-                totalHours={totalHours}
-                billableHours={billableHours}
-                nonBillableHours={nonBillableHours}
-                costData={{
-                  actualCost: costSummary?.actualCost || 0,
-                  estimatedCost: costSummary?.estimatedCost || 0,
-                  percentageUsed: costSummary?.percentageUsed || 0
-                }}
-                timeData={{
-                  daysRemaining,
-                  daysTotal: projectMetrics.daysTotal,
-                  progressPercentage: projectMetrics.progressPercentage
-                }}
-                onHelpClick={handleOpenHelpDialog}
-              />
-            </div>
-          )}
-          
-          {/* Panel de Análisis */}
-          {dashboardState.showSections.deviations && (
-            <div className="bg-card rounded-lg border shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-3">Análisis de Desviaciones</h2>
-              <DeviationSection
-                costVariance={costSummary?.variance || 0}
-                scheduleVariance={scheduleVariance}
-                riskMetrics={riskIndicators}
-                onHelpClick={handleOpenHelpDialog}
-                showRisks={dashboardState.viewMode === "detailed"}
-              />
-            </div>
-          )}
-
-          {/* Panel de Visualización */}
-          {dashboardState.showSections.charts && (
-            <div className="bg-card rounded-lg border shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-3">Gráficos y Tendencias</h2>
-              <ChartsSection
-                timeByPersonnelData={timeByPersonnelData}
-                billableDistributionData={billableDistributionData}
-                timeAndCostData={timeAndCostTrendData}
-                onChartExpand={handleExpandChart}
-                onRegisterHours={handleRegisterHours}
-              />
-            </div>
-          )}
-          
-          {/* Panel de Recursos */}
-          {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
-            <div className="bg-card rounded-lg border shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-3">Asignación de Recursos</h2>
-              <TeamSection
-                teamMembers={timeByPersonnelData}
-                onHelpClick={handleOpenHelpDialog}
-              />
-            </div>
-          )}
-          
-          {/* Panel de Componentes */}
-          {project && (
-            <div className="bg-card rounded-lg border shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-3">Componentes del Proyecto</h2>
-              <ComponentsManager 
+          {/* 3. SECCIÓN DE ENFOQUE PRIORITARIO (Indicadores de Robustez) */}
+          <div className="lg:col-span-3">
+            <div className="bg-primary/5 rounded-lg border border-primary/20 p-5 shadow mb-6">
+              <div className="mb-3 flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+                  <BaggageClaim className="h-5 w-5" />
+                  Indicadores de Robustez
+                </h2>
+                {project?.quotation?.clientId === 17 && (
+                  <span className="bg-primary/15 text-primary text-sm px-3 py-1 rounded-full font-medium">
+                    Proyecto MODO
+                  </span>
+                )}
+              </div>
+              <ProjectModoMetrics 
+                deliverable={deliverableData} 
                 projectId={parsedProjectId || 0} 
-                refreshTimeEntries={() => {
-                  queryClient.invalidateQueries({
-                    queryKey: [`/api/time-entries/project/${parsedProjectId}`]
-                  });
-                }}
               />
             </div>
-          )}
+          </div>
+
+          {/* 4. PANEL DE ANÁLISIS Y TENDENCIAS */}
+          <div className="lg:col-span-2">
+            {/* Panel de Desviaciones */}
+            {dashboardState.showSections.deviations && (
+              <div className="bg-card rounded-lg border shadow p-5 mb-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                  Análisis de Desviaciones
+                </h2>
+                <DeviationSection
+                  costVariance={costSummary?.variance || 0}
+                  scheduleVariance={scheduleVariance}
+                  riskMetrics={riskIndicators}
+                  onHelpClick={handleOpenHelpDialog}
+                  showRisks={dashboardState.viewMode === "detailed"}
+                />
+              </div>
+            )}
+
+            {/* Panel de Gráficos */}
+            {dashboardState.showSections.charts && (
+              <div className="bg-card rounded-lg border shadow p-5 mb-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Tendencias y Análisis
+                </h2>
+                <ChartsSection
+                  timeByPersonnelData={timeByPersonnelData}
+                  billableDistributionData={billableDistributionData}
+                  timeAndCostData={timeAndCostTrendData}
+                  onChartExpand={handleExpandChart}
+                  onRegisterHours={handleRegisterHours}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 5. DETALLES DE RECURSOS Y ACTIVIDADES */}
+          <div className="lg:col-span-1">
+            {/* Panel de Equipo */}
+            {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
+              <div className="bg-card rounded-lg border shadow p-5 mb-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Asignación de Recursos
+                </h2>
+                <TeamSection
+                  teamMembers={timeByPersonnelData}
+                  onHelpClick={handleOpenHelpDialog}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 6. CONFIGURACIÓN Y HERRAMIENTAS */}
+          <div className="lg:col-span-3">
+            {/* Panel de Componentes del Proyecto */}
+            {project && (
+              <div className="bg-card rounded-lg border shadow p-5 mb-6">
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-primary" />
+                  Componentes del Proyecto
+                </h2>
+                <ComponentsManager 
+                  projectId={parsedProjectId || 0} 
+                  refreshTimeEntries={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: [`/api/time-entries/project/${parsedProjectId}`]
+                    });
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
