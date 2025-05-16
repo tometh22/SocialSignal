@@ -45,17 +45,27 @@ const deliverableSchema = z.object({
   title: z.string().min(2, "El título debe tener al menos 2 caracteres"),
   delivery_date: z.string().optional(),
   due_date: z.string().optional(),
+  month: z.number().min(1).max(12).default(1),
+  analysts: z.string().optional(),
+  pm: z.string().optional(),
   on_time: z.boolean().default(true),
+  retrabajo: z.boolean().default(false),
+  // Métricas principales
   narrative_quality: z.number().min(0).max(5).default(0),
   graphics_effectiveness: z.number().min(0).max(5).default(0),
   format_design: z.number().min(0).max(5).default(0),
   relevant_insights: z.number().min(0).max(5).default(0),
   operations_feedback: z.number().min(0).max(5).default(0),
+  // Feedback cliente
   client_feedback: z.number().min(0).max(5).default(0),
-  brief_compliance: z.number().min(0).max(5).default(0),
+  client_feedback_average: z.number().min(0).max(5).default(0),
+  // Cumplimiento de horas
   hours_available: z.number().min(0).default(0),
   hours_real: z.number().min(0).default(0),
-  retrabajo: z.boolean().default(false),
+  hours_compliance: z.number().min(0).max(5).default(0),
+  // Cumplimiento del brief
+  brief_compliance: z.number().min(0).max(5).default(0),
+  brief_compliance_average: z.number().min(0).max(5).default(0),
   notes: z.string().optional(),
 });
 
@@ -120,15 +130,24 @@ export default function EditDeliverable() {
       form.reset({
         title: deliverable.title || "",
         on_time: deliverable.on_time || false,
+        month: deliverable.month || deliverable.mes_entrega || 1,
+        analysts: deliverable.analysts || "",
+        pm: deliverable.pm || "",
+        // Métricas principales
         narrative_quality: deliverable.narrative_quality || 0,
         graphics_effectiveness: deliverable.graphics_effectiveness || 0,
         format_design: deliverable.format_design || 0,
         relevant_insights: deliverable.relevant_insights || 0,
         operations_feedback: deliverable.operations_feedback || 0,
+        // Feedback cliente y cumplimiento
         client_feedback: deliverable.client_feedback || 0,
+        client_feedback_average: deliverable.client_feedback_average || 0,
         brief_compliance: deliverable.brief_compliance || 0,
+        brief_compliance_average: deliverable.brief_compliance_average || 0,
+        // Horas y retrabajos
         hours_available: deliverable.hours_available || 0,
         hours_real: deliverable.hours_real || 0,
+        hours_compliance: deliverable.hours_compliance || 0,
         retrabajo: deliverable.retrabajo || false,
         notes: deliverable.notes || "",
       });
@@ -250,6 +269,41 @@ export default function EditDeliverable() {
                   />
 
                   <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="month"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mes de Entrega</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(Number(value))}
+                            defaultValue={field.value.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona el mes" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="1">Enero</SelectItem>
+                              <SelectItem value="2">Febrero</SelectItem>
+                              <SelectItem value="3">Marzo</SelectItem>
+                              <SelectItem value="4">Abril</SelectItem>
+                              <SelectItem value="5">Mayo</SelectItem>
+                              <SelectItem value="6">Junio</SelectItem>
+                              <SelectItem value="7">Julio</SelectItem>
+                              <SelectItem value="8">Agosto</SelectItem>
+                              <SelectItem value="9">Septiembre</SelectItem>
+                              <SelectItem value="10">Octubre</SelectItem>
+                              <SelectItem value="11">Noviembre</SelectItem>
+                              <SelectItem value="12">Diciembre</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div>
                       <FormLabel>Fecha de Entrega</FormLabel>
                       <Input
@@ -263,7 +317,9 @@ export default function EditDeliverable() {
                         }
                       />
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <FormLabel>Fecha Límite</FormLabel>
                       <Input
@@ -277,28 +333,55 @@ export default function EditDeliverable() {
                         }
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="on_time"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Entregado a Tiempo</FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="on_time"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                          <FormLabel>Entregado a Tiempo</FormLabel>
-                          <FormDescription>
-                            Indica si el entregable se completó en la fecha límite
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="analysts"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Analistas</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Nombres de analistas" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="pm"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Manager</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Nombre del PM" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
@@ -350,7 +433,7 @@ export default function EditDeliverable() {
                     name="hours_real"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Horas Reales</FormLabel>
+                        <FormLabel>Horas Reales Trabajadas</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -366,6 +449,32 @@ export default function EditDeliverable() {
 
                   <FormField
                     control={form.control}
+                    name="hours_compliance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between mb-2">
+                          <FormLabel>Cumplimiento de Horas</FormLabel>
+                          <span className="text-sm font-medium">{field.value} / 5</span>
+                        </div>
+                        <FormControl>
+                          <Slider
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[field.value]}
+                            onValueChange={(vals) => field.onChange(vals[0])}
+                            className="py-3"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Evaluación del cumplimiento de la estimación de horas
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
@@ -373,7 +482,7 @@ export default function EditDeliverable() {
                         <FormControl>
                           <Textarea
                             placeholder="Ingresa cualquier nota o comentario adicional"
-                            className="min-h-32"
+                            className="min-h-20"
                             {...field}
                           />
                         </FormControl>
