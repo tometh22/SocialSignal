@@ -498,22 +498,25 @@ export default function EditDeliverable() {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                                {/* El contador de analistas lo mostramos en otro lugar para evitar superposición */}
+                              </div>
+                              
+                              {/* Campo para mostrar y editar analistas seleccionados */}
+                              <div className="relative">
+                                <Input 
+                                  {...field} 
+                                  placeholder="Analistas seleccionados" 
+                                  value={field.value || ""}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                />
                                 {analysts.length > 0 && (
-                                  <div className="absolute right-10 top-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      {analysts.length} analista(s) activo(s)
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                    <Badge variant="outline" className="text-xs bg-primary/5">
+                                      {analysts.length} analista(s)
                                     </Badge>
                                   </div>
                                 )}
                               </div>
-                              
-                              {/* Campo para mostrar y editar analistas seleccionados */}
-                              <Input 
-                                {...field} 
-                                placeholder="Analistas seleccionados" 
-                                value={field.value || ""}
-                                onChange={(e) => field.onChange(e.target.value)}
-                              />
                             </div>
                           </FormControl>
                           
