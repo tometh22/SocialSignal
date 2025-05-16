@@ -1866,13 +1866,18 @@ export class DatabaseStorage implements IStorage {
     }
   }
   
-  async getDeliverable(id: number): Promise<Deliverable | undefined> {
+  async getDeliverable(id: number): Promise<any | undefined> {
     try {
-      const [deliverable] = await db
-        .select()
-        .from(deliverables)
-        .where(eq(deliverables.id, id));
-      return deliverable;
+      // Usamos SQL plano para evitar problemas con la diferencia entre el esquema 
+      // y la estructura real de la tabla
+      const result = await db.execute(`
+        SELECT * FROM deliverables WHERE id = $1
+      `, [id]);
+      
+      if (result.rows && result.rows.length > 0) {
+        return result.rows[0];
+      }
+      return undefined;
     } catch (error) {
       console.error("Error fetching deliverable:", error);
       return undefined;
@@ -1884,26 +1889,39 @@ export class DatabaseStorage implements IStorage {
     return newDeliverable;
   }
   
-  async updateDeliverable(id: number, deliverable: Partial<InsertDeliverable>): Promise<Deliverable | undefined> {
+  async updateDeliverable(id: number, deliverable: any): Promise<any | undefined> {
     try {
       const existingDeliverable = await this.getDeliverable(id);
       if (!existingDeliverable) {
         return undefined;
       }
       
-      const [updatedDeliverable] = await db
-        .update(deliverables)
-        .set({
-          ...deliverable,
-          updatedAt: new Date()
-        })
-        .where(eq(deliverables.id, id))
-        .returning();
+      // Añadir fecha de actualización
+      if (!deliverable.updated_at) {
+        deliverable.updated_at = new Date();
+      }
       
-      return updatedDeliverable;
+      // Ejecutar la consulta SQL directamente para evitar problemas con el esquema
+      const keys = Object.keys(deliverable);
+      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const values = Object.values(deliverable);
+      
+      const query = `
+        UPDATE deliverables 
+        SET ${setClause} 
+        WHERE id = $1 
+        RETURNING *
+      `;
+      
+      const result = await db.execute(query, [id, ...values]);
+      
+      if (result.rows && result.rows.length > 0) {
+        return result.rows[0];
+      }
+      return undefined;
     } catch (error) {
       console.error("Error updating deliverable:", error);
-      throw error;
+      return undefined;
     }
   }
   
