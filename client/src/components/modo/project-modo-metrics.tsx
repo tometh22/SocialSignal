@@ -174,35 +174,28 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   
   // Manejar el guardado de valores
   const handleSaveValues = () => {
-    updateDeliverableMutation.mutate(editableValues);
-  };
-  
-  // Cargar datos específicos para Sony One directamente desde la imagen
-  const loadSonyOneData = () => {
-    const sonyOneValues = {
-      month: 1,
-      analystId: null,
-      analysts: "Vanti, Trini",
-      pmId: null,
-      pm: "Vanti",
-      deliveryOnTime: true,
-      retrabajo: true,
-      narrativeQuality: 5.0,
-      graphicsEffectiveness: 5.0,
-      formatDesign: 5.0,
-      relevantInsights: 5.0,
-      operationsFeedback: 5.0,
-      hoursEstimated: 40
+    console.log("Valores a guardar:", editableValues);
+    
+    // Convertir los valores a los campos esperados por el servidor
+    const serverData = {
+      name: deliverable.name,
+      title: deliverable.title,
+      project_id: deliverable.project_id,
+      narrative_quality: editableValues.narrativeQuality,
+      graphics_effectiveness: editableValues.graphicsEffectiveness,
+      format_design: editableValues.formatDesign,
+      relevant_insights: editableValues.relevantInsights,
+      operations_feedback: editableValues.operationsFeedback,
+      mes_entrega: editableValues.month,
+      analysts: editableValues.analysts,
+      pm: editableValues.pm,
+      deliveryOnTime: editableValues.deliveryOnTime,
+      retrabajo: editableValues.retrabajo,
+      hoursEstimated: editableValues.hoursEstimated
     };
     
-    // Actualizar el estado para reflejar los datos de la imagen
-    setEditableValues(sonyOneValues);
-    
-    // Mostrar mensaje de éxito 
-    toast({
-      title: "Datos cargados",
-      description: "Los datos de Sony One se han cargado correctamente. Haz clic en 'Guardar Cambios' para aplicarlos.",
-    });
+    console.log("Datos formateados para el servidor:", serverData);
+    updateDeliverableMutation.mutate(serverData);
   };
 
   // Si no hay entregable, muestra un mensaje
