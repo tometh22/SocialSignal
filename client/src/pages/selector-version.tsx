@@ -23,6 +23,10 @@ const VersionSelector = () => {
   const handleFixedVersion = () => {
     setLocation(`/project-summary-fixed/${projectId}`);
   };
+  
+  const handleAnalyticsView = () => {
+    setLocation(`/project-analytics/${projectId}`);
+  };
 
   const handleBack = () => {
     setLocation("/active-projects");
@@ -118,8 +122,8 @@ const VersionSelector = () => {
           </CardContent>
         </Card>
         
-        <Card className="border-2 shadow-md hover:shadow-lg transition-shadow border-primary/40 bg-primary/5">
-          <CardHeader className="pb-2 bg-primary/10">
+        <Card className="border shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
               Versión Final
@@ -137,8 +141,33 @@ const VersionSelector = () => {
             <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
               Versión final perfeccionada. Espaciado óptimo, estructura clara, sin superposición de elementos. Con tooltips y mejor organización.
             </p>
-            <Button onClick={handleFixedVersion} variant="default" size="sm" className="w-full h-7 text-xs relative overflow-hidden group">
-              <span className="relative z-10">Ver Versión Final</span>
+            <Button onClick={handleFixedVersion} variant="outline" size="sm" className="w-full h-7 text-xs">
+              Ver Versión Final
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-2 shadow-md hover:shadow-lg transition-shadow border-primary/40 bg-primary/5">
+          <CardHeader className="pb-2 bg-primary/10">
+            <CardTitle className="flex items-center gap-2 text-xs md:text-sm">
+              <BarChart4 className="h-3.5 w-3.5 text-primary" />
+              Análisis Completo
+            </CardTitle>
+            <CardDescription className="text-[10px]">
+              Rediseño de UX/UI
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="bg-slate-100 rounded-md p-3 mb-2 h-28 flex items-center justify-center">
+              <div className="text-center text-slate-400">
+                <p className="text-[10px]">Análisis y visualización avanzada</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-3 h-16 overflow-auto">
+              Completamente rediseñado con un enfoque analítico. Interfaz profesional con pestañas, métricas claras, indicadores visuales y análisis detallados. Experiencia de usuario de clase mundial.
+            </p>
+            <Button onClick={handleAnalyticsView} variant="default" size="sm" className="w-full h-7 text-xs relative overflow-hidden group">
+              <span className="relative z-10">Ver Análisis Avanzado</span>
               <span className="absolute inset-0 bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
             </Button>
           </CardContent>
