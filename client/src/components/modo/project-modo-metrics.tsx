@@ -118,22 +118,22 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   // Mutación para actualizar el entregable
   const updateDeliverableMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Mapeo para el backend
+      // Mapeo para el backend - usar el formato tal como está en la base de datos
       const serverData = {
+        id: deliverable.id,
+        project_id: deliverable.project_id,
+        title: deliverable.title || deliverable.name,
         name: deliverable.name,
-        deliveryMonth: String(data.month),
-        mes_entrega: data.month,
-        analystId: data.analystId,
+        mes_entrega: data.mes_entrega,
         analysts: data.analysts,
-        pmId: data.pmId,
         pm: data.pm,
         deliveryOnTime: data.deliveryOnTime,
         retrabajo: data.retrabajo,
-        narrativeQuality: data.narrativeQuality,
-        graphicsEffectiveness: data.graphicsEffectiveness,
-        formatDesign: data.formatDesign,
-        relevantInsights: data.relevantInsights,
-        operationsFeedback: data.operationsFeedback,
+        narrative_quality: data.narrative_quality,
+        graphics_effectiveness: data.graphics_effectiveness,
+        format_design: data.format_design,
+        relevant_insights: data.relevant_insights,
+        operations_feedback: data.operations_feedback,
         hoursEstimated: data.hoursEstimated,
       };
       
@@ -147,6 +147,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
       
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Error del servidor:", errorData);
         throw new Error(errorData.message || "Error al actualizar el entregable");
       }
       
@@ -178,19 +179,16 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
     
     // Convertir los valores a los campos esperados por el servidor
     const serverData = {
-      name: deliverable.name,
-      title: deliverable.title,
-      project_id: deliverable.project_id,
-      narrative_quality: editableValues.narrativeQuality,
-      graphics_effectiveness: editableValues.graphicsEffectiveness,
-      format_design: editableValues.formatDesign,
-      relevant_insights: editableValues.relevantInsights,
-      operations_feedback: editableValues.operationsFeedback,
       mes_entrega: editableValues.month,
       analysts: editableValues.analysts,
       pm: editableValues.pm,
       deliveryOnTime: editableValues.deliveryOnTime,
       retrabajo: editableValues.retrabajo,
+      narrative_quality: editableValues.narrativeQuality,
+      graphics_effectiveness: editableValues.graphicsEffectiveness,
+      format_design: editableValues.formatDesign,
+      relevant_insights: editableValues.relevantInsights,
+      operations_feedback: editableValues.operationsFeedback,
       hoursEstimated: editableValues.hoursEstimated
     };
     
@@ -419,18 +417,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                   </div>
                 </div>
                 
-                <DialogFooter className="flex justify-between">
-                  <div>
-                    <Button 
-                      type="button" 
-                      variant="secondary"
-                      onClick={loadSonyOneData}
-                      disabled={updateDeliverableMutation.isPending}
-                      className="mr-2"
-                    >
-                      Cargar Datos Sony One
-                    </Button>
-                  </div>
+                <DialogFooter>
                   <div className="flex space-x-2">
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancelar
