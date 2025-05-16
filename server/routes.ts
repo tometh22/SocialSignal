@@ -1641,37 +1641,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
       console.log("Datos recibidos:", req.body);
       
-      // Obtener el entregable existente
-      const existingDeliverable = await storage.getDeliverable(id);
-      if (!existingDeliverable) {
+      // Usamos SQL directo para evitar problemas de validación
+      const updateQuery = `
+        UPDATE deliverables 
+        SET 
+          narrative_quality = $1,
+          graphics_effectiveness = $2,
+          format_design = $3,
+          relevant_insights = $4,
+          operations_feedback = $5,
+          retrabajo = $6,
+          mes_entrega = $7,
+          analysts = $8,
+          pm = $9,
+          delivery_on_time = $10,
+          hours_estimated = $11,
+          updated_at = NOW()
+        WHERE id = $12
+        RETURNING *
+      `;
+      
+      const { rows } = await db.execute(updateQuery, [
+        req.body.narrative_quality || 0,
+        req.body.graphics_effectiveness || 0,
+        req.body.format_design || 0,
+        req.body.relevant_insights || 0, 
+        req.body.operations_feedback || 0,
+        req.body.retrabajo || false,
+        req.body.mes_entrega || 1,
+        req.body.analysts || "",
+        req.body.pm || "",
+        req.body.delivery_on_time || false,
+        req.body.hours_estimated || 0,
+        id
+      ]);
+      
+      if (rows.length === 0) {
         return res.status(404).json({ message: "Deliverable not found" });
       }
       
-      // Solo permitir campos específicos relacionados con los indicadores
-      const allowedFields = [
-        "mes_entrega", "delivery_on_time", "retrabajo",
-        "narrative_quality", "graphics_effectiveness", "format_design",
-        "relevant_insights", "operations_feedback",
-        "analysts", "pm", "hours_estimated"
-      ];
-      
-      // Filtrar solo los campos permitidos
-      const updateData: Record<string, any> = {};
-      for (const field of allowedFields) {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field];
-        }
-      }
-      
-      updateData.updated_at = new Date().toISOString();
-      
-      console.log("Datos filtrados a actualizar:", updateData);
-      
-      // Actualizar el entregable
-      const updatedDeliverable = await storage.updateDeliverable(id, updateData);
-      
-      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
-      res.json(updatedDeliverable);
+      console.log("Entregable actualizado exitosamente:", rows[0]);
+      res.json(rows[0]);
     } catch (error) {
       console.error("Error updating deliverable indicators:", error);
       res.status(500).json({ message: "Failed to update deliverable indicators", error: String(error) });
