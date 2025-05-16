@@ -31,14 +31,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { Loader2, ArrowLeft, Save, HelpCircle, Info, Clock } from "lucide-react";
 
 // Esquema de validación para los datos del entregable
 const deliverableSchema = z.object({
@@ -81,11 +88,41 @@ export default function EditDeliverable() {
   });
 
   // Consulta para obtener los datos del entregable
-  const { data: deliverable, isLoading } = useQuery({
+  const { data: deliverable, isLoading: isLoadingDeliverable } = useQuery({
     queryKey: ["/api/deliverables", id],
     queryFn: () => fetch(`/api/deliverables/${id}`).then((res) => res.json()),
     enabled: !!id,
   });
+  
+  // Consulta para obtener el personal (analistas y PMs)
+  const { data: personnel, isLoading: isLoadingPersonnel } = useQuery({
+    queryKey: ["/api/personnel"],
+    queryFn: () => fetch("/api/personnel").then((res) => res.json()),
+  });
+  
+  // Consulta para obtener los roles para identificar analistas y PMs
+  const { data: roles, isLoading: isLoadingRoles } = useQuery({
+    queryKey: ["/api/roles"],
+    queryFn: () => fetch("/api/roles").then((res) => res.json()),
+  });
+  
+  // Consulta para obtener los registros de tiempo del proyecto
+  const { data: timeEntries, isLoading: isLoadingTimeEntries } = useQuery({
+    queryKey: ["/api/time-entries/project", deliverable?.project_id],
+    queryFn: () => fetch(`/api/time-entries/project/${deliverable?.project_id}`).then((res) => res.json()),
+    enabled: !!deliverable?.project_id,
+  });
+  
+  // Filtrar personal por rol (analistas y PMs)
+  const analysts = personnel?.filter(p => {
+    const roleIds = [1, 2, 3, 4, 5, 6, 8]; // IDs de roles tipo analista
+    return roleIds.includes(p.roleId);
+  }) || [];
+  
+  const projectManagers = personnel?.filter(p => {
+    const roleIds = [7, 9, 10]; // IDs de roles tipo PM
+    return roleIds.includes(p.roleId);
+  }) || [];
 
   // Formulario
   const form = useForm<DeliverableFormValues>({
@@ -125,14 +162,26 @@ export default function EditDeliverable() {
         delivery_date: deliveryDate,
         due_date: dueDate,
       });
-
+      
+      // Obtener analistas y PM desde los registros de tiempo o usar los existentes
+      const analystNames = getAnalystNames();
+      const analystText = analystNames.length > 0 
+        ? analystNames.join(", ") 
+        : (deliverable.analysts || "");
+        
+      const pmName = getProjectManagerName() || deliverable.pm || "";
+      
+      // Calcular horas actuales a partir de los registros de tiempo
+      const actualHours = calculateTotalHours();
+      const availableHours = deliverable.hours_available || 0;
+      
       // Configurar valores del formulario
       form.reset({
         title: deliverable.title || "",
         on_time: deliverable.on_time || false,
         month: deliverable.month || deliverable.mes_entrega || 1,
-        analysts: deliverable.analysts || "",
-        pm: deliverable.pm || "",
+        analysts: analystText,
+        pm: pmName,
         // Métricas principales
         narrative_quality: deliverable.narrative_quality || 0,
         graphics_effectiveness: deliverable.graphics_effectiveness || 0,
@@ -145,14 +194,14 @@ export default function EditDeliverable() {
         brief_compliance: deliverable.brief_compliance || 0,
         brief_compliance_average: deliverable.brief_compliance_average || 0,
         // Horas y retrabajos
-        hours_available: deliverable.hours_available || 0,
-        hours_real: deliverable.hours_real || 0,
+        hours_available: availableHours,
+        hours_real: actualHours > 0 ? actualHours : (deliverable.hours_real || 0),
         hours_compliance: deliverable.hours_compliance || 0,
         retrabajo: deliverable.retrabajo || false,
         notes: deliverable.notes || "",
       });
     }
-  }, [deliverable, form]);
+  }, [deliverable, form, personnel, timeEntries]);
 
   // Mutación para actualizar el entregable
   const updateDeliverableMutation = useMutation({
@@ -208,6 +257,54 @@ export default function EditDeliverable() {
     updateDeliverableMutation.mutate(data);
   };
 
+  // Calcular horas totales del proyecto basadas en los registros de tiempo
+  const calculateTotalHours = () => {
+    if (!timeEntries) return 0;
+    return timeEntries.reduce((total, entry) => total + entry.hours, 0);
+  };
+  
+  // Calcular lista de nombres de analistas basada en los registros de tiempo
+  const getAnalystNames = () => {
+    if (!timeEntries || !personnel) return [];
+    
+    // Obtener IDs únicos de analistas que han registrado tiempo
+    const analystIds = timeEntries
+      .filter(entry => {
+        const person = personnel.find(p => p.id === entry.personnelId);
+        return person && [1, 2, 3, 4, 5, 6, 8].includes(person.roleId);
+      })
+      .map(entry => entry.personnelId)
+      .filter((id, index, self) => self.indexOf(id) === index);
+    
+    // Obtener nombres basados en los IDs
+    return analystIds.map(id => {
+      const person = personnel.find(p => p.id === id);
+      return person ? person.name : '';
+    }).filter(Boolean);
+  };
+  
+  // Obtener nombre del PM asignado al proyecto
+  const getProjectManagerName = () => {
+    if (!timeEntries || !personnel) return '';
+    
+    // Buscar entradas de tiempo de PMs
+    const pmEntries = timeEntries.filter(entry => {
+      const person = personnel.find(p => p.id === entry.personnelId);
+      return person && [7, 9, 10].includes(person.roleId);
+    });
+    
+    if (pmEntries.length > 0) {
+      const pmId = pmEntries[0].personnelId;
+      const pm = personnel.find(p => p.id === pmId);
+      return pm ? pm.name : '';
+    }
+    
+    return '';
+  };
+  
+  const isLoading = isLoadingDeliverable || isLoadingPersonnel || isLoadingRoles || 
+                  (!!deliverable?.project_id && isLoadingTimeEntries);
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
