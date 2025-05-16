@@ -15,6 +15,10 @@ const VersionSelector = () => {
   const handleImprovedVersion = () => {
     setLocation(`/project-summary-new/${projectId}`);
   };
+  
+  const handleSuperVersion = () => {
+    setLocation(`/project-summary-super/${projectId}`);
+  };
 
   const handleBack = () => {
     setLocation("/active-projects");
@@ -34,55 +38,82 @@ const VersionSelector = () => {
         Elige entre la versión original o la versión mejorada con visualización de datos optimizada
       </p>
 
-      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
         <Card className="border shadow-md hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code className="h-5 w-5 text-primary" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+              <Code className="h-4 w-4 text-primary" />
               Versión Original
             </CardTitle>
-            <CardDescription>
-              El dashboard de resumen de proyecto en su versión inicial
+            <CardDescription className="text-xs">
+              Dashboard con la disposición inicial
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-slate-100 rounded-md p-4 mb-4 h-48 flex items-center justify-center">
+            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
               <div className="text-center text-slate-400">
-                <p className="text-sm">Vista previa no disponible</p>
-                <p className="text-xs">Visualización básica con disposición original</p>
+                <p className="text-xs">Vista previa no disponible</p>
+                <p className="text-[10px]">Visualización básica inicial</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              La versión original incluye los datos principales del proyecto pero con una disposición visual que puede dificultar el análisis efectivo.
+            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
+              La versión original incluye los datos principales del proyecto pero con problemas de superposición y jerarquía visual que dificultan el análisis efectivo.
             </p>
-            <Button onClick={handleOriginalVersion} className="w-full">
+            <Button onClick={handleOriginalVersion} size="sm" className="w-full">
               Ver Versión Original
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-md hover:shadow-lg transition-shadow border-primary/20 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
-              <Sparkles className="h-5 w-5 text-primary" />
+        <Card className="border shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
               Versión Mejorada
             </CardTitle>
-            <CardDescription>
-              Diseño optimizado para mejor visualización y análisis
+            <CardDescription className="text-xs">
+              Primera mejora de diseño y estructura
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-slate-100 rounded-md p-4 mb-4 h-48 flex items-center justify-center">
+            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
               <div className="text-center text-slate-400">
-                <p className="text-sm">Vista previa no disponible</p>
-                <p className="text-xs">Diseño mejorado con jerarquía visual clara</p>
+                <p className="text-xs">Vista previa no disponible</p>
+                <p className="text-[10px]">Diseño mejorado con mejor jerarquía</p>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              La versión mejorada presenta una jerarquía visual clara, mejor espaciado de componentes, colores consistentes y una organización más intuitiva para un análisis eficiente.
+            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
+              Esta versión mejorada presenta mejor disposición de componentes, esquema visual más claro y distribución más intuitiva. Resuelve parcialmente los problemas de diseño.
             </p>
-            <Button onClick={handleImprovedVersion} variant="default" className="w-full">
-              Ver Versión Mejorada
+            <Button onClick={handleImprovedVersion} size="sm" className="w-full">
+              Ver Primera Versión Mejorada
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-2 shadow-md hover:shadow-lg transition-shadow border-primary/40 bg-primary/5">
+          <CardHeader className="pb-3 bg-primary/10">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Versión Optimizada
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Solución completa a problemas visuales
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-slate-100 rounded-md p-4 mb-4 h-36 flex items-center justify-center">
+              <div className="text-center text-slate-400">
+                <p className="text-xs">Vista previa no disponible</p>
+                <p className="text-[10px]">Diseño completamente rediseñado</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4 h-24 overflow-auto">
+              Versión totalmente renovada con una interfaz tipo "dashboard profesional". Utiliza pestañas para separar claramente las secciones, mejora el espaciado y elimina completamente las superposiciones. Incluye tooltips y mejor organización visual.
+            </p>
+            <Button onClick={handleSuperVersion} variant="default" size="sm" className="w-full relative overflow-hidden group">
+              <span className="relative z-10">Ver Versión Optimizada</span>
+              <span className="absolute inset-0 bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
             </Button>
           </CardContent>
         </Card>
