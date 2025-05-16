@@ -277,7 +277,7 @@ export default function EditDeliverable() {
                           <FormLabel>Mes de Entrega</FormLabel>
                           <Select
                             onValueChange={(value) => field.onChange(Number(value))}
-                            defaultValue={field.value.toString()}
+                            defaultValue={field.value ? field.value.toString() : "1"}
                           >
                             <FormControl>
                               <SelectTrigger>
