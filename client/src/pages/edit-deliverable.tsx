@@ -456,10 +456,53 @@ export default function EditDeliverable() {
                       name="analysts"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Analistas</FormLabel>
+                          <FormLabel className="flex items-center gap-2">
+                            Analistas
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="w-[220px] text-sm">Analistas que han registrado horas en este proyecto</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Nombres de analistas" />
+                            <div className="relative">
+                              <Input {...field} placeholder="Nombres de analistas" />
+                              {analysts.length > 0 && (
+                                <div className="absolute right-2 top-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {analysts.length} analista(s) activo(s)
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
                           </FormControl>
+                          {analysts.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {analysts.map((analyst, idx) => (
+                                <Badge 
+                                  key={idx} 
+                                  variant="secondary" 
+                                  className="text-xs cursor-pointer"
+                                  onClick={() => {
+                                    const currentAnalysts = field.value ? field.value.split(", ").filter(Boolean) : [];
+                                    if (!currentAnalysts.includes(analyst.name)) {
+                                      const newValue = currentAnalysts.length > 0 
+                                        ? `${field.value}, ${analyst.name}` 
+                                        : analyst.name;
+                                      field.onChange(newValue);
+                                    }
+                                  }}
+                                >
+                                  {analyst.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -470,9 +513,35 @@ export default function EditDeliverable() {
                       name="pm"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Project Manager</FormLabel>
+                          <FormLabel className="flex items-center gap-2">
+                            Project Manager
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="w-[220px] text-sm">PM asignado según registros de tiempo</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Nombre del PM" />
+                            <Select
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar PM" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {projectManagers.map((pm) => (
+                                  <SelectItem key={pm.id} value={pm.name}>
+                                    {pm.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
