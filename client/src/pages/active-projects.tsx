@@ -257,7 +257,7 @@ export default function ActiveProjects() {
               <tr 
                 key={project.id} 
                 className="text-xs hover:bg-gray-50 cursor-pointer"
-                onClick={() => setLocation(`/project-summary/${project.id}`)}
+                onClick={() => setLocation(`/project-analytics/${project.id}`)}
               >
                 <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
                 <td className="px-2 py-1.5">
