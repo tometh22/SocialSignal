@@ -1550,6 +1550,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener entregables para un proyecto específico
+  app.get("/api/modo/deliverables/project/:projectId", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ message: "ID de proyecto inválido" });
+    }
+    
+    try {
+      // Consulta SQL directa para obtener entregable de un proyecto
+      const { rows } = await db.execute(
+        `SELECT * FROM deliverables WHERE project_id = ${projectId} LIMIT 1`
+      );
+      
+      if (rows.length === 0) {
+        console.log(`No se encontró entregables MODO para el proyecto ID ${projectId}`);
+        return res.json(null);
+      }
+      
+      console.log(`Entregable MODO encontrado para proyecto ID ${projectId}`);
+      res.json(rows[0]);
+    } catch (error) {
+      console.error(`Error al obtener entregable MODO para proyecto ID ${projectId}:`, error);
+      res.status(500).json({ message: "Error al obtener datos MODO" });
+    }
+  });
+  
   // Obtener un entregable por ID
   app.get("/api/deliverables/:id", async (req, res) => {
     const id = parseInt(req.params.id);
