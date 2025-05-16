@@ -96,15 +96,28 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   return (
     <Card className="shadow-md">
       <CardHeader className="bg-gray-50 border-b pb-3">
-        <CardTitle className="text-lg font-bold flex justify-between items-center">
-          <span>Métricas MODO</span>
-          <Badge variant="outline" className={getScoreColor(totalScore)}>
-            {totalScore.toFixed(2)} / 5.0
-          </Badge>
-        </CardTitle>
-        <CardDescription>
-          Métricas del Sistema de Seguimiento Operacional para este entregable
-        </CardDescription>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <span>Métricas MODO</span>
+              <Badge variant="outline" className={getScoreColor(totalScore)}>
+                {totalScore.toFixed(2)} / 5.0
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Métricas del Sistema de Seguimiento Operacional para este entregable
+            </CardDescription>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1 text-xs"
+            onClick={() => setLocation(`/edit-deliverable/${deliverable.id}`)}
+          >
+            <PenSquare className="h-3.5 w-3.5" />
+            Editar Indicadores
+          </Button>
+        </div>
       </CardHeader>
       
       <CardContent className="pt-6">

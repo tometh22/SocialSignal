@@ -137,9 +137,12 @@ export default function EditDeliverable() {
 
   // Mutación para actualizar el entregable
   const updateDeliverableMutation = useMutation({
-    mutationFn: (data: DeliverableFormValues) => {
-      return apiRequest(`/api/deliverables/${id}`, {
+    mutationFn: async (data: DeliverableFormValues) => {
+      const response = await fetch(`/api/deliverables/${id}`, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           ...data,
           delivery_date: formattedDates.delivery_date
@@ -150,6 +153,12 @@ export default function EditDeliverable() {
             : null,
         }),
       });
+      
+      if (!response.ok) {
+        throw new Error("Error al actualizar el entregable");
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       toast({
