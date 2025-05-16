@@ -176,6 +176,31 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   const handleSaveValues = () => {
     updateDeliverableMutation.mutate(editableValues);
   };
+  
+  // Cargar datos específicos para Sony One directamente desde la imagen
+  const loadSonyOneData = () => {
+    const sonyOneValues = {
+      month: 1,
+      analystId: null,
+      analysts: "Vanti, Trini",
+      pmId: null,
+      pm: "Vanti",
+      deliveryOnTime: true,
+      retrabajo: true,
+      narrativeQuality: 5.0,
+      graphicsEffectiveness: 5.0,
+      formatDesign: 5.0,
+      relevantInsights: 5.0,
+      operationsFeedback: 5.0,
+      hoursEstimated: 40
+    };
+    
+    // Actualizar el estado para reflejar los datos de la imagen
+    setEditableValues(sonyOneValues);
+    
+    // Guardar inmediatamente los cambios
+    updateDeliverableMutation.mutate(sonyOneValues);
+  };
 
   // Si no hay entregable, muestra un mensaje
   if (!deliverable) {
@@ -398,24 +423,37 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                   </div>
                 </div>
                 
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    type="button" 
-                    onClick={handleSaveValues}
-                    disabled={updateDeliverableMutation.isPending}
-                  >
-                    {updateDeliverableMutation.isPending ? (
-                      <>Guardando...</>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Guardar Cambios
-                      </>
-                    )}
-                  </Button>
+                <DialogFooter className="flex justify-between">
+                  <div>
+                    <Button 
+                      type="button" 
+                      variant="secondary"
+                      onClick={loadSonyOneData}
+                      disabled={updateDeliverableMutation.isPending}
+                      className="mr-2"
+                    >
+                      Cargar Datos Sony One
+                    </Button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="button" 
+                      onClick={handleSaveValues}
+                      disabled={updateDeliverableMutation.isPending}
+                    >
+                      {updateDeliverableMutation.isPending ? (
+                        <>Guardando...</>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Guardar Cambios
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
