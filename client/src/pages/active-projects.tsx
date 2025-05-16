@@ -317,8 +317,11 @@ export default function ActiveProjects() {
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0"
-                      onClick={() => setLocation(`/project-summary/${project.id}`)}
-                      title="Ver resumen del proyecto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/project-summary-selector/${project.id}`);
+                      }}
+                      title="Ver resumen del proyecto (con opciones de visualización)"
                     >
                       <BarChart2 className="h-3.5 w-3.5" />
                     </Button>

@@ -14,6 +14,7 @@ import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 import ProjectSummary from "@/pages/project-summary";
 import ProjectSummaryImproved from "@/pages/project-summary-improved";
+import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
 import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
@@ -99,6 +100,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
                   <ProtectedRoute path="/project-summary/:projectId" component={ProjectSummary} />
+                  <ProtectedRoute path="/project-summary-new/:projectId" component={ProjectSummaryImproved} />
+                  <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <Route component={NotFound} />
