@@ -53,8 +53,8 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Métricas MODO</CardTitle>
-          <CardDescription>No hay datos disponibles para este proyecto</CardDescription>
+          <CardTitle>Indicadores de Robustez</CardTitle>
+          <CardDescription>No hay datos de indicadores disponibles para este proyecto</CardDescription>
         </CardHeader>
       </Card>
     );

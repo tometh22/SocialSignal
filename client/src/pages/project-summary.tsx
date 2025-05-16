@@ -638,18 +638,20 @@ const ProjectSummary = () => {
         />
       </div>
 
-      {/* SECCIÓN MODO - Destacada en la parte superior */}
-      {project && project?.quotation?.clientId === 17 && (
-        <div className="container mx-auto px-4 mt-3 mb-8">
-          <div className="bg-primary/5 rounded-lg border border-primary/20 p-5 shadow-sm">
+      {/* Sección de Indicadores de Robustez - Para todos los proyectos */}
+      {project && (
+        <div className="container mx-auto px-4 mt-3 mb-6">
+          <div className="bg-primary/5 rounded-lg border border-primary/20 p-5 shadow-md">
             <div className="mb-3 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
                 <BaggageClaim className="h-5 w-5" />
-                Métricas MODO
+                Indicadores de Robustez
               </h2>
-              <span className="bg-primary/15 text-primary text-sm px-3 py-1 rounded-full font-medium">
-                Proyecto MODO
-              </span>
+              {project?.quotation?.clientId === 17 && (
+                <span className="bg-primary/15 text-primary text-sm px-3 py-1 rounded-full font-medium">
+                  Proyecto MODO
+                </span>
+              )}
             </div>
             <ProjectModoMetrics 
               deliverable={deliverableData} 
@@ -659,75 +661,87 @@ const ProjectSummary = () => {
         </div>
       )}
 
-      {/* Contenedor principal */}
-      <div className="container mx-auto px-4 pb-6">
-        {/* KPI Ribbon - Los 3 KPIs críticos */}
-        {dashboardState.showSections.kpi && (
-          <KpiRibbon
-            totalHours={totalHours}
-            billableHours={billableHours}
-            nonBillableHours={nonBillableHours}
-            costData={{
-              actualCost: costSummary?.actualCost || 0,
-              estimatedCost: costSummary?.estimatedCost || 0,
-              percentageUsed: costSummary?.percentageUsed || 0
-            }}
-            timeData={{
-              daysRemaining,
-              daysTotal: projectMetrics.daysTotal,
-              progressPercentage: projectMetrics.progressPercentage
-            }}
-            onHelpClick={handleOpenHelpDialog}
-          />
-        )}
+      {/* Panel de métricas críticas y seguimiento */}
+      <div className="container mx-auto px-4 mb-6">
+        <div className="grid grid-cols-1 gap-6">
+          {/* KPI Ribbon - Los 3 KPIs críticos */}
+          {dashboardState.showSections.kpi && (
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+              <h2 className="text-lg font-semibold mb-3">Resumen del Proyecto</h2>
+              <KpiRibbon
+                totalHours={totalHours}
+                billableHours={billableHours}
+                nonBillableHours={nonBillableHours}
+                costData={{
+                  actualCost: costSummary?.actualCost || 0,
+                  estimatedCost: costSummary?.estimatedCost || 0,
+                  percentageUsed: costSummary?.percentageUsed || 0
+                }}
+                timeData={{
+                  daysRemaining,
+                  daysTotal: projectMetrics.daysTotal,
+                  progressPercentage: projectMetrics.progressPercentage
+                }}
+                onHelpClick={handleOpenHelpDialog}
+              />
+            </div>
+          )}
+          
+          {/* Panel de Análisis */}
+          {dashboardState.showSections.deviations && (
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+              <h2 className="text-lg font-semibold mb-3">Análisis de Desviaciones</h2>
+              <DeviationSection
+                costVariance={costSummary?.variance || 0}
+                scheduleVariance={scheduleVariance}
+                riskMetrics={riskIndicators}
+                onHelpClick={handleOpenHelpDialog}
+                showRisks={dashboardState.viewMode === "detailed"}
+              />
+            </div>
+          )}
 
-        {/* Deviation Section - Desviaciones y Riesgos */}
-        {dashboardState.showSections.deviations && (
-          <DeviationSection
-            costVariance={costSummary?.variance || 0}
-            scheduleVariance={scheduleVariance}
-            riskMetrics={riskIndicators}
-            onHelpClick={handleOpenHelpDialog}
-            showRisks={dashboardState.viewMode === "detailed"}
-          />
-        )}
-
-        {/* Team Section - Equipo asignado */}
-        {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
-          <TeamSection
-            teamMembers={timeByPersonnelData}
-            onHelpClick={handleOpenHelpDialog}
-          />
-        )}
-
-        {/* Charts Section - Gráficos */}
-        {dashboardState.showSections.charts && (
-          <ChartsSection
-            timeByPersonnelData={timeByPersonnelData}
-            billableDistributionData={billableDistributionData}
-            timeAndCostData={timeAndCostTrendData}
-            onChartExpand={handleExpandChart}
-            onRegisterHours={handleRegisterHours}
-          />
-        )}
-      </div>
-
-      {/* Sección de configuración de proyecto */}
-      {project && (
-        <div className="container mx-auto px-4 mt-6">
-          <div className="bg-card rounded-lg border p-4">
-            <h2 className="text-xl font-semibold mb-3">Componentes del Proyecto</h2>
-            <ComponentsManager 
-              projectId={parsedProjectId || 0} 
-              refreshTimeEntries={() => {
-                queryClient.invalidateQueries({
-                  queryKey: [`/api/time-entries/project/${parsedProjectId}`]
-                });
-              }}
-            />
-          </div>
+          {/* Panel de Visualización */}
+          {dashboardState.showSections.charts && (
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+              <h2 className="text-lg font-semibold mb-3">Gráficos y Tendencias</h2>
+              <ChartsSection
+                timeByPersonnelData={timeByPersonnelData}
+                billableDistributionData={billableDistributionData}
+                timeAndCostData={timeAndCostTrendData}
+                onChartExpand={handleExpandChart}
+                onRegisterHours={handleRegisterHours}
+              />
+            </div>
+          )}
+          
+          {/* Panel de Recursos */}
+          {dashboardState.showSections.team && dashboardState.viewMode === "detailed" && (
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+              <h2 className="text-lg font-semibold mb-3">Asignación de Recursos</h2>
+              <TeamSection
+                teamMembers={timeByPersonnelData}
+                onHelpClick={handleOpenHelpDialog}
+              />
+            </div>
+          )}
+          
+          {/* Panel de Componentes */}
+          {project && (
+            <div className="bg-card rounded-lg border shadow-sm p-4">
+              <h2 className="text-lg font-semibold mb-3">Componentes del Proyecto</h2>
+              <ComponentsManager 
+                projectId={parsedProjectId || 0} 
+                refreshTimeEntries={() => {
+                  queryClient.invalidateQueries({
+                    queryKey: [`/api/time-entries/project/${parsedProjectId}`]
+                  });
+                }}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Modal para gráficos expandidos */}
       <ChartModal
