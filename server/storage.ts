@@ -1868,11 +1868,9 @@ export class DatabaseStorage implements IStorage {
   
   async getDeliverable(id: number): Promise<any | undefined> {
     try {
-      // Usamos SQL plano para evitar problemas con la diferencia entre el esquema 
-      // y la estructura real de la tabla
-      const result = await db.execute(`
-        SELECT * FROM deliverables WHERE id = $1
-      `, [id]);
+      const result = await db.execute(
+        `SELECT * FROM deliverables WHERE id = ${id}`
+      );
       
       if (result.rows && result.rows.length > 0) {
         return result.rows[0];
@@ -1901,19 +1899,38 @@ export class DatabaseStorage implements IStorage {
         deliverable.updated_at = new Date();
       }
       
-      // Ejecutar la consulta SQL directamente para evitar problemas con el esquema
-      const keys = Object.keys(deliverable);
-      const setClause = keys.map((key, i) => `${key} = $${i + 2}`).join(', ');
-      const values = Object.values(deliverable);
+      // Construir la consulta SET dinámicamente
+      let setClause = '';
+      const entries = Object.entries(deliverable);
+      
+      entries.forEach(([key, value], index) => {
+        // Agregar la coma si no es el primer elemento
+        if (index > 0) setClause += ', ';
+        
+        // Manejar el valor según su tipo
+        if (value === null) {
+          setClause += `${key} = NULL`;
+        } else if (typeof value === 'string') {
+          setClause += `${key} = '${value.replace(/'/g, "''")}'`; // Escapar comillas simples
+        } else if (value instanceof Date) {
+          setClause += `${key} = '${value.toISOString()}'`;
+        } else {
+          setClause += `${key} = ${value}`;
+        }
+      });
+      
+      if (!setClause) {
+        return existingDeliverable; // No hay cambios que hacer
+      }
       
       const query = `
         UPDATE deliverables 
         SET ${setClause} 
-        WHERE id = $1 
+        WHERE id = ${id} 
         RETURNING *
       `;
       
-      const result = await db.execute(query, [id, ...values]);
+      const result = await db.execute(query);
       
       if (result.rows && result.rows.length > 0) {
         return result.rows[0];
