@@ -172,26 +172,63 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   });
   
   // Manejar el guardado de valores
-  const handleSaveValues = () => {
+  const handleSaveIndicators = async () => {
     console.log("Valores a guardar:", editableValues);
     
-    // Convertir los valores a los campos esperados por el servidor
-    const serverData = {
-      mes_entrega: editableValues.month,
-      analysts: editableValues.analysts,
-      pm: editableValues.pm,
-      deliveryOnTime: editableValues.deliveryOnTime,
-      retrabajo: editableValues.retrabajo,
-      narrative_quality: editableValues.narrativeQuality,
-      graphics_effectiveness: editableValues.graphicsEffectiveness,
-      format_design: editableValues.formatDesign,
-      relevant_insights: editableValues.relevantInsights,
-      operations_feedback: editableValues.operationsFeedback,
-      hoursEstimated: editableValues.hoursEstimated
-    };
-    
-    console.log("Datos formateados para el servidor:", serverData);
-    updateDeliverableMutation.mutate(serverData);
+    try {
+      // Convertir los valores a los campos esperados por el servidor
+      const serverData = {
+        mes_entrega: editableValues.month,
+        analysts: editableValues.analysts,
+        pm: editableValues.pm,
+        delivery_on_time: editableValues.deliveryOnTime,
+        retrabajo: editableValues.retrabajo,
+        narrative_quality: editableValues.narrativeQuality,
+        graphics_effectiveness: editableValues.graphicsEffectiveness,
+        format_design: editableValues.formatDesign,
+        relevant_insights: editableValues.relevantInsights,
+        operations_feedback: editableValues.operationsFeedback,
+        hours_estimated: editableValues.hoursEstimated
+      };
+      
+      console.log("Datos formateados para nuevo endpoint:", serverData);
+      
+      // Usar la nueva ruta especializada para indicadores con POST
+      const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(serverData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error al actualizar los indicadores:", errorData);
+        throw new Error(errorData.message || "Error al actualizar el entregable");
+      }
+      
+      const data = await response.json();
+      console.log("Actualización exitosa:", data);
+      
+      // Mostrar mensaje de éxito
+      toast({
+        title: "Éxito",
+        description: "Indicadores actualizados correctamente",
+      });
+      
+      // Cerrar el diálogo
+      setIsDialogOpen(false);
+      
+      // Actualizar los datos
+      queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${projectId}`] });
+      
+    } catch (error: any) {
+      console.error("Error al guardar los indicadores:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar los indicadores",
+        variant: "destructive"
+      });
+    }
   };
 
   // Si no hay entregable, muestra un mensaje
@@ -422,17 +459,13 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
                     </Button>
                     <Button 
                       type="button" 
-                      onClick={handleSaveValues}
-                      disabled={updateDeliverableMutation.isPending}
+                      onClick={handleSaveIndicators}
+                      disabled={false}
                     >
-                      {updateDeliverableMutation.isPending ? (
-                        <>Guardando...</>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Guardar Cambios
-                        </>
-                      )}
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar Cambios
+                      </>
                     </Button>
                   </div>
                 </DialogFooter>
