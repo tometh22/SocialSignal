@@ -638,6 +638,27 @@ const ProjectSummary = () => {
         />
       </div>
 
+      {/* SECCIÓN MODO - Destacada en la parte superior */}
+      {project && project?.quotation?.clientId === 17 && (
+        <div className="container mx-auto px-4 mt-3 mb-8">
+          <div className="bg-primary/5 rounded-lg border border-primary/20 p-5 shadow-sm">
+            <div className="mb-3 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-primary flex items-center gap-2">
+                <BaggageClaim className="h-5 w-5" />
+                Métricas MODO
+              </h2>
+              <span className="bg-primary/15 text-primary text-sm px-3 py-1 rounded-full font-medium">
+                Proyecto MODO
+              </span>
+            </div>
+            <ProjectModoMetrics 
+              deliverable={deliverableData} 
+              projectId={parsedProjectId || 0} 
+            />
+          </div>
+        </div>
+      )}
+
       {/* Contenedor principal */}
       <div className="container mx-auto px-4 pb-6">
         {/* KPI Ribbon - Los 3 KPIs críticos */}
@@ -691,6 +712,23 @@ const ProjectSummary = () => {
         )}
       </div>
 
+      {/* Sección de configuración de proyecto */}
+      {project && (
+        <div className="container mx-auto px-4 mt-6">
+          <div className="bg-card rounded-lg border p-4">
+            <h2 className="text-xl font-semibold mb-3">Componentes del Proyecto</h2>
+            <ComponentsManager 
+              projectId={parsedProjectId || 0} 
+              refreshTimeEntries={() => {
+                queryClient.invalidateQueries({
+                  queryKey: [`/api/time-entries/project/${parsedProjectId}`]
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Modal para gráficos expandidos */}
       <ChartModal
         isOpen={expandedChart.isOpen}
@@ -707,58 +745,7 @@ const ProjectSummary = () => {
         title={showHelp.title}
         content={showHelp.content}
       />
-      
-      {/* Sección principal de MODO y Configuración */}
-      {project && (
-        <div className="container mx-auto px-4 mt-6">
-          <Tabs defaultValue="modo" className="w-full">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="modo" className="flex items-center gap-2 font-semibold">
-                <BaggageClaim className="h-4 w-4" />
-                Métricas MODO
-              </TabsTrigger>
-              <TabsTrigger value="components" className="flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Componentes
-              </TabsTrigger>
-              {/* Se pueden agregar más pestañas de configuración aquí */}
-            </TabsList>
-            
-            {/* Destacamos la pestaña de MODO poniéndola primera y por defecto */}
-            <TabsContent value="modo" className="mt-4">
-              <div className="bg-card rounded-lg border p-4 shadow-sm">
-                <div className="mb-3 flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-primary">Métricas MODO del Proyecto</h2>
-                  {/* Indicador visual si el proyecto es de MODO */}
-                  {project?.quotation?.clientId === 17 && (
-                    <span className="bg-primary/10 text-primary text-sm px-3 py-1 rounded-full font-medium">
-                      Proyecto MODO
-                    </span>
-                  )}
-                </div>
-                <ProjectModoMetrics 
-                  deliverable={deliverableData} 
-                  projectId={parsedProjectId || 0} 
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="components" className="mt-4">
-              <div className="bg-card rounded-lg border p-4">
-                <h2 className="text-xl font-semibold mb-3">Componentes del Proyecto</h2>
-                <ComponentsManager 
-                  projectId={parsedProjectId || 0} 
-                  refreshTimeEntries={() => {
-                    queryClient.invalidateQueries({
-                      queryKey: [`/api/time-entries/project/${parsedProjectId}`]
-                    });
-                  }}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
+    
     </div>
   );
 };
