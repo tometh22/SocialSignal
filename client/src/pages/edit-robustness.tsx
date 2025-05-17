@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRoute, useLocation, Link } from 'wouter';
+import { useRoute } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -261,8 +261,7 @@ const EditRobustnessPage = () => {
   // Calcular la puntuación total
   const totalScore = calculateTotalScore();
   
-  // Para navegar programáticamente
-  const [, setLocation] = useLocation();
+  // No necesitamos navegación por wouter para esta página
   
   return (
     <div className="container mx-auto py-8">
@@ -275,10 +274,7 @@ const EditRobustnessPage = () => {
         </div>
         <Button 
           variant="outline" 
-          onClick={() => {
-            // Volver atrás en el historial del navegador
-            window.history.back();
-          }}
+          onClick={() => window.history.back()}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
