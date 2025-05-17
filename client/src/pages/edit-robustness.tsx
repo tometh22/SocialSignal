@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRoute, useLocation } from 'wouter';
+import { useRoute, useLocation, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -261,6 +261,9 @@ const EditRobustnessPage = () => {
   // Calcular la puntuación total
   const totalScore = calculateTotalScore();
   
+  // Para navegar programáticamente
+  const [, setLocation] = useLocation();
+  
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-6">
@@ -270,7 +273,17 @@ const EditRobustnessPage = () => {
             Proyecto: {deliverable.title} (ID: {deliverable.id})
           </p>
         </div>
-        <Button variant="outline" onClick={() => window.history.back()}>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            // Usar setLocation para navegación sin recargar la página
+            if (deliverable?.project_id) {
+              setLocation(`/project-analytics/${deliverable.project_id}`);
+            } else {
+              setLocation('/active-projects');
+            }
+          }}
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
         </Button>
