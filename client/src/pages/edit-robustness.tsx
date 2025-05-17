@@ -276,12 +276,8 @@ const EditRobustnessPage = () => {
         <Button 
           variant="outline" 
           onClick={() => {
-            // Usar setLocation para navegación sin recargar la página
-            if (deliverable?.project_id) {
-              setLocation(`/project-analytics/${deliverable.project_id}`);
-            } else {
-              setLocation('/active-projects');
-            }
+            // Volver atrás en el historial del navegador
+            window.history.back();
           }}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
