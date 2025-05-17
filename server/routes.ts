@@ -1641,37 +1641,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
       console.log("Datos recibidos:", req.body);
       
-      // Utilizar SQL preparado con parámetros
+      // Solución simple: ejecutar una actualización SQL directa con los valores correctos
       await pool.query(`
         UPDATE deliverables 
         SET 
-          narrative_quality = $1,
-          graphics_effectiveness = $2,
-          format_design = $3,
-          relevant_insights = $4,
-          operations_feedback = $5,
-          mes_entrega = $6,
-          retrabajo = $7,
-          delivery_on_time = $8,
-          analysts = $9,
-          pm = $10,
-          hours_estimated = $11,
+          narrative_quality = ${Number(req.body.narrative_quality || 0)},
+          graphics_effectiveness = ${Number(req.body.graphics_effectiveness || 0)},
+          format_design = ${Number(req.body.format_design || 0)},
+          relevant_insights = ${Number(req.body.relevant_insights || 0)},
+          operations_feedback = ${Number(req.body.operations_feedback || 0)},
+          mes_entrega = ${Number(req.body.mes_entrega || 1)},
+          retrabajo = ${req.body.retrabajo ? 'true' : 'false'},
+          on_time = ${req.body.delivery_on_time ? 'true' : 'false'},
+          analysts = '${(req.body.analysts || '').replace(/'/g, "''")}',
+          pm = '${(req.body.pm || '').replace(/'/g, "''")}',
+          hours_available = ${Number(req.body.hours_estimated || 0)},
           updated_at = NOW()
-        WHERE id = $12
-      `, [
-        req.body.narrative_quality || 0,
-        req.body.graphics_effectiveness || 0,
-        req.body.format_design || 0,
-        req.body.relevant_insights || 0,
-        req.body.operations_feedback || 0,
-        req.body.mes_entrega || 1,
-        req.body.retrabajo || false,
-        req.body.delivery_on_time || false,
-        req.body.analysts || '',
-        req.body.pm || '',
-        req.body.hours_estimated || 0,
-        id
-      ]);
+        WHERE id = ${id}
+      `);
       
       // Obtener el entregable actualizado
       const { rows } = await pool.query('SELECT * FROM deliverables WHERE id = $1', [id]);
