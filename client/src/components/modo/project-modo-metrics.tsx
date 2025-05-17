@@ -283,16 +283,7 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
               </Badge>
             </CardTitle>
             
-            <div className="mt-2">
-              <Button 
-                size="sm" 
-                variant="secondary"
-                onClick={() => window.location.href = `/edit-indicators/${deliverable.id}`}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Editar Indicadores
-              </Button>
-            </div>
+
             
             {/* Dialog para editar los valores */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

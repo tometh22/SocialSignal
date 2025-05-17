@@ -353,7 +353,7 @@ export default function ActiveProjects() {
                             }
                             const deliverable = await response.json();
                             if (deliverable && deliverable.id) {
-                              setLocation(`/edit-deliverable/${deliverable.id}`);
+                              window.location.href = `/edit-indicators/${deliverable.id}`;
                             } else {
                               toast({
                                 title: "Error",
