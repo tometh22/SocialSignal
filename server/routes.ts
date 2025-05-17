@@ -1,7 +1,7 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { z } from "zod";
 import { 
   insertClientSchema, 
@@ -1641,21 +1641,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
       console.log("Datos recibidos:", req.body);
       
-      // Solución directa utilizando SQL simple
-      await db.execute(`
+      // Utilizar SQL preparado con parámetros
+      await pool.query(`
         UPDATE deliverables 
         SET 
-          narrative_quality = ${req.body.narrative_quality || 0},
-          graphics_effectiveness = ${req.body.graphics_effectiveness || 0},
-          format_design = ${req.body.format_design || 0},
-          relevant_insights = ${req.body.relevant_insights || 0},
-          operations_feedback = ${req.body.operations_feedback || 0},
+          narrative_quality = $1,
+          graphics_effectiveness = $2,
+          format_design = $3,
+          relevant_insights = $4,
+          operations_feedback = $5,
+          mes_entrega = $6,
+          retrabajo = $7,
+          delivery_on_time = $8,
+          analysts = $9,
+          pm = $10,
+          hours_estimated = $11,
           updated_at = NOW()
-        WHERE id = ${id}
-      `);
+        WHERE id = $12
+      `, [
+        req.body.narrative_quality || 0,
+        req.body.graphics_effectiveness || 0,
+        req.body.format_design || 0,
+        req.body.relevant_insights || 0,
+        req.body.operations_feedback || 0,
+        req.body.mes_entrega || 1,
+        req.body.retrabajo || false,
+        req.body.delivery_on_time || false,
+        req.body.analysts || '',
+        req.body.pm || '',
+        req.body.hours_estimated || 0,
+        id
+      ]);
       
       // Obtener el entregable actualizado
-      const [updatedDeliverable] = await db.select().from('deliverables').where({ id }).limit(1);
+      const { rows } = await pool.query('SELECT * FROM deliverables WHERE id = $1', [id]);
+      const updatedDeliverable = rows[0];
       
       if (!updatedDeliverable) {
         return res.status(404).json({ message: "Deliverable not found" });
