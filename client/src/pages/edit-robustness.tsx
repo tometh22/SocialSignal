@@ -193,6 +193,39 @@ const EditRobustnessPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateIndicatorsMutation.mutate(formData);
+    
+    // Después de enviar el formulario, vamos a forzar la recarga del entregable
+    setTimeout(() => {
+      fetch(`/api/deliverables/${id}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log("Datos actualizados recargados:", data);
+          setFormData({
+            mes_entrega: data.mes_entrega || 1,
+            analysts: data.analysts || "",
+            analystId: null,
+            pm: data.pm || "",
+            pmId: null,
+            deliveryOnTime: data.on_time || false,
+            retrabajo: data.retrabajo || false,
+            narrativeQuality: data.narrative_quality || 0,
+            graphicsEffectiveness: data.graphics_effectiveness || 0,
+            formatDesign: data.format_design || 0,
+            relevantInsights: data.relevant_insights || 0,
+            operationsFeedback: data.operations_feedback || 0,
+            hoursEstimated: data.hours_available || 0,
+            hoursActual: calculateTotalHours(timeEntries || [])
+          });
+          
+          toast({
+            title: "Datos actualizados",
+            description: `Horas estimadas: ${data.hours_available}`,
+          });
+        })
+        .catch(error => {
+          console.error("Error recargando datos:", error);
+        });
+    }, 500); // Esperar 500ms para asegurarnos que la actualización se complete
   };
   
   // Función para actualizar campos del formulario
