@@ -76,7 +76,7 @@ const EditRobustnessPage = () => {
         formatDesign: deliverable.format_design || 0,
         relevantInsights: deliverable.relevant_insights || 0,
         operationsFeedback: deliverable.operations_feedback || 0,
-        hoursEstimated: deliverable.hoursEstimated || 40,
+        hoursEstimated: deliverable.hours_available || 40,
         hoursActual: calculateTotalHours(timeEntries || [])
       });
     }
