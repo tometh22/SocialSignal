@@ -360,40 +360,69 @@ const EditRobustnessPage = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Equipo de Proyecto</h3>
                   <div>
-                    <Label htmlFor="analysts">Analistas</Label>
-                    <div className="flex space-x-2">
-                      <Select 
-                        value={formData.analystId || ""} 
-                        onValueChange={(value) => {
-                          if (value) {
-                            const analyst = personnel?.find(p => p.id === parseInt(value));
-                            if (analyst) {
-                              handleInputChange('analysts', analyst.name);
-                              handleInputChange('analystId', analyst.id);
+                    <Label htmlFor="analysts">Analistas (separados por coma)</Label>
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <Select 
+                          value={formData.analystId || ""} 
+                          onValueChange={(value) => {
+                            if (value) {
+                              const analyst = personnel?.find(p => p.id === parseInt(value));
+                              if (analyst) {
+                                // Si ya hay analistas, añadir con coma
+                                const currentAnalysts = formData.analysts ? formData.analysts.split(',').map(a => a.trim()) : [];
+                                
+                                // Verificar si el analista ya está en la lista
+                                if (!currentAnalysts.includes(analyst.name)) {
+                                  currentAnalysts.push(analyst.name);
+                                }
+                                
+                                // Actualizar con la lista completa
+                                handleInputChange('analysts', currentAnalysts.join(', '));
+                                handleInputChange('analystId', analyst.id);
+                              }
                             }
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Seleccionar analista" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {personnel?.filter(p => {
-                            const role = roles?.find(r => r.id === p.roleId);
-                            return role && (role.name.includes('Analista') || role.name.includes('Analyst'));
-                          }).map((analyst) => (
-                            <SelectItem key={analyst.id} value={analyst.id.toString()}>
-                              {analyst.name}
-                            </SelectItem>
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Añadir analista" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {personnel?.filter(p => {
+                              const role = roles?.find(r => r.id === p.roleId);
+                              return role && (role.name.includes('Analista') || role.name.includes('Analyst'));
+                            }).map((analyst) => (
+                              <SelectItem key={analyst.id} value={analyst.id.toString()}>
+                                {analyst.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Input
+                          id="analysts"
+                          value={formData.analysts}
+                          onChange={(e) => handleInputChange('analysts', e.target.value)}
+                          placeholder="Nombres de analistas (ej: Ana, Juan, María)"
+                        />
+                        
+                        {/* Mostrar chips o badges para los analistas seleccionados */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {formData.analysts.split(',').map((analyst, index) => (
+                            analyst.trim() && (
+                              <Badge 
+                                key={index} 
+                                variant="secondary"
+                                className="flex items-center gap-1"
+                              >
+                                {analyst.trim()}
+                              </Badge>
+                            )
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        id="analysts"
-                        value={formData.analysts}
-                        onChange={(e) => handleInputChange('analysts', e.target.value)}
-                        placeholder="Nombre del analista"
-                      />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div>
