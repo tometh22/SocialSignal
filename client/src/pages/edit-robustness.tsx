@@ -218,8 +218,8 @@ const EditRobustnessPage = () => {
           });
           
           toast({
-            title: "Datos actualizados",
-            description: `Horas estimadas: ${data.hours_available}`,
+            title: "Datos actualizados correctamente",
+            description: "Los cambios han sido guardados en la base de datos",
           });
         })
         .catch(error => {
