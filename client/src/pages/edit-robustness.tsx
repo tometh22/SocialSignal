@@ -146,24 +146,38 @@ const EditRobustnessPage = () => {
         return response.json();
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Éxito",
         description: "Indicadores actualizados correctamente",
       });
-      // Invalidar consultas para refrescar datos
+      
+      // Actualizar los datos locales con los valores actualizados
+      if (data) {
+        setFormData({
+          ...formData,
+          narrativeQuality: data.narrative_quality || 0,
+          graphicsEffectiveness: data.graphics_effectiveness || 0,
+          formatDesign: data.format_design || 0,
+          relevantInsights: data.relevant_insights || 0,
+          operationsFeedback: data.operations_feedback || 0,
+          mes_entrega: data.mes_entrega || 1,
+          retrabajo: data.retrabajo || false,
+          deliveryOnTime: data.on_time || false,
+          analysts: data.analysts || "",
+          pm: data.pm || "",
+          hoursEstimated: data.hours_available || 0,
+          hoursActual: calculateTotalHours(timeEntries || [])
+        });
+      }
+      
+      // Invalidar consultas para refrescar datos en segundo plano
       queryClient.invalidateQueries({ queryKey: [`/api/deliverables/${id}`] });
       if (deliverable?.project_id) {
         queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${deliverable.project_id}`] });
       }
       
-      // Redirigir a la vista del proyecto y forzar recarga de datos
-      const projectId = deliverable?.project_id;
-      if (projectId) {
-        window.location.href = `/project-analytics/${projectId}`;
-      } else {
-        window.location.href = '/active-projects';
-      }
+      // NO redirigimos - permanecemos en la misma página
     },
     onError: (error) => {
       console.error("Error al actualizar indicadores:", error);
