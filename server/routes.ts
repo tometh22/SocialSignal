@@ -1642,6 +1642,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Datos recibidos:", req.body);
       
       // Solución simple: ejecutar una actualización SQL directa con los valores correctos
+      console.log("Datos recibidos en formato final:", {
+        narrative_quality: Number(req.body.narrative_quality || 0),
+        graphics_effectiveness: Number(req.body.graphics_effectiveness || 0),
+        format_design: Number(req.body.format_design || 0),
+        relevant_insights: Number(req.body.relevant_insights || 0),
+        operations_feedback: Number(req.body.operations_feedback || 0),
+        mes_entrega: Number(req.body.mes_entrega || 1),
+        retrabajo: req.body.retrabajo ? 'true' : 'false',
+        on_time: req.body.delivery_on_time ? 'true' : 'false',
+        analysts: (req.body.analysts || '').replace(/'/g, "''"),
+        pm: (req.body.pm || '').replace(/'/g, "''"),
+        hours_available: Number(req.body.hours_available || 0)
+      });
+      
       await pool.query(`
         UPDATE deliverables 
         SET 
@@ -1655,7 +1669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           on_time = ${req.body.delivery_on_time ? 'true' : 'false'},
           analysts = '${(req.body.analysts || '').replace(/'/g, "''")}',
           pm = '${(req.body.pm || '').replace(/'/g, "''")}',
-          hours_available = ${Number(req.body.hours_estimated || 0)},
+          hours_available = ${Number(req.body.hours_available || 0)},
           updated_at = NOW()
         WHERE id = ${id}
       `);

@@ -126,7 +126,8 @@ const EditRobustnessPage = () => {
         format_design: data.formatDesign,
         relevant_insights: data.relevantInsights,
         operations_feedback: data.operationsFeedback,
-        hours_estimated: data.hoursEstimated
+        // Usar el nombre correcto para las horas estimadas
+        hours_available: data.hoursEstimated
       };
       
       console.log("Enviando datos al servidor:", serverData);
