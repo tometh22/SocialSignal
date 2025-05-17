@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRoute } from 'wouter';
+import { useRoute, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -272,13 +272,21 @@ const EditRobustnessPage = () => {
             Proyecto: {deliverable.title} (ID: {deliverable.id})
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => window.history.back()}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
-        </Button>
+        {deliverable?.project_id ? (
+          <Link href={`/project-analytics/${deliverable.project_id}`}>
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Proyecto
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/active-projects">
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver a Proyectos
+            </Button>
+          </Link>
+        )}
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
