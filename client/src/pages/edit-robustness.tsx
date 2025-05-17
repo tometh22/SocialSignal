@@ -157,8 +157,13 @@ const EditRobustnessPage = () => {
         queryClient.invalidateQueries({ queryKey: [`/api/modo/deliverables/project/${deliverable.project_id}`] });
       }
       
-      // Redirigir a la página anterior
-      window.history.back();
+      // Redirigir a la vista del proyecto y forzar recarga de datos
+      const projectId = deliverable?.project_id;
+      if (projectId) {
+        window.location.href = `/project-analytics/${projectId}`;
+      } else {
+        window.location.href = '/active-projects';
+      }
     },
     onError: (error) => {
       console.error("Error al actualizar indicadores:", error);
