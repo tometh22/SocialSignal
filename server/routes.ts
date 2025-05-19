@@ -931,8 +931,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si es un proyecto macro, obtener sus subproyectos
       if (project.isAlwaysOnMacro) {
-        const subprojects = await storage.getActiveProjectsByParentId(id);
-        project.subProjects = subprojects;
+        try {
+          const subprojects = await storage.getActiveProjectsByParentId(id);
+          // Agregamos los subproyectos a un nuevo objeto para evitar problemas de tipado
+          return res.json({
+            ...project,
+            subProjects: subprojects
+          });
+        } catch (error) {
+          console.error("Error obteniendo subproyectos:", error);
+          // Aún devolvemos el proyecto principal si hay un error con los subproyectos
+        }
       }
       
       res.json(project);

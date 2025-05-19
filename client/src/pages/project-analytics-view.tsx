@@ -557,7 +557,6 @@ const ProjectAnalyticsView: React.FC = () => {
                         </div>
                         <ProjectHealthIndicators 
                           project={project} 
-                          subprojects={project?.subProjects} 
                         />
                       </TabsContent>
                       
@@ -567,7 +566,6 @@ const ProjectAnalyticsView: React.FC = () => {
                         </div>
                         <BudgetAllocationTool 
                           project={project} 
-                          subprojects={project?.subProjects} 
                         />
                       </TabsContent>
                     </Tabs>
