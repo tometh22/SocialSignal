@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowUpDown } from 'lucide-reac
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
-import OptimizedTeamConfig from '@/components/optimized/team-config';
+import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 
 // Interfaces para los props
