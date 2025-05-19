@@ -25,6 +25,7 @@ import EditDeliverable from "@/pages/edit-deliverable";
 import EditRobustnessPage from "@/pages/edit-robustness";
 // Importamos directamente el componente de edición de proyectos Always On
 import EditAlwaysOnProject from "@/pages/edit-always-on-project";
+import TestPersonnel from "@/pages/test-personnel";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -118,6 +119,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
+                  <ProtectedRoute path="/test-personnel" component={TestPersonnel} />
                   <Route component={NotFound} />
                 </Switch>
               </div>
