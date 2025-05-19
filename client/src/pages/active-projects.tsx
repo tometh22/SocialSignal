@@ -37,8 +37,8 @@ interface Quotation {
   totalAmount: number;
   analysisType: string;
   projectType: string;
-  client?: Client; // Added client property for easier access
-  clientName?: string; // Added clientName property for fallback
+  client?: Client;
+  clientName?: string;
 }
 
 interface ActiveProject {
@@ -56,7 +56,6 @@ interface ActiveProject {
   quotation: Quotation;
 }
 
-
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
   const { data: projects = [], refetch: refetchProjects, isFetching: isLoadingProjects } = useQuery<ActiveProject[]>({ 
@@ -68,7 +67,17 @@ export default function ActiveProjects() {
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({16: true}); // ID 16 es el proyecto macro MODO, inicialmente expandido
   const { toast } = useToast();
+  
+  // Función para desplegar o colapsar un proyecto
+  const toggleProjectExpansion = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation(); // Evita que se active el onClick del tr
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId]
+    }));
+  };
 
   // Mutation para asignar cliente a un proyecto
   const assignClientMutation = useMutation({
@@ -158,6 +167,13 @@ export default function ActiveProjects() {
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
+  // Filtramos los proyectos para mostrar solo los principales y los subproyectos expandidos
+  const visibleProjects = projects.filter(project => {
+    // Mostrar todos los proyectos principales
+    if (!project.parentProjectId) return true;
+    // Mostrar subproyectos solo si su padre está expandido
+    return expandedProjects[project.parentProjectId];
+  });
 
   return (
     <div className="p-3 space-y-3">
@@ -253,190 +269,203 @@ export default function ActiveProjects() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {projects.length === 0 ? (
+            {visibleProjects.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-2 py-4 text-center text-gray-500 text-xs">No hay proyectos</td>
               </tr>
-            ) : projects.map((project) => (
-              <tr 
-                key={project.id} 
-                className={`text-xs hover:bg-gray-50 cursor-pointer ${project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''} ${project.parentProjectId ? 'pl-4' : ''}`}
-                onClick={() => setLocation(`/project-analytics/${project.id}`)}
-              >
-                <td className="px-2 py-1.5 font-medium">
-                  <div className="flex items-center">
-                    {project.isAlwaysOnMacro && (
-                      <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
-                        Always On
-                      </Badge>
-                    )}
-                    {project.parentProjectId && (
-                      <span className="text-gray-400 mr-1">└─</span>
-                    )}
-                    {project.quotation?.projectName || '-'}
-                    {project.isAlwaysOnMacro && (
-                      <span className="ml-2 text-blue-600 text-[10px]">
-                        ${project.macroMonthlyBudget?.toLocaleString()} / mes
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-2 py-1.5">
-                  <div className="flex items-center gap-2">
-                    {project.quotation?.client?.logoUrl ? (
-                      <div className="h-5 w-5 rounded overflow-hidden border flex-shrink-0">
-                        <img 
-                          src={project.quotation.client.logoUrl} 
-                          alt={`${project.quotation.client.name} logo`} 
-                          className="h-full w-full object-contain"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : project.quotation?.client?.name ? (
-                      <div className="h-5 w-5 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                        <span className="text-[9px] font-medium text-primary">
-                          {project.quotation.client.name.substring(0, 2).toUpperCase()}
+            ) : (
+              visibleProjects.map(project => (
+                <tr 
+                  key={project.id} 
+                  className={`text-xs hover:bg-gray-50 cursor-pointer ${project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''} ${project.parentProjectId ? 'pl-4' : ''}`}
+                  onClick={() => setLocation(`/project-analytics/${project.id}`)}
+                >
+                  <td className="px-2 py-1.5 font-medium">
+                    <div className="flex items-center">
+                      {/* Botón para expandir/colapsar para proyectos macro */}
+                      {project.isAlwaysOnMacro && (
+                        <Button 
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 mr-1 text-blue-600"
+                          onClick={(e) => toggleProjectExpansion(e, project.id)}
+                        >
+                          {expandedProjects[project.id] ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                              <path d="M19 12h-14"></path>
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                              <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                          )}
+                          <span className="sr-only">
+                            {expandedProjects[project.id] ? 'Colapsar' : 'Expandir'}
+                          </span>
+                        </Button>
+                      )}
+                    
+                      {project.isAlwaysOnMacro && (
+                        <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
+                          Always On
+                        </Badge>
+                      )}
+                      {project.parentProjectId && (
+                        <span className="text-gray-400 mr-1">└─</span>
+                      )}
+                      {project.quotation?.projectName || '-'}
+                      {project.isAlwaysOnMacro && (
+                        <span className="ml-2 text-blue-600 text-[10px]">
+                          ${project.macroMonthlyBudget?.toLocaleString()} / mes
                         </span>
-                      </div>
-                    ) : null}
-                    <span>{project.quotation?.client?.name || 'Cliente Desconocido'}</span>
-                    {(!project.quotation?.client?.name || project.quotation?.client?.name === '') && (
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <div className="flex items-center gap-2">
+                      {project.quotation?.client?.logoUrl ? (
+                        <div className="h-5 w-5 rounded overflow-hidden border flex-shrink-0">
+                          <img 
+                            src={project.quotation.client.logoUrl} 
+                            alt={`${project.quotation.client.name} logo`} 
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : project.quotation?.client?.name ? (
+                        <div className="h-5 w-5 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+                          <span className="text-[9px] font-medium text-primary">
+                            {project.quotation.client.name.substring(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                      ) : null}
+                      <span>{project.quotation?.client?.name || 'Cliente Desconocido'}</span>
+                      {(!project.quotation?.client?.name || project.quotation?.client?.name === '') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          onClick={(e) => openAssignClientDialog(e, project.id)}
+                          title="Asignar cliente"
+                        >
+                          <UserPlus className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
+                      {project.status === 'active' ? 'Activo' : project.status === 'en_progreso' ? 'En progreso' : project.status}
+                    </Badge>
+                  </td>
+                  <td className="px-2 py-1.5 text-gray-600">
+                    {formatDate(project.startDate)}
+                  </td>
+                  <td className="px-2 py-1.5 text-gray-600">
+                    {formatDate(project.expectedEndDate)}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {project.trackingFrequency === "weekly" ? "Semanal" : 
+                     project.trackingFrequency === "biweekly" ? "Quincenal" :
+                     project.trackingFrequency === "monthly" ? "Mensual" : 
+                     project.trackingFrequency}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <div className="flex gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-5 w-5 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                        onClick={(e) => openAssignClientDialog(e, project.id)}
-                        title="Asignar cliente"
-                      >
-                        <UserPlus className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-                <td className="px-2 py-1.5">
-                  <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
-                    {project.status === 'active' ? 'Activo' : project.status}
-                  </Badge>
-                </td>
-                <td className="px-2 py-1.5 text-gray-600">
-                  {formatDate(project.startDate)}
-                </td>
-                <td className="px-2 py-1.5 text-gray-600">
-                  {formatDate(project.expectedEndDate)}
-                </td>
-                <td className="px-2 py-1.5">
-                  {project.trackingFrequency === "weekly" ? "Semanal" : 
-                   project.trackingFrequency === "biweekly" ? "Quincenal" :
-                   project.trackingFrequency === "monthly" ? "Mensual" : 
-                   project.trackingFrequency}
-                </td>
-                <td className="px-2 py-1.5">
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/project-analytics/${project.id}`);
-                      }}
-                      title="Ver análisis completo del proyecto"
-                    >
-                      <BarChart2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/active-projects/${project.id}/time-entries`);
-                      }}
-                      title="Gestión de horas"
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                    </Button>
-                    {/* Botón para Vista Resumen de Cliente - Solo para proyectos MODO */}
-                    {project.quotation?.clientId === 17 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-6 w-6 p-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          const clientId = project.quotation?.clientId;
-                          if (clientId) {
-                            setLocation(`/client-summary/${clientId}`);
-                          } else {
-                            toast({
-                              title: "Error",
-                              description: "No se pudo encontrar el ID del cliente",
-                              variant: "destructive",
-                            });
-                          }
+                          setLocation(`/project-analytics/${project.id}`);
                         }}
-                        title="Ver resumen del cliente MODO"
+                        title="Ver analíticas"
                       >
-                        <LineChartIcon className="h-3.5 w-3.5" />
+                        <LineChart className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    
-                    {/* Botón para Editar Indicadores de Robustez - Solo para proyectos MODO */}
-                    {project.quotation?.clientId === 17 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            // Obtener el ID del entregable para este proyecto
-                            const response = await fetch(`/api/modo/deliverables/project/${project.id}`);
-                            if (!response.ok) {
-                              throw new Error('No se pudo obtener el entregable');
-                            }
-                            const deliverable = await response.json();
-                            if (deliverable && deliverable.id) {
-                              window.location.href = `/edit-indicators/${deliverable.id}`;
-                            } else {
+                      
+                      {/* Botón para editar indicadores de robustez */}
+                      {project.status !== 'cancelled' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              // Verificar si existe el indicador de robustez para este proyecto
+                              const response = await fetch(`/api/deliverables/project/${project.id}`);
+                              if (response.ok) {
+                                const deliverable = await response.json();
+                                if (deliverable && deliverable.id) {
+                                  setLocation(`/edit-robustness/${deliverable.id}`);
+                                } else {
+                                  // No existe, crearlo
+                                  const createResponse = await fetch('/api/deliverables', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      projectId: project.id,
+                                      feedbackGeneral: '',
+                                      feedbackBrief: '',
+                                      feedbackAppliedMetrics: '',
+                                      feedbackDeliverables: '',
+                                      feedbackExecution: '',
+                                      feedbackRecommendations: '',
+                                      feedbackExtraValue: '',
+                                      feedbackScore: 0
+                                    }),
+                                  });
+                                  
+                                  if (createResponse.ok) {
+                                    const newDeliverable = await createResponse.json();
+                                    setLocation(`/edit-robustness/${newDeliverable.id}`);
+                                  } else {
+                                    toast({
+                                      title: "Error",
+                                      description: "No se pudo crear un registro de indicadores",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error al buscar el entregable:', error);
                               toast({
                                 title: "Error",
-                                description: "No se encontró el entregable para este proyecto",
+                                description: "No se pudo acceder a los indicadores de robustez",
                                 variant: "destructive",
                               });
                             }
-                          } catch (error) {
-                            console.error('Error al buscar el entregable:', error);
-                            toast({
-                              title: "Error",
-                              description: "No se pudo acceder a los indicadores de robustez",
-                              variant: "destructive",
-                            });
-                          }
+                          }}
+                          title="Editar Indicadores de Robustez"
+                        >
+                          <PenSquare className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProject(project.id);
                         }}
-                        title="Editar Indicadores de Robustez"
+                        title="Eliminar proyecto"
                       >
-                        <PenSquare className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteProject(project.id);
-                      }}
-                      title="Eliminar proyecto"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -447,82 +476,42 @@ export default function ActiveProjects() {
           <DialogHeader>
             <DialogTitle>Confirmar eliminación</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.
+              ¿Estás seguro que deseas eliminar este proyecto? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteProjectId(null)}>
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDelete}
-              disabled={deleteProjectMutation.isPending}
-            >
-              {deleteProjectMutation.isPending ? "Eliminando..." : "Eliminar"}
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteProjectId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para asignar cliente a una cotización */}
+      {/* Diálogo para asignar cliente */}
       <Dialog open={assignClientDialogOpen} onOpenChange={setAssignClientDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Asignar Cliente al Proyecto</DialogTitle>
+            <DialogTitle>Asignar cliente al proyecto</DialogTitle>
             <DialogDescription>
-              Selecciona un cliente para asignar a este proyecto sin cliente.
+              Selecciona un cliente para asociarlo con este proyecto.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="my-4">
-            <Select
-              value={selectedClientId}
-              onValueChange={setSelectedClientId}
-            >
+          <div className="py-4">
+            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un cliente" />
               </SelectTrigger>
               <SelectContent>
-                {clients.map((client) => (
+                {clients.map(client => (
                   <SelectItem key={client.id} value={client.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      {client.logoUrl ? (
-                        <div className="h-4 w-4 rounded overflow-hidden flex-shrink-0">
-                          <img 
-                            src={client.logoUrl} 
-                            alt={`${client.name} logo`} 
-                            className="h-full w-full object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-4 w-4 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                          <span className="text-[9px] font-medium text-primary">
-                            {client.name.substring(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                      {client.name}
-                    </div>
+                    {client.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignClientDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={assignClient}
-              disabled={assignClientMutation.isPending || !selectedClientId}
-            >
-              {assignClientMutation.isPending ? "Asignando..." : "Asignar Cliente"}
-            </Button>
+            <Button variant="outline" onClick={() => setAssignClientDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={assignClient}>Asignar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
