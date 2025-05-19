@@ -118,12 +118,19 @@ const ProjectAnalyticsView: React.FC = () => {
   const searchParams = useSearch();
   const params = new URLSearchParams(searchParams);
   const shouldEdit = params.get('edit') === 'true';
-
+  
   // Consultas de datos
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
     queryKey: [`/api/active-projects/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
+  
+  // Abrir el editor si se solicita a través de la URL
+  useEffect(() => {
+    if (shouldEdit && project?.isAlwaysOnMacro) {
+      setShowAlwaysOnEditor(true);
+    }
+  }, [shouldEdit, project]);
 
   const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
     queryKey: [`/api/time-entries/project/${parsedProjectId}`],
@@ -559,6 +566,28 @@ const ProjectAnalyticsView: React.FC = () => {
         title={showHelp.title}
         content={showHelp.content}
       />
+
+      {/* Dialog de edición de proyecto Always-On */}
+      {project?.isAlwaysOnMacro && (
+        <AlwaysOnEditorDialog
+          isOpen={showAlwaysOnEditor}
+          onClose={() => setShowAlwaysOnEditor(false)}
+          project={project}
+        />
+      )}
+      
+      {/* Botón flotante para editar proyecto Always-On */}
+      {project?.isAlwaysOnMacro && (
+        <div className="fixed bottom-6 right-6">
+          <Button 
+            onClick={() => setShowAlwaysOnEditor(true)}
+            className="rounded-full h-12 w-12 bg-blue-600 hover:bg-blue-700 shadow-md"
+            title="Editar configuración del proyecto Always-On"
+          >
+            <PencilIcon className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
