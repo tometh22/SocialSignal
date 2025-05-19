@@ -444,101 +444,96 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
         </Card>
       </div>
       
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Gráficos - Versión Compacta */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {/* Distribución de Presupuesto */}
-        <Card>
-          <CardHeader className="pb-0">
-            <CardTitle className="text-base">Distribución del Presupuesto</CardTitle>
-            <CardDescription>Asignación actual entre subproyectos</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="h-[300px]">
-              {budgetDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={budgetDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      fill="#8884d8"
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: $${value.toLocaleString()}`}
-                    >
-                      {budgetDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No hay datos de distribución disponibles
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Tendencia Mensual */}
-        <Card>
-          <CardHeader className="pb-0">
-            <CardTitle className="text-base">Tendencia de Gasto Mensual</CardTitle>
-            <CardDescription>Evolución del consumo del presupuesto</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="h-[300px]">
-              {monthlyTrend.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={monthlyTrend}
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        <div className="border rounded-md p-2 bg-white">
+          <div className="flex justify-between items-center mb-1">
+            <h4 className="text-xs font-semibold">Distribución del Presupuesto</h4>
+            <span className="text-[10px] text-muted-foreground">Asignación entre subproyectos</span>
+          </div>
+          <div className="h-[220px]">
+            {budgetDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                  <Pie
+                    data={budgetDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={35}
+                    outerRadius={65}
+                    fill="#8884d8"
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ value }) => `$${value.toLocaleString()}`}
                   >
-                    <defs>
-                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']} />
-                    <Area
-                      type="monotone"
-                      dataKey="total"
-                      stroke="#8884d8"
-                      fillOpacity={1}
-                      fill="url(#colorTotal)"
-                    />
-                    {/* Línea para el presupuesto mensual */}
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <line
-                      x1="0%"
-                      y1={(1 - (monthlyBudget / 4500)) * 100 + "%"}
-                      x2="100%"
-                      y2={(1 - (monthlyBudget / 4500)) * 100 + "%"}
-                      stroke="red"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No hay datos de tendencia disponibles
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                    {budgetDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']}
+                  />
+                  <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-xs">
+                No hay datos disponibles
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Tendencia Mensual - Versión Compacta */}
+        <div className="border rounded-md p-2 bg-white">
+          <div className="flex justify-between items-center mb-1">
+            <h4 className="text-xs font-semibold">Tendencia de Gasto Mensual</h4>
+            <span className="text-[10px] text-muted-foreground">Evolución del presupuesto</span>
+          </div>
+          <div className="h-[220px]">
+            {monthlyTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={monthlyTrend}
+                  margin={{ top: 5, right: 10, left: -15, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']} />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#8884d8"
+                    fillOpacity={1}
+                    fill="url(#colorTotal)"
+                  />
+                  {/* Línea para el presupuesto mensual */}
+                  <line
+                    x1="0%"
+                    y1={(1 - (monthlyBudget / 4500)) * 100 + "%"}
+                    x2="100%"
+                    y2={(1 - (monthlyBudget / 4500)) * 100 + "%"}
+                    stroke="red"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-xs">
+                No hay datos disponibles
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       
       {/* Lista de Subproyectos */}
