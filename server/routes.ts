@@ -844,15 +844,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA PROYECTOS ACTIVOS ----------
   
   // Obtener todos los proyectos activos
-  app.get("/api/active-projects", async (_, res) => {
+  app.get("/api/active-projects", async (req, res) => {
     try {
-      const projects = await storage.getActiveProjects();
+      // Obtener parámetro de consulta para filtrar subproyectos
+      const showSubprojects = req.query.showSubprojects === 'true';
+      
+      // Obtener todos los proyectos
+      const allProjects = await storage.getActiveProjects();
+      
+      // Filtrar los proyectos según el parámetro
+      let projects;
+      
+      if (!showSubprojects) {
+        // Modo normal - mostrar solo proyectos padres y proyectos sin padre
+        projects = allProjects.filter(project => !project.parentProjectId);
+      } else {
+        // Modo completo - mostrar todos los proyectos
+        projects = allProjects;
+      }
       
       // Depuración para ver qué está pasando con las cotizaciones
-      console.log("Proyectos activos con cotizaciones:");
+      console.log(`Proyectos activos filtrados (showSubprojects=${showSubprojects}): ${projects.length} de ${allProjects.length}`);
       projects.forEach(project => {
         console.log(`Proyecto ID: ${project.id}, Cotización ID: ${project.quotationId}`);
-        console.log(`Cotización completa:`, project.quotation ? "Disponible" : "No disponible");
         if (project.quotation) {
           console.log(`Nombre del proyecto: ${project.quotation.projectName}`);
         }

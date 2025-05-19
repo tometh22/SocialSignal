@@ -59,7 +59,7 @@ interface ActiveProject {
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
   const { data: projects = [], refetch: refetchProjects, isFetching: isLoadingProjects } = useQuery<ActiveProject[]>({ 
-    queryKey: ['/api/active-projects'],
+    queryKey: ['/api/active-projects', { showSubprojects: false }],
     refetchOnWindowFocus: true,
   });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
@@ -70,13 +70,56 @@ export default function ActiveProjects() {
   const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({16: true}); // ID 16 es el proyecto macro MODO, inicialmente expandido
   const { toast } = useToast();
   
+  // Consulta para obtener subproyectos de un proyecto específico
+  const { data: subprojects = [], refetch: refetchSubprojects } = useQuery<ActiveProject[]>({
+    queryKey: ['/api/active-projects/parent', expandedProjects],
+    queryFn: async () => {
+      // Obtener subproyectos solo para los proyectos expandidos
+      const expandedIds = Object.keys(expandedProjects)
+        .filter(id => expandedProjects[parseInt(id)])
+        .map(id => parseInt(id));
+      
+      if (expandedIds.length === 0) return [];
+      
+      // Realizar consultas para todos los proyectos expandidos
+      const allSubprojects: ActiveProject[] = [];
+      
+      for (const id of expandedIds) {
+        try {
+          const response = await fetch(`/api/active-projects/parent/${id}`);
+          if (response.ok) {
+            const data = await response.json();
+            allSubprojects.push(...data);
+          }
+        } catch (error) {
+          console.error(`Error al obtener subproyectos para el proyecto ${id}:`, error);
+        }
+      }
+      
+      return allSubprojects;
+    },
+    enabled: Object.values(expandedProjects).some(expanded => expanded),
+  });
+  
   // Función para desplegar o colapsar un proyecto
   const toggleProjectExpansion = (e: React.MouseEvent, projectId: number) => {
     e.stopPropagation(); // Evita que se active el onClick del tr
-    setExpandedProjects(prev => ({
-      ...prev,
-      [projectId]: !prev[projectId]
-    }));
+    setExpandedProjects(prev => {
+      const newState = {
+        ...prev,
+        [projectId]: !prev[projectId]
+      };
+      
+      // Refrescar subproyectos si es necesario
+      if (newState[projectId]) {
+        // Retrasamos la llamada para dar tiempo a que se actualice el estado
+        setTimeout(() => {
+          refetchSubprojects();
+        }, 100);
+      }
+      
+      return newState;
+    });
   };
 
   // Mutation para asignar cliente a un proyecto
@@ -167,13 +210,36 @@ export default function ActiveProjects() {
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
-  // Filtramos los proyectos para mostrar solo los principales y los subproyectos expandidos
-  const visibleProjects = projects.filter(project => {
-    // Mostrar todos los proyectos principales
-    if (!project.parentProjectId) return true;
-    // Mostrar subproyectos solo si su padre está expandido
-    return expandedProjects[project.parentProjectId];
-  });
+  // Combinamos los proyectos principales con los subproyectos cargados por separado
+  const visibleProjects = useMemo(() => {
+    // Filtrar los proyectos principales (sin parentProjectId)
+    const mainProjects = projects.filter(project => !project.parentProjectId);
+    
+    // Crear una lista con todos los proyectos visibles
+    const visible = [...mainProjects];
+    
+    // Agregar subproyectos solo para proyectos expandidos
+    if (subprojects.length > 0) {
+      // Ordenar subproyectos para que aparezcan después de sus padres
+      const sortedSubprojects = [...subprojects].sort((a, b) => {
+        // Primero por ID de padre
+        if (a.parentProjectId !== b.parentProjectId) {
+          return (a.parentProjectId || 0) - (b.parentProjectId || 0);
+        }
+        // Luego por nombre de proyecto
+        return (a.quotation?.projectName || '').localeCompare(b.quotation?.projectName || '');
+      });
+      
+      // Agregar solo subproyectos de proyectos expandidos
+      sortedSubprojects.forEach(subproject => {
+        if (subproject.parentProjectId && expandedProjects[subproject.parentProjectId]) {
+          visible.push(subproject);
+        }
+      });
+    }
+    
+    return visible;
+  }, [projects, subprojects, expandedProjects]);
 
   return (
     <div className="p-3 space-y-3">
