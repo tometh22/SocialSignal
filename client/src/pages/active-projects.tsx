@@ -60,6 +60,12 @@ export default function ActiveProjects() {
   const [, setLocation] = useLocation();
   const { data: projects = [], refetch: refetchProjects, isFetching: isLoadingProjects } = useQuery<ActiveProject[]>({ 
     queryKey: ['/api/active-projects', { showSubprojects: false }],
+    queryFn: async () => {
+      // Consulta que solo devuelve proyectos principales (no subproyectos)
+      const response = await fetch(`/api/active-projects?showSubprojects=false`);
+      if (!response.ok) throw new Error('Error al cargar proyectos activos');
+      return response.json();
+    },
     refetchOnWindowFocus: true,
   });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
@@ -71,7 +77,7 @@ export default function ActiveProjects() {
   const { toast } = useToast();
   
   // Consulta para obtener subproyectos de un proyecto específico
-  const { data: subprojects = [], refetch: refetchSubprojects } = useQuery<ActiveProject[]>({
+  const { data: subprojects = [], refetch: refetchSubprojects, isLoading: isLoadingSubprojects } = useQuery<ActiveProject[]>({
     queryKey: ['/api/active-projects/parent', expandedProjects],
     queryFn: async () => {
       // Obtener subproyectos solo para los proyectos expandidos
@@ -86,9 +92,11 @@ export default function ActiveProjects() {
       
       for (const id of expandedIds) {
         try {
+          console.log(`Obteniendo subproyectos para proyecto ID ${id}...`);
           const response = await fetch(`/api/active-projects/parent/${id}`);
           if (response.ok) {
             const data = await response.json();
+            console.log(`Se encontraron ${data.length} subproyectos para proyecto ID ${id}`);
             allSubprojects.push(...data);
           }
         } catch (error) {

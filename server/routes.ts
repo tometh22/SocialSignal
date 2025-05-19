@@ -855,11 +855,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filtrar los proyectos según el parámetro
       let projects;
       
+      console.log("Parámetro showSubprojects:", showSubprojects, typeof showSubprojects);
+      
       if (!showSubprojects) {
         // Modo normal - mostrar solo proyectos padres y proyectos sin padre
-        projects = allProjects.filter(project => !project.parentProjectId);
+        console.log("Filtrando para mostrar solo proyectos principales (sin parentProjectId)");
+        projects = allProjects.filter(project => {
+          const result = project.parentProjectId === null;
+          console.log(`Proyecto ID ${project.id}: parentProjectId=${project.parentProjectId}, incluido=${result}`);
+          return result;
+        });
       } else {
         // Modo completo - mostrar todos los proyectos
+        console.log("Mostrando todos los proyectos sin filtrar");
         projects = allProjects;
       }
       
