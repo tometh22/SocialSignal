@@ -43,7 +43,8 @@ const OptimizedQuoteContent = () => {
     isSavingInProgress,
     isEditing,
     isRecotizacion,
-    quotationId
+    quotationId,
+    addTeamMember // Agregamos la función para añadir miembros al equipo
   } = useOptimizedQuote();
   
   const [, setLocation] = useLocation();
@@ -241,14 +242,31 @@ const OptimizedQuoteContent = () => {
             <CardContent className="p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
-              {currentStep === 3 && <DirectTeamSelector 
-                onAddMember={(member) => {
-                  if (member && addTeamMember) {
-                    addTeamMember(member);
-                  }
-                }} 
-                existingMembers={quotationData.teamMembers || []}
-              />}
+              {currentStep === 3 && (
+                <>
+                  {/* Opción: usar el selector directo que soluciona el problema */}
+                  <div className="p-6">
+                    <h2 className="text-xl font-semibold mb-4">Configuración del Equipo</h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                      Configura el equipo del proyecto seleccionando roles y personal específico.
+                    </p>
+                    {addTeamMember && (
+                      <DirectTeamSelector 
+                        onAddMember={(member) => {
+                          addTeamMember({
+                            roleId: member.roleId,
+                            personnelId: member.personnelId,
+                            hours: member.hours,
+                            rate: member.rate,
+                            cost: member.cost
+                          });
+                        }} 
+                        existingMembers={quotationData.teamMembers || []}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
               {currentStep === 4 && <OptimizedFinancialReview />}
             </CardContent>
           </Card>
