@@ -337,6 +337,31 @@ export default function ActiveProjects() {
                     >
                       <Clock className="h-3.5 w-3.5" />
                     </Button>
+                    {/* Botón para Vista Resumen de Cliente - Solo para proyectos MODO */}
+                    {project.quotation?.clientId === 17 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const clientId = project.quotation?.clientId;
+                          if (clientId) {
+                            setLocation(`/client-summary/${clientId}`);
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "No se pudo encontrar el ID del cliente",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        title="Ver resumen del cliente MODO"
+                      >
+                        <LineChartIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    
                     {/* Botón para Editar Indicadores de Robustez - Solo para proyectos MODO */}
                     {project.quotation?.clientId === 17 && (
                       <Button

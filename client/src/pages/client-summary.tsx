@@ -65,13 +65,18 @@ const ClientSummaryPage = () => {
     );
   }
 
+  // Extraer los datos del cliente con seguridad en TypeScript
+  const clientName = client && typeof client === 'object' && 'name' in client 
+    ? client.name as string 
+    : "Cliente";
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Resumen de Cliente</h1>
           <p className="text-muted-foreground">
-            Análisis global de todos los proyectos de {client.name}
+            Análisis global de todos los proyectos de {clientName}
           </p>
         </div>
         <Button variant="outline" onClick={() => window.history.back()}>
@@ -80,7 +85,7 @@ const ClientSummaryPage = () => {
         </Button>
       </div>
 
-      <ClientSummaryView clientId={clientId} clientName={client.name} />
+      <ClientSummaryView clientId={clientId} clientName={clientName} />
     </div>
   );
 };
