@@ -115,6 +115,11 @@ function AppRoutes() {
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
+                  <ProtectedRoute path="/edit-always-on/:projectId" component={() => (
+                    // Importamos dinámicamente para evitar problemas de circular imports
+                    // y mejorar performance de carga
+                    React.lazy(() => import('@/pages/edit-always-on-project'))
+                  )} />
                   <Route component={NotFound} />
                 </Switch>
               </div>
