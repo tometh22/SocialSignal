@@ -283,6 +283,38 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
                     <CardTitle className="text-lg">Métricas Clave</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Presupuesto consolidado para "always on" */}
+                    {clientName === "MODO" && (
+                      <div className="mb-4 pb-4 border-b border-gray-100">
+                        <h4 className="text-sm font-semibold mb-2">Presupuesto Mensual Consolidado</h4>
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm font-medium">Total Asignado</span>
+                            <span className="font-bold">$4,200</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">Utilización Global</span>
+                            <span className="font-semibold text-blue-600">
+                              {projects && projects.length > 0
+                                ? formatPercent(
+                                    (projects.reduce(
+                                      (sum, p) => sum + (p.total_hours_real || 0),
+                                      0
+                                    ) /
+                                      (4200 / 85)) * 100
+                                  ) // Cálculo aproximado: 85 USD por hora
+                                : "0%"}
+                            </span>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">
+                              Los proyectos asociados a MODO comparten un presupuesto global de $4,200 mensuales
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Entregables Totales</span>

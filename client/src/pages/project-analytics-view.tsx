@@ -4,6 +4,7 @@ import { useLocation, useParams } from "wouter";
 import ProjectAnalytics from "@/components/dashboard/project-analytics";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
+import { AlwaysOnBudgetAlert } from "@/components/project/always-on-budget-alert";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { ArrowLeft, Calendar, Home, LineChart, User } from "lucide-react";
@@ -468,6 +469,15 @@ const ProjectAnalyticsView: React.FC = () => {
       {/* Contenido principal */}
       <div className="flex-1 p-6 pt-0">
         <div className="container mx-auto max-w-7xl">
+          {/* Alerta para proyectos "always on" como MODO */}
+          {!isLoading && project?.quotation?.client?.name === "MODO" && (
+            <AlwaysOnBudgetAlert 
+              clientId={project.quotation.clientId} 
+              clientName={project.quotation.client.name}
+              globalBudget={4200} 
+            />
+          )}
+          
           <ProjectAnalytics
             project={project}
             costSummary={costSummary}
