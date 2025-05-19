@@ -256,10 +256,27 @@ export default function ActiveProjects() {
             ) : projects.map((project) => (
               <tr 
                 key={project.id} 
-                className="text-xs hover:bg-gray-50 cursor-pointer"
+                className={`text-xs hover:bg-gray-50 cursor-pointer ${project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''} ${project.parentProjectId ? 'pl-4' : ''}`}
                 onClick={() => setLocation(`/project-analytics/${project.id}`)}
               >
-                <td className="px-2 py-1.5 font-medium">{project.quotation?.projectName || '-'}</td>
+                <td className="px-2 py-1.5 font-medium">
+                  <div className="flex items-center">
+                    {project.isAlwaysOnMacro && (
+                      <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
+                        Always On
+                      </Badge>
+                    )}
+                    {project.parentProjectId && (
+                      <span className="text-gray-400 mr-1">└─</span>
+                    )}
+                    {project.quotation?.projectName || '-'}
+                    {project.isAlwaysOnMacro && (
+                      <span className="ml-2 text-blue-600 text-[10px]">
+                        ${project.macroMonthlyBudget?.toLocaleString()} / mes
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-2 py-1.5">
                   <div className="flex items-center gap-2">
                     {project.quotation?.client?.logoUrl ? (

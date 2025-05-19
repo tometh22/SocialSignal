@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import ProjectAnalytics from "@/components/dashboard/project-analytics";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
 import { AlwaysOnBudgetAlert } from "@/components/project/always-on-budget-alert";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { ArrowLeft, Calendar, Home, LineChart, User } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, Calendar, ExternalLink, Home, LineChart, User } from "lucide-react";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -35,6 +36,9 @@ interface ActiveProject {
   actualEndDate: string | null;
   trackingFrequency: string;
   notes: string | null;
+  isAlwaysOnMacro?: boolean;
+  macroMonthlyBudget?: number;
+  parentProjectId?: number;
   quotation: {
     id: number;
     projectName: string;
@@ -469,13 +473,39 @@ const ProjectAnalyticsView: React.FC = () => {
       {/* Contenido principal */}
       <div className="flex-1 p-6 pt-0">
         <div className="container mx-auto max-w-7xl">
-          {/* Alerta para proyectos "always on" como MODO */}
-          {!isLoading && project?.quotation?.client?.name === "MODO" && (
-            <AlwaysOnBudgetAlert 
-              clientId={project.quotation.clientId} 
-              clientName={project.quotation.client.name}
-              globalBudget={4200} 
-            />
+          {/* Alerta para proyectos "always on" */}
+          {!isLoading && (
+            <>
+              {/* Si es un proyecto macro "Always On" */}
+              {project?.isAlwaysOnMacro && (
+                <Alert className="bg-blue-50 border-blue-200 mb-4">
+                  <AlertTitle className="text-blue-700 flex items-center text-sm font-medium">
+                    Proyecto Macro "Always On" - ${project.macroMonthlyBudget?.toLocaleString()} / mes
+                  </AlertTitle>
+                  <AlertDescription className="text-blue-600 text-xs">
+                    <p className="mb-1">
+                      Este es un proyecto macro con presupuesto mensual consolidado compartido entre varios subproyectos.
+                    </p>
+                    <div className="mt-2">
+                      <Link href={`/client-summary/${project.quotation?.clientId}`} className="text-blue-700 inline-flex items-center text-xs hover:underline">
+                        Ver resumen completo del cliente
+                        <ExternalLink className="ml-1 h-3 w-3" />
+                      </Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {/* Si es un subproyecto */}
+              {project?.parentProjectId && (
+                <AlwaysOnBudgetAlert 
+                  clientId={project.quotation?.clientId} 
+                  clientName={project.quotation?.client?.name || 'Cliente'}
+                  globalBudget={4200} 
+                  parentProjectId={project.parentProjectId}
+                />
+              )}
+            </>
           )}
           
           <ProjectAnalytics

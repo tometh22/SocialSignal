@@ -11,9 +11,10 @@ interface AlwaysOnBudgetAlertProps {
   clientId: number;
   clientName: string;
   globalBudget: number;
+  parentProjectId?: number;
 }
 
-export function AlwaysOnBudgetAlert({ clientId, clientName, globalBudget }: AlwaysOnBudgetAlertProps) {
+export function AlwaysOnBudgetAlert({ clientId, clientName, globalBudget, parentProjectId }: AlwaysOnBudgetAlertProps) {
   return (
     <Alert className="bg-blue-50 border-blue-200 mb-4">
       <AlertTitle className="text-blue-700 flex items-center text-sm font-medium">
