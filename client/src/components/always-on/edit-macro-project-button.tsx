@@ -24,8 +24,8 @@ interface EditMacroProjectButtonProps {
 export default function EditMacroProjectButton({ project }: EditMacroProjectButtonProps) {
   // Estados
   const [isOpen, setIsOpen] = useState(false);
-  const [budget, setBudget] = useState(project?.macroMonthlyBudget?.toString() || "4200");
-  const [status, setStatus] = useState(project?.status || "active");
+  const [budget, setBudget] = useState("4200");
+  const [status, setStatus] = useState("active");
   const { toast } = useToast();
   
   // Actualizar estados cuando cambia el proyecto
@@ -38,13 +38,16 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   
   // Mutation para actualizar el proyecto
   const updateProjectMutation = useMutation({
-    mutationFn: (data: any) => 
-      apiRequest(`/api/active-projects/${project.id}`, "PATCH", data),
+    mutationFn: (data: any) => {
+      console.log("Actualizando proyecto:", data);
+      return apiRequest(`/api/active-projects/${project.id}`, "PATCH", data);
+    },
     onSuccess: () => {
       toast({
         title: "Proyecto actualizado",
         description: "Los cambios al proyecto Always-On han sido guardados."
       });
+      // Invalidar queries para actualizar la UI
       queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${project.id}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       setIsOpen(false);
@@ -61,22 +64,44 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
 
   // Manejar envío del formulario
   const handleSave = () => {
-    if (!project?.id) return;
+    if (!project?.id) {
+      console.error("No se puede actualizar: ID de proyecto no disponible");
+      return;
+    }
     
-    updateProjectMutation.mutate({
-      macroMonthlyBudget: parseFloat(budget),
-      status
-    });
+    try {
+      const budgetValue = parseFloat(budget);
+      if (isNaN(budgetValue)) {
+        toast({
+          title: "Error en presupuesto",
+          description: "El presupuesto debe ser un número válido",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      updateProjectMutation.mutate({
+        macroMonthlyBudget: budgetValue,
+        status
+      });
+    } catch (error) {
+      console.error("Error al procesar datos:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al procesar los datos del formulario",
+        variant: "destructive"
+      });
+    }
   };
 
   // No renderizar nada si no es un proyecto macro Always-On
   if (!project?.isAlwaysOnMacro) return null;
-
+  
   return (
     <>
       <Button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 rounded-full h-12 w-12 bg-blue-600 hover:bg-blue-700 shadow-md flex items-center justify-center"
+        className="fixed bottom-6 right-6 rounded-full h-12 w-12 bg-blue-600 hover:bg-blue-700 shadow-md flex items-center justify-center z-50"
         title="Editar proyecto Always-On"
       >
         <PencilIcon className="h-5 w-5" />
@@ -99,7 +124,7 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
               <Label htmlFor="name" className="mb-1 block">Nombre del Proyecto</Label>
               <Input 
                 id="name" 
-                value={project?.quotation?.projectName || ""} 
+                value={project?.quotation?.projectName || "Proyecto Always-On"} 
                 disabled 
                 className="bg-gray-50"
               />
