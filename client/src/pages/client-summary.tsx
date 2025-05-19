@@ -25,16 +25,9 @@ const ClientSummaryPage = () => {
   const { toast } = useToast();
   
   // Obtener información del cliente
-  const { data: client, isLoading: clientLoading } = useQuery<any>({
+  const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: [`/api/clients/${clientId}`],
     enabled: !!clientId,
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la información del cliente",
-        variant: "destructive",
-      });
-    },
   });
 
   if (!clientId) {

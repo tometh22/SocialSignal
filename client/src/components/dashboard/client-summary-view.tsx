@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -96,6 +96,21 @@ interface ProjectMetrics {
   hoursCompliance: number;
 }
 
+// Definir tipos para las respuestas de la API
+type Project = {
+  id: number;
+  name: string;
+  status: string;
+  budget?: number;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  deliverable_count?: number;
+  total_hours_available?: number;
+  total_hours_real?: number;
+  hours_compliance?: number;
+};
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#83a6ed'];
 
 // Función para formatear números como porcentaje
@@ -108,52 +123,28 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   const { toast } = useToast();
 
   // Obtener el resumen MODO del cliente
-  const { data: clientSummary, isLoading: summaryLoading } = useQuery<ClientSummary>({
+  const { data: clientSummaryData, isLoading: summaryLoading } = useQuery({
     queryKey: [`/api/clients/${clientId}/modo-summary`],
-    onSuccess: (data) => {
-      console.log("Resumen MODO cargado correctamente:", data);
-    },
-    onError: (error) => {
-      console.error("Error al cargar resumen MODO:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar el resumen del cliente",
-        variant: "destructive",
-      });
-    },
   });
+
+  // Necesitamos confirmar el tipo manualmente para TypeScript
+  const clientSummary: ClientSummary | undefined = clientSummaryData as ClientSummary;
 
   // Obtener todos los entregables del cliente
-  const { data: deliverables, isLoading: deliverablesLoading } = useQuery<DeliverableData[]>({
+  const { data: deliverablesData, isLoading: deliverablesLoading } = useQuery({
     queryKey: [`/api/clients/${clientId}/deliverables`],
-    onSuccess: (data) => {
-      console.log("Entregables del cliente cargados correctamente, cantidad:", data?.length);
-    },
-    onError: (error) => {
-      console.error("Error al cargar entregables:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los entregables del cliente",
-        variant: "destructive",
-      });
-    },
   });
 
+  // Confirmar el tipo para TypeScript
+  const deliverables: DeliverableData[] = deliverablesData as DeliverableData[] || [];
+
   // Obtener todos los proyectos del cliente
-  const { data: projects, isLoading: projectsLoading } = useQuery<any[]>({
+  const { data: projectsData, isLoading: projectsLoading } = useQuery({
     queryKey: [`/api/clients/${clientId}/projects`],
-    onSuccess: (data) => {
-      console.log("Proyectos del cliente cargados correctamente, cantidad:", data?.length);
-    },
-    onError: (error) => {
-      console.error("Error al cargar proyectos:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los proyectos del cliente",
-        variant: "destructive",
-      });
-    },
   });
+
+  // Confirmar el tipo para TypeScript
+  const projects: Project[] = projectsData as Project[] || [];
 
   // Preparar los datos para las gráficas
   const qualityScoresData = clientSummary ? [
