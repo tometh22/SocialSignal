@@ -1656,26 +1656,186 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Financial comparison operations
-  async getProjectCostSummary(projectId: number): Promise<{
-    estimatedCost: number;
-    actualCost: number;
-    variance: number;
-    percentageUsed: number;
-  }> {
+  async getProjectCostSummary(
+    projectId: number,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      period?: 'month' | 'quarter' | 'custom';
+      monthYear?: string;
+      quarter?: string;
+    }
+  ): Promise<any> {
     const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
     if (!project) throw new Error(`Project with ID ${projectId} not found`);
     
     const [quotation] = await db.select().from(quotations).where(eq(quotations.id, project.quotationId));
     if (!quotation) throw new Error(`Quotation with ID ${project.quotationId} not found`);
     
-    // Obtener todas las entradas de tiempo para el proyecto
-    const entries = await db.select({
+    // Verificar si es un proyecto Always-On y tiene subproyectos
+    let periodLabel: string | undefined = undefined;
+    const isAlwaysOnMacro = project.isAlwaysOnMacro;
+    
+    // Establecer el período de fechas según los filtros
+    let effectiveStartDate: Date | undefined = undefined;
+    let effectiveEndDate: Date | undefined = undefined;
+    
+    if (filters) {
+      if (filters.monthYear) {
+        // Si se proporciona un mes específico (YYYY-MM)
+        const [yearStr, monthStr] = filters.monthYear.split('-');
+        const year = parseInt(yearStr);
+        const month = parseInt(monthStr) - 1; // Meses en JS son 0-indexados
+        
+        effectiveStartDate = new Date(year, month, 1);
+        effectiveEndDate = new Date(year, month + 1, 0); // Último día del mes
+        periodLabel = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(effectiveStartDate);
+      } else if (filters.quarter) {
+        // Si se proporciona un trimestre específico (YYYY-Q1, YYYY-Q2, etc.)
+        const [yearStr, quarterStr] = filters.quarter.split('-');
+        const year = parseInt(yearStr);
+        const quarterNum = parseInt(quarterStr.substring(1));
+        
+        // Calcular meses para el trimestre (Q1: 0-2, Q2: 3-5, Q3: 6-8, Q4: 9-11)
+        const startMonth = (quarterNum - 1) * 3;
+        
+        effectiveStartDate = new Date(year, startMonth, 1);
+        effectiveEndDate = new Date(year, startMonth + 3, 0); // Último día del último mes del trimestre
+        periodLabel = `Q${quarterNum} ${year}`;
+      } else if (filters.period === 'month') {
+        // Filtrar por el mes actual
+        const now = new Date();
+        effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Último día del mes
+        periodLabel = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(effectiveStartDate);
+      } else if (filters.period === 'quarter') {
+        // Filtrar por el trimestre actual
+        const now = new Date();
+        const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+        const startMonth = (currentQuarter - 1) * 3;
+        
+        effectiveStartDate = new Date(now.getFullYear(), startMonth, 1);
+        effectiveEndDate = new Date(now.getFullYear(), startMonth + 3, 0); // Último día del último mes del trimestre
+        periodLabel = `Q${currentQuarter} ${now.getFullYear()}`;
+      } else if (filters.startDate && filters.endDate) {
+        // Filtrar por rango de fechas personalizado
+        effectiveStartDate = filters.startDate;
+        effectiveEndDate = filters.endDate;
+        
+        // Formatear etiqueta para el período personalizado
+        const formatDate = (date: Date) => {
+          return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+        };
+        periodLabel = `${formatDate(effectiveStartDate)} al ${formatDate(effectiveEndDate)}`;
+      }
+    }
+    
+    // Obtener subproyectos si es un proyecto Always-On
+    let subprojectsData: Array<{
+      id: number;
+      name: string;
+      startDate: Date;
+      endDate: Date;
+      costs: {
+        estimatedCost: number;
+        actualCost: number;
+        percentageUsed: number;
+      }
+    }> = [];
+    
+    if (isAlwaysOnMacro) {
+      // Obtener todos los subproyectos
+      const subprojects = await db
+        .select()
+        .from(activeProjects)
+        .where(eq(activeProjects.parentProjectId, projectId));
+        
+      // Para cada subproyecto, obtener sus datos de costos
+      for (const subproject of subprojects) {
+        const subQuotation = await db
+          .select()
+          .from(quotations)
+          .where(eq(quotations.id, subproject.quotationId))
+          .then(rows => rows[0]);
+          
+        if (!subQuotation) continue;
+        
+        // Verificar si el subproyecto debe incluirse según el filtro de fecha
+        const subStartDate = new Date(subproject.startDate);
+        const subEndDate = new Date(subproject.expectedEndDate);
+        
+        let includeSubproject = true;
+        
+        // Si hay filtros de fecha, verificar si el subproyecto está dentro del rango
+        if (effectiveStartDate && effectiveEndDate) {
+          // Un subproyecto se incluye si su periodo se superpone con el periodo del filtro
+          includeSubproject = 
+            (subStartDate <= effectiveEndDate && subEndDate >= effectiveStartDate);
+        }
+        
+        if (includeSubproject) {
+          // Obtener las entradas de tiempo para este subproyecto
+          const subEntries = await db.select({
+            timeEntry: timeEntries,
+            personnel: personnel
+          })
+          .from(timeEntries)
+          .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+          .where(eq(timeEntries.projectId, subproject.id));
+          
+          // Calcular costos del subproyecto
+          let subActualCost = 0;
+          for (const entry of subEntries) {
+            if (entry.timeEntry.billable) {
+              // Si hay filtro de fechas y la entrada tiene fecha, verificar si está dentro del rango
+              if (effectiveStartDate && effectiveEndDate && entry.timeEntry.date) {
+                const entryDate = new Date(entry.timeEntry.date);
+                if (entryDate < effectiveStartDate || entryDate > effectiveEndDate) {
+                  continue; // Omitir esta entrada si está fuera del rango de fechas
+                }
+              }
+              subActualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
+            }
+          }
+          
+          const subEstimatedCost = subQuotation.totalAmount;
+          const subPercentageUsed = subEstimatedCost > 0 ? (subActualCost / subEstimatedCost) * 100 : 0;
+          
+          subprojectsData.push({
+            id: subproject.id,
+            name: subQuotation.projectName,
+            startDate: subStartDate,
+            endDate: subEndDate,
+            costs: {
+              estimatedCost: subEstimatedCost,
+              actualCost: subActualCost,
+              percentageUsed: subPercentageUsed
+            }
+          });
+        }
+      }
+    }
+    
+    // Construir la consulta para las entradas de tiempo del proyecto principal
+    let query = db.select({
       timeEntry: timeEntries,
       personnel: personnel
     })
     .from(timeEntries)
     .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
     .where(eq(timeEntries.projectId, projectId));
+    
+    // Aplicar filtro de fechas si está presente
+    if (effectiveStartDate && effectiveEndDate) {
+      query = query.where(
+        and(
+          sql`${timeEntries.date} >= ${effectiveStartDate}`,
+          sql`${timeEntries.date} <= ${effectiveEndDate}`
+        )
+      );
+    }
+    
+    const entries = await query;
     
     // Calcular el costo real basado en las horas registradas
     let actualCost = 0;
@@ -1685,16 +1845,42 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const estimatedCost = quotation.totalAmount;
+    // Si es un proyecto Always-On con presupuesto mensual, usar ese valor como estimado
+    let estimatedCost = quotation.totalAmount;
+    if (isAlwaysOnMacro && project.macroMonthlyBudget && filters && 
+        (filters.monthYear || filters.period === 'month')) {
+      // Para filtro por mes, usar el presupuesto mensual en lugar del total
+      estimatedCost = project.macroMonthlyBudget;
+    }
+    
+    // Si estamos filtrando por trimestre y es Always-On, multiplicar el presupuesto mensual por 3
+    if (isAlwaysOnMacro && project.macroMonthlyBudget && filters && 
+        (filters.quarter || filters.period === 'quarter')) {
+      estimatedCost = project.macroMonthlyBudget * 3;
+    }
+    
     const variance = estimatedCost - actualCost;
     const percentageUsed = estimatedCost > 0 ? (actualCost / estimatedCost) * 100 : 0;
     
-    return {
+    // Construir el resultado
+    const result: any = {
       estimatedCost,
       actualCost,
       variance,
       percentageUsed
     };
+    
+    // Agregar la etiqueta del período si existe
+    if (periodLabel) {
+      result.periodLabel = periodLabel;
+    }
+    
+    // Agregar subproyectos si existen y es un proyecto Always-On
+    if (isAlwaysOnMacro && subprojectsData.length > 0) {
+      result.subprojects = subprojectsData;
+    }
+    
+    return result;
   }
   
   async getClientCostSummary(clientId: number): Promise<{

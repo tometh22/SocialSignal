@@ -1493,6 +1493,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA COMPARACIONES FINANCIERAS ----------
   
   // Obtener resumen de costos de un proyecto
+  // Obtener resumen de costos para un periodo específico (mes, trimestre, etc.)
+  app.get("/api/projects/:id/cost-summary/period", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      // Obtener parámetros de fecha (opcionales)
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const period = req.query.period as 'month' | 'quarter' | 'custom' | undefined;
+      
+      // Si se proporciona un mes específico (formato 'YYYY-MM')
+      const monthYear = req.query.monthYear as string | undefined;
+      
+      // Si se proporciona un trimestre específico (formato 'YYYY-Q1', 'YYYY-Q2', etc.)
+      const quarter = req.query.quarter as string | undefined;
+      
+      // Lógica temporal para filtrar por periodo
+      let filteredSummary;
+      let periodLabel = "";
+      
+      // Obtener el proyecto y verificar si es un Always-On
+      const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, id));
+      
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Si es un proyecto Always-On con subproyectos
+      if (project.isAlwaysOnMacro) {
+        // Obtener subproyectos
+        const subprojects = await db.select().from(activeProjects).where(eq(activeProjects.parentProjectId, id));
+        
+        // Filtrar subproyectos por fecha si se especifica
+        let filteredSubprojects = [...subprojects];
+        
+        if (monthYear) {
+          // Filtrar por mes específico (YYYY-MM)
+          const [yearStr, monthStr] = monthYear.split('-');
+          const year = parseInt(yearStr);
+          const month = parseInt(monthStr) - 1; // JS months are 0-indexed
+          
+          const firstDayOfMonth = new Date(year, month, 1);
+          const lastDayOfMonth = new Date(year, month + 1, 0);
+          
+          filteredSubprojects = subprojects.filter(subproject => {
+            const startDate = new Date(subproject.startDate);
+            const endDate = new Date(subproject.expectedEndDate);
+            
+            return (startDate <= lastDayOfMonth && endDate >= firstDayOfMonth);
+          });
+          
+          periodLabel = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(firstDayOfMonth);
+        } else if (quarter) {
+          // Filtrar por trimestre (YYYY-Q1, YYYY-Q2, etc.)
+          const [yearStr, quarterStr] = quarter.split('-');
+          const year = parseInt(yearStr);
+          const quarterNum = parseInt(quarterStr.substring(1));
+          
+          // Calcular meses para el trimestre
+          const startMonth = (quarterNum - 1) * 3;
+          const startDate = new Date(year, startMonth, 1);
+          const endDate = new Date(year, startMonth + 3, 0);
+          
+          filteredSubprojects = subprojects.filter(subproject => {
+            const projectStartDate = new Date(subproject.startDate);
+            const projectEndDate = new Date(subproject.expectedEndDate);
+            
+            return (projectStartDate <= endDate && projectEndDate >= startDate);
+          });
+          
+          periodLabel = `Q${quarterNum} ${year}`;
+        }
+        
+        // Obtener costos de cada subproyecto filtrado
+        const subprojectCosts = await Promise.all(
+          filteredSubprojects.map(async (subproject) => {
+            // Obtener cotización para el subproyecto
+            const [quotation] = await db.select().from(quotations).where(eq(quotations.id, subproject.quotationId));
+            
+            // Obtener entradas de tiempo para el subproyecto
+            const timeEntryData = await db.select({
+              timeEntry: timeEntries,
+              personnel: personnel
+            })
+            .from(timeEntries)
+            .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+            .where(eq(timeEntries.projectId, subproject.id));
+            
+            // Calcular costo actual
+            let actualCost = 0;
+            for (const entry of timeEntryData) {
+              if (entry.timeEntry.billable) {
+                actualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
+              }
+            }
+            
+            return {
+              id: subproject.id,
+              name: quotation?.projectName || 'Unnamed Project',
+              startDate: new Date(subproject.startDate),
+              endDate: new Date(subproject.expectedEndDate),
+              costs: {
+                estimatedCost: quotation?.totalAmount || 0,
+                actualCost,
+                percentageUsed: quotation?.totalAmount ? (actualCost / quotation.totalAmount * 100) : 0
+              }
+            };
+          })
+        );
+        
+        // Calcular totales para el periodo
+        const totalEstimatedCost = project.macroMonthlyBudget || 
+          subprojectCosts.reduce((sum, p) => sum + p.costs.estimatedCost, 0);
+        const totalActualCost = subprojectCosts.reduce((sum, p) => sum + p.costs.actualCost, 0);
+        
+        filteredSummary = {
+          estimatedCost: totalEstimatedCost,
+          actualCost: totalActualCost,
+          variance: totalEstimatedCost - totalActualCost,
+          percentageUsed: totalEstimatedCost > 0 ? (totalActualCost / totalEstimatedCost * 100) : 0,
+          periodLabel,
+          subprojects: subprojectCosts
+        };
+      } else {
+        // Para proyectos regulares, usar el resumen estándar
+        filteredSummary = await storage.getProjectCostSummary(id);
+      }
+      
+      res.json(filteredSummary);
+    } catch (error) {
+      console.error("Error fetching filtered cost summary:", error);
+      res.status(500).json({ message: "Failed to fetch filtered cost summary" });
+    }
+  });
+  
+  // Mantener el endpoint original para compatibilidad
   app.get("/api/projects/:id/cost-summary", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
