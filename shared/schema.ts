@@ -182,6 +182,11 @@ export const activeProjects = pgTable("active_projects", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
+  
+  // Campos para proyectos macro y subproyectos
+  parentProjectId: integer("parent_project_id").references(() => activeProjects.id), // Referencia al proyecto padre (para subproyectos)
+  isAlwaysOnMacro: boolean("is_always_on_macro").default(false), // Indica si es un proyecto macro "Always On"
+  macroMonthlyBudget: doublePrecision("macro_monthly_budget"), // Presupuesto mensual consolidado para proyectos "Always On"
 });
 
 // Esquema base generado por drizzle-zod
@@ -196,6 +201,9 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
   actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  parentProjectId: z.number().optional(),
+  isAlwaysOnMacro: z.boolean().optional(),
+  macroMonthlyBudget: z.number().optional(),
 });
 
 // ==================== COMPONENTES DE PROYECTO ====================
