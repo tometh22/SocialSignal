@@ -929,10 +929,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(id);
       if (!project) return res.status(404).json({ message: "Project not found" });
       
+      // Si es un proyecto macro, obtener sus subproyectos
+      if (project.isAlwaysOnMacro) {
+        const subprojects = await storage.getActiveProjectsByParentId(id);
+        project.subProjects = subprojects;
+      }
+      
       res.json(project);
     } catch (error) {
       console.error("Error fetching active project:", error);
       res.status(500).json({ message: "Failed to fetch active project" });
+    }
+  });
+  
+  // Obtener subproyectos por ID de proyecto padre
+  app.get("/api/active-projects/parent/:parentId", async (req, res) => {
+    const parentId = parseInt(req.params.parentId);
+    if (isNaN(parentId)) return res.status(400).json({ message: "ID de proyecto padre inválido" });
+    
+    try {
+      const subprojects = await storage.getActiveProjectsByParentId(parentId);
+      res.json(subprojects);
+    } catch (error) {
+      console.error("Error obteniendo subproyectos:", error);
+      res.status(500).json({ message: "Error al obtener subproyectos" });
     }
   });
   
