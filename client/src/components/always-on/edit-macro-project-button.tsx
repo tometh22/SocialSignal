@@ -94,17 +94,20 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
     }
   };
 
-  // No renderizar nada si no es un proyecto macro Always-On
-  if (!project?.isAlwaysOnMacro) return null;
+  // Debugging para ver si detecta correctamente el proyecto macro
+  console.log("Proyecto recibido en botón de edición:", project?.id, project?.isAlwaysOnMacro);
+  
+  // Siempre renderizar para proyectos Always-On o con ID 16 (MODO Always-On)
+  if (!project?.isAlwaysOnMacro && project?.id !== 16) return null;
   
   return (
     <>
       <Button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 rounded-full h-12 w-12 bg-blue-600 hover:bg-blue-700 shadow-md flex items-center justify-center z-50"
+        className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center z-50 animate-pulse"
         title="Editar proyecto Always-On"
       >
-        <PencilIcon className="h-5 w-5" />
+        <PencilIcon className="h-8 w-8" />
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
