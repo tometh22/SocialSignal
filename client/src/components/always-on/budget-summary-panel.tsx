@@ -23,10 +23,96 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CircleAlert, TrendingUp, TrendingDown, Info, DollarSign, ArrowUpRight } from 'lucide-react';
+import { 
+  CircleAlert, 
+  TrendingUp, 
+  TrendingDown, 
+  Info, 
+  DollarSign, 
+  ArrowUpRight,
+  Calendar
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface BudgetSummaryPanelProps {
   project: any;
+}
+
+// Función para obtener el mes actual en formato YYYY-MM
+function getCurrentMonthStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Función para obtener el trimestre actual en formato YYYY-Q#
+function getCurrentQuarterStr() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const quarter = Math.floor(month / 3) + 1;
+  return `${year}-Q${quarter}`;
+}
+
+// Función para obtener un rango de meses para seleccionar
+function getMonthsOptions() {
+  const months = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  // Agregar los últimos 12 meses
+  for (let i = 0; i < 12; i++) {
+    let year = currentYear;
+    let month = currentMonth - i;
+    
+    if (month < 0) {
+      month += 12;
+      year--;
+    }
+    
+    const monthStr = String(month + 1).padStart(2, '0');
+    const dateObj = new Date(year, month, 1);
+    const label = dateObj.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+    
+    months.push({
+      value: `${year}-${monthStr}`,
+      label
+    });
+  }
+  
+  return months;
+}
+
+// Función para obtener opciones de trimestres
+function getQuartersOptions() {
+  const quarters = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+  
+  // Agregar los últimos 8 trimestres (2 años)
+  for (let i = 0; i < 8; i++) {
+    let year = currentYear;
+    let quarter = currentQuarter - i;
+    
+    while (quarter <= 0) {
+      quarter += 4;
+      year--;
+    }
+    
+    quarters.push({
+      value: `${year}-Q${quarter}`,
+      label: `Q${quarter} ${year}`
+    });
+  }
+  
+  return quarters;
 }
 
 export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
@@ -35,6 +121,12 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
   const [percentUsed, setPercentUsed] = useState(0);
   const [budgetDistribution, setBudgetDistribution] = useState<any[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState<any[]>([]);
+  
+  // Periodos para filtrar los costos
+  const [periodType, setPeriodType] = useState<'current' | 'month' | 'quarter'>('current');
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthStr());
+  const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarterStr());
+  const [periodLabel, setPeriodLabel] = useState('Período actual');
 
   // Obtener los subproyectos asociados al proyecto macro
   const { data: subprojects = [], isLoading: isLoadingSubprojects } = useQuery({
@@ -48,57 +140,132 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
     enabled: !!project?.id && project?.isAlwaysOnMacro
   });
 
-  // Obtener el resumen de costos para cada subproyecto
-  const { data: costSummaries = {}, isLoading: isLoadingCosts } = useQuery({
-    queryKey: ['/api/projects/costs', project?.id, subprojects],
+  // Obtener la URL correcta según el tipo de período seleccionado
+  const getCostSummaryUrl = (projectId: number) => {
+    let url = `/api/projects/${projectId}/cost-summary`;
+    
+    if (periodType === 'month') {
+      url = `/api/projects/${projectId}/cost-summary/period?monthYear=${selectedMonth}`;
+    } else if (periodType === 'quarter') {
+      url = `/api/projects/${projectId}/cost-summary/period?quarter=${selectedQuarter}`;
+    }
+    
+    return url;
+  };
+  
+  // Obtener el resumen de costos para el proyecto macro con el filtro por período
+  const { data: macroCostSummary = null, isLoading: isLoadingMacroCosts } = useQuery({
+    queryKey: ['/api/projects/cost-period', project?.id, periodType, selectedMonth, selectedQuarter],
     queryFn: async () => {
-      if (!project?.id || subprojects.length === 0) return {};
+      if (!project?.id) return null;
       
-      const projectIds = [project.id, ...subprojects.map((p: any) => p.id)];
+      try {
+        const url = getCostSummaryUrl(project.id);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Error al obtener costos del proyecto macro');
+        
+        const data = await response.json();
+        
+        // Si el endpoint devuelve una etiqueta para el período, actualizarla
+        if (data.periodLabel) {
+          setPeriodLabel(data.periodLabel);
+        }
+        
+        return data;
+      } catch (error) {
+        console.error(`Error al obtener costos para el proyecto macro ${project.id}:`, error);
+        return null;
+      }
+    },
+    enabled: !!project?.id
+  });
+  
+  // Obtener el resumen de costos para cada subproyecto (solo si son necesarios)
+  const { data: subprojectCostSummaries = {}, isLoading: isLoadingSubprojectCosts } = useQuery({
+    queryKey: ['/api/projects/subproject-costs', subprojects, periodType, selectedMonth, selectedQuarter],
+    queryFn: async () => {
+      if (!project?.id || subprojects.length === 0 || macroCostSummary?.subprojects) return {};
+      
+      // Si el macro resumen ya incluye los subproyectos, no es necesario realizar consultas adicionales
+      if (macroCostSummary?.subprojects) {
+        const summaries: Record<number, any> = {};
+        macroCostSummary.subprojects.forEach((subproject: any) => {
+          summaries[subproject.id] = {
+            estimatedCost: subproject.costs.estimatedCost,
+            actualCost: subproject.costs.actualCost,
+            percentageUsed: subproject.costs.percentageUsed
+          };
+        });
+        return summaries;
+      }
+      
+      // De lo contrario, obtener los costos de cada subproyecto individualmente
+      const projectIds = subprojects.map((p: any) => p.id);
       const summaries: Record<number, any> = {};
       
       await Promise.all(projectIds.map(async (id) => {
         try {
-          const response = await fetch(`/api/projects/${id}/cost-summary`);
+          const url = getCostSummaryUrl(id);
+          const response = await fetch(url);
           if (response.ok) {
             summaries[id] = await response.json();
           }
         } catch (error) {
-          console.error(`Error al obtener costos para el proyecto ${id}:`, error);
+          console.error(`Error al obtener costos para el subproyecto ${id}:`, error);
         }
       }));
       
       return summaries;
     },
-    enabled: !!project?.id && subprojects.length > 0
+    enabled: !!project?.id && subprojects.length > 0 && !macroCostSummary?.subprojects
   });
 
+  // Manejar cambios en el período seleccionado
+  const handlePeriodChange = (value: 'current' | 'month' | 'quarter') => {
+    setPeriodType(value);
+  };
+  
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+  };
+  
+  const handleQuarterChange = (value: string) => {
+    setSelectedQuarter(value);
+  };
+
+  // Procesar datos cuando estén disponibles
   useEffect(() => {
-    if (project && !isLoadingSubprojects && !isLoadingCosts) {
-      const mainProjectCost = costSummaries[project.id]?.actualCost || 0;
-      const subprojectsCost = subprojects.reduce((total: number, subproject: any) => {
-        return total + (costSummaries[subproject.id]?.actualCost || 0);
-      }, 0);
-      
-      const total = mainProjectCost + subprojectsCost;
-      setTotalSpent(total);
-      setPercentUsed(Math.min((total / monthlyBudget) * 100, 100));
+    if (project && macroCostSummary) {
+      // Usar los datos del resumen macro si están disponibles
+      setTotalSpent(macroCostSummary.actualCost || 0);
+      setPercentUsed(Math.min((macroCostSummary.actualCost / monthlyBudget) * 100, 100));
       
       // Datos para el gráfico de distribución de presupuesto
-      const distribution = [
-        ...subprojects.map((subproject: any) => ({
-          name: subproject.quotation?.projectName || `Subproyecto ${subproject.id}`,
-          value: costSummaries[subproject.id]?.actualCost || 0,
-        })),
-        {
-          name: project.quotation?.projectName || 'Proyecto principal',
-          value: costSummaries[project.id]?.actualCost || 0
-        }
-      ].filter(item => item.value > 0);
+      let distribution = [];
+      
+      // Si el resumen macro incluye subproyectos
+      if (macroCostSummary.subprojects) {
+        distribution = macroCostSummary.subprojects.map((subproject: any) => ({
+          name: subproject.name || `Subproyecto ${subproject.id}`,
+          value: subproject.costs.actualCost || 0,
+        })).filter((item: any) => item.value > 0);
+      } else {
+        // Usar los datos de subprojectCostSummaries
+        distribution = [
+          ...subprojects.map((subproject: any) => ({
+            name: subproject.quotation?.projectName || `Subproyecto ${subproject.id}`,
+            value: subprojectCostSummaries[subproject.id]?.actualCost || 0,
+          })),
+          {
+            name: project.quotation?.projectName || 'Proyecto principal',
+            value: macroCostSummary.actualCost || 0
+          }
+        ].filter(item => item.value > 0);
+      }
       
       setBudgetDistribution(distribution);
       
-      // Datos para la tendencia mensual (simulada por ahora)
+      // Datos para la tendencia mensual (se podrían obtener de la API en futuras iteraciones)
       const currentMonth = new Date().getMonth();
       const trend = [
         { name: 'Ene', total: currentMonth >= 0 ? Math.random() * 4200 : 0 },
@@ -117,16 +284,20 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
       
       // Establecer el mes actual con el valor real
       if (currentMonth >= 0 && currentMonth < 12) {
-        trend[currentMonth].total = total;
+        trend[currentMonth].total = macroCostSummary.actualCost || 0;
       }
       
       setMonthlyTrend(trend);
     }
-  }, [project, subprojects, costSummaries, isLoadingSubprojects, isLoadingCosts, monthlyBudget]);
+  }, [project, subprojects, macroCostSummary, subprojectCostSummaries, monthlyBudget]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#A4DE6C'];
+  
+  // Opciones para seleccionar periodos
+  const monthOptions = getMonthsOptions();
+  const quarterOptions = getQuartersOptions();
 
-  if (isLoadingSubprojects || isLoadingCosts) {
+  if (isLoadingSubprojects || isLoadingMacroCosts || isLoadingSubprojectCosts) {
     return (
       <div className="flex justify-center items-center h-40">
         <div className="animate-pulse text-gray-400">Cargando datos presupuestales...</div>
@@ -136,6 +307,61 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
 
   return (
     <div className="space-y-6">
+      {/* Selector de Período */}
+      <div className="bg-muted/20 p-4 rounded-lg border">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-medium mb-1">Filtro de Período</h3>
+            <p className="text-xs text-muted-foreground">
+              {periodLabel || "Selecciona un período para filtrar los datos presupuestales"}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Select value={periodType} onValueChange={(value: any) => handlePeriodChange(value)}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Tipo de período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Período Actual</SelectItem>
+                <SelectItem value="month">Mensual</SelectItem>
+                <SelectItem value="quarter">Trimestral</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {periodType === 'month' && (
+              <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Seleccionar mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {periodType === 'quarter' && (
+              <Select value={selectedQuarter} onValueChange={handleQuarterChange}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Seleccionar trimestre" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quarterOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+      </div>
+      
       {/* Resumen General */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
