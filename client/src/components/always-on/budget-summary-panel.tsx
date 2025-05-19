@@ -316,61 +316,55 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
   return (
     <div className="space-y-6">
       {/* Selector de Período */}
-      <Card className="border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center">
-            <Calendar className="h-4 w-4 mr-2" />
-            Filtro de Período
-          </CardTitle>
-          <CardDescription>
-            {periodLabel || "Selecciona un período para filtrar los datos presupuestales"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Select value={periodType} onValueChange={(value: any) => handlePeriodChange(value)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Tipo de período" />
+      <div className="flex items-center space-x-2 p-2 border rounded-md bg-muted/10 mb-2">
+        <div className="flex items-center">
+          <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
+          <span className="text-xs font-medium">Filtro: </span>
+          <span className="text-xs ml-1 text-muted-foreground">{periodLabel || "Selecciona período"}</span>
+        </div>
+        <div className="flex flex-1 justify-end space-x-2">
+          <Select value={periodType} onValueChange={(value: any) => handlePeriodChange(value)}>
+            <SelectTrigger className="h-7 text-xs w-[110px]">
+              <SelectValue placeholder="Tipo de período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Período Actual</SelectItem>
+              <SelectItem value="month">Mensual</SelectItem>
+              <SelectItem value="quarter">Trimestral</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          {periodType === 'month' && (
+            <Select value={selectedMonth} onValueChange={handleMonthChange}>
+              <SelectTrigger className="h-7 text-xs w-[120px]">
+                <SelectValue placeholder="Mes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current">Período Actual</SelectItem>
-                <SelectItem value="month">Mensual</SelectItem>
-                <SelectItem value="quarter">Trimestral</SelectItem>
+                {monthOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            
-            {periodType === 'month' && (
-              <Select value={selectedMonth} onValueChange={handleMonthChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Seleccionar mes" />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            
-            {periodType === 'quarter' && (
-              <Select value={selectedQuarter} onValueChange={handleQuarterChange}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Seleccionar trimestre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quarterOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          )}
+          
+          {periodType === 'quarter' && (
+            <Select value={selectedQuarter} onValueChange={handleQuarterChange}>
+              <SelectTrigger className="h-7 text-xs w-[100px]">
+                <SelectValue placeholder="Trimestre" />
+              </SelectTrigger>
+              <SelectContent>
+                {quarterOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
       
       {/* Resumen General */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
