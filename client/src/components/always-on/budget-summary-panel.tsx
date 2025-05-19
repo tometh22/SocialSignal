@@ -559,8 +559,10 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
               </thead>
               <tbody>
                 {subprojects.map((subproject: any) => {
-                  const cost = costSummaries[subproject.id]?.actualCost || 0;
-                  const budget = costSummaries[subproject.id]?.estimatedCost || 1000;
+                  const cost = macroCostSummary?.subprojects?.find((s: any) => s.id === subproject.id)?.costs?.actualCost || 
+                               subprojectCostSummaries[subproject.id]?.actualCost || 0;
+                  const budget = macroCostSummary?.subprojects?.find((s: any) => s.id === subproject.id)?.costs?.estimatedCost || 
+                                subprojectCostSummaries[subproject.id]?.estimatedCost || monthlyBudget;
                   const percentage = Math.min((cost / budget) * 100, 100);
                   
                   return (
