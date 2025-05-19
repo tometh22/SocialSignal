@@ -84,6 +84,7 @@ export interface IStorage {
   updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
   getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
   getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
+  getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]>;
   deleteActiveProject(id: number): Promise<boolean>;
   
   // Project component operations
@@ -1489,6 +1490,30 @@ export class DatabaseStorage implements IStorage {
     }
     
     return projects;
+  }
+  
+  async getActiveProjectsByParentId(parentId: number): Promise<(ActiveProject & { quotation?: Quotation & { client?: Client } })[]> {
+    console.log(`[DEBUG] Buscando subproyectos para el proyecto padre ID ${parentId}`);
+    
+    const results = await db.select({
+      project: activeProjects,
+      quotation: quotations,
+      client: clients
+    })
+    .from(activeProjects)
+    .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+    .leftJoin(clients, eq(quotations.clientId, clients.id))
+    .where(eq(activeProjects.parentProjectId, parentId));
+    
+    console.log(`[DEBUG] Subproyectos encontrados para proyecto padre ${parentId}:`, results.length);
+    
+    return results.map(result => ({
+      ...result.project,
+      quotation: {
+        ...result.quotation,
+        client: result.client || undefined
+      }
+    }));
   }
   
   async deleteActiveProject(id: number): Promise<boolean> {

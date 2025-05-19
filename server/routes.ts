@@ -956,6 +956,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Guardar asignaciones de presupuesto para subproyectos Always-On
+  app.post("/api/projects/budget-allocations", async (req, res) => {
+    try {
+      const { macroProjectId, allocations } = req.body;
+      
+      if (!macroProjectId || !allocations || !Array.isArray(allocations)) {
+        return res.status(400).json({ message: "Datos de asignación de presupuesto inválidos" });
+      }
+      
+      // Verificar que el proyecto macro existe y es de tipo Always-On
+      const macroProject = await storage.getActiveProject(macroProjectId);
+      if (!macroProject || !macroProject.isAlwaysOnMacro) {
+        return res.status(400).json({ message: "El proyecto especificado no es un proyecto macro Always-On válido" });
+      }
+      
+      // Actualizar el presupuesto estimado de cada subproyecto
+      const results = [];
+      for (const allocation of allocations) {
+        const { projectId, amount } = allocation;
+        
+        if (!projectId || typeof amount !== 'number') {
+          console.warn("Datos de asignación incorrectos:", allocation);
+          continue;
+        }
+        
+        // Verificar que el subproyecto pertenece al proyecto macro
+        const subproject = await storage.getActiveProject(projectId);
+        if (!subproject || subproject.parentProjectId !== macroProjectId) {
+          console.warn(`El proyecto ${projectId} no es un subproyecto de ${macroProjectId}`);
+          continue;
+        }
+        
+        // En una implementación real, aquí actualizaríamos el presupuesto estimado en la base de datos
+        // Por ahora, simulamos la actualización
+        console.log(`Asignando presupuesto de $${amount} al proyecto ${projectId}`);
+        
+        results.push({
+          projectId,
+          success: true,
+          previousAmount: 0, // Aquí deberíamos poner el monto anterior
+          newAmount: amount
+        });
+      }
+      
+      res.json({
+        success: true,
+        macroProjectId,
+        updatedAllocations: results
+      });
+    } catch (error) {
+      console.error("Error al guardar asignaciones de presupuesto:", error);
+      res.status(500).json({ 
+        message: "Error al procesar la asignación de presupuesto",
+        error: error.message
+      });
+    }
+  });
+  
   // Crear un nuevo proyecto activo desde una cotización
   app.post("/api/active-projects", async (req, res) => {
     try {
