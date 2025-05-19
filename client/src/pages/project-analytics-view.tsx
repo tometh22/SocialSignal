@@ -526,34 +526,39 @@ const ProjectAnalyticsView: React.FC = () => {
                     </Link>
                   </div>
                   
-                  {/* Panel de gestión avanzada Always-On */}
-                  <div className="mb-4 border rounded-lg p-2 bg-white">                    
+                  {/* Panel de Gestión Macro-Proyectos (Always-On) */}
+                  <div className="mb-4 border-2 border-blue-200 rounded-lg p-2 bg-blue-50/30">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <div className="bg-blue-600 w-1 h-5 rounded"></div> 
+                      <h3 className="text-blue-800 font-semibold text-sm">Panel de Control Always-On</h3>
+                      <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">Herramientas específicas para macro-proyectos</span>
+                    </div>                   
                     <Tabs defaultValue="summary" className="mb-2">
-                      <TabsList className="mb-2">
+                      <TabsList className="mb-2 bg-white/80">
                         <TabsTrigger value="summary">Resumen Presupuestal</TabsTrigger>
                         <TabsTrigger value="health">Salud del Proyecto</TabsTrigger>
                         <TabsTrigger value="allocation">Asignación de Presupuesto</TabsTrigger>
                       </TabsList>
                       
-                      <TabsContent value="summary" className="space-y-4">
-                        <div className="text-sm text-muted-foreground mb-2">
-                          Vista consolidada del presupuesto y costos del proyecto macro y sus subproyectos asociados.
+                      <TabsContent value="summary" className="space-y-2">
+                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                          Vista consolidada del presupuesto mensual y distribución entre subproyectos.
                         </div>
                         {project && <BudgetSummaryPanel project={project} />}
                       </TabsContent>
                       
-                      <TabsContent value="health" className="space-y-4">
-                        <div className="text-sm text-muted-foreground mb-2">
-                          Indicadores de salud del proyecto para evaluar su estado y detectar posibles problemas.
+                      <TabsContent value="health" className="space-y-2">
+                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                          Indicadores de salud para monitorear el estado del proyecto macro.
                         </div>
                         <ProjectHealthIndicators 
                           project={project} 
                         />
                       </TabsContent>
                       
-                      <TabsContent value="allocation" className="space-y-4">
-                        <div className="text-sm text-muted-foreground mb-2">
-                          Herramienta para distribuir el presupuesto mensual entre los diferentes subproyectos.
+                      <TabsContent value="allocation" className="space-y-2">
+                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                          Herramienta para distribuir el presupuesto entre los subproyectos.
                         </div>
                         <BudgetAllocationTool 
                           project={project} 
@@ -576,23 +581,31 @@ const ProjectAnalyticsView: React.FC = () => {
             </>
           )}
           
-          <ProjectAnalytics
-            project={project}
-            costSummary={costSummary}
-            timeEntries={filteredTimeEntries}
-            personnel={personnel}
-            roles={roles}
-            deliverableData={deliverableData}
-            projectMetrics={projectMetrics}
-            riskIndicators={riskIndicators}
-            timeByPersonnelData={timeByPersonnelData}
-            billableDistributionData={billableDistributionData}
-            onHelpRequest={handleHelpDialog}
-            onExpandChart={handleExpandChart}
-            onTimeFilterChange={handleTimeFilterChange}
-            isLoading={isLoading}
-            timeFilter={timeFilter}
-          />
+          {/* Panel de Analítica Estándar */}
+          <div className="mt-4 border border-slate-200 rounded-lg p-3 bg-white/60">
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <div className="bg-slate-600 w-1 h-5 rounded"></div> 
+              <h3 className="text-slate-800 font-semibold text-sm">Panel de Análisis Estándar</h3>
+              <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">Métricas detalladas del proyecto</span>
+            </div>
+            <ProjectAnalytics
+              project={project}
+              costSummary={costSummary}
+              timeEntries={filteredTimeEntries}
+              personnel={personnel}
+              roles={roles}
+              deliverableData={deliverableData}
+              projectMetrics={projectMetrics}
+              riskIndicators={riskIndicators}
+              timeByPersonnelData={timeByPersonnelData}
+              billableDistributionData={billableDistributionData}
+              onHelpRequest={handleHelpDialog}
+              onExpandChart={handleExpandChart}
+              onTimeFilterChange={handleTimeFilterChange}
+              isLoading={isLoading}
+              timeFilter={timeFilter}
+            />
+          </div>
         </div>
       </div>
 
