@@ -12,6 +12,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
+import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 
 // Interfaces para los props
@@ -240,7 +241,14 @@ const OptimizedQuoteContent = () => {
             <CardContent className="p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
-              {currentStep === 3 && <OptimizedTeamConfig />}
+              {currentStep === 3 && <DirectTeamSelector 
+                onAddMember={(member) => {
+                  if (member && addTeamMember) {
+                    addTeamMember(member);
+                  }
+                }} 
+                existingMembers={quotationData.teamMembers || []}
+              />}
               {currentStep === 4 && <OptimizedFinancialReview />}
             </CardContent>
           </Card>

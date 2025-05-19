@@ -30,17 +30,47 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
-    loadRoles();
-    loadPersonnel();
+    // Cargar datos mediante llamada directa a la API
+    const fetchData = async () => {
+      try {
+        console.log("Cargando roles y personal directamente desde la API...");
+        
+        // Primero intentamos usar las funciones proporcionadas por el contexto
+        loadRoles();
+        loadPersonnel();
+        
+        // Como respaldo, hacemos llamadas directas a la API
+        const rolesResponse = await fetch('/api/roles');
+        if (rolesResponse.ok) {
+          const rolesData = await rolesResponse.json();
+          console.log("Roles cargados directamente:", rolesData.length);
+        }
+        
+        const personnelResponse = await fetch('/api/personnel');
+        if (personnelResponse.ok) {
+          const personnelData = await personnelResponse.json();
+          console.log("Personal cargado directamente:", personnelData.length);
+        }
+      } catch (error) {
+        console.error("Error al cargar datos:", error);
+      }
+    };
     
-    // Registro para depuración
-    console.log("Cargando roles y personal...");
+    fetchData();
   }, [loadRoles, loadPersonnel]);
 
   // Verificar si hay datos cargados
   useEffect(() => {
-    console.log("Roles disponibles:", availableRoles?.length || 0);
-    console.log("Personal disponible:", availablePersonnel?.length || 0);
+    console.log("Roles disponibles en el contexto:", availableRoles?.length || 0);
+    console.log("Personal disponible en el contexto:", availablePersonnel?.length || 0);
+    
+    if (availableRoles?.length) {
+      console.log("Ejemplo de rol:", availableRoles[0]);
+    }
+    
+    if (availablePersonnel?.length) {
+      console.log("Ejemplo de personal:", availablePersonnel[0]);
+    }
   }, [availableRoles, availablePersonnel]);
 
   // Actualizar tarifa cuando se selecciona un rol
