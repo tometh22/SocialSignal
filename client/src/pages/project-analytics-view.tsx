@@ -569,26 +569,9 @@ const ProjectAnalyticsView: React.FC = () => {
         content={showHelp.content}
       />
 
-      {/* Dialog de edición de proyecto Always-On */}
+      {/* Componente para editar proyecto Always-On */}
       {project?.isAlwaysOnMacro && (
-        <AlwaysOnEditorDialog
-          isOpen={showAlwaysOnEditor}
-          onClose={() => setShowAlwaysOnEditor(false)}
-          project={project}
-        />
-      )}
-      
-      {/* Botón flotante para editar proyecto Always-On */}
-      {project?.isAlwaysOnMacro && (
-        <div className="fixed bottom-6 right-6">
-          <Button 
-            onClick={() => setShowAlwaysOnEditor(true)}
-            className="rounded-full h-12 w-12 bg-blue-600 hover:bg-blue-700 shadow-md"
-            title="Editar configuración del proyecto Always-On"
-          >
-            <PencilIcon className="h-5 w-5" />
-          </Button>
-        </div>
+        <EditMacroProjectButton project={project} />
       )}
     </div>
   );
