@@ -654,25 +654,27 @@ const OptimizedTeamConfig: React.FC = () => {
                           <SelectValue placeholder="Seleccionar" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availablePersonnel?.map(person => {
-                            const role = availableRoles?.find(r => r.id === person.roleId);
-                            return (
-                              <SelectItem 
-                                key={person.id} 
-                                value={String(person.id)}
-                                className="flex items-center text-xs"
-                              >
-                                <div>
-                                  {person.name}
-                                  {role && (
-                                    <span className="text-xs text-gray-500 ml-1">
-                                      ({role.name})
-                                    </span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
+                          {availablePersonnel
+                            ?.filter(person => person.roleId === newMember.roleId)
+                            .map(person => {
+                              const role = availableRoles?.find(r => r.id === person.roleId);
+                              return (
+                                <SelectItem 
+                                  key={person.id} 
+                                  value={String(person.id)}
+                                  className="flex items-center text-xs"
+                                >
+                                  <div>
+                                    {person.name}
+                                    {role && (
+                                      <span className="text-xs text-gray-500 ml-1">
+                                        ({role.name})
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
                         </SelectContent>
                       </Select>
                     ) : (
