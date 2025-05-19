@@ -11,7 +11,8 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  ReferenceLine
 } from 'recharts';
 import { 
   Card, 
@@ -299,7 +300,7 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
     }
   }, [project, subprojects, macroCostSummary, subprojectCostSummaries, monthlyBudget]);
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#A4DE6C'];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#A4DE6C', '#74A9CF', '#E41A1C', '#377EB8', '#4DAF4A'];
   
   // Opciones para seleccionar periodos
   const monthOptions = getMonthsOptions();
@@ -465,7 +466,8 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
                     fill="#8884d8"
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ value }) => `$${value.toLocaleString()}`}
+                    nameKey="name"
+                    label={false}
                   >
                     {budgetDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -473,8 +475,19 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
                   </Pie>
                   <Tooltip 
                     formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']}
+                    labelFormatter={(name) => `${name}`}
                   />
-                  <Legend layout="horizontal" verticalAlign="bottom" align="center" />
+                  <Legend 
+                    layout="vertical" 
+                    verticalAlign="middle" 
+                    align="right"
+                    iconSize={8}
+                    wrapperStyle={{
+                      fontSize: '9px',
+                      paddingLeft: '10px',
+                      lineHeight: '1.2em'
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -496,34 +509,58 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={monthlyTrend}
-                  margin={{ top: 5, right: 10, left: -15, bottom: 0 }}
+                  margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
                 >
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1} />
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0.1} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.5} />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']} />
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 9 }}
+                    tickMargin={5} 
+                    axisLine={{ stroke: '#E5E7EB' }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 9 }} 
+                    tickFormatter={(value) => `$${value}`}
+                    tickMargin={5}
+                    axisLine={{ stroke: '#E5E7EB' }}
+                    width={40}
+                  />
+                  {/* Etiqueta para el límite del presupuesto */}
+                  <text
+                    x="98%"
+                    y={monthlyBudget < 4000 ? "30%" : "20%"}
+                    textAnchor="end"
+                    fill="#F43F5E"
+                    style={{ fontSize: '9px', fontWeight: 'bold' }}
+                  >
+                    Límite: ${monthlyBudget.toLocaleString()}
+                  </text>
+                  <Tooltip 
+                    formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Gasto']} 
+                    contentStyle={{ fontSize: '10px' }}
+                  />
                   <Area
                     type="monotone"
                     dataKey="total"
-                    stroke="#8884d8"
-                    fillOpacity={1}
+                    stroke="#6366F1"
+                    strokeWidth={1.5}
+                    fillOpacity={0.7}
                     fill="url(#colorTotal)"
                   />
                   {/* Línea para el presupuesto mensual */}
-                  <line
-                    x1="0%"
-                    y1={(1 - (monthlyBudget / 4500)) * 100 + "%"}
-                    x2="100%"
-                    y2={(1 - (monthlyBudget / 4500)) * 100 + "%"}
-                    stroke="red"
-                    strokeWidth={1}
-                    strokeDasharray="3 3"
+                  <CartesianGrid
+                    horizontal={true}
+                    vertical={false}
+                    horizontalPoints={[monthlyBudget]}
+                    strokeDasharray="5 5"
+                    stroke="#F43F5E"
+                    strokeWidth={1.5}
                   />
                 </AreaChart>
               </ResponsiveContainer>
