@@ -387,6 +387,25 @@ export default function ActiveProjects() {
                         <LineChart className="h-3.5 w-3.5" />
                       </Button>
                       
+                      {/* Botón para editar proyecto Always On (solo para proyectos macro) */}
+                      {project.isAlwaysOnMacro && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/edit-always-on/${project.id}`);
+                          }}
+                          title="Editar Proyecto Always On"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                          </svg>
+                        </Button>
+                      )}
+                      
                       {/* Botón para editar indicadores de robustez */}
                       {project.status !== 'cancelled' && (
                         <Button
@@ -411,14 +430,15 @@ export default function ActiveProjects() {
                                     },
                                     body: JSON.stringify({
                                       projectId: project.id,
-                                      feedbackGeneral: '',
-                                      feedbackBrief: '',
-                                      feedbackAppliedMetrics: '',
-                                      feedbackDeliverables: '',
-                                      feedbackExecution: '',
-                                      feedbackRecommendations: '',
-                                      feedbackExtraValue: '',
-                                      feedbackScore: 0
+                                      feedbackGeneral: 0,
+                                      feedbackBrief: 0,
+                                      feedbackAppliedMetrics: 0,
+                                      feedbackDeliverables: 0,
+                                      feedbackExecution: 0,
+                                      feedbackRecommendations: 0,
+                                      feedbackExtraValue: 0,
+                                      feedbackScore: 0,
+                                      title: `Indicadores para ${project.quotation?.projectName || 'Proyecto'}`
                                     }),
                                   });
                                   
@@ -445,7 +465,10 @@ export default function ActiveProjects() {
                           }}
                           title="Editar Indicadores de Robustez"
                         >
-                          <PenSquare className="h-3.5 w-3.5" />
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                            <path d="M16 16v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1"></path>
+                            <path d="m8 11 2 2 7-7"></path>
+                          </svg>
                         </Button>
                       )}
                       

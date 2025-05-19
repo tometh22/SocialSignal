@@ -23,6 +23,8 @@ import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
 import EditDeliverable from "@/pages/edit-deliverable";
 import EditRobustnessPage from "@/pages/edit-robustness";
+// Importamos directamente el componente de edición de proyectos Always On
+import EditAlwaysOnProject from "@/pages/edit-always-on-project";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -115,11 +117,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
-                  <ProtectedRoute path="/edit-always-on/:projectId" component={() => (
-                    // Importamos dinámicamente para evitar problemas de circular imports
-                    // y mejorar performance de carga
-                    React.lazy(() => import('@/pages/edit-always-on-project'))
-                  )} />
+                  <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
                   <Route component={NotFound} />
                 </Switch>
               </div>
