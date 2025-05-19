@@ -26,6 +26,7 @@ interface Client {
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  logoUrl?: string;
 }
 
 interface Quotation {
@@ -49,6 +50,9 @@ interface ActiveProject {
   actualEndDate: string | null;
   trackingFrequency: string;
   notes: string | null;
+  isAlwaysOnMacro?: boolean;
+  macroMonthlyBudget?: number;
+  parentProjectId?: number;
   quotation: Quotation;
 }
 
