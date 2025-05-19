@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import ProjectAnalytics from "@/components/dashboard/project-analytics";
@@ -9,7 +9,9 @@ import EditMacroProjectButton from "@/components/always-on/edit-macro-project-bu
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Calendar, Home, LineChart, User } from "lucide-react";
+import { ArrowLeft, Calendar, Home, LineChart, User, ExternalLink, PencilIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -113,12 +115,7 @@ const ProjectAnalyticsView: React.FC = () => {
     content: ""
   });
   
-  // Estado para el diálogo de edición de proyecto Always-On
-  const [showAlwaysOnEditor, setShowAlwaysOnEditor] = useState(false);
-  const [macroFormData, setMacroFormData] = useState({
-    budget: "4200",
-    status: "active"
-  });
+  // Toast para notificaciones
   const { toast } = useToast();
   
   // Consultas de datos
@@ -126,13 +123,6 @@ const ProjectAnalyticsView: React.FC = () => {
     queryKey: [`/api/active-projects/${parsedProjectId}`],
     enabled: !!parsedProjectId,
   });
-  
-  // Abrir el editor si se solicita a través de la URL
-  useEffect(() => {
-    if (shouldEdit && project?.isAlwaysOnMacro) {
-      setShowAlwaysOnEditor(true);
-    }
-  }, [shouldEdit, project]);
 
   const { data: timeEntries = [], isLoading: isLoadingTimeEntries } = useQuery<TimeEntry[]>({
     queryKey: [`/api/time-entries/project/${parsedProjectId}`],
