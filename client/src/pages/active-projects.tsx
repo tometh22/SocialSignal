@@ -395,7 +395,7 @@ export default function ActiveProjects() {
                           className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocation(`/edit-always-on/${project.id}`);
+                            setLocation(`/project-analytics/${project.id}?edit=true`);
                           }}
                           title="Editar Proyecto Always On"
                         >
