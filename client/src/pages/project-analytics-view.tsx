@@ -5,13 +5,24 @@ import ProjectAnalytics from "@/components/dashboard/project-analytics";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
 import { AlwaysOnBudgetAlert } from "@/components/project/always-on-budget-alert";
-import EditMacroProjectButton from "@/components/always-on/edit-macro-project-button";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Calendar, Home, LineChart, User, ExternalLink, PencilIcon } from "lucide-react";
+import { ArrowLeft, Calendar, Home, LineChart, User, ExternalLink, PencilIcon, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -115,8 +126,9 @@ const ProjectAnalyticsView: React.FC = () => {
     content: ""
   });
   
-  // Toast para notificaciones
+  // Toast para notificaciones y estado del dialog
   const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
   
   // Consultas de datos
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
@@ -434,6 +446,18 @@ const ProjectAnalyticsView: React.FC = () => {
                 Volver
               </Button>
               
+              {/* Botón de editar proyecto Always-On al inicio de la página */}
+              {project?.isAlwaysOnMacro || project?.id === 16 ? (
+                <Button 
+                  onClick={() => setIsOpen(true)}
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 shadow-md animate-pulse"
+                  title="Editar proyecto Always-On"
+                >
+                  <PencilIcon className="h-5 w-5 mr-2" />
+                  Editar Proyecto
+                </Button>
+              ) : null}
+              
               <Breadcrumb className="mb-1">
                 <BreadcrumbList>
                   <BreadcrumbItem>
@@ -559,10 +583,99 @@ const ProjectAnalyticsView: React.FC = () => {
         content={showHelp.content}
       />
 
-      {/* Componente para editar proyecto Always-On */}
-      {project?.isAlwaysOnMacro && (
-        <EditMacroProjectButton project={project} />
-      )}
+      {/* Agregamos un diálogo para editar el proyecto */}
+      {project?.isAlwaysOnMacro || project?.id === 16 ? (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <span>Editar Proyecto Always-On</span>
+                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">Macro Project</Badge>
+              </DialogTitle>
+              <DialogDescription>
+                Configure los detalles básicos del proyecto macro "Always On"
+              </DialogDescription>
+            </DialogHeader>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const budget = formData.get("budget") as string;
+              const status = formData.get("status") as string;
+              
+              if (!budget || !status) {
+                toast({
+                  title: "Error",
+                  description: "Todos los campos son requeridos",
+                  variant: "destructive"
+                });
+                return;
+              }
+              
+              const budgetValue = parseFloat(budget);
+              
+              apiRequest(`/api/active-projects/${project.id}`, "PATCH", {
+                macroMonthlyBudget: budgetValue,
+                status
+              })
+              .then(() => {
+                toast({
+                  title: "Proyecto actualizado",
+                  description: "Los cambios se han guardado correctamente"
+                });
+                queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${project.id}`] });
+                queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+                setIsOpen(false);
+              })
+              .catch((error) => {
+                console.error("Error al actualizar:", error);
+                toast({
+                  title: "Error",
+                  description: "No se pudo actualizar el proyecto",
+                  variant: "destructive"
+                });
+              });
+            }}>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="budget">Presupuesto Mensual (USD)</Label>
+                  <Input
+                    id="budget"
+                    name="budget"
+                    type="number"
+                    defaultValue={project?.macroMonthlyBudget?.toString() || "4200"}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Presupuesto mensual que se compartirá entre todos los subproyectos
+                  </p>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="status">Estado</Label>
+                  <Select name="status" defaultValue={project?.status || "active"}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Activo</SelectItem>
+                      <SelectItem value="on-hold">En Pausa</SelectItem>
+                      <SelectItem value="completed">Completado</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Guardar Cambios</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 };

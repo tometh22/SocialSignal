@@ -104,10 +104,11 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
     <>
       <Button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 rounded-full h-16 w-16 bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center z-50 animate-pulse"
+        className="mb-4 ml-4 bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center animate-pulse"
         title="Editar proyecto Always-On"
       >
-        <PencilIcon className="h-8 w-8" />
+        <PencilIcon className="h-5 w-5 mr-2" />
+        Editar Proyecto Always-On
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
