@@ -505,40 +505,31 @@ const ProjectAnalyticsView: React.FC = () => {
       </div>
 
       {/* Contenido principal */}
-      <div className="flex-1 p-6 pt-0">
+      <div className="flex-1 p-3 pt-0">
         <div className="container mx-auto max-w-7xl">
-          {/* Alerta para proyectos "always on" */}
+          {/* Contenido para proyectos "always on" */}
           {!isLoading && (
             <>
               {/* Si es un proyecto macro "Always On" */}
               {project?.isAlwaysOnMacro && (
-                <div className="mb-6">
-                  <Alert className="bg-blue-50 border-blue-200 mb-4">
-                    <AlertTitle className="text-blue-700 flex items-center text-sm font-medium">
-                      Proyecto Macro "Always On" - ${project.macroMonthlyBudget?.toLocaleString()} / mes
-                    </AlertTitle>
-                    <AlertDescription className="text-blue-600 text-xs">
-                      <p className="mb-1">
-                        Este es un proyecto macro con presupuesto mensual consolidado compartido entre varios subproyectos.
-                      </p>
-                      <div className="mt-2">
-                        <Link href={`/client-summary/${project.quotation?.clientId}`} className="text-blue-700 inline-flex items-center text-xs hover:underline">
-                          Ver resumen completo del cliente
-                          <ExternalLink className="ml-1 h-3 w-3" />
-                        </Link>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
+                <div className="mb-3">
+                  <div className="flex flex-wrap gap-2 items-center justify-between bg-blue-50 border border-blue-100 rounded-md p-2 mb-2">
+                    <div className="flex items-center">
+                      <Badge variant="outline" className="h-6 mr-2 border-blue-200 bg-blue-50 text-blue-700">Always-On</Badge>
+                      <span className="text-sm font-medium text-blue-700">
+                        Presupuesto mensual: ${project.macroMonthlyBudget?.toLocaleString()} / mes
+                      </span>
+                    </div>
+                    <Link href={`/client-summary/${project.quotation?.clientId}`} className="text-blue-700 inline-flex items-center text-xs hover:underline">
+                      Ver resumen del cliente
+                      <ExternalLink className="ml-1 h-3 w-3" />
+                    </Link>
+                  </div>
                   
                   {/* Panel de gestión avanzada Always-On */}
-                  <div className="mb-6 border rounded-lg p-4 bg-white">
-                    <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center">
-                      <Badge variant="outline" className="mr-2 border-blue-200 bg-blue-50 text-blue-600">Always-On</Badge>
-                      Panel de Gestión Consolidada
-                    </h2>
-                    
-                    <Tabs defaultValue="summary" className="mb-4">
-                      <TabsList className="mb-3">
+                  <div className="mb-4 border rounded-lg p-2 bg-white">                    
+                    <Tabs defaultValue="summary" className="mb-2">
+                      <TabsList className="mb-2">
                         <TabsTrigger value="summary">Resumen Presupuestal</TabsTrigger>
                         <TabsTrigger value="health">Salud del Proyecto</TabsTrigger>
                         <TabsTrigger value="allocation">Asignación de Presupuesto</TabsTrigger>
