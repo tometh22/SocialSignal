@@ -545,11 +545,18 @@ const OptimizedTeamConfig: React.FC = () => {
                       <Select
                         value={newMember.roleId ? String(newMember.roleId) : ''}
                         onValueChange={(value) => {
+                          console.log("Rol seleccionado:", value);
+                          const roleId = parseInt(value);
+                          
+                          // Comprobar si hay personal disponible para este rol
+                          const personnelForRole = availablePersonnel?.filter(p => p.roleId === roleId) || [];
+                          console.log(`Personal disponible para rol ${roleId}:`, personnelForRole);
+                          
                           setNewMember(prev => ({
                             ...prev,
-                            roleId: parseInt(value),
+                            roleId: roleId,
                             personnelId: null,
-                            rate: availableRoles?.find(r => r.id === parseInt(value))?.defaultRate || 0
+                            rate: availableRoles?.find(r => r.id === roleId)?.defaultRate || 0
                           }));
                         }}
                       >
