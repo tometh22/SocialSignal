@@ -548,7 +548,7 @@ const ProjectAnalyticsView: React.FC = () => {
                         <div className="text-sm text-muted-foreground mb-2">
                           Vista consolidada del presupuesto y costos del proyecto macro y sus subproyectos asociados.
                         </div>
-                        <BudgetSummaryPanel project={project} />
+                        {project && <BudgetSummaryPanel project={project} />}
                       </TabsContent>
                       
                       <TabsContent value="health" className="space-y-4">

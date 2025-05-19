@@ -153,6 +153,8 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
     return url;
   };
   
+  // Usar React Query para gestionar el estado de carga y evitar múltiples re-renders
+  
   // Obtener el resumen de costos para el proyecto macro con el filtro por período
   const { data: macroCostSummary = null, isLoading: isLoadingMacroCosts } = useQuery({
     queryKey: ['/api/projects/cost-period', project?.id, periodType, selectedMonth, selectedQuarter],
@@ -237,55 +239,61 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
   useEffect(() => {
     if (project && macroCostSummary) {
       // Usar los datos del resumen macro si están disponibles
-      setTotalSpent(macroCostSummary.actualCost || 0);
-      setPercentUsed(Math.min((macroCostSummary.actualCost / monthlyBudget) * 100, 100));
+      const actualCost = macroCostSummary.actualCost || 0;
+      setTotalSpent(actualCost);
+      setPercentUsed(Math.min((actualCost / monthlyBudget) * 100, 100));
       
       // Datos para el gráfico de distribución de presupuesto
       let distribution = [];
       
       // Si el resumen macro incluye subproyectos
-      if (macroCostSummary.subprojects) {
-        distribution = macroCostSummary.subprojects.map((subproject: any) => ({
-          name: subproject.name || `Subproyecto ${subproject.id}`,
-          value: subproject.costs.actualCost || 0,
-        })).filter((item: any) => item.value > 0);
-      } else {
+      if (macroCostSummary.subprojects && Array.isArray(macroCostSummary.subprojects)) {
+        distribution = macroCostSummary.subprojects
+          .filter((subproject: any) => subproject && typeof subproject === 'object')
+          .map((subproject: any) => ({
+            name: subproject.name || `Subproyecto ${subproject.id}`,
+            value: (subproject.costs && subproject.costs.actualCost) || 0,
+          }))
+          .filter((item: any) => item.value > 0);
+      } else if (subprojects && Array.isArray(subprojects)) {
         // Usar los datos de subprojectCostSummaries
-        distribution = [
-          ...subprojects.map((subproject: any) => ({
-            name: subproject.quotation?.projectName || `Subproyecto ${subproject.id}`,
-            value: subprojectCostSummaries[subproject.id]?.actualCost || 0,
-          })),
-          {
-            name: project.quotation?.projectName || 'Proyecto principal',
-            value: macroCostSummary.actualCost || 0
-          }
-        ].filter(item => item.value > 0);
+        const subprojectData = subprojects
+          .filter((subproject: any) => subproject && typeof subproject === 'object')
+          .map((subproject: any) => ({
+            name: (subproject.quotation && subproject.quotation.projectName) || `Subproyecto ${subproject.id}`,
+            value: (subprojectCostSummaries[subproject.id] && subprojectCostSummaries[subproject.id].actualCost) || 0,
+          }));
+          
+        if (project && typeof project === 'object') {
+          const projectData = {
+            name: (project.quotation && project.quotation.projectName) || 'Proyecto principal',
+            value: actualCost
+          };
+          
+          distribution = [...subprojectData, projectData].filter(item => item.value > 0);
+        } else {
+          distribution = subprojectData.filter(item => item.value > 0);
+        }
       }
       
       setBudgetDistribution(distribution);
       
-      // Datos para la tendencia mensual (se podrían obtener de la API en futuras iteraciones)
+      // Datos para la tendencia mensual simplificada y más estable
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
       const currentMonth = new Date().getMonth();
-      const trend = [
-        { name: 'Ene', total: currentMonth >= 0 ? Math.random() * 4200 : 0 },
-        { name: 'Feb', total: currentMonth >= 1 ? Math.random() * 4200 : 0 },
-        { name: 'Mar', total: currentMonth >= 2 ? Math.random() * 4200 : 0 },
-        { name: 'Abr', total: currentMonth >= 3 ? Math.random() * 4200 : 0 },
-        { name: 'May', total: currentMonth >= 4 ? Math.random() * 4200 : 0 },
-        { name: 'Jun', total: currentMonth >= 5 ? Math.random() * 4200 : 0 },
-        { name: 'Jul', total: currentMonth >= 6 ? Math.random() * 4200 : 0 },
-        { name: 'Ago', total: currentMonth >= 7 ? Math.random() * 4200 : 0 },
-        { name: 'Sep', total: currentMonth >= 8 ? Math.random() * 4200 : 0 },
-        { name: 'Oct', total: currentMonth >= 9 ? Math.random() * 4200 : 0 },
-        { name: 'Nov', total: currentMonth >= 10 ? Math.random() * 4200 : 0 },
-        { name: 'Dic', total: currentMonth >= 11 ? Math.random() * 4200 : 0 },
-      ];
       
-      // Establecer el mes actual con el valor real
-      if (currentMonth >= 0 && currentMonth < 12) {
-        trend[currentMonth].total = macroCostSummary.actualCost || 0;
-      }
+      const trend = months.map((name, index) => {
+        // Sólo mostrar datos para el mes actual y anteriores
+        if (index <= currentMonth) {
+          // Usar el valor real solo para el mes actual, valores progresivos para los anteriores
+          const value = index === currentMonth ? 
+            actualCost : 
+            Math.round((index + 1) * monthlyBudget / 12);
+          
+          return { name, total: value };
+        }
+        return { name, total: 0 };
+      });
       
       setMonthlyTrend(trend);
     }
@@ -308,18 +316,20 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
   return (
     <div className="space-y-6">
       {/* Selector de Período */}
-      <div className="bg-muted/20 p-4 rounded-lg border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-medium mb-1">Filtro de Período</h3>
-            <p className="text-xs text-muted-foreground">
-              {periodLabel || "Selecciona un período para filtrar los datos presupuestales"}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center">
+            <Calendar className="h-4 w-4 mr-2" />
+            Filtro de Período
+          </CardTitle>
+          <CardDescription>
+            {periodLabel || "Selecciona un período para filtrar los datos presupuestales"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
             <Select value={periodType} onValueChange={(value: any) => handlePeriodChange(value)}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Tipo de período" />
               </SelectTrigger>
               <SelectContent>
@@ -331,7 +341,7 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
             
             {periodType === 'month' && (
               <Select value={selectedMonth} onValueChange={handleMonthChange}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Seleccionar mes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -346,7 +356,7 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
             
             {periodType === 'quarter' && (
               <Select value={selectedQuarter} onValueChange={handleQuarterChange}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Seleccionar trimestre" />
                 </SelectTrigger>
                 <SelectContent>
@@ -359,8 +369,8 @@ export function BudgetSummaryPanel({ project }: BudgetSummaryPanelProps) {
               </Select>
             )}
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
       
       {/* Resumen General */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
