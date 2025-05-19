@@ -1,15 +1,15 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useParams, Link, useSearch } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import ProjectAnalytics from "@/components/dashboard/project-analytics";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
 import { AlwaysOnBudgetAlert } from "@/components/project/always-on-budget-alert";
-import { AlwaysOnEditorDialog } from "@/components/project/always-on-editor-dialog";
+import EditMacroProjectButton from "@/components/always-on/edit-macro-project-button";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Calendar, ExternalLink, Home, LineChart, PencilIcon, User } from "lucide-react";
+import { ArrowLeft, Calendar, Home, LineChart, User } from "lucide-react";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -112,12 +112,14 @@ const ProjectAnalyticsView: React.FC = () => {
     title: "",
     content: ""
   });
-  const [showAlwaysOnEditor, setShowAlwaysOnEditor] = useState(false);
   
-  // Obtener parámetros de búsqueda para detectar si el usuario quiere editar
-  const searchParams = useSearch();
-  const params = new URLSearchParams(searchParams);
-  const shouldEdit = params.get('edit') === 'true';
+  // Estado para el diálogo de edición de proyecto Always-On
+  const [showAlwaysOnEditor, setShowAlwaysOnEditor] = useState(false);
+  const [macroFormData, setMacroFormData] = useState({
+    budget: "4200",
+    status: "active"
+  });
+  const { toast } = useToast();
   
   // Consultas de datos
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
