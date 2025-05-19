@@ -661,9 +661,7 @@ const OptimizedTeamConfig: React.FC = () => {
                           <SelectValue placeholder="Seleccionar" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availablePersonnel
-                            ?.filter(person => person.roleId === newMember.roleId)
-                            .map(person => {
+                          {availablePersonnel?.map(person => {
                               const role = availableRoles?.find(r => r.id === person.roleId);
                               return (
                                 <SelectItem 
