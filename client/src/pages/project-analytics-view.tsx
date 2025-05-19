@@ -5,6 +5,9 @@ import ProjectAnalytics from "@/components/dashboard/project-analytics";
 import ChartModal from "@/components/project/chart-modal";
 import HelpDialog from "@/components/project/help-dialog";
 import { AlwaysOnBudgetAlert } from "@/components/project/always-on-budget-alert";
+import { BudgetSummaryPanel } from "@/components/always-on/budget-summary-panel";
+import { ProjectHealthIndicators } from "@/components/always-on/project-health-indicators";
+import { BudgetAllocationTool } from "@/components/always-on/budget-allocation-tool";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -23,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -508,22 +512,67 @@ const ProjectAnalyticsView: React.FC = () => {
             <>
               {/* Si es un proyecto macro "Always On" */}
               {project?.isAlwaysOnMacro && (
-                <Alert className="bg-blue-50 border-blue-200 mb-4">
-                  <AlertTitle className="text-blue-700 flex items-center text-sm font-medium">
-                    Proyecto Macro "Always On" - ${project.macroMonthlyBudget?.toLocaleString()} / mes
-                  </AlertTitle>
-                  <AlertDescription className="text-blue-600 text-xs">
-                    <p className="mb-1">
-                      Este es un proyecto macro con presupuesto mensual consolidado compartido entre varios subproyectos.
-                    </p>
-                    <div className="mt-2">
-                      <Link href={`/client-summary/${project.quotation?.clientId}`} className="text-blue-700 inline-flex items-center text-xs hover:underline">
-                        Ver resumen completo del cliente
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </Link>
-                    </div>
-                  </AlertDescription>
-                </Alert>
+                <div className="mb-6">
+                  <Alert className="bg-blue-50 border-blue-200 mb-4">
+                    <AlertTitle className="text-blue-700 flex items-center text-sm font-medium">
+                      Proyecto Macro "Always On" - ${project.macroMonthlyBudget?.toLocaleString()} / mes
+                    </AlertTitle>
+                    <AlertDescription className="text-blue-600 text-xs">
+                      <p className="mb-1">
+                        Este es un proyecto macro con presupuesto mensual consolidado compartido entre varios subproyectos.
+                      </p>
+                      <div className="mt-2">
+                        <Link href={`/client-summary/${project.quotation?.clientId}`} className="text-blue-700 inline-flex items-center text-xs hover:underline">
+                          Ver resumen completo del cliente
+                          <ExternalLink className="ml-1 h-3 w-3" />
+                        </Link>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                  
+                  {/* Panel de gestión avanzada Always-On */}
+                  <div className="mb-6 border rounded-lg p-4 bg-white">
+                    <h2 className="text-lg font-semibold mb-3 text-blue-800 flex items-center">
+                      <Badge variant="outline" className="mr-2 border-blue-200 bg-blue-50 text-blue-600">Always-On</Badge>
+                      Panel de Gestión Consolidada
+                    </h2>
+                    
+                    <Tabs defaultValue="summary" className="mb-4">
+                      <TabsList className="mb-3">
+                        <TabsTrigger value="summary">Resumen Presupuestal</TabsTrigger>
+                        <TabsTrigger value="health">Salud del Proyecto</TabsTrigger>
+                        <TabsTrigger value="allocation">Asignación de Presupuesto</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="summary" className="space-y-4">
+                        <div className="text-sm text-muted-foreground mb-2">
+                          Vista consolidada del presupuesto y costos del proyecto macro y sus subproyectos asociados.
+                        </div>
+                        <BudgetSummaryPanel project={project} />
+                      </TabsContent>
+                      
+                      <TabsContent value="health" className="space-y-4">
+                        <div className="text-sm text-muted-foreground mb-2">
+                          Indicadores de salud del proyecto para evaluar su estado y detectar posibles problemas.
+                        </div>
+                        <ProjectHealthIndicators 
+                          project={project} 
+                          subprojects={project?.subProjects} 
+                        />
+                      </TabsContent>
+                      
+                      <TabsContent value="allocation" className="space-y-4">
+                        <div className="text-sm text-muted-foreground mb-2">
+                          Herramienta para distribuir el presupuesto mensual entre los diferentes subproyectos.
+                        </div>
+                        <BudgetAllocationTool 
+                          project={project} 
+                          subprojects={project?.subProjects} 
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </div>
               )}
               
               {/* Si es un subproyecto */}

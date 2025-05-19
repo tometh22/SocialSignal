@@ -167,7 +167,7 @@ export function BudgetSummaryPanel({ project, showTitle = true }: BudgetSummaryP
           
           {/* Alerta si está cerca del límite */}
           {!isOverBudget && usagePercentage > 80 && (
-            <Alert variant="warning" className="mt-3 border-yellow-200 bg-yellow-50 text-yellow-800">
+            <Alert className="mt-3 border-yellow-200 bg-yellow-50 text-yellow-800">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Cerca del límite</AlertTitle>
               <AlertDescription>
