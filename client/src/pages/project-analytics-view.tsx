@@ -526,29 +526,28 @@ const ProjectAnalyticsView: React.FC = () => {
                     </Link>
                   </div>
                   
-                  {/* Panel de Gestión Macro-Proyectos (Always-On) */}
-                  <div className="mb-4 border-2 border-blue-200 rounded-lg p-2 bg-blue-50/30">
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <div className="bg-blue-600 w-1 h-5 rounded"></div> 
-                      <h3 className="text-blue-800 font-semibold text-sm">Panel de Control Always-On</h3>
-                      <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">Herramientas específicas para macro-proyectos</span>
+                  {/* Panel de Gestión Always-On */}
+                  <div className="mb-4 border border-blue-100 rounded-lg p-2 bg-white">
+                    <div className="bg-blue-50 rounded-md p-2 mb-3">
+                      <h3 className="text-blue-700 font-medium text-sm">Panel de Control Always-On</h3>
+                      <p className="text-xs text-blue-600 mt-1">Herramientas para la gestión de proyectos macro y sus subproyectos</p>
                     </div>                   
                     <Tabs defaultValue="summary" className="mb-2">
-                      <TabsList className="mb-2 bg-white/80">
+                      <TabsList className="mb-2">
                         <TabsTrigger value="summary">Resumen Presupuestal</TabsTrigger>
                         <TabsTrigger value="health">Salud del Proyecto</TabsTrigger>
                         <TabsTrigger value="allocation">Asignación de Presupuesto</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="summary" className="space-y-2">
-                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                        <div className="text-xs text-muted-foreground mb-2">
                           Vista consolidada del presupuesto mensual y distribución entre subproyectos.
                         </div>
                         {project && <BudgetSummaryPanel project={project} />}
                       </TabsContent>
                       
                       <TabsContent value="health" className="space-y-2">
-                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                        <div className="text-xs text-muted-foreground mb-2">
                           Indicadores de salud para monitorear el estado del proyecto macro.
                         </div>
                         <ProjectHealthIndicators 
@@ -557,7 +556,7 @@ const ProjectAnalyticsView: React.FC = () => {
                       </TabsContent>
                       
                       <TabsContent value="allocation" className="space-y-2">
-                        <div className="text-xs text-blue-700 bg-blue-50 p-1 rounded mb-2 border border-blue-100">
+                        <div className="text-xs text-muted-foreground mb-2">
                           Herramienta para distribuir el presupuesto entre los subproyectos.
                         </div>
                         <BudgetAllocationTool 
@@ -581,12 +580,10 @@ const ProjectAnalyticsView: React.FC = () => {
             </>
           )}
           
-          {/* Panel de Analítica Estándar */}
-          <div className="mt-4 border border-slate-200 rounded-lg p-3 bg-white/60">
-            <div className="flex items-center gap-2 mb-3 px-1">
-              <div className="bg-slate-600 w-1 h-5 rounded"></div> 
-              <h3 className="text-slate-800 font-semibold text-sm">Panel de Análisis Estándar</h3>
-              <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">Métricas detalladas del proyecto</span>
+          {/* Estándar Analytics */}
+          <div className="mt-4">
+            <div className="border-b pb-2 mb-4">
+              <h3 className="text-base font-medium text-gray-700">Métricas Detalladas</h3>
             </div>
             <ProjectAnalytics
               project={project}
