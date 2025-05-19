@@ -1,5 +1,4 @@
-import React from "react";
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -218,36 +217,48 @@ export default function ActiveProjects() {
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
-  // Combinamos los proyectos principales con los subproyectos cargados por separado
-  const visibleProjects = useMemo(() => {
-    // Filtrar los proyectos principales (sin parentProjectId)
-    const mainProjects = projects.filter(project => !project.parentProjectId);
-    
-    // Crear una lista con todos los proyectos visibles
-    const visible = [...mainProjects];
-    
-    // Agregar subproyectos solo para proyectos expandidos
-    if (subprojects.length > 0) {
-      // Ordenar subproyectos para que aparezcan después de sus padres
-      const sortedSubprojects = [...subprojects].sort((a, b) => {
-        // Primero por ID de padre
-        if (a.parentProjectId !== b.parentProjectId) {
-          return (a.parentProjectId || 0) - (b.parentProjectId || 0);
-        }
-        // Luego por nombre de proyecto
-        return (a.quotation?.projectName || '').localeCompare(b.quotation?.projectName || '');
-      });
+  // Estado para almacenar todos los proyectos visibles (proyectos principales + subproyectos)
+  const [allVisibleProjects, setAllVisibleProjects] = useState<ActiveProject[]>([]);
+  
+  // Efecto para cargar subproyectos cuando se expande un proyecto
+  useEffect(() => {
+    const loadSubprojectsForExpandedProjects = async () => {
+      // Primero empezamos con los proyectos principales
+      const updatedProjects = [...projects];
       
-      // Agregar solo subproyectos de proyectos expandidos
-      sortedSubprojects.forEach(subproject => {
-        if (subproject.parentProjectId && expandedProjects[subproject.parentProjectId]) {
-          visible.push(subproject);
+      // Para cada proyecto expandido, cargamos sus subproyectos
+      for (const projectId in expandedProjects) {
+        if (expandedProjects[parseInt(projectId)]) {
+          try {
+            console.log(`Cargando subproyectos para proyecto ID ${projectId}...`);
+            const response = await fetch(`/api/active-projects/parent/${projectId}`);
+            
+            if (response.ok) {
+              const childProjects = await response.json();
+              console.log(`Encontrados ${childProjects.length} subproyectos para proyecto ID ${projectId}`);
+              
+              // Encontrar la posición del proyecto padre
+              const parentIndex = updatedProjects.findIndex(p => p.id === parseInt(projectId));
+              
+              if (parentIndex !== -1) {
+                // Insertar los subproyectos justo después del padre
+                updatedProjects.splice(parentIndex + 1, 0, ...childProjects);
+              }
+            }
+          } catch (error) {
+            console.error(`Error cargando subproyectos para ID ${projectId}:`, error);
+          }
         }
-      });
-    }
+      }
+      
+      setAllVisibleProjects(updatedProjects);
+    };
     
-    return visible;
-  }, [projects, subprojects, expandedProjects]);
+    loadSubprojectsForExpandedProjects();
+  }, [projects, expandedProjects]);
+  
+  // Usamos allVisibleProjects en lugar de visibleProjects
+  const visibleProjects = allVisibleProjects;
 
   return (
     <div className="p-3 space-y-3">
