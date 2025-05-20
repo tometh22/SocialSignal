@@ -157,9 +157,9 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       // Mensaje de confirmación
       alert('Miembro añadido al equipo correctamente');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al añadir miembro al equipo:", error);
-      alert(`Error al añadir miembro: ${error.message || 'Error desconocido'}`);
+      alert(`Error al añadir miembro: ${error?.message || 'Error desconocido'}`);
     }
   };
 

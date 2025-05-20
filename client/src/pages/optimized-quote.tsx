@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowUpDown, AlertCircle } from 'lucide-react';
 
 // Importación de los componentes para cada paso
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
@@ -264,26 +264,21 @@ const OptimizedQuoteContent = () => {
                     <DirectTeamSelector 
                       onAddMember={(member) => {
                         console.log("Intentando añadir miembro con:", JSON.stringify(member));
-                        try {
-                          // Verificar si la función addTeamMember está disponible
-                          if (typeof addTeamMember === 'function') {
-                            addTeamMember({
-                              roleId: member.roleId,
-                              personnelId: member.personnelId,
-                              hours: member.hours,
-                              rate: member.rate,
-                              cost: member.hours * member.rate // Recalcular por si acaso
-                            });
-                            console.log("Miembro añadido exitosamente al equipo");
-                          } else {
-                            console.error("Error: La función addTeamMember no está disponible");
-                            alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
-                          }
-                        } catch (error) {
-                          console.error("Error al intentar añadir miembro:", error);
-                          alert(`Error: ${error.message || 'Ocurrió un error desconocido'}`);
+                        
+                        if (typeof addTeamMember === 'function') {
+                          addTeamMember({
+                            roleId: member.roleId,
+                            personnelId: member.personnelId,
+                            hours: member.hours,
+                            rate: member.rate,
+                            cost: member.hours * member.rate
+                          });
+                          console.log("Miembro añadido exitosamente al equipo");
+                        } else {
+                          console.error("Error: La función addTeamMember no está disponible");
+                          alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
                         }
-                      }} 
+                      }}
                       existingMembers={Array.isArray(quotationData.teamMembers) ? quotationData.teamMembers : []}
                     />
                   </div>
