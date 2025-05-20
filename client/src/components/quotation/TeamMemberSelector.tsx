@@ -46,6 +46,11 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
   // Estado para el modo de selección (por rol o por personal)
   const [selectionMode, setSelectionMode] = useState<'role' | 'personnel'>('role');
   
+  // Limpiar la selección de personal al cambiar el modo
+  useEffect(() => {
+    setSelectedPerson('');
+  }, [selectionMode]);
+  
   // Formulario de nuevo miembro
   const [selectedRole, setSelectedRole] = useState<number | string>('');
   const [selectedPerson, setSelectedPerson] = useState<number | string>('');
@@ -171,17 +176,8 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
     setSelectedPerson('');
     setHours(10);
     
-    // Mostrar mensaje según el modo
-    if (selectionMode === 'role') {
-      // En modo por rol, mostrar mensaje acorde
-      const roleName = roles.find(r => r.id === roleId)?.name || 'Rol seleccionado';
-      alert(`Se ha añadido "${roleName}" al equipo (sin asignar personal específico)`);
-    } else {
-      // En modo por personal, mostrar mensaje con el nombre del personal
-      const personName = personnelId ? (personnel.find(p => p.id === personnelId)?.name || 'Personal seleccionado') : '';
-      const roleName = roles.find(r => r.id === roleId)?.name || 'Rol';
-      alert(`Se ha añadido a "${personName}" como ${roleName} al equipo`);
-    }
+    // No mostramos alerta para mejorar la experiencia de usuario
+    console.log('Miembro añadido al equipo correctamente');
   };
 
   // Obtener nombre del rol a partir de su ID
