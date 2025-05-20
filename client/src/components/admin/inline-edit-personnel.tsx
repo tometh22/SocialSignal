@@ -33,6 +33,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
   const [editName, setEditName] = useState(person.name);
   const [editRoleId, setEditRoleId] = useState(person.roleId);
   const [editRate, setEditRate] = useState(person.hourlyRate);
+  const [editRateText, setEditRateText] = useState(person.hourlyRate.toString().replace('.', ','));
   const [updatedPerson, setUpdatedPerson] = useState<Personnel>(person);
   const { toast } = useToast();
 
@@ -43,6 +44,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       setEditName(person.name);
       setEditRoleId(person.roleId);
       setEditRate(person.hourlyRate);
+      setEditRateText(person.hourlyRate.toString().replace('.', ','));
     }
   }, [person, isEditing]);
 
@@ -196,11 +198,12 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
               type="text" 
               inputMode="decimal"
               placeholder="0,00"
-              value={editRate.toString().replace('.', ',')} 
+              value={editRateText} 
               onChange={(e) => {
                 const inputValue = e.target.value;
+                setEditRateText(inputValue);
                 
-                // Permitir entrada vacía
+                // Si está vacío, establecer a cero
                 if (inputValue === "") {
                   setEditRate(0);
                   return;
@@ -209,12 +212,10 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
                 // Reemplazar comas por puntos para parsing
                 const normalizedValue = inputValue.replace(',', '.');
                 
-                // Solo procesar si es un número válido
-                if (/^\d*\.?\d*$/.test(normalizedValue)) {
-                  const numericValue = parseFloat(normalizedValue);
-                  if (!isNaN(numericValue)) {
-                    setEditRate(numericValue);
-                  }
+                // Verificar si es un número
+                const numericValue = parseFloat(normalizedValue);
+                if (!isNaN(numericValue)) {
+                  setEditRate(numericValue);
                 }
               }} 
               className="w-full h-9" // Altura fija
