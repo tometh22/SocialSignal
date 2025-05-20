@@ -147,8 +147,15 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
       return;
     }
     
+    // En modo "por personal", verificar que se haya seleccionado personal si el modo lo requiere
+    if (selectionMode === 'personnel' && !selectedPerson) {
+      alert('Por favor, selecciona un miembro del personal');
+      return;
+    }
+    
     const roleId = Number(selectedRole);
-    const personnelId = selectedPerson ? Number(selectedPerson) : null;
+    // El personnelId solo se usará en modo "personnel"
+    const personnelId = selectionMode === 'personnel' && selectedPerson ? Number(selectedPerson) : null;
     const cost = hours * rate;
     
     // Llamar a la función proporcionada por el padre
@@ -163,6 +170,18 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
     // Mantener el rol seleccionado pero limpiar el personal
     setSelectedPerson('');
     setHours(10);
+    
+    // Mostrar mensaje según el modo
+    if (selectionMode === 'role') {
+      // En modo por rol, mostrar mensaje acorde
+      const roleName = roles.find(r => r.id === roleId)?.name || 'Rol seleccionado';
+      alert(`Se ha añadido "${roleName}" al equipo (sin asignar personal específico)`);
+    } else {
+      // En modo por personal, mostrar mensaje con el nombre del personal
+      const personName = personnelId ? (personnel.find(p => p.id === personnelId)?.name || 'Personal seleccionado') : '';
+      const roleName = roles.find(r => r.id === roleId)?.name || 'Rol';
+      alert(`Se ha añadido a "${personName}" como ${roleName} al equipo`);
+    }
   };
 
   // Obtener nombre del rol a partir de su ID
@@ -194,16 +213,39 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
             <div className="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 flex items-start">
               <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
               <p className="text-sm text-blue-700">
-                Aquí puedes seleccionar roles y personal para tu proyecto. Selecciona un rol, personal (opcional), 
-                horas y tarifa para cada miembro del equipo.
+                Configura el equipo del proyecto seleccionando roles y personal específico.
               </p>
+            </div>
+            
+            <div className="mb-4">
+              <h4 className="text-sm font-medium text-neutral-800 mb-2">Tipo de Cotización</h4>
+              <div className="flex space-x-4">
+                <Button
+                  type="button"
+                  variant={selectionMode === 'role' ? "default" : "outline"}
+                  onClick={() => setSelectionMode('role')}
+                  className="flex-1"
+                  size="sm"
+                >
+                  Por Roles (Tarifas Estándar)
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectionMode === 'personnel' ? "default" : "outline"}
+                  onClick={() => setSelectionMode('personnel')}
+                  className="flex-1"
+                  size="sm"
+                >
+                  Por Miembros Específicos
+                </Button>
+              </div>
             </div>
             
             <div className="mt-4">
               <h3 className="text-base font-medium mb-4">Añadir Miembro al Equipo</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                {/* Selector de Rol */}
+                {/* Selector de Rol - Siempre visible */}
                 <div>
                   <Label className="block text-sm font-medium mb-1">Rol</Label>
                   <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
@@ -220,12 +262,20 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
                   </Select>
                 </div>
                 
-                {/* Selector de Personal */}
+                {/* Selector de Personal - Solo visible en modo de personal específico */}
                 <div>
                   <Label className="block text-sm font-medium mb-1">Personal</Label>
-                  <Select value={selectedPerson.toString()} onValueChange={handlePersonnelChange} disabled={!selectedRole}>
+                  <Select 
+                    value={selectedPerson.toString()} 
+                    onValueChange={handlePersonnelChange} 
+                    disabled={!selectedRole || selectionMode === 'role'}
+                  >
                     <SelectTrigger className="w-full h-10">
-                      <SelectValue placeholder="Seleccionar personal" />
+                      <SelectValue placeholder={
+                        selectionMode === 'role' 
+                          ? "No aplica en modo Por Roles" 
+                          : "Seleccionar personal"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredPersonnel.length > 0 ? (
