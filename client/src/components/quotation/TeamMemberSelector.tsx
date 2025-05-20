@@ -499,14 +499,14 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                             <Input
                               type="text"
                               inputMode="decimal"
-                              pattern="[0-9]*\.?[0-9]*"
+                              pattern="[0-9]*[.,]?[0-9]*"
                               value={editValues.rate}
                               onChange={(e) => {
                                 const value = e.target.value;
-                                if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                if (value === "" || /^\d*[.,]?\d*$/.test(value)) {
                                   setEditValues({
                                     ...editValues,
-                                    rate: value
+                                    rate: value.replace(',', '.')
                                   });
                                 }
                               }}
