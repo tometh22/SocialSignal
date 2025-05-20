@@ -102,30 +102,43 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return;
     }
 
-    // Convertir texto a número (asegurando reemplazo de comas)
-    const rateValue = parseFloat(editRateText.replace(',', '.'));
-    
-    // Validar que sea un número válido
-    if (isNaN(rateValue) || rateValue <= 0) {
+    try {
+      // Convertir texto a número (asegurando reemplazo de comas)
+      const valueText = editRateText.replace(',', '.');
+      const rateValue = parseFloat(valueText);
+      
+      // Validar que sea un número válido
+      if (isNaN(rateValue) || rateValue <= 0) {
+        toast({
+          title: "Error",
+          description: "La tarifa por hora debe ser mayor que 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Redondear a 2 decimales para evitar problemas de precisión
+      const roundedValue = Math.round(rateValue * 100) / 100;
+      
+      console.log(`Guardando tarifa: ${roundedValue} (desde texto: ${editRateText})`);
+      
+      // Enviamos el valor como número ya convertido
+      updatePersonnelMutation.mutate({ 
+        id: person.id, 
+        data: {
+          name: editName,
+          roleId: editRoleId,
+          hourlyRate: roundedValue
+        }
+      });
+    } catch (error) {
+      console.error("Error al procesar valor numérico:", error);
       toast({
         title: "Error",
-        description: "La tarifa por hora debe ser mayor que 0",
+        description: "Formato de tarifa inválido. Use un número válido.",
         variant: "destructive",
       });
-      return;
     }
-
-    // Usar el valor convertido de texto en lugar del estado numérico
-    console.log(`Guardando tarifa: ${rateValue} (desde texto: ${editRateText})`);
-    
-    updatePersonnelMutation.mutate({ 
-      id: person.id, 
-      data: {
-        name: editName,
-        roleId: editRoleId,
-        hourlyRate: rateValue
-      }
-    });
   };
 
   const handleCancel = () => {
