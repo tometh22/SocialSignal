@@ -198,8 +198,24 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
               placeholder="0,00"
               value={editRate.toString().replace('.', ',')} 
               onChange={(e) => {
-                const value = parseDecimal(e.target.value);
-                setEditRate(isNaN(value) ? 0 : value);
+                const inputValue = e.target.value;
+                
+                // Permitir entrada vacía
+                if (inputValue === "") {
+                  setEditRate(0);
+                  return;
+                }
+                
+                // Reemplazar comas por puntos para parsing
+                const normalizedValue = inputValue.replace(',', '.');
+                
+                // Solo procesar si es un número válido
+                if (/^\d*\.?\d*$/.test(normalizedValue)) {
+                  const numericValue = parseFloat(normalizedValue);
+                  if (!isNaN(numericValue)) {
+                    setEditRate(numericValue);
+                  }
+                }
               }} 
               className="w-full h-9" // Altura fija
             />
