@@ -100,16 +100,22 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
     fetchData();
   }, []);
 
-  // Filtrar personal cuando cambia el rol
+  // Actualizar los datos al cambiar el modo de selección
   useEffect(() => {
-    if (selectedRole && personnel.length > 0) {
+    // Cuando cambiamos a modo por personal, ya no necesitamos filtrar
+    if (selectionMode === 'personnel') {
+      // Mostrar todo el personal disponible sin filtrar por rol
+      setFilteredPersonnel(personnel);
+    } 
+    // Cuando cambiamos a modo por rol, filtramos por el rol seleccionado
+    else if (selectionMode === 'role' && selectedRole) {
       const roleId = Number(selectedRole);
       const filtered = personnel.filter(person => person.roleId === roleId);
       setFilteredPersonnel(filtered);
     } else {
       setFilteredPersonnel([]);
     }
-  }, [selectedRole, personnel]);
+  }, [selectionMode, selectedRole, personnel]);
 
   // Actualizar tarifa cuando cambia el rol
   useEffect(() => {
@@ -132,11 +138,14 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   const handlePersonnelChange = (value: string) => {
     setSelectedPerson(value);
     
-    // Actualizar tarifa si se selecciona una persona
+    // Actualizar rol y tarifa automáticamente si se selecciona una persona
     if (value) {
       const personnelId = Number(value);
       const person = personnel.find(p => p.id === personnelId);
       if (person) {
+        // Actualizamos el rol automáticamente
+        setSelectedRole(person.roleId.toString());
+        // Actualizamos la tarifa
         setRate(person.hourlyRate);
       }
     }
@@ -144,8 +153,14 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
 
   // Manejar envío del formulario
   const handleAddMember = () => {
-    if (!selectedRole) {
+    // Validaciones según el modo de selección
+    if (selectionMode === 'role' && !selectedRole) {
       alert('Por favor, selecciona un rol');
+      return;
+    }
+    
+    if (selectionMode === 'personnel' && !selectedPerson) {
+      alert('Por favor, selecciona un miembro del personal');
       return;
     }
     
@@ -156,12 +171,6 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
     
     if (rate <= 0) {
       alert('La tarifa debe ser mayor a 0');
-      return;
-    }
-    
-    // En modo "por personal", verificar que se haya seleccionado personal si el modo lo requiere
-    if (selectionMode === 'personnel' && !selectedPerson) {
-      alert('Por favor, selecciona un miembro del personal');
       return;
     }
     
@@ -289,54 +298,56 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
             <div className="mt-4">
               <h3 className="text-base font-medium mb-4">Añadir Miembro al Equipo</h3>
               
+              {/* Mostrar diferentes campos según el modo de selección */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                {/* Selector de Rol - Siempre visible */}
-                <div>
-                  <Label className="block text-sm font-medium mb-1">Rol</Label>
-                  <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
-                    <SelectTrigger className="w-full h-10">
-                      <SelectValue placeholder="Seleccionar rol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map(role => (
-                        <SelectItem key={role.id} value={role.id.toString()}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Selector de Personal - Solo visible en modo de personal específico */}
-                <div>
-                  <Label className="block text-sm font-medium mb-1">Personal</Label>
-                  <Select 
-                    value={selectedPerson.toString()} 
-                    onValueChange={handlePersonnelChange} 
-                    disabled={!selectedRole || selectionMode === 'role'}
-                  >
-                    <SelectTrigger className="w-full h-10">
-                      <SelectValue placeholder={
-                        selectionMode === 'role' 
-                          ? "No aplica en modo Por Roles" 
-                          : "Seleccionar personal"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredPersonnel.length > 0 ? (
-                        filteredPersonnel.map(person => (
-                          <SelectItem key={person.id} value={person.id.toString()}>
-                            {person.name}
+                {/* Selector condicional basado en el modo de selección */}
+                {selectionMode === 'role' ? (
+                  /* Selector de Rol - Visible en modo 'por roles' */
+                  <div>
+                    <Label className="block text-sm font-medium mb-1">Rol</Label>
+                    <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder="Seleccionar rol" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map(role => (
+                          <SelectItem key={role.id} value={role.id.toString()}>
+                            {role.name}
                           </SelectItem>
-                        ))
-                      ) : (
-                        <div className="text-center py-2 text-sm text-gray-500">
-                          No hay personal disponible para este rol
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  /* Selector de Personal - Visible en modo 'por personal' */
+                  <div className="col-span-2">
+                    <Label className="block text-sm font-medium mb-1">Personal</Label>
+                    <Select 
+                      value={selectedPerson.toString()} 
+                      onValueChange={handlePersonnelChange}
+                    >
+                      <SelectTrigger className="w-full h-10">
+                        <SelectValue placeholder="Seleccionar personal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {personnel.length > 0 ? (
+                          personnel.map(person => (
+                            <SelectItem key={person.id} value={person.id.toString()}>
+                              {person.name} - {getRoleName(person.roleId)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="text-center py-2 text-sm text-gray-500">
+                            No hay personal disponible
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      El rol y la tarifa se establecerán automáticamente al seleccionar una persona
+                    </p>
+                  </div>
+                )}
                 
                 {/* Horas */}
                 <div>
