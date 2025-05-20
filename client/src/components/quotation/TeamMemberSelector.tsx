@@ -61,8 +61,8 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   // Formulario de nuevo miembro
   const [selectedRole, setSelectedRole] = useState<number | string>('');
   const [selectedPerson, setSelectedPerson] = useState<number | string>('');
-  const [hours, setHours] = useState<number>(10);
-  const [rate, setRate] = useState<number>(0);
+  const [hours, setHours] = useState<string>("10");
+  const [rate, setRate] = useState<string>("0");
   
   // Filtrado de personal por rol
   const [filteredPersonnel, setFilteredPersonnel] = useState<Personnel[]>([]);
@@ -123,7 +123,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
       const roleId = Number(selectedRole);
       const role = roles.find(r => r.id === roleId);
       if (role) {
-        setRate(role.defaultRate);
+        setRate(role.defaultRate.toString());
       }
     }
   }, [selectedRole, roles]);
@@ -146,7 +146,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         // Actualizamos el rol automáticamente
         setSelectedRole(person.roleId.toString());
         // Actualizamos la tarifa
-        setRate(person.hourlyRate);
+        setRate(person.hourlyRate.toString());
       }
     }
   };
@@ -164,12 +164,16 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
       return;
     }
     
-    if (hours <= 0) {
+    // Convertir a número para validar correctamente
+    const hoursNum = hours === "" ? 0 : Number(hours);
+    const rateNum = rate === "" ? 0 : Number(rate);
+    
+    if (hoursNum <= 0) {
       alert('Las horas deben ser mayores a 0');
       return;
     }
     
-    if (rate <= 0) {
+    if (rateNum <= 0) {
       alert('La tarifa debe ser mayor a 0');
       return;
     }
@@ -177,20 +181,20 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
     const roleId = Number(selectedRole);
     // El personnelId solo se usará en modo "personnel"
     const personnelId = selectionMode === 'personnel' && selectedPerson ? Number(selectedPerson) : null;
-    const cost = hours * rate;
+    const cost = hoursNum * rateNum;
     
     // Llamar a la función proporcionada por el padre
     onAddMember({
       roleId,
       personnelId,
-      hours,
-      rate,
+      hours: hoursNum,
+      rate: rateNum,
       cost
     });
     
     // Mantener el rol seleccionado pero limpiar el personal
     setSelectedPerson('');
-    setHours(10);
+    setHours("10");
     
     // No mostramos alerta para mejorar la experiencia de usuario
     console.log('Miembro añadido al equipo correctamente');
@@ -211,17 +215,17 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   
   // Estados para la edición de miembros
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{hours: number, rate: number}>({
-    hours: 0,
-    rate: 0
+  const [editValues, setEditValues] = useState<{hours: string, rate: string}>({
+    hours: "0",
+    rate: "0"
   });
   
   // Iniciar edición de un miembro
   const handleStartEdit = (member: TeamMember) => {
     setEditingMemberId(member.id);
     setEditValues({
-      hours: member.hours,
-      rate: member.rate
+      hours: member.hours.toString(),
+      rate: member.rate.toString()
     });
   };
   
@@ -233,10 +237,26 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   // Guardar cambios de edición
   const handleSaveEdit = (memberId: string) => {
     if (onUpdateMember) {
-      const cost = editValues.hours * editValues.rate;
+      // Convertir a números
+      const hoursNum = editValues.hours === "" ? 0 : Number(editValues.hours);
+      const rateNum = editValues.rate === "" ? 0 : Number(editValues.rate);
+      
+      // Validar
+      if (hoursNum <= 0) {
+        alert('Las horas deben ser mayores a 0');
+        return;
+      }
+      
+      if (rateNum <= 0) {
+        alert('La tarifa debe ser mayor a 0');
+        return;
+      }
+      
+      const cost = hoursNum * rateNum;
+      
       onUpdateMember(memberId, {
-        hours: editValues.hours, 
-        rate: editValues.rate,
+        hours: hoursNum, 
+        rate: rateNum,
         cost
       });
       
@@ -353,10 +373,17 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                 <div>
                   <Label className="block text-sm font-medium mb-1">Horas</Label>
                   <Input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={hours}
-                    onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                    onChange={(e) => {
+                      // Permitir cadena vacía o números
+                      const value = e.target.value;
+                      if (value === "" || /^\d+$/.test(value)) {
+                        setHours(value);
+                      }
+                    }}
                     className="h-10"
                   />
                 </div>
@@ -367,11 +394,17 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                     <Input
-                      type="number"
-                      min="0"
-                      step="0.1"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*\.?[0-9]*"
                       value={rate}
-                      onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => {
+                        // Permitir cadena vacía o números decimales
+                        const value = e.target.value;
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setRate(value);
+                        }
+                      }}
                       className="pl-7 h-10"
                     />
                   </div>
