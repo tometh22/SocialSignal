@@ -1180,6 +1180,23 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             return;
           }
           
+          // Determinar automáticamente el paso más avanzado según los datos
+          let detectedStep = 1; // Paso inicial por defecto
+          
+          // Si tiene información básica completa (cliente y nombre de proyecto), al menos está en paso 2
+          if (quotation.clientId && quotation.projectName) {
+            detectedStep = 2;
+            
+            // Si tiene parámetros de configuración completos, al menos está en paso 3
+            if (quotation.analysisType && quotation.mentionsVolume && 
+                quotation.countriesCovered && quotation.clientEngagement) {
+              detectedStep = 3;
+              
+              // Verificaremos si tiene miembros en el equipo para el paso 4
+              // (Esto lo verificamos más adelante cuando cargamos el equipo)
+            }
+          }
+          
           // Cargar el cliente
           let cliente = null;
           try {
@@ -1262,10 +1279,20 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
               });
               
               console.log("Equipo convertido (final):", teamMembers);
+              
+              // Si tiene miembros en el equipo, consideramos que está en el paso 4 (financiero)
+              if (teamMembers.length > 0) {
+                detectedStep = 4;
+                console.log("Cotización con equipo completo, avanzando al paso 4");
+              }
             }
           } catch (err) {
             console.error("Error al cargar equipo:", err);
           }
+          
+          // Restaurar al paso detectado automáticamente
+          console.log(`Detectado paso ${detectedStep} para esta cotización`);
+          setCurrentStep(detectedStep);
           
           // Actualizar el estado con los datos cargados
           setBaseCost(quotation.baseCost || 0);
