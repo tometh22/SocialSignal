@@ -45,7 +45,9 @@ const OptimizedQuoteContent = () => {
     isEditing,
     isRecotizacion,
     quotationId,
-    addTeamMember // Agregamos la función para añadir miembros al equipo
+    addTeamMember, // Función para añadir miembros al equipo
+    updateTeamMember, // Función para actualizar miembros del equipo
+    removeTeamMember // Función para eliminar miembros del equipo
   } = useOptimizedQuote();
   
   const [, setLocation] = useLocation();
@@ -275,6 +277,20 @@ const OptimizedQuoteContent = () => {
                         } else {
                           console.error("Error: La función addTeamMember no está disponible");
                           alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
+                        }
+                      }}
+                      onUpdateMember={(id, updates) => {
+                        if (typeof updateTeamMember === 'function') {
+                          updateTeamMember(id, updates);
+                        } else {
+                          console.error("Error: La función updateTeamMember no está disponible");
+                        }
+                      }}
+                      onRemoveMember={(id) => {
+                        if (typeof removeTeamMember === 'function') {
+                          removeTeamMember(id);
+                        } else {
+                          console.error("Error: La función removeTeamMember no está disponible");
                         }
                       }}
                       existingMembers={Array.isArray(quotationData.teamMembers) ? quotationData.teamMembers : []}
