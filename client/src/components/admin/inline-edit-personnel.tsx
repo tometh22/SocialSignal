@@ -102,7 +102,11 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return;
     }
 
-    if (editRate <= 0) {
+    // Convertir texto a número (asegurando reemplazo de comas)
+    const rateValue = parseFloat(editRateText.replace(',', '.'));
+    
+    // Validar que sea un número válido
+    if (isNaN(rateValue) || rateValue <= 0) {
       toast({
         title: "Error",
         description: "La tarifa por hora debe ser mayor que 0",
@@ -111,12 +115,15 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return;
     }
 
+    // Usar el valor convertido de texto en lugar del estado numérico
+    console.log(`Guardando tarifa: ${rateValue} (desde texto: ${editRateText})`);
+    
     updatePersonnelMutation.mutate({ 
       id: person.id, 
       data: {
         name: editName,
         roleId: editRoleId,
-        hourlyRate: editRate
+        hourlyRate: rateValue
       }
     });
   };
