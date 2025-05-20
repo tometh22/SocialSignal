@@ -710,10 +710,22 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   const goToStep = useCallback((step: number) => {
     if (step >= 1 && step <= 4) {
       setCurrentStep(step);
+      
+      // Si es una edición (hay un quotationId), guardar el paso en localStorage
+      if (quotationId) {
+        console.log(`Guardando paso ${step} para cotización ${quotationId}`);
+        localStorage.setItem(`quote_step_${quotationId}`, step.toString());
+      }
     }
-  }, []);
+  }, [quotationId]);
 
   const nextStep = useCallback(() => {
+    // También guardar el paso actual + 1 si hay un ID de cotización
+    if (quotationId && currentStep < 4) {
+      const nextStepNumber = currentStep + 1;
+      console.log(`Guardando paso siguiente ${nextStepNumber} para cotización ${quotationId}`);
+      localStorage.setItem(`quote_step_${quotationId}`, nextStepNumber.toString());
+    }
     // Si estamos en el paso 1 (información básica), validar los campos de información básica
     if (currentStep === 1) {
       // Verificar que el cliente esté seleccionado
@@ -1290,9 +1302,21 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             console.error("Error al cargar equipo:", err);
           }
           
-          // Restaurar al paso detectado automáticamente
-          console.log(`Detectado paso ${detectedStep} para esta cotización`);
-          setCurrentStep(detectedStep);
+                  // Verificar si hay un paso guardado en localStorage
+          const savedStep = localStorage.getItem(`quote_step_${quotationId}`);
+          let finalStep = detectedStep;
+          
+          if (savedStep) {
+            const parsedStep = parseInt(savedStep);
+            if (!isNaN(parsedStep) && parsedStep >= 1 && parsedStep <= 4) {
+              console.log(`Usando paso guardado localmente: ${parsedStep}`);
+              finalStep = parsedStep;
+            }
+          }
+          
+          // Restaurar al paso detectado o guardado
+          console.log(`Restaurando al paso ${finalStep} para esta cotización`);
+          setCurrentStep(finalStep);
           
           // Actualizar el estado con los datos cargados
           setBaseCost(quotation.baseCost || 0);
