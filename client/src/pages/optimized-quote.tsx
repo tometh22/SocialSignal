@@ -250,20 +250,42 @@ const OptimizedQuoteContent = () => {
                     <p className="text-sm text-gray-500 mb-6">
                       Configura el equipo del proyecto seleccionando roles y personal específico.
                     </p>
-                    {addTeamMember && (
-                      <DirectTeamSelector 
-                        onAddMember={(member) => {
-                          addTeamMember({
-                            roleId: member.roleId,
-                            personnelId: member.personnelId,
-                            hours: member.hours,
-                            rate: member.rate,
-                            cost: member.cost
-                          });
-                        }} 
-                        existingMembers={quotationData.teamMembers || []}
-                      />
-                    )}
+                    {/* Selectores de equipo mejorados */}
+                    <div className="grid grid-cols-1 gap-6 mb-6">
+                      <div className="bg-sky-50 p-4 rounded-md border border-sky-100 flex items-center gap-3">
+                        <AlertCircle className="h-5 w-5 text-sky-500" />
+                        <div className="text-sm text-sky-700">
+                          <p>Aquí puedes seleccionar roles y personal para tu proyecto. Selecciona un rol, personal (opcional), 
+                          horas y tarifa para cada miembro del equipo.</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <DirectTeamSelector 
+                      onAddMember={(member) => {
+                        console.log("Intentando añadir miembro con:", JSON.stringify(member));
+                        try {
+                          // Verificar si la función addTeamMember está disponible
+                          if (typeof addTeamMember === 'function') {
+                            addTeamMember({
+                              roleId: member.roleId,
+                              personnelId: member.personnelId,
+                              hours: member.hours,
+                              rate: member.rate,
+                              cost: member.hours * member.rate // Recalcular por si acaso
+                            });
+                            console.log("Miembro añadido exitosamente al equipo");
+                          } else {
+                            console.error("Error: La función addTeamMember no está disponible");
+                            alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
+                          }
+                        } catch (error) {
+                          console.error("Error al intentar añadir miembro:", error);
+                          alert(`Error: ${error.message || 'Ocurrió un error desconocido'}`);
+                        }
+                      }} 
+                      existingMembers={Array.isArray(quotationData.teamMembers) ? quotationData.teamMembers : []}
+                    />
                   </div>
                 </>
               )}

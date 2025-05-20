@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, Users } from 'lucide-react';
+import { UserPlus, Users, AlertCircle } from 'lucide-react';
 import { parseDecimalInput } from '@/lib/number-utils';
+import { v4 as uuidv4 } from 'uuid';
 
 // Interfaces para los datos
 interface Role {
@@ -99,37 +100,67 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
 
   // Manejar la adición de nuevo miembro
   const handleAddMember = () => {
-    if (newMember.roleId === 0) {
-      alert('Por favor selecciona un rol');
-      return;
+    try {
+      if (newMember.roleId === 0) {
+        alert('Por favor selecciona un rol');
+        return;
+      }
+      
+      if (newMember.hours <= 0) {
+        alert('Las horas deben ser mayores a 0');
+        return;
+      }
+      
+      if (newMember.rate <= 0) {
+        alert('La tarifa debe ser mayor a 0');
+        return;
+      }
+      
+      // Calcular el costo total
+      const cost = newMember.hours * newMember.rate;
+      
+      // Para propósitos de depuración
+      console.log("Preparando miembro para añadir:", {
+        roleId: newMember.roleId,
+        personnelId: newMember.personnelId,
+        hours: newMember.hours,
+        rate: newMember.rate,
+        cost
+      });
+      
+      // Crear un objeto miembro completo
+      const memberToAdd = {
+        roleId: newMember.roleId,
+        personnelId: newMember.personnelId,
+        hours: newMember.hours,
+        rate: newMember.rate,
+        cost
+      };
+      
+      // Si la función de callback no existe, manejarlo directamente
+      if (typeof onAddMember !== 'function') {
+        console.error("Error: onAddMember no es una función válida", onAddMember);
+        alert("Error: No se pudo añadir el miembro al equipo (callback inválido)");
+        return;
+      }
+      
+      // Llamar a la función de callback proporcionada por el componente padre
+      onAddMember(memberToAdd);
+      
+      // Limpiar el formulario pero mantener el rol seleccionado
+      setNewMember(prev => ({
+        ...prev,
+        personnelId: null,
+        hours: 10,
+      }));
+      
+      // Mensaje de confirmación
+      alert('Miembro añadido al equipo correctamente');
+      
+    } catch (error) {
+      console.error("Error al añadir miembro al equipo:", error);
+      alert(`Error al añadir miembro: ${error.message || 'Error desconocido'}`);
     }
-    
-    if (newMember.hours <= 0) {
-      alert('Las horas deben ser mayores a 0');
-      return;
-    }
-    
-    if (newMember.rate <= 0) {
-      alert('La tarifa debe ser mayor a 0');
-      return;
-    }
-    
-    const cost = newMember.hours * newMember.rate;
-    
-    onAddMember({
-      roleId: newMember.roleId,
-      personnelId: newMember.personnelId,
-      hours: newMember.hours,
-      rate: newMember.rate,
-      cost
-    });
-    
-    // Limpiar el formulario pero mantener el rol seleccionado
-    setNewMember(prev => ({
-      ...prev,
-      personnelId: null,
-      hours: 10,
-    }));
   };
 
   // Filtrar personal por rol seleccionado
