@@ -415,7 +415,14 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
               <div className="flex justify-end">
                 <Button 
                   onClick={handleAddMember} 
-                  disabled={!selectedRole || hours <= 0 || rate <= 0}
+                  disabled={
+                    (selectionMode === 'role' && !selectedRole) || 
+                    (selectionMode === 'personnel' && !selectedPerson) ||
+                    hours === "" || 
+                    Number(hours) <= 0 || 
+                    rate === "" || 
+                    Number(rate) <= 0
+                  }
                   className="bg-primary hover:bg-primary/90"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -469,13 +476,19 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                       <>
                         <td className="px-4 py-3 text-center">
                           <Input
-                            type="number"
-                            min="1"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={editValues.hours}
-                            onChange={(e) => setEditValues({
-                              ...editValues,
-                              hours: parseInt(e.target.value) || 0
-                            })}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === "" || /^\d+$/.test(value)) {
+                                setEditValues({
+                                  ...editValues,
+                                  hours: value
+                                });
+                              }
+                            }}
                             className="h-9 w-20 mx-auto text-center"
                           />
                         </td>
@@ -483,20 +496,26 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                           <div className="relative w-24 mx-auto">
                             <span className="absolute left-1 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                             <Input
-                              type="number"
-                              min="0"
-                              step="0.1"
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*\.?[0-9]*"
                               value={editValues.rate}
-                              onChange={(e) => setEditValues({
-                                ...editValues,
-                                rate: parseFloat(e.target.value) || 0
-                              })}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                  setEditValues({
+                                    ...editValues,
+                                    rate: value
+                                  });
+                                }
+                              }}
                               className="h-9 pl-6 text-center"
                             />
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          ${(editValues.hours * editValues.rate).toFixed(2)}
+                          ${((editValues.hours === "" ? 0 : Number(editValues.hours)) * 
+                             (editValues.rate === "" ? 0 : Number(editValues.rate))).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex justify-center space-x-1">
