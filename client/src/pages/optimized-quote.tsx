@@ -13,6 +13,7 @@ import { DirectComplexitySelection } from '@/components/optimized/minimal-comple
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
+import TeamMemberSelector from '@/components/quotation/TeamMemberSelector';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 
 // Interfaces para los props
@@ -261,19 +262,16 @@ const OptimizedQuoteContent = () => {
                       </div>
                     </div>
                     
-                    <DirectTeamSelector 
+                    <TeamMemberSelector 
                       onAddMember={(member) => {
-                        console.log("Intentando añadir miembro con:", JSON.stringify(member));
-                        
                         if (typeof addTeamMember === 'function') {
                           addTeamMember({
                             roleId: member.roleId,
                             personnelId: member.personnelId,
                             hours: member.hours,
                             rate: member.rate,
-                            cost: member.hours * member.rate
+                            cost: member.cost
                           });
-                          console.log("Miembro añadido exitosamente al equipo");
                         } else {
                           console.error("Error: La función addTeamMember no está disponible");
                           alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
