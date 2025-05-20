@@ -396,13 +396,14 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                     <Input
                       type="text"
                       inputMode="decimal"
-                      pattern="[0-9]*\.?[0-9]*"
+                      pattern="[0-9]*[.,]?[0-9]*"
                       value={rate}
                       onChange={(e) => {
-                        // Permitir cadena vacía o números decimales
+                        // Permitir cadena vacía o números decimales (con punto o coma)
                         const value = e.target.value;
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setRate(value);
+                        if (value === "" || /^\d*[.,]?\d*$/.test(value)) {
+                          // Normalizar para almacenamiento interno (reemplazar coma por punto)
+                          setRate(value.replace(',', '.'));
                         }
                       }}
                       className="pl-7 h-10"
