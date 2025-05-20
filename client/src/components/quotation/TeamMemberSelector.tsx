@@ -3,7 +3,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users } from 'lucide-react';
+import { UserPlus, Users, Info } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { v4 as uuidv4 } from 'uuid';
 
 // Interfaces para los datos
@@ -41,6 +42,9 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Estado para el modo de selección (por rol o por personal)
+  const [selectionMode, setSelectionMode] = useState<'role' | 'personnel'>('role');
   
   // Formulario de nuevo miembro
   const [selectedRole, setSelectedRole] = useState<number | string>('');
@@ -176,90 +180,109 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({ onAddMember, ex
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4">Añadir Miembro al Equipo</h2>
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="border-b border-gray-200 p-4">
+          <h2 className="text-lg font-medium">Añadir Miembro al Equipo</h2>
+        </div>
         
         {loading ? (
-          <div className="text-center p-4">Cargando datos...</div>
+          <div className="text-center p-6">Cargando datos...</div>
         ) : error ? (
-          <div className="text-center p-4 text-red-500">{error}</div>
+          <div className="text-center p-6 text-red-500">{error}</div>
         ) : (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              {/* Selector de Rol */}
-              <div>
-                <Label htmlFor="role-selector" className="block text-sm font-medium mb-1">Rol</Label>
-                <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map(role => (
-                      <SelectItem key={role.id} value={role.id.toString()}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Selector de Personal */}
-              <div>
-                <Label htmlFor="personnel-selector" className="block text-sm font-medium mb-1">Personal</Label>
-                <Select value={selectedPerson.toString()} onValueChange={handlePersonnelChange} disabled={!selectedRole}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar personal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredPersonnel.map(person => (
-                      <SelectItem key={person.id} value={person.id.toString()}>
-                        {person.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Horas */}
-              <div>
-                <Label htmlFor="hours-input" className="block text-sm font-medium mb-1">Horas</Label>
-                <Input
-                  id="hours-input"
-                  type="number"
-                  min="1"
-                  value={hours}
-                  onChange={(e) => setHours(parseInt(e.target.value) || 0)}
-                />
-              </div>
-              
-              {/* Tarifa */}
-              <div>
-                <Label htmlFor="rate-input" className="block text-sm font-medium mb-1">Tarifa ($/h)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                  <Input
-                    id="rate-input"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={rate}
-                    onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
-                    className="pl-7"
-                  />
-                </div>
-              </div>
+          <div className="p-4">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 flex items-start">
+              <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+              <p className="text-sm text-blue-700">
+                Aquí puedes seleccionar roles y personal para tu proyecto. Selecciona un rol, personal (opcional), 
+                horas y tarifa para cada miembro del equipo.
+              </p>
             </div>
             
-            {/* Botón para añadir */}
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleAddMember} 
-                disabled={!selectedRole || hours <= 0 || rate <= 0}
-                className="bg-primary hover:bg-primary/90"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Añadir
-              </Button>
+            <div className="mt-4">
+              <h3 className="text-base font-medium mb-4">Añadir Miembro al Equipo</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                {/* Selector de Rol */}
+                <div>
+                  <Label className="block text-sm font-medium mb-1">Rol</Label>
+                  <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
+                    <SelectTrigger className="w-full h-10">
+                      <SelectValue placeholder="Seleccionar rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map(role => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Selector de Personal */}
+                <div>
+                  <Label className="block text-sm font-medium mb-1">Personal</Label>
+                  <Select value={selectedPerson.toString()} onValueChange={handlePersonnelChange} disabled={!selectedRole}>
+                    <SelectTrigger className="w-full h-10">
+                      <SelectValue placeholder="Seleccionar personal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredPersonnel.length > 0 ? (
+                        filteredPersonnel.map(person => (
+                          <SelectItem key={person.id} value={person.id.toString()}>
+                            {person.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="text-center py-2 text-sm text-gray-500">
+                          No hay personal disponible para este rol
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Horas */}
+                <div>
+                  <Label className="block text-sm font-medium mb-1">Horas</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={hours}
+                    onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                    className="h-10"
+                  />
+                </div>
+                
+                {/* Tarifa */}
+                <div>
+                  <Label className="block text-sm font-medium mb-1">Tarifa ($/h)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={rate}
+                      onChange={(e) => setRate(parseFloat(e.target.value) || 0)}
+                      className="pl-7 h-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Botón para añadir */}
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleAddMember} 
+                  disabled={!selectedRole || hours <= 0 || rate <= 0}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Añadir
+                </Button>
+              </div>
             </div>
           </div>
         )}
