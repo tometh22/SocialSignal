@@ -178,48 +178,45 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
             return oldData.map(item => item.id === updatedData.id ? updatedData : item);
           });
           
-          // Sin recargar la página, actualiza manualmente los valores
+          // Un enfoque más directo: actualizar el estado local y forzar una recarga de datos
           try {
-            // Actualiza la vista directamente en el DOM
+            // Actualizamos inmediatamente el estado local
+            setUpdatedPerson(updatedData);
             setIsEditing(false);
             
-            // Esperar un momento para que React actualice el DOM
-            setTimeout(() => {
-              console.log("Intentando actualizar interfaz sin recarga para ID:", person.id);
-              
-              // Buscar todos los elementos relacionados con este ID de personal
-              const elements = document.querySelectorAll(`[data-personnel-id="${person.id}"]`);
-              console.log(`Encontrados ${elements.length} elementos para actualizar`);
-              
-              elements.forEach(element => {
-                try {
-                  // Actualizar nombre si existe
-                  const nameElement = element.querySelector('[data-field="name"]');
-                  if (nameElement) {
-                    nameElement.textContent = updatedData.name;
-                    console.log("Nombre actualizado:", updatedData.name);
-                  }
+            // Invalidar y forzar recarga de los datos de personal
+            await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+            
+            // Forzar un refresco específico de la lista de personal después de una actualización exitosa
+            const refreshData = async () => {
+              console.log("Refrescando datos de personal desde el servidor...");
+              try {
+                // Obtener datos actualizados directamente del servidor
+                const response = await fetch("/api/personnel");
+                if (response.ok) {
+                  const freshData = await response.json();
                   
-                  // Actualizar rol si existe
-                  const roleElement = element.querySelector('[data-field="role"]');
-                  if (roleElement) {
-                    const roleName = getRoleName(updatedData.roleId);
-                    roleElement.textContent = roleName;
-                    console.log("Rol actualizado:", roleName);
-                  }
+                  // Actualizar la caché con los datos recién obtenidos
+                  queryClient.setQueryData(["/api/personnel"], freshData);
                   
-                  // Actualizar tarifa si existe
-                  const rateElement = element.querySelector('[data-field="rate"]');
-                  if (rateElement) {
-                    const formattedRate = `$${updatedData.hourlyRate.toFixed(2).replace('.', ',')}/hr`;
-                    rateElement.textContent = formattedRate;
-                    console.log("Tarifa actualizada:", formattedRate);
+                  console.log("Datos refrescados correctamente:", freshData);
+                  
+                  // Buscar el personal específico que se actualizó
+                  const updatedPersonnel = freshData.find((p: Personnel) => p.id === person.id);
+                  if (updatedPersonnel) {
+                    console.log("Datos actualizados confirmados:", updatedPersonnel);
+                    
+                    // Actualizar el estado local con los datos más recientes
+                    setUpdatedPerson(updatedPersonnel);
                   }
-                } catch (domError) {
-                  console.error("Error al manipular el DOM:", domError);
                 }
-              });
-            }, 100);
+              } catch (refreshError) {
+                console.error("Error al refrescar datos:", refreshError);
+              }
+            };
+            
+            // Ejecutar el refresco después de un breve momento
+            setTimeout(refreshData, 100);
           } catch (error) {
             console.error("Error al actualizar la interfaz:", error);
           }
