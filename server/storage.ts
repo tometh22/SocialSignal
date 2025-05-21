@@ -593,31 +593,81 @@ export class MemStorage implements IStorage {
 
   // Personnel operations
   async getPersonnel(): Promise<Personnel[]> {
-    return Array.from(this.personnel.values());
+    try {
+      // Usar directamente la base de datos para obtener todo el personal
+      const result = await db.select().from(personnel);
+      console.log(`Obtenidos ${result.length} miembros del personal desde la base de datos`);
+      return result;
+    } catch (error) {
+      console.error("Error al obtener personal desde la base de datos:", error);
+      throw error;
+    }
   }
 
   async getPersonnelByRole(roleId: number): Promise<Personnel[]> {
-    return Array.from(this.personnel.values()).filter(p => p.roleId === roleId);
+    try {
+      // Usar la base de datos para filtrar por rol
+      const result = await db.select().from(personnel).where(eq(personnel.roleId, roleId));
+      console.log(`Obtenidos ${result.length} miembros del personal con rol ${roleId} desde la base de datos`);
+      return result;
+    } catch (error) {
+      console.error(`Error al obtener personal con rol ${roleId} desde la base de datos:`, error);
+      throw error;
+    }
   }
 
   async getPersonnelById(id: number): Promise<Personnel | undefined> {
-    return this.personnel.get(id);
+    try {
+      // Usar la base de datos para obtener una persona específica por ID
+      const [result] = await db.select().from(personnel).where(eq(personnel.id, id));
+      
+      if (result) {
+        console.log(`Obtenido miembro del personal ID ${id} desde la base de datos:`, result.name);
+      } else {
+        console.log(`No se encontró miembro del personal con ID ${id} en la base de datos`);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`Error al obtener miembro del personal con ID ${id} desde la base de datos:`, error);
+      throw error;
+    }
   }
 
-  async createPersonnel(personnel: InsertPersonnel): Promise<Personnel> {
-    const id = this.personnelId++;
-    const newPersonnel: Personnel = { ...personnel, id };
-    this.personnel.set(id, newPersonnel);
-    return newPersonnel;
+  async createPersonnel(newPersonnel: InsertPersonnel): Promise<Personnel> {
+    try {
+      // Usar la base de datos para crear un nuevo miembro del personal
+      const [result] = await db.insert(personnel).values(newPersonnel).returning();
+      console.log(`Creado nuevo miembro del personal en la base de datos:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error al crear miembro del personal en la base de datos:", error);
+      throw error;
+    }
   }
 
-  async updatePersonnel(id: number, personnel: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
-    const existingPersonnel = this.personnel.get(id);
-    if (!existingPersonnel) return undefined;
-    
-    const updatedPersonnel = { ...existingPersonnel, ...personnel };
-    this.personnel.set(id, updatedPersonnel);
-    return updatedPersonnel;
+  async updatePersonnel(id: number, personnelData: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
+    try {
+      // Verificar si el miembro del personal existe
+      const existingPerson = await this.getPersonnelById(id);
+      if (!existingPerson) {
+        console.log(`No se encontró miembro del personal con ID ${id} para actualizar`);
+        return undefined;
+      }
+      
+      // Usar la base de datos para actualizar el miembro del personal
+      const [result] = await db
+        .update(personnel)
+        .set(personnelData)
+        .where(eq(personnel.id, id))
+        .returning();
+      
+      console.log(`Actualizado miembro del personal ID ${id} en la base de datos:`, result);
+      return result;
+    } catch (error) {
+      console.error(`Error al actualizar miembro del personal ID ${id} en la base de datos:`, error);
+      throw error;
+    }
   }
 
   // Report template operations
