@@ -161,26 +161,40 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           const updatedData = await response.json();
           console.log("Actualización exitosa:", updatedData);
           
-          // Actualizar estado local
-          setUpdatedPerson(updatedData);
+          // Inmediatamente verificar los datos actualizados con una nueva petición
+          const verificationResponse = await fetch(`/api/personnel/${person.id}`);
+          const verifiedData = await verificationResponse.json();
           
-          // Notificar al componente padre
+          console.log("Verificación desde el servidor:", verifiedData);
+          console.log(`¿Los datos coinciden? ${JSON.stringify(verifiedData) === JSON.stringify(updatedData)}`);
+          
+          // Forzar actualización de la interfaz con los datos verificados
+          setUpdatedPerson(verifiedData);
+          
+          // Notificar al componente padre con los datos verificados
           if (onUpdate) {
-            onUpdate(updatedData);
+            onUpdate(verifiedData);
           }
           
-          // Actualizar caché
+          // Actualizar caché directamente con los datos verificados
           queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-            if (!oldData) return [updatedData];
-            return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+            if (!oldData) return [verifiedData];
+            return oldData.map(item => item.id === verifiedData.id ? verifiedData : item);
           });
           
-          // Invalidar consultas
-          queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+          // Forzar invalidación de todas las consultas relacionadas
+          await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/personnel", person.id.toString()] });
+          
+          // Actualizar la interfaz inmediatamente
+          window.location.href = window.location.href.split('#')[0] + '#refresh-' + Date.now();
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
           
           toast({
             title: "Éxito",
-            description: "Miembro del equipo actualizado correctamente.",
+            description: `Personal actualizado. Tarifa actual: $${verifiedData.hourlyRate}/hr`,
           });
           
           setIsEditing(false);
