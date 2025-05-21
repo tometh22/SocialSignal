@@ -186,11 +186,29 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
           await queryClient.invalidateQueries({ queryKey: ["/api/personnel", person.id.toString()] });
           
-          // Actualizar la interfaz inmediatamente
-          window.location.href = window.location.href.split('#')[0] + '#refresh-' + Date.now();
-          setTimeout(() => {
-            window.location.reload();
-          }, 100);
+          // Actualizar solo este componente sin recargar toda la página
+          // Actualiza todos los campos en la interfaz
+          document.querySelectorAll(`[data-personnel-id="${person.id}"]`).forEach(element => {
+            // Actualizar nombre
+            const nameElement = element.querySelector('[data-field="name"]');
+            if (nameElement) {
+              nameElement.textContent = verifiedData.name;
+            }
+            
+            // Actualizar rol
+            const roleElement = element.querySelector('[data-field="role"]');
+            if (roleElement) {
+              roleElement.textContent = getRoleName(verifiedData.roleId);
+            }
+            
+            // Actualizar tarifa
+            const rateElement = element.querySelector('[data-field="rate"]');
+            if (rateElement) {
+              rateElement.textContent = `$${verifiedData.hourlyRate.toFixed(2).replace('.', ',')}/hr`;
+            }
+            
+            console.log(`Actualización en tiempo real completada para ID: ${person.id}`);
+          });
           
           toast({
             title: "Éxito",
@@ -262,7 +280,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
 
   return (
     <>
-      <TableRow>
+      <TableRow data-personnel-id={person.id}>
         <TableCell className="font-medium">
           {isEditing ? (
             <Input 
@@ -270,7 +288,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
               onChange={(e) => setEditName(e.target.value)}
               className="w-full h-9" // Altura fija
             />
-          ) : updatedPerson.name}
+          ) : <span data-field="name">{updatedPerson.name}</span>}
         </TableCell>
         <TableCell>
           {isEditing ? (
@@ -286,7 +304,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
                 ))}
               </SelectContent>
             </Select>
-          ) : getRoleName(updatedPerson.roleId)}
+          ) : <span data-field="role">{getRoleName(updatedPerson.roleId)}</span>}
         </TableCell>
         <TableCell>
           {isEditing ? (
@@ -316,7 +334,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
               }} 
               className="w-full h-9" // Altura fija
             />
-          ) : `$${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr`}
+          ) : <span data-field="rate">${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr</span>}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (
