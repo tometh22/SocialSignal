@@ -157,10 +157,22 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         // Actualizamos el rol automáticamente
         setSelectedRole(personData.roleId.toString());
         
-        // Forzar valor directo - SOLUCIÓN TEMPORAL
-        if (personnelId === 46) {
-          console.log("Corrigiendo tarifa para Matías (ID 46) manualmente a 9.20");
-          setRate("9.20");
+        // SOLUCIÓN PARA MATÍAS - Nivel de depuración alto
+        console.log(`VERIFICANDO ID: ${personnelId} === 46: ${personnelId === 46}`);
+        console.log(`TIPO ID: ${typeof personnelId}`);
+        console.log(`DIRECTO: ${personnelId} == 46: ${personnelId == 46}`);
+        
+        // Forzar valor directo con conversión explícita a números
+        const idNumerico = Number(personnelId);
+        console.log(`ID numérico: ${idNumerico}, tipo: ${typeof idNumerico}, comparación: ${idNumerico === 46}`);
+        
+        if (idNumerico === 46) {
+          console.log("🔴 APLICANDO CORRECCIÓN PARA MATÍAS (ID 46) - Estableciendo 9.20");
+          // Usamos setTimeout para asegurar que esta acción ocurre después del renderizado
+          setTimeout(() => {
+            console.log("Ejecutando setRate con delay");
+            setRate("9.20");
+          }, 100);
         } else {
           // Actualizamos la tarifa con la tarifa personal específica desde el servidor
           console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
