@@ -161,58 +161,72 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           const updatedData = await response.json();
           console.log("Actualización exitosa:", updatedData);
           
-          // Inmediatamente verificar los datos actualizados con una nueva petición
-          const verificationResponse = await fetch(`/api/personnel/${person.id}`);
-          const verifiedData = await verificationResponse.json();
+          // Usar la respuesta directa del servidor como fuente de la verdad
+          console.log("Datos actualizados recibidos:", updatedData);
           
-          console.log("Verificación desde el servidor:", verifiedData);
-          console.log(`¿Los datos coinciden? ${JSON.stringify(verifiedData) === JSON.stringify(updatedData)}`);
+          // Actualizar el estado local con los datos recibidos
+          setUpdatedPerson(updatedData);
           
-          // Forzar actualización de la interfaz con los datos verificados
-          setUpdatedPerson(verifiedData);
-          
-          // Notificar al componente padre con los datos verificados
+          // Notificar al componente padre usando los datos actualizados
           if (onUpdate) {
-            onUpdate(verifiedData);
+            onUpdate(updatedData);
           }
           
-          // Actualizar caché directamente con los datos verificados
+          // Actualizar inmediatamente la caché
           queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-            if (!oldData) return [verifiedData];
-            return oldData.map(item => item.id === verifiedData.id ? verifiedData : item);
+            if (!oldData) return [updatedData];
+            return oldData.map(item => item.id === updatedData.id ? updatedData : item);
           });
           
-          // Forzar invalidación de todas las consultas relacionadas
-          await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-          await queryClient.invalidateQueries({ queryKey: ["/api/personnel", person.id.toString()] });
-          
-          // Actualizar solo este componente sin recargar toda la página
-          // Actualiza todos los campos en la interfaz
-          document.querySelectorAll(`[data-personnel-id="${person.id}"]`).forEach(element => {
-            // Actualizar nombre
-            const nameElement = element.querySelector('[data-field="name"]');
-            if (nameElement) {
-              nameElement.textContent = verifiedData.name;
-            }
+          // Sin recargar la página, actualiza manualmente los valores
+          try {
+            // Actualiza la vista directamente en el DOM
+            setIsEditing(false);
             
-            // Actualizar rol
-            const roleElement = element.querySelector('[data-field="role"]');
-            if (roleElement) {
-              roleElement.textContent = getRoleName(verifiedData.roleId);
-            }
-            
-            // Actualizar tarifa
-            const rateElement = element.querySelector('[data-field="rate"]');
-            if (rateElement) {
-              rateElement.textContent = `$${verifiedData.hourlyRate.toFixed(2).replace('.', ',')}/hr`;
-            }
-            
-            console.log(`Actualización en tiempo real completada para ID: ${person.id}`);
-          });
+            // Esperar un momento para que React actualice el DOM
+            setTimeout(() => {
+              console.log("Intentando actualizar interfaz sin recarga para ID:", person.id);
+              
+              // Buscar todos los elementos relacionados con este ID de personal
+              const elements = document.querySelectorAll(`[data-personnel-id="${person.id}"]`);
+              console.log(`Encontrados ${elements.length} elementos para actualizar`);
+              
+              elements.forEach(element => {
+                try {
+                  // Actualizar nombre si existe
+                  const nameElement = element.querySelector('[data-field="name"]');
+                  if (nameElement) {
+                    nameElement.textContent = updatedData.name;
+                    console.log("Nombre actualizado:", updatedData.name);
+                  }
+                  
+                  // Actualizar rol si existe
+                  const roleElement = element.querySelector('[data-field="role"]');
+                  if (roleElement) {
+                    const roleName = getRoleName(updatedData.roleId);
+                    roleElement.textContent = roleName;
+                    console.log("Rol actualizado:", roleName);
+                  }
+                  
+                  // Actualizar tarifa si existe
+                  const rateElement = element.querySelector('[data-field="rate"]');
+                  if (rateElement) {
+                    const formattedRate = `$${updatedData.hourlyRate.toFixed(2).replace('.', ',')}/hr`;
+                    rateElement.textContent = formattedRate;
+                    console.log("Tarifa actualizada:", formattedRate);
+                  }
+                } catch (domError) {
+                  console.error("Error al manipular el DOM:", domError);
+                }
+              });
+            }, 100);
+          } catch (error) {
+            console.error("Error al actualizar la interfaz:", error);
+          }
           
           toast({
             title: "Éxito",
-            description: `Personal actualizado. Tarifa actual: $${verifiedData.hourlyRate}/hr`,
+            description: `Personal actualizado. Tarifa actual: $${updatedData.hourlyRate.toFixed(2).replace('.', ',')}/hr`,
           });
           
           setIsEditing(false);
