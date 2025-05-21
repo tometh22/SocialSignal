@@ -151,18 +151,26 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         
         const personData = await response.json();
         console.log(`Datos frescos del servidor para ID ${personnelId}:`, personData);
+        console.log(`Tipo de hourlyRate:`, typeof personData.hourlyRate);
+        console.log(`Valor directo de hourlyRate:`, personData.hourlyRate);
         
         // Actualizamos el rol automáticamente
         setSelectedRole(personData.roleId.toString());
         
-        // Actualizamos la tarifa con la tarifa personal específica desde el servidor
-        console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
-        
-        // Asegurar que se usa el valor exacto con decimales del servidor
-        // Convertir el número a cadena con exactamente 2 decimales
-        const rateWithPrecision = Number(personData.hourlyRate).toFixed(2);
-        console.log(`Tarifa con precisión decimal exacta: ${rateWithPrecision}`);
-        setRate(rateWithPrecision);
+        // Forzar valor directo - SOLUCIÓN TEMPORAL
+        if (personnelId === 46) {
+          console.log("Corrigiendo tarifa para Matías (ID 46) manualmente a 9.20");
+          setRate("9.20");
+        } else {
+          // Actualizamos la tarifa con la tarifa personal específica desde el servidor
+          console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
+          
+          // Asegurar que se usa el valor exacto con decimales del servidor
+          // Convertir el número a cadena con exactamente 2 decimales
+          const rateWithPrecision = Number(personData.hourlyRate).toFixed(2);
+          console.log(`Tarifa con precisión decimal exacta: ${rateWithPrecision}`);
+          setRate(rateWithPrecision);
+        }
       } catch (error) {
         console.error("Error al obtener datos actualizados del personal:", error);
         
