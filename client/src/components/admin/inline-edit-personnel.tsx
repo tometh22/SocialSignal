@@ -91,16 +91,19 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       });
       setIsEditing(false);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error detallado al actualizar personal:", error);
+      
+      // Mostrar mensaje de error con más detalles
       toast({
         title: "Error",
-        description: "No se pudo actualizar el miembro del equipo.",
+        description: "No se pudo actualizar el miembro del equipo. Verifica la consola para más detalles.",
         variant: "destructive",
       });
     },
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validate inputs
     if (!editName.trim()) {
       toast({
@@ -112,24 +115,89 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
     }
 
     try {
-      // Enviar la tarifa exactamente como texto para que el backend la procese correctamente
-      // De esta forma el backend manejará la conversión de forma adecuada
-      console.log(`Guardando tarifa como texto para procesamiento en el servidor: "${editRateText}"`);
+      // Convertir tarifa de texto a número para enviarlo correctamente
+      let rateValue = 0;
       
-      // Enviamos los datos incluyendo la tarifa como texto (el servidor lo procesará)
-      updatePersonnelMutation.mutate({ 
-        id: person.id, 
-        data: {
-          name: editName,
-          roleId: editRoleId,
-          hourlyRate: editRateText // Enviamos como texto, el backend lo procesará
+      if (editRateText) {
+        // Reemplazar coma por punto para el parsing correcto
+        const normalizedValue = editRateText.replace(',', '.');
+        rateValue = parseFloat(normalizedValue);
+        
+        // Validar si es un número válido
+        if (isNaN(rateValue) || rateValue <= 0) {
+          toast({
+            title: "Error",
+            description: "La tarifa debe ser un número mayor que 0",
+            variant: "destructive",
+          });
+          return;
         }
+        
+        // Redondear a 2 decimales
+        rateValue = Math.round(rateValue * 100) / 100;
+      }
+      
+      console.log(`Enviando actualización para ID ${person.id}:`, {
+        name: editName,
+        roleId: editRoleId,
+        hourlyRate: rateValue
       });
+      
+      // Intenta hacer la petición directamente con fetch en lugar de la mutación
+      try {
+        const response = await fetch(`/api/personnel/${person.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: editName,
+            roleId: editRoleId,
+            hourlyRate: rateValue
+          })
+        });
+        
+        if (response.ok) {
+          const updatedData = await response.json();
+          console.log("Actualización exitosa:", updatedData);
+          
+          // Actualizar estado local
+          setUpdatedPerson(updatedData);
+          
+          // Notificar al componente padre
+          if (onUpdate) {
+            onUpdate(updatedData);
+          }
+          
+          // Actualizar caché
+          queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+            if (!oldData) return [updatedData];
+            return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+          });
+          
+          // Invalidar consultas
+          queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+          
+          toast({
+            title: "Éxito",
+            description: "Miembro del equipo actualizado correctamente.",
+          });
+          
+          setIsEditing(false);
+        } else {
+          const errorData = await response.json();
+          console.error("Error en la respuesta:", errorData);
+          throw new Error(errorData.message || "Error en la actualización");
+        }
+      } catch (fetchError) {
+        console.error("Error en la petición fetch:", fetchError);
+        throw fetchError;
+      }
     } catch (error) {
-      console.error("Error al procesar los datos del personal:", error);
+      console.error("Error completo al procesar datos del personal:", error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar la información. Inténtelo de nuevo.",
+        description: "No se pudo actualizar la información. Consulta la consola para más detalles.",
         variant: "destructive",
       });
     }
