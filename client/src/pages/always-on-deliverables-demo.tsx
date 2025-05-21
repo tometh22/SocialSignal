@@ -154,7 +154,13 @@ const AlwaysOnDeliverablesDemo = () => {
             proyecto={projectName}
             fechaInicio={startDate}
             presupuestoMensual={monthlyBudget}
-            entregables={deliverables}
+            entregables={deliverables.map(d => ({
+              id: d.id,
+              tipo: d.type,
+              frecuencia: d.frequency,
+              descripcion: d.description,
+              presupuesto: d.budget
+            }))}
             equipo={initialTeam}
             costoAdicional={additionalCost}
           />
