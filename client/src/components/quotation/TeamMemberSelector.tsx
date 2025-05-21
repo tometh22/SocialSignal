@@ -145,7 +145,9 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
       if (person) {
         // Actualizamos el rol automáticamente
         setSelectedRole(person.roleId.toString());
-        // Actualizamos la tarifa
+        // Actualizamos la tarifa con la tarifa personal específica
+        // Asegurar que usamos exactamente la tarifa de la persona, no la del rol
+        console.log(`Seleccionado personal: ${person.name}, tarifa personal: ${person.hourlyRate}`);
         setRate(person.hourlyRate.toString());
       }
     }
