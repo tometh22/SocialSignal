@@ -595,6 +595,10 @@ export const deliverables = pgTable("deliverables", {
   project_id: integer("project_id").references(() => activeProjects.id), // Vinculación con proyecto
   delivery_date: timestamp("delivery_date"), // Fecha real de entrega
   due_date: timestamp("due_date"), // Fecha límite de entrega
+  frequency: text("frequency"), // Frecuencia de entrega: semanal, quincenal, mensual, trimestral
+  deliverable_type: text("deliverable_type"), // Tipo de entregable: informe, análisis, monitoreo, dashboard
+  specific_budget: numeric("specific_budget", { precision: 8, scale: 2 }), // Presupuesto específico para este entregable
+  parent_project_id: integer("parent_project_id").references(() => activeProjects.id), // Para relacionar con proyectos macro
 });
 
 // Relaciones de entregables
@@ -604,6 +608,7 @@ export const deliverablesRelations = relations(deliverables, ({ one }) => ({
   pm: one(personnel, { fields: [deliverables.pmId], references: [personnel.id] }),
   creator: one(users, { fields: [deliverables.createdBy], references: [users.id] }),
   project: one(activeProjects, { fields: [deliverables.project_id], references: [activeProjects.id] }),
+  parentProject: one(activeProjects, { fields: [deliverables.parent_project_id], references: [activeProjects.id] }),
 }));
 
 // Esquema para agregar entregables

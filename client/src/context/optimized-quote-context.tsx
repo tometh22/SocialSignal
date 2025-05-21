@@ -44,6 +44,14 @@ export interface FinancialSettings {
   marginFactor?: number; // Factor multiplicador para el margen operativo (1.0-10.0)
 }
 
+export interface QuoteDeliverable {
+  id: string;
+  type: string;
+  frequency: string;
+  description: string;
+  budget: number;
+}
+
 export interface QuotationData {
   // Paso 1: Información básica
   client: Client | null;
@@ -64,7 +72,11 @@ export interface QuotationData {
   // Paso 3: Equipo
   teamOption: 'auto' | 'manual';
   teamMembers: TeamMember[];
-  // Paso 4: Financials
+  // Paso 4: Configuración de entregables para proyectos Always-On
+  isAlwaysOnProject: boolean;
+  deliverables: QuoteDeliverable[];
+  additionalDeliverableCost: number;
+  // Paso 5: Financials
   financials: FinancialSettings;
 }
 
