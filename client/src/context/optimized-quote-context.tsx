@@ -117,7 +117,14 @@ interface OptimizedQuoteContextType {
   updateTeamMember: (id: string, updates: Partial<Omit<TeamMember, 'id'>>) => void;
   removeTeamMember: (id: string) => void;
   applyRecommendedTeam: () => void;
-  // Métodos paso 4
+  // Métodos paso 4 - Configuración Always-On
+  setIsAlwaysOnProject: (isAlwaysOn: boolean) => void;
+  updateDeliverables: (deliverables: QuoteDeliverable[]) => void;
+  addDeliverable: (deliverable: QuoteDeliverable) => void;
+  updateDeliverable: (id: string, updates: Partial<Omit<QuoteDeliverable, 'id'>>) => void;
+  removeDeliverable: (id: string) => void;
+  updateAdditionalDeliverableCost: (cost: number) => void;
+  // Métodos paso 5
   updateFinancials: (updates: Partial<FinancialSettings>) => void;
   // Método para guardar la cotización
   saveQuotation: () => Promise<number>;
@@ -151,6 +158,10 @@ const initialQuotationData: QuotationData = {
   clientEngagement: 'medium',
   teamOption: 'auto',
   teamMembers: [],
+  // Configuración de entregables para proyectos Always-On
+  isAlwaysOnProject: false,
+  deliverables: [],
+  additionalDeliverableCost: 0,
   financials: {
     platformCost: 0,
     deviationPercentage: 0,
@@ -546,6 +557,60 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   }, [availableRoles, availablePersonnel, recommendedRoleIds, quotationData.template]);
 
   // Métodos para el Paso 4: Ajustes Financieros
+  // Métodos para manejar proyectos Always-On con entregables múltiples
+  const setIsAlwaysOnProject = useCallback((isAlwaysOn: boolean) => {
+    setQuotationData(prev => ({
+      ...prev,
+      isAlwaysOnProject: isAlwaysOn
+    }));
+    
+    // Si desactivamos el modo Always-On, limpiamos los entregables
+    if (!isAlwaysOn) {
+      setQuotationData(prev => ({
+        ...prev,
+        deliverables: [],
+        additionalDeliverableCost: 0
+      }));
+    }
+  }, []);
+  
+  const updateDeliverables = useCallback((deliverables: QuoteDeliverable[]) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables
+    }));
+  }, []);
+  
+  const addDeliverable = useCallback((deliverable: QuoteDeliverable) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: [...prev.deliverables, deliverable]
+    }));
+  }, []);
+  
+  const updateDeliverable = useCallback((id: string, updates: Partial<Omit<QuoteDeliverable, 'id'>>) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables.map(d => 
+        d.id === id ? { ...d, ...updates } : d
+      )
+    }));
+  }, []);
+  
+  const removeDeliverable = useCallback((id: string) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables.filter(d => d.id !== id)
+    }));
+  }, []);
+  
+  const updateAdditionalDeliverableCost = useCallback((cost: number) => {
+    setQuotationData(prev => ({
+      ...prev,
+      additionalDeliverableCost: cost
+    }));
+  }, []);
+
   const updateFinancials = useCallback((updates: Partial<FinancialSettings>) => {
     // Asegurarnos que las actualizaciones tengan valores numéricos válidos
     const sanitizedUpdates: Partial<FinancialSettings> = {};
@@ -1613,6 +1678,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             analysisType: getAnalysisTypeFromIdOrText(quotation.analysisTypeId, quotation.analysisType),
             mentionsVolume: getMentionsVolumeFromIdOrText(quotation.mentionsVolumeId, quotation.mentionsVolume),
             countriesCovered: getCountriesCoveredFromIdOrText(quotation.countriesCoveredId, quotation.countriesCovered),
+            isAlwaysOnProject: quotation.isAlwaysOnProject || false,
+            deliverables: quotation.deliverables || [],
+            additionalDeliverableCost: quotation.additionalCost || 0,
             clientEngagement: getClientEngagementFromIdOrText(quotation.clientEngagementId, quotation.clientEngagement),
             teamOption: 'manual', // Por defecto asumimos manual en edición
             teamMembers: teamMembers,

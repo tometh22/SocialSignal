@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
+import { InfoIcon } from 'lucide-react';
 
 interface DeliverableConfigurationProps {
   isAlwaysOnProject: boolean;
