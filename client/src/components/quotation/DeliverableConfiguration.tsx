@@ -93,7 +93,7 @@ const DeliverableConfiguration: React.FC<DeliverableConfigurationProps> = ({
         <CardContent>
           {isAlwaysOnProject ? (
             <Alert className="mb-6 bg-blue-50 text-blue-800 border border-blue-200">
-              <InfoCircledIcon className="h-4 w-4" />
+              <InfoIcon className="h-4 w-4" />
               <AlertTitle>Modo Always-On</AlertTitle>
               <AlertDescription>
                 Los proyectos Always-On te permiten configurar múltiples entregables a diferentes

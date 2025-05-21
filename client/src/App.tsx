@@ -28,6 +28,7 @@ import EditRobustnessPage from "@/pages/edit-robustness";
 // Importamos directamente el componente de edición de proyectos Always On
 import EditAlwaysOnProject from "@/pages/edit-always-on-project";
 import AlwaysOnDeliverablesDemo from "@/pages/always-on-deliverables-demo";
+import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import Sidebar from "@/components/layout/sidebar-new";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -122,6 +123,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <ProtectedRoute path="/always-on-demo" component={AlwaysOnDeliverablesDemo} />
+                  <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
                   <Route component={NotFound} />
