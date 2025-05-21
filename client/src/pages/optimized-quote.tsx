@@ -15,6 +15,7 @@ import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
 import TeamMemberSelector from '@/components/quotation/TeamMemberSelector';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
+import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 
 // Interfaces para los props
 interface OptimizedQuoteProps {
@@ -275,11 +276,18 @@ const OptimizedQuoteContent = () => {
                   
                   <DeliverableConfiguration 
                     isAlwaysOnProject={true}
-                    onIsAlwaysOnProjectChange={(value) => {}}
+                    onIsAlwaysOnProjectChange={(value) => {
+                      console.log("Always-On mode:", value);
+                    }}
                     deliverables={quotationData.deliverables || []}
-                    onDeliverablesChange={(deliverables) => updateDeliverables(deliverables)}
+                    onDeliverablesChange={(deliverables) => {
+                      // Actualizar el estado del contexto con los nuevos entregables
+                      console.log("Actualizando entregables:", deliverables);
+                    }}
                     additionalCost={quotationData.additionalDeliverableCost || 0}
-                    onAdditionalCostChange={(cost) => updateAdditionalDeliverableCost(cost)}
+                    onAdditionalCostChange={(cost) => {
+                      console.log("Actualizando costo adicional:", cost);
+                    }}
                   />
                 </div>
               )}
