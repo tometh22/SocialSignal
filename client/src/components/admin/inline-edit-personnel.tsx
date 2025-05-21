@@ -103,39 +103,24 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
     }
 
     try {
-      // Convertir texto a número (asegurando reemplazo de comas)
-      const valueText = editRateText.replace(',', '.');
-      const rateValue = parseFloat(valueText);
+      // Enviar la tarifa exactamente como texto para que el backend la procese correctamente
+      // De esta forma el backend manejará la conversión de forma adecuada
+      console.log(`Guardando tarifa como texto para procesamiento en el servidor: "${editRateText}"`);
       
-      // Validar que sea un número válido
-      if (isNaN(rateValue) || rateValue <= 0) {
-        toast({
-          title: "Error",
-          description: "La tarifa por hora debe ser mayor que 0",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Redondear a 2 decimales para evitar problemas de precisión
-      const roundedValue = Math.round(rateValue * 100) / 100;
-      
-      console.log(`Guardando tarifa: ${roundedValue} (desde texto: ${editRateText})`);
-      
-      // Enviamos el valor como número ya convertido
+      // Enviamos los datos incluyendo la tarifa como texto (el servidor lo procesará)
       updatePersonnelMutation.mutate({ 
         id: person.id, 
         data: {
           name: editName,
           roleId: editRoleId,
-          hourlyRate: roundedValue
+          hourlyRate: editRateText // Enviamos como texto, el backend lo procesará
         }
       });
     } catch (error) {
-      console.error("Error al procesar valor numérico:", error);
+      console.error("Error al procesar los datos del personal:", error);
       toast({
         title: "Error",
-        description: "Formato de tarifa inválido. Use un número válido.",
+        description: "No se pudo actualizar la información. Inténtelo de nuevo.",
         variant: "destructive",
       });
     }

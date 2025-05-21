@@ -249,15 +249,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
-      const validatedData = insertPersonnelSchema.partial().parse(req.body);
+      console.log("PATCH /api/personnel/:id - Datos recibidos:", req.body);
+      
+      // Si hourlyRate viene como string, asegurarnos de convertirlo a número
+      let data = { ...req.body };
+      
+      if (typeof data.hourlyRate === 'string') {
+        // Reemplazar coma por punto si existe
+        const rateString = data.hourlyRate.replace(',', '.');
+        const rateNumber = parseFloat(rateString);
+        
+        if (!isNaN(rateNumber)) {
+          data.hourlyRate = Math.round(rateNumber * 100) / 100; // Redondear a 2 decimales
+          console.log(`Tarifa convertida: ${req.body.hourlyRate} -> ${data.hourlyRate}`);
+        }
+      }
+      
+      const validatedData = insertPersonnelSchema.partial().parse(data);
+      console.log("Datos validados a guardar:", validatedData);
+      
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
       
       if (!updatedPerson) {
         return res.status(404).json({ message: "Personnel not found" });
       }
       
+      console.log("Personal actualizado exitosamente:", updatedPerson);
       res.json(updatedPerson);
     } catch (error) {
+      console.error("Error al actualizar personal:", error);
+      
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid personnel data", errors: error.errors });
       }
