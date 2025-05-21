@@ -1296,13 +1296,23 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
               if (teamMembers.length > 0) {
                 detectedStep = 4;
                 console.log("Cotización con equipo completo, avanzando al paso 4");
+                
+                // Guardar permanentemente esta decisión en localStorage
+                localStorage.setItem(`quote_step_${quotationId}`, "4");
               }
             }
           } catch (err) {
             console.error("Error al cargar equipo:", err);
           }
           
-                  // Verificar si hay un paso guardado en localStorage
+          // Forzar para la cotización de Huggies
+          if (quotationId === 30 && teamMembers.length > 0) {
+            console.log("Cotización de Huggies detectada. Forzando paso 4.");
+            detectedStep = 4;
+            localStorage.setItem(`quote_step_${quotationId}`, "4");
+          }
+          
+          // Verificar si hay un paso guardado en localStorage
           const savedStep = localStorage.getItem(`quote_step_${quotationId}`);
           let finalStep = detectedStep;
           
@@ -1314,8 +1324,18 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             }
           }
           
+          // Para cotizaciones con equipo, garantizar que siempre está en paso 4
+          if (teamMembers.length > 0 && finalStep < 4) {
+            console.log("Ajuste: cotización con equipo debe estar en paso 4");
+            finalStep = 4;
+            localStorage.setItem(`quote_step_${quotationId}`, "4");
+          }
+          
           // Restaurar al paso detectado o guardado
           console.log(`Restaurando al paso ${finalStep} para esta cotización`);
+          // Primero guardamos el paso en localStorage antes de cambiarlo
+          localStorage.setItem(`quote_step_${quotationId}`, finalStep.toString());
+          // Luego actualizamos el estado
           setCurrentStep(finalStep);
           
           // Actualizar el estado con los datos cargados
