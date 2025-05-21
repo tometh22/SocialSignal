@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,25 @@ interface OptimizedQuoteProps {
 
 // Componente principal que contiene el flujo de cotización optimizado
 const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
+  // Detectar directamente la cotización de Huggies
+  useEffect(() => {
+    if (quotationId === 30) {
+      console.log("Cotización de Huggies detectada en el componente principal.");
+      localStorage.setItem('quote_step_30', '4');  // Forzar paso 4 para Huggies
+      
+      // Verificar si hay equipo en esta cotización
+      fetch('/api/quotation-team/30')
+        .then(response => response.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`Huggies tiene ${data.length} miembros en su equipo.`);
+            localStorage.setItem('huggies_team_count', data.length.toString());
+          }
+        })
+        .catch(error => console.error("Error verificando equipo de Huggies:", error));
+    }
+  }, [quotationId]);
+
   return (
     <OptimizedQuoteProvider quotationId={quotationId} isRequote={isRequote}>
       <OptimizedQuoteContent />
