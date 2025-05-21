@@ -187,6 +187,13 @@ export const activeProjects = pgTable("active_projects", {
   parentProjectId: integer("parent_project_id").references(() => activeProjects.id), // Referencia al proyecto padre (para subproyectos)
   isAlwaysOnMacro: boolean("is_always_on_macro").default(false), // Indica si es un proyecto macro "Always On"
   macroMonthlyBudget: doublePrecision("macro_monthly_budget"), // Presupuesto mensual consolidado para proyectos "Always On"
+  
+  // Nuevos campos para entregables y frecuencias
+  deliverableFrequency: text("deliverable_frequency"), // quincenal, mensual, trimestral, etc.
+  deliverableType: text("deliverable_type"), // tipo de entregable (informe, reporte, análisis, etc.)
+  deliverableBudget: doublePrecision("deliverable_budget"), // presupuesto específico para este entregable
+  additionalDeliverableCost: doublePrecision("additional_deliverable_cost"), // costo de entregables opcionales/adicionales
+  deliverableDescription: text("deliverable_description"), // descripción detallada del entregable
 });
 
 // Esquema base generado por drizzle-zod
@@ -204,6 +211,13 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   parentProjectId: z.number().optional(),
   isAlwaysOnMacro: z.boolean().optional(),
   macroMonthlyBudget: z.number().optional(),
+  
+  // Nuevos campos para entregables
+  deliverableFrequency: z.string().optional(), // quincenal, mensual, trimestral, etc.
+  deliverableType: z.string().optional(), // tipo de entregable
+  deliverableBudget: z.number().optional(), // presupuesto específico para este entregable
+  additionalDeliverableCost: z.number().optional(), // costo adicional para entregables fuera de lo planeado
+  deliverableDescription: z.string().optional(), // descripción detallada del entregable
 });
 
 // ==================== COMPONENTES DE PROYECTO ====================
