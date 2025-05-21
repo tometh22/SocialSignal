@@ -57,8 +57,17 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
 
   // Update personnel mutation
   const updatePersonnelMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string; roleId: number; hourlyRate: number } }) => {
-      const response = await apiRequest("PATCH", `/api/personnel/${id}`, data);
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; roleId: number; hourlyRate: number | string } }) => {
+      // Asegurar que hourlyRate sea un número antes de enviarlo
+      const processedData = {
+        ...data,
+        hourlyRate: typeof data.hourlyRate === 'string' 
+          ? parseFloat(data.hourlyRate.replace(',', '.')) 
+          : data.hourlyRate
+      };
+      
+      console.log("Enviando datos procesados:", processedData);
+      const response = await apiRequest("PATCH", `/api/personnel/${id}`, processedData);
       return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
