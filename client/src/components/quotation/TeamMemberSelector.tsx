@@ -135,20 +135,38 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   };
 
   // Manejar selección de personal
-  const handlePersonnelChange = (value: string) => {
+  const handlePersonnelChange = async (value: string) => {
     setSelectedPerson(value);
     
     // Actualizar rol y tarifa automáticamente si se selecciona una persona
     if (value) {
       const personnelId = Number(value);
-      const person = personnel.find(p => p.id === personnelId);
-      if (person) {
+      
+      try {
+        // Obtener los datos más recientes directamente de la API para este ID específico
+        const response = await fetch(`/api/personnel/${personnelId}`);
+        if (!response.ok) {
+          throw new Error(`Error al obtener datos del personal: ${response.status}`);
+        }
+        
+        const personData = await response.json();
+        console.log(`Datos frescos del servidor para ID ${personnelId}:`, personData);
+        
         // Actualizamos el rol automáticamente
-        setSelectedRole(person.roleId.toString());
-        // Actualizamos la tarifa con la tarifa personal específica
-        // Asegurar que usamos exactamente la tarifa de la persona, no la del rol
-        console.log(`Seleccionado personal: ${person.name}, tarifa personal: ${person.hourlyRate}`);
-        setRate(person.hourlyRate.toString());
+        setSelectedRole(personData.roleId.toString());
+        
+        // Actualizamos la tarifa con la tarifa personal específica desde el servidor
+        console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
+        setRate(personData.hourlyRate.toString());
+      } catch (error) {
+        console.error("Error al obtener datos actualizados del personal:", error);
+        
+        // Fallback a los datos en memoria en caso de error
+        const person = personnel.find(p => p.id === personnelId);
+        if (person) {
+          setSelectedRole(person.roleId.toString());
+          setRate(person.hourlyRate.toString());
+        }
       }
     }
   };
