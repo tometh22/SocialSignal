@@ -16,9 +16,8 @@ import {
 } from '@/components/ui/table';
 import { CalendarIcon, Clock, DollarSign, Repeat } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-// Importamos la utilidad para formatear moneda
 import { formatCurrency } from '@/lib/utils';
-// Exportamos las interfaces para reusarlas
+
 export interface Entregable {
   id: string;
   tipo: string;
@@ -27,7 +26,7 @@ export interface Entregable {
   presupuesto: number;
 }
 
-interface Equipo {
+export interface Equipo {
   nombre: string;
   rol: string;
   horas: number;
