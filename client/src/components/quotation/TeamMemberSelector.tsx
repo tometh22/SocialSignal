@@ -157,7 +157,12 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         
         // Actualizamos la tarifa con la tarifa personal específica desde el servidor
         console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
-        setRate(personData.hourlyRate.toString());
+        
+        // Asegurar que se usa el valor exacto con decimales del servidor
+        // Convertir el número a cadena con exactamente 2 decimales
+        const rateWithPrecision = Number(personData.hourlyRate).toFixed(2);
+        console.log(`Tarifa con precisión decimal exacta: ${rateWithPrecision}`);
+        setRate(rateWithPrecision);
       } catch (error) {
         console.error("Error al obtener datos actualizados del personal:", error);
         
@@ -165,7 +170,11 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         const person = personnel.find(p => p.id === personnelId);
         if (person) {
           setSelectedRole(person.roleId.toString());
-          setRate(person.hourlyRate.toString());
+          
+          // Usar el mismo formato con precisión decimal exacta
+          const fallbackRateWithPrecision = Number(person.hourlyRate).toFixed(2);
+          console.log(`Fallback - Tarifa con precisión decimal exacta: ${fallbackRateWithPrecision}`);
+          setRate(fallbackRateWithPrecision);
         }
       }
     }
