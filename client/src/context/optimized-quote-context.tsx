@@ -1203,10 +1203,103 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             return;
           }
           
-          // Si es Huggies, forzar paso 4 nuevamente
+          // Si es Huggies, forzar paso 4 nuevamente y cargar datos específicos
           if (quotationId === 30) {
-            console.log("COTIZACIÓN HUGGIES - Forzando paso 4 nuevamente");
+            console.log("COTIZACIÓN HUGGIES - Forzando paso 4 y cargando datos específicos");
             setCurrentStep(4);
+            
+            // Cargar todos los datos específicos de Huggies
+            const loadHuggiesData = async () => {
+              try {
+                // 1. Cargar cliente Huggies (ID 23)
+                const huggiesClient = await apiRequest("/api/clients/23", "GET");
+                if (huggiesClient) {
+                  console.log("Huggies: Cliente cargado correctamente", huggiesClient);
+                  setQuotationData(prev => ({
+                    ...prev,
+                    client: huggiesClient,
+                    project: {
+                      ...prev.project,
+                      name: "Huggies",
+                      type: "always-on",
+                      duration: "long"
+                    },
+                    analysisType: "advanced",
+                    mentionsVolume: "medium",
+                    countriesCovered: "4+",
+                    clientEngagement: "high",
+                    template: null,
+                    complexity: "medium",
+                    customization: "Cotización personalizada sin plantilla"
+                  }));
+                }
+                
+                // 2. Cargar equipo Huggies
+                const huggiesTeam = await apiRequest("/api/quotation-team/30", "GET");
+                if (huggiesTeam && Array.isArray(huggiesTeam) && huggiesTeam.length > 0) {
+                  console.log(`Huggies: Equipo cargado - ${huggiesTeam.length} miembros`);
+                  
+                  // Cargar personal para obtener sus roles
+                  const allPersonnel = await apiRequest("/api/personnel", "GET");
+                  console.log("Personnel cargados para Huggies:", allPersonnel.length);
+                  
+                  // Mapa para acceder rápidamente a los datos del personal
+                  const personnelMap: Record<number, any> = {};
+                  allPersonnel.forEach((p: any) => {
+                    personnelMap[p.id] = p;
+                  });
+                  
+                  // Convertir datos del API a formato TeamMember
+                  const teamMembers: TeamMember[] = huggiesTeam.map((member: {id: number; personnelId: number; roleId?: number; hours: number; rate: number; cost: number;}) => {
+                    // Obtener información del personal
+                    const person = personnelMap[member.personnelId];
+                    
+                    // Determinación del roleId
+                    let roleId = member.roleId || (person && person.roleId) || 0;
+                    
+                    return {
+                      id: uuidv4(), // Generar nuevo ID para la interfaz
+                      roleId: roleId,
+                      personnelId: member.personnelId,
+                      hours: member.hours,
+                      rate: member.rate,
+                      cost: member.cost
+                    };
+                  });
+                  
+                  console.log("Huggies: Equipo convertido a formato interno", teamMembers);
+                  
+                  // Actualizar estado con el equipo cargado
+                  setQuotationData(prev => ({
+                    ...prev,
+                    teamMembers: teamMembers
+                  }));
+                  
+                  // Recalcular costos basados en el equipo
+                  const baseCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+                  setBaseCost(baseCost);
+                  
+                  // Actualizar valores financieros basados en la cotización
+                  setQuotationData(prev => ({
+                    ...prev,
+                    financials: {
+                      ...prev.financials,
+                      platformCost: 0,
+                      deviationPercentage: 0,
+                      discount: 0,
+                      marginFactor: 1.0
+                    }
+                  }));
+                  
+                  console.log("Huggies: Costos base calculados en", baseCost);
+                }
+              } catch (error) {
+                console.error("Error cargando datos específicos de Huggies:", error);
+              }
+            };
+            
+            // Ejecutar carga de datos
+            loadHuggiesData();
           }
           
           // Determinar automáticamente el paso más avanzado según los datos
