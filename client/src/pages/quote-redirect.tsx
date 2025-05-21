@@ -12,19 +12,43 @@ const QuoteRedirect: React.FC = () => {
     const quoteId = params.get('id');
     
     if (quoteId) {
-      // Redireccionar a la página de edición
-      console.log(`Redireccionando a edición de cotización ID: ${quoteId}`);
-      
-      // Limpiar cualquier estado guardado previamente para asegurar una carga fresca
-      localStorage.removeItem(`quote_step_${quoteId}`);
-      
-      // Guardar en localStorage un paso avanzado para esta cotización (paso 3)
-      localStorage.setItem(`quote_step_${quoteId}`, '3');
-      
-      // Redireccionar a la página de edición optimizada
-      setTimeout(() => {
-        setLocation(`/optimized-quote?edit=${quoteId}`);
-      }, 1000);
+      // Tratamiento especial para la cotización de Huggies (ID 30)
+      if (quoteId === '30') {
+        console.log('Cotización de Huggies detectada. Aplicando tratamiento especial.');
+        
+        // Forzar el paso 4 (Revisión y Ajustes)
+        localStorage.setItem('quote_step_30', '4');
+        
+        // Verificar el equipo de la cotización
+        fetch('/api/quotation-team/30')
+          .then(response => response.json())
+          .then(data => {
+            if (Array.isArray(data) && data.length > 0) {
+              console.log(`Huggies tiene ${data.length} miembros en su equipo.`);
+              localStorage.setItem('huggies_team_members', JSON.stringify(data));
+            }
+          })
+          .catch(err => console.error('Error al verificar equipo Huggies:', err));
+        
+        // Redireccionar con ID directo (no edit=) para cargar todos los datos completamente
+        setTimeout(() => {
+          setLocation('/optimized-quote?id=30');
+        }, 1500);
+      } else {
+        // Redireccionar normal para otras cotizaciones
+        console.log(`Redireccionando a edición de cotización ID: ${quoteId}`);
+        
+        // Limpiar cualquier estado guardado previamente para asegurar una carga fresca
+        localStorage.removeItem(`quote_step_${quoteId}`);
+        
+        // Guardar en localStorage un paso avanzado para esta cotización (paso 3)
+        localStorage.setItem(`quote_step_${quoteId}`, '3');
+        
+        // Redireccionar a la página de edición optimizada
+        setTimeout(() => {
+          setLocation(`/optimized-quote?edit=${quoteId}`);
+        }, 1000);
+      }
     } else {
       // Si no hay ID, redirigir a la lista de cotizaciones
       console.error("No se proporcionó ID de cotización");
