@@ -7,7 +7,7 @@ import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
 import QuotationDetail from "@/pages/quotation-detail";
 import QuoteRedirect from "@/pages/quote-redirect";
-import HuggiesQuoteRedirect from "@/pages/huggies-quote-redirect";
+import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics";
 import Admin from "@/pages/admin";
@@ -91,7 +91,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/" component={Dashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
-                  <ProtectedRoute path="/huggies-quote" component={HuggiesQuoteRedirect} />
+                  <ProtectedRoute path="/huggies" component={HuggiesPage} />
                   <ProtectedRoute path="/new-quote">
                     <Redirect to="/optimized-quote" />
                   </ProtectedRoute>

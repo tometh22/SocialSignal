@@ -1181,6 +1181,17 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   // Efecto para cargar una cotización existente si hay quotationId
   useEffect(() => {
     if (quotationId) {
+      // Verificar si es la cotización de Huggies (ID 30)
+      if (quotationId === 30) {
+        console.log("COTIZACIÓN HUGGIES DETECTADA - Aplicando configuración especial");
+        
+        // Forzar paso 4
+        setCurrentStep(4);
+        
+        // Guardar en localStorage para persistencia
+        localStorage.setItem('quote_step_30', '4');
+      }
+      
       const loadExistingQuotation = async () => {
         try {
           console.log(`Cargando cotización existente ID: ${quotationId}`);
@@ -1190,6 +1201,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           if (!quotation) {
             console.error("No se pudo cargar la cotización");
             return;
+          }
+          
+          // Si es Huggies, forzar paso 4 nuevamente
+          if (quotationId === 30) {
+            console.log("COTIZACIÓN HUGGIES - Forzando paso 4 nuevamente");
+            setCurrentStep(4);
           }
           
           // Determinar automáticamente el paso más avanzado según los datos
