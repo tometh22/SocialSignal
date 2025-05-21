@@ -220,17 +220,18 @@ const OptimizedQuoteContent = () => {
               {/* Barra de progreso */}
               <div className="absolute h-0.5 bg-neutral-100 left-0 right-0 top-[18px]"></div>
               <div className="absolute h-0.5 bg-primary left-0 top-[18px]" style={{ 
-                width: `${(currentStep-1)/(4-1)*100}%`, 
+                width: `${(currentStep-1)/((quotationData.project?.type === 'always-on' ? 5 : 4)-1)*100}%`, 
                 transition: 'width 0.3s ease-out' 
               }}></div>
               
               {/* Indicadores de pasos */}
-              <div className="grid grid-cols-4 relative">
+              <div className={`grid ${quotationData.project?.type === 'always-on' ? 'grid-cols-5' : 'grid-cols-4'} relative`}>
                 {[
                   { num: 1, title: "Información Básica" },
                   { num: 2, title: "Selección de Plantilla" },
                   { num: 3, title: "Configuración de Equipo" },
-                  { num: 4, title: "Revisión y Ajustes" }
+                  ...(quotationData.project?.type === 'always-on' ? [{ num: 4, title: "Configuración Entregables" }] : []),
+                  { num: quotationData.project?.type === 'always-on' ? 5 : 4, title: "Revisión y Ajustes" }
                 ].map((step) => (
                   <div key={step.num} className="flex flex-col items-center">
                     <div 
@@ -264,6 +265,24 @@ const OptimizedQuoteContent = () => {
             <CardContent className="p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
+              {/* Paso de configuración de entregables para proyectos Always-On */}
+              {currentStep === 4 && quotationData.project?.type === 'always-on' && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Configuración de Entregables</h2>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Define los entregables específicos y sus frecuencias para este proyecto Always-On.
+                  </p>
+                  
+                  <DeliverableConfiguration 
+                    isAlwaysOnProject={true}
+                    onIsAlwaysOnProjectChange={(value) => {}}
+                    deliverables={quotationData.deliverables || []}
+                    onDeliverablesChange={(deliverables) => updateDeliverables(deliverables)}
+                    additionalCost={quotationData.additionalDeliverableCost || 0}
+                    onAdditionalCostChange={(cost) => updateAdditionalDeliverableCost(cost)}
+                  />
+                </div>
+              )}
               {currentStep === 3 && (
                 <>
                   {/* Opción: usar el selector directo que soluciona el problema */}
