@@ -152,8 +152,8 @@ const SimpleTeamConfig: React.FC = () => {
   };
 
   return (
-    <div className="h-[600px] overflow-y-auto pr-2">
-      <Card className="p-4 bg-white rounded-md border border-gray-200 mb-4">
+    <div className="space-y-4">
+      <Card className="p-4 bg-white rounded-md border border-gray-200">
         <div className="flex items-center mb-4">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mr-3">
             <Users className="h-5 w-5 text-primary" />
@@ -386,7 +386,14 @@ const SimpleTeamConfig: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-xs border-collapse table-fixed">
+                <colgroup>
+                  <col className="w-[35%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="text-left p-2 border-b">Rol / Personal</th>
@@ -413,22 +420,24 @@ const SimpleTeamConfig: React.FC = () => {
                         {/* Horas - editable */}
                         <td className="p-2 text-center">
                           {isCurrentlyEditing ? (
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editingMember[memberId]?.hours || member.hours}
-                              onChange={(e) => {
-                                const hours = parseInt(e.target.value) || 0;
-                                setEditingMember({
-                                  ...editingMember,
-                                  [memberId]: {
-                                    ...editingMember[memberId],
-                                    hours
-                                  }
-                                });
-                              }}
-                              className="h-7 w-16 text-center text-xs"
-                            />
+                            <div className="flex justify-center">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={editingMember[memberId]?.hours || member.hours}
+                                onChange={(e) => {
+                                  const hours = parseInt(e.target.value) || 0;
+                                  setEditingMember({
+                                    ...editingMember,
+                                    [memberId]: {
+                                      ...editingMember[memberId],
+                                      hours
+                                    }
+                                  });
+                                }}
+                                className="h-7 w-full max-w-[60px] text-center text-xs"
+                              />
+                            </div>
                           ) : (
                             <span>{member.hours}</span>
                           )}
@@ -437,23 +446,25 @@ const SimpleTeamConfig: React.FC = () => {
                         {/* Tarifa - editable */}
                         <td className="p-2 text-center">
                           {isCurrentlyEditing ? (
-                            <div className="relative">
-                              <span className="absolute left-1 top-1 text-gray-500 text-xs">$</span>
-                              <Input
-                                type="text"
-                                value={String(editingMember[memberId]?.rate || member.rate)}
-                                onChange={(e) => {
-                                  const rate = parseDecimalInput(e.target.value);
-                                  setEditingMember({
-                                    ...editingMember,
-                                    [memberId]: {
-                                      ...editingMember[memberId],
-                                      rate
-                                    }
-                                  });
-                                }}
-                                className="h-7 w-20 text-center text-xs pl-3"
-                              />
+                            <div className="flex justify-center">
+                              <div className="relative w-full max-w-[70px]">
+                                <span className="absolute left-2 top-1 text-gray-500 text-xs">$</span>
+                                <Input
+                                  type="text"
+                                  value={String(editingMember[memberId]?.rate || member.rate)}
+                                  onChange={(e) => {
+                                    const rate = parseDecimalInput(e.target.value);
+                                    setEditingMember({
+                                      ...editingMember,
+                                      [memberId]: {
+                                        ...editingMember[memberId],
+                                        rate
+                                      }
+                                    });
+                                  }}
+                                  className="h-7 w-full text-center text-xs pl-4"
+                                />
+                              </div>
                             </div>
                           ) : (
                             <span>${member.rate}</span>
