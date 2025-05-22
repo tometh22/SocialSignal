@@ -85,8 +85,8 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
 
 // Generic function for API requests
 export async function apiRequest(
-  method: string,
   endpoint: string,
+  method: string,
   data?: any
 ) {
   const url = endpoint;
