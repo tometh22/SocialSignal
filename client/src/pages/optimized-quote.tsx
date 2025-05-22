@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowUpDown, AlertCircle } from
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
-import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
+import OptimizedTeamConfig from '@/components/optimized/team-config';
 import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
 import TeamMemberSelector from '@/components/quotation/TeamMemberSelector';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
