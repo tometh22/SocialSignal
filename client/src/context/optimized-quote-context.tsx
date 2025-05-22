@@ -968,6 +968,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                             : "Generado desde cotización optimizada"
       };
       
+      // Establecer el estado como "draft" para cotizaciones nuevas
+      if (!isEditing) {
+        payload.status = "draft";
+      }
+      
       // Si es una recotización, siempre crear como nuevo
       if (isRecotizacion) {
         payload.status = "negotiation"; // Las recotizaciones siempre inician en negociación
