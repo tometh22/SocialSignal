@@ -278,15 +278,18 @@ const OptimizedQuoteContent = () => {
                     isAlwaysOnProject={true}
                     onIsAlwaysOnProjectChange={(value) => {
                       console.log("Always-On mode:", value);
+                      setIsAlwaysOnProject(value);
                     }}
                     deliverables={quotationData.deliverables || []}
                     onDeliverablesChange={(deliverables) => {
                       // Actualizar el estado del contexto con los nuevos entregables
                       console.log("Actualizando entregables:", deliverables);
+                      updateDeliverables(deliverables);
                     }}
                     additionalCost={quotationData.additionalDeliverableCost || 0}
                     onAdditionalCostChange={(cost) => {
                       console.log("Actualizando costo adicional:", cost);
+                      updateAdditionalDeliverableCost(cost);
                     }}
                   />
                 </div>
