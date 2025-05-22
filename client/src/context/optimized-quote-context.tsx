@@ -972,7 +972,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       if (isRecotizacion) {
         payload.status = "negotiation"; // Las recotizaciones siempre inician en negociación
       } else if (!isEditing) {
-        payload.status = "draft"; // Nuevas cotizaciones siempre inician como borrador
+        payload.status = "completed"; // Cambiar a completada cuando se guarda por primera vez
       }
       
       console.log("Payload a enviar:", payload);
