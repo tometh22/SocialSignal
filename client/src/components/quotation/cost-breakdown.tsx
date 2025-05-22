@@ -40,15 +40,27 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
 
   // Helper functions to get names
   const getPersonnelName = (personnelId: number | null) => {
-    if (!personnelId || !allPersonnel) return "No asignado";
+    if (!personnelId) return "No asignado";
+    
+    if (!allPersonnel) {
+      console.log("[BREAKDOWN] Personal aún no cargado para ID:", personnelId);
+      return "Cargando...";
+    }
+    
     const person = allPersonnel.find(p => p.id === personnelId);
-    return person ? person.name : "No asignado";
+    console.log(`[BREAKDOWN] Buscando personal ID ${personnelId}:`, person ? person.name : "No encontrado");
+    return person ? person.name : `Personal #${personnelId} no encontrado`;
   };
 
   const getRoleName = (roleId: number) => {
-    if (!roles) return "Rol Desconocido";
+    if (!roles) {
+      console.log("[BREAKDOWN] Roles aún no cargados para ID:", roleId);
+      return "Cargando...";
+    }
+    
     const role = roles.find(r => r.id === roleId);
-    return role ? role.name : "Rol Desconocido";
+    console.log(`[BREAKDOWN] Buscando rol ID ${roleId}:`, role ? role.name : "No encontrado");
+    return role ? role.name : `Rol #${roleId} no encontrado`;
   };
 
   return (
