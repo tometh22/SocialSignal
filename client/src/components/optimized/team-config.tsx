@@ -1093,13 +1093,19 @@ const OptimizedTeamConfig: React.FC = () => {
                     : "Utiliza el formulario anterior para añadir miembros al equipo del proyecto."}
                 </p>
                 
-                {activeTab === 'recommended' && recommendedRoleIds.length > 0 && (
+                {/* Debug info */}
+                <div className="text-xs text-gray-400 mb-2">
+                  Debug: Plantilla: {quotationData.template?.name || 'Sin plantilla'}, Roles recomendados: {recommendedRoleIds?.length || 0}
+                </div>
+                
+                {activeTab === 'recommended' && (
                   <Button 
                     onClick={applyRecommendedTeam}
                     className="flex items-center bg-primary/80 hover:bg-primary text-xs h-8"
+                    disabled={!recommendedRoleIds || recommendedRoleIds.length === 0}
                   >
                     <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                    Aplicar Equipo Recomendado
+                    Aplicar Equipo Recomendado ({recommendedRoleIds?.length || 0} roles)
                   </Button>
                 )}
               </div>
