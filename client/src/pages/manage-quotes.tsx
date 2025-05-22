@@ -337,7 +337,7 @@ export default function ManageQuotes() {
                                   <Edit className="h-4 w-4 mr-1" />
                                   Estado
                                 </Button>
-                                {quote.status === 'draft' && (
+                                {(quote.status === 'draft' || quote.status === 'pending') && (
                                   <Button 
                                     variant="outline" 
                                     size="sm"
