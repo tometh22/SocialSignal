@@ -73,14 +73,23 @@ export default function ManageQuotes() {
     : [];
 
   const handleStatusChange = async () => {
-    if (!selectedQuote || !newStatus) return;
+    console.log(`[CLIENT] Iniciando actualización de estado`, { selectedQuote, newStatus });
+    
+    if (!selectedQuote || !newStatus) {
+      console.log(`[CLIENT] Faltan datos:`, { selectedQuote: !!selectedQuote, newStatus });
+      return;
+    }
 
     try {
+      console.log(`[CLIENT] Enviando PATCH a /api/quotations/${selectedQuote.id}/status con status: ${newStatus}`);
+      
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
         { status: newStatus }
       );
+      
+      console.log(`[CLIENT] Actualización exitosa`);
       
       toast({
         title: "Estado actualizado",
@@ -90,6 +99,7 @@ export default function ManageQuotes() {
       refetch();
       setDialogOpen(false);
     } catch (error) {
+      console.error(`[CLIENT] Error en actualización de estado:`, error);
       toast({
         title: "Error",
         description: "No se pudo actualizar el estado de la cotización.",
