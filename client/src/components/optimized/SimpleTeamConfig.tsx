@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Personnel, Role } from '@shared/schema';
 import { parseDecimalInput } from '@/lib/number-utils';
-import { Clock, UserPlus, Users } from 'lucide-react';
+import { Clock, UserPlus, Users, Edit, Check, X, Trash2 } from 'lucide-react';
 
 const SimpleTeamConfig: React.FC = () => {
   const {
     quotationData,
     addTeamMember,
+    updateTeamMember,
+    removeTeamMember,
     loadRoles,
     loadPersonnel,
     availableRoles,
@@ -27,6 +29,10 @@ const SimpleTeamConfig: React.FC = () => {
     hours: 10,
     rate: 0
   });
+
+  // Estados para edición inline
+  const [editingMember, setEditingMember] = useState<Record<string, {hours: number, rate: number}>>({});
+  const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
@@ -114,6 +120,35 @@ const SimpleTeamConfig: React.FC = () => {
       personnelId: null,
       hours: 10
     }));
+  };
+
+  // Funciones para edición inline
+  const startEditing = (memberId: string, hours: number, rate: number) => {
+    setEditingMember({
+      ...editingMember, 
+      [memberId]: { hours, rate }
+    });
+    setIsEditing({...isEditing, [memberId]: true});
+  };
+  
+  const cancelEditing = (memberId: string) => {
+    setIsEditing({...isEditing, [memberId]: false});
+  };
+  
+  const saveEditing = (member: any) => {
+    const memberId = String(member.id);
+    if (editingMember[memberId]) {
+      const hours = editingMember[memberId].hours;
+      const rate = editingMember[memberId].rate;
+      
+      updateTeamMember(member.id, {
+        ...member,
+        hours,
+        rate,
+        cost: hours * rate
+      });
+      setIsEditing({...isEditing, [memberId]: false});
+    }
   };
 
   return (
@@ -358,12 +393,15 @@ const SimpleTeamConfig: React.FC = () => {
                     <th className="text-center p-2 border-b">Horas</th>
                     <th className="text-center p-2 border-b">Tarifa</th>
                     <th className="text-right p-2 border-b">Costo</th>
+                    <th className="text-center p-2 border-b">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quotationData.teamMembers.map(member => {
                     const role = availableRoles?.find(r => r.id === member.roleId);
                     const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                    const memberId = String(member.id);
+                    const isCurrentlyEditing = isEditing[memberId];
                     
                     return (
                       <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -371,14 +409,118 @@ const SimpleTeamConfig: React.FC = () => {
                           <div className="font-medium">{role?.name || 'Rol no especificado'}</div>
                           {person && <div className="text-gray-500 text-xs">{person.name}</div>}
                         </td>
-                        <td className="p-2 text-center">{member.hours}</td>
-                        <td className="p-2 text-center">${member.rate}</td>
-                        <td className="p-2 text-right font-medium">${member.cost.toFixed(2)}</td>
+                        
+                        {/* Horas - editable */}
+                        <td className="p-2 text-center">
+                          {isCurrentlyEditing ? (
+                            <Input
+                              type="number"
+                              min="1"
+                              value={editingMember[memberId]?.hours || member.hours}
+                              onChange={(e) => {
+                                const hours = parseInt(e.target.value) || 0;
+                                setEditingMember({
+                                  ...editingMember,
+                                  [memberId]: {
+                                    ...editingMember[memberId],
+                                    hours
+                                  }
+                                });
+                              }}
+                              className="h-7 w-16 text-center text-xs"
+                            />
+                          ) : (
+                            <span>{member.hours}</span>
+                          )}
+                        </td>
+                        
+                        {/* Tarifa - editable */}
+                        <td className="p-2 text-center">
+                          {isCurrentlyEditing ? (
+                            <div className="relative">
+                              <span className="absolute left-1 top-1 text-gray-500 text-xs">$</span>
+                              <Input
+                                type="text"
+                                value={String(editingMember[memberId]?.rate || member.rate)}
+                                onChange={(e) => {
+                                  const rate = parseDecimalInput(e.target.value);
+                                  setEditingMember({
+                                    ...editingMember,
+                                    [memberId]: {
+                                      ...editingMember[memberId],
+                                      rate
+                                    }
+                                  });
+                                }}
+                                className="h-7 w-20 text-center text-xs pl-3"
+                              />
+                            </div>
+                          ) : (
+                            <span>${member.rate}</span>
+                          )}
+                        </td>
+                        
+                        {/* Costo calculado */}
+                        <td className="p-2 text-right font-medium">
+                          {isCurrentlyEditing ? (
+                            <span>
+                              ${((editingMember[memberId]?.hours || member.hours) * 
+                                 (editingMember[memberId]?.rate || member.rate)).toFixed(2)}
+                            </span>
+                          ) : (
+                            <span>${member.cost.toFixed(2)}</span>
+                          )}
+                        </td>
+                        
+                        {/* Acciones */}
+                        <td className="p-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {isCurrentlyEditing ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => saveEditing(member)}
+                                  className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => cancelEditing(memberId)}
+                                  className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => startEditing(memberId, member.hours, member.rate)}
+                                  className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => removeTeamMember(member.id)}
+                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
                   <tr className="bg-gray-50 font-medium">
-                    <td colSpan={3} className="p-2 text-right">Total:</td>
+                    <td colSpan={4} className="p-2 text-right">Total:</td>
                     <td className="p-2 text-right">
                       ${quotationData.teamMembers.reduce((sum, member) => sum + member.cost, 0).toFixed(2)}
                     </td>
