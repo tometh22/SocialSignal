@@ -478,17 +478,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { status } = req.body;
+      console.log(`[API] Actualizando estado de cotización ID ${id} a: ${status}`);
+      
       if (!status) return res.status(400).json({ message: "Status is required" });
 
       const updatedQuotation = await storage.updateQuotationStatus(id, status);
+      console.log(`[API] Resultado de actualización:`, updatedQuotation);
       
       if (!updatedQuotation) {
+        console.log(`[API] Error: Cotización ID ${id} no encontrada`);
         return res.status(404).json({ message: "Quotation not found" });
       }
       
+      console.log(`[API] Cotización ID ${id} actualizada exitosamente`);
       res.json(updatedQuotation);
     } catch (error) {
-      res.status(500).json({ message: "Failed to update quotation status" });
+      console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
+      res.status(500).json({ message: "Failed to update quotation status", error: error.message });
     }
   });
   

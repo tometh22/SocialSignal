@@ -1294,12 +1294,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined> {
-    const [updatedQuotation] = await db
-      .update(quotations)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(quotations.id, id))
-      .returning();
-    return updatedQuotation;
+    try {
+      console.log(`[STORAGE] Actualizando estado de cotización ID ${id} a: ${status}`);
+      
+      const [updatedQuotation] = await db
+        .update(quotations)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(quotations.id, id))
+        .returning();
+      
+      console.log(`[STORAGE] Resultado de la actualización:`, updatedQuotation);
+      return updatedQuotation;
+    } catch (error) {
+      console.error(`[STORAGE] Error actualizando estado de cotización ID ${id}:`, error);
+      throw error;
+    }
   }
   
   async deleteQuotation(id: number): Promise<boolean> {
