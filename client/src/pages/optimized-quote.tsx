@@ -11,7 +11,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowUpDown, AlertCircle } from
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { DirectComplexitySelection } from '@/components/optimized/minimal-complexity';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
-import OptimizedTeamConfig from '@/components/optimized/team-config';
+import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
 import TeamMemberSelector from '@/components/quotation/TeamMemberSelector';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
@@ -291,59 +291,7 @@ const OptimizedQuoteContent = () => {
                   />
                 </div>
               )}
-              {currentStep === 3 && (
-                <>
-                  {/* Opción: usar el selector directo que soluciona el problema */}
-                  <div className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">Configuración del Equipo</h2>
-                    <p className="text-sm text-gray-500 mb-6">
-                      Configura el equipo del proyecto seleccionando roles y personal específico.
-                    </p>
-                    {/* Selectores de equipo mejorados */}
-                    <div className="grid grid-cols-1 gap-6 mb-6">
-                      <div className="bg-sky-50 p-4 rounded-md border border-sky-100 flex items-center gap-3">
-                        <AlertCircle className="h-5 w-5 text-sky-500" />
-                        <div className="text-sm text-sky-700">
-                          <p>Aquí puedes seleccionar roles y personal para tu proyecto. Selecciona un rol, personal (opcional), 
-                          horas y tarifa para cada miembro del equipo.</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <TeamMemberSelector 
-                      onAddMember={(member) => {
-                        if (typeof addTeamMember === 'function') {
-                          addTeamMember({
-                            roleId: member.roleId,
-                            personnelId: member.personnelId,
-                            hours: member.hours,
-                            rate: member.rate,
-                            cost: member.cost
-                          });
-                        } else {
-                          console.error("Error: La función addTeamMember no está disponible");
-                          alert("Error: No se pudo añadir el miembro al equipo (función no disponible)");
-                        }
-                      }}
-                      onUpdateMember={(id, updates) => {
-                        if (typeof updateTeamMember === 'function') {
-                          updateTeamMember(id, updates);
-                        } else {
-                          console.error("Error: La función updateTeamMember no está disponible");
-                        }
-                      }}
-                      onRemoveMember={(id) => {
-                        if (typeof removeTeamMember === 'function') {
-                          removeTeamMember(id);
-                        } else {
-                          console.error("Error: La función removeTeamMember no está disponible");
-                        }
-                      }}
-                      existingMembers={Array.isArray(quotationData.teamMembers) ? quotationData.teamMembers : []}
-                    />
-                  </div>
-                </>
-              )}
+              {currentStep === 3 && <OptimizedTeamConfig />}
               {currentStep === 4 && <OptimizedFinancialReview />}
             </CardContent>
           </Card>

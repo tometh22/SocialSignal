@@ -131,6 +131,54 @@ const SimpleTeamConfig: React.FC = () => {
           </div>
         </div>
 
+        {/* Sección de Roles Recomendados */}
+        {recommendedRoleIds && recommendedRoleIds.length > 0 && (
+          <div className="bg-blue-50 rounded-md p-4 mb-4 border border-blue-200">
+            <div className="mb-3">
+              <h3 className="text-sm font-medium mb-2 text-blue-800 flex items-center">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Equipo Recomendado para {quotationData.template?.name || 'este proyecto'}
+              </h3>
+              <p className="text-xs text-blue-600 mb-3">
+                Estos roles son los más adecuados para este tipo de proyecto según nuestra experiencia.
+              </p>
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                {recommendedRoleIds.map(roleId => {
+                  const role = availableRoles?.find(r => r.id === roleId);
+                  return role ? (
+                    <Badge key={roleId} variant="outline" className="bg-white border-blue-300 text-blue-700">
+                      {role.name}
+                    </Badge>
+                  ) : null;
+                })}
+              </div>
+              
+              <Button 
+                onClick={() => {
+                  // Aplicar equipo recomendado - agregar cada rol recomendado
+                  recommendedRoleIds.forEach(roleId => {
+                    const role = availableRoles?.find(r => r.id === roleId);
+                    if (role) {
+                      addTeamMember({
+                        roleId: role.id,
+                        personnelId: null,
+                        hours: 10, // Horas por defecto
+                        rate: role.defaultRate,
+                        cost: 10 * role.defaultRate
+                      });
+                    }
+                  });
+                }}
+                className="flex items-center bg-blue-600 hover:bg-blue-700 text-white text-xs h-8"
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                Aplicar Equipo Recomendado ({recommendedRoleIds.length} roles)
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-50 rounded-md p-4 mb-4">
           <div className="mb-3">
             <h3 className="text-sm font-medium mb-2">Añadir Miembro al Equipo</h3>
