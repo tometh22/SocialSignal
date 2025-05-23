@@ -18,7 +18,7 @@ import { apiRequest } from '@/lib/queryClient';
 export type ProjectDuration = 'short' | 'medium' | 'long';
 
 export interface TeamMember {
-  id: string;
+  id: string | number; // Permitir ambos tipos temporalmente para compatibilidad
   roleId: number;
   personnelId: number | null;
   hours: number;
@@ -114,8 +114,8 @@ interface OptimizedQuoteContextType {
   // Métodos paso 3
   setTeamOption: (option: 'auto' | 'manual') => void;
   addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
-  updateTeamMember: (id: string, updates: Partial<Omit<TeamMember, 'id'>>) => void;
-  removeTeamMember: (id: string) => void;
+  updateTeamMember: (id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => void;
+  removeTeamMember: (id: string | number) => void;
   applyRecommendedTeam: () => void;
   // Métodos paso 4 - Configuración Always-On
   setIsAlwaysOnProject: (isAlwaysOn: boolean) => void;
@@ -405,10 +405,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
 
   const addTeamMember = useCallback((member: Omit<TeamMember, 'id'>) => {
     setQuotationData(prev => {
-      // Crear un nuevo miembro con ID único
+      // Crear un nuevo miembro con ID único temporal (se convertirá a number al guardar)
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const newMember: TeamMember = { 
         ...member, 
-        id: uuidv4() 
+        id: tempId 
       };
       
       // Añadir al equipo evitando duplicados
@@ -421,7 +422,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     });
   }, [removeDuplicateMembers]);
 
-  const updateTeamMember = useCallback((id: string, updates: Partial<Omit<TeamMember, 'id'>>) => {
+  const updateTeamMember = useCallback((id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => {
     setQuotationData(prev => {
       // Encontrar el miembro a actualizar
       const updatedMembers = prev.teamMembers.map(member => {
@@ -447,7 +448,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     });
   }, []);
 
-  const removeTeamMember = useCallback((id: string) => {
+  const removeTeamMember = useCallback((id: string | number) => {
     setQuotationData(prev => ({
       ...prev,
       teamMembers: prev.teamMembers.filter(member => member.id !== id)
