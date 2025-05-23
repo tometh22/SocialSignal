@@ -385,22 +385,28 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     }
   }, []);
 
-  // Función para verificar y evitar duplicados en el equipo
-  const removeDuplicateMembers = useCallback((members: TeamMember[]): TeamMember[] => {
-    // Nuevo enfoque: permitir múltiples entradas del mismo rol pero con ID único
-    // Solo consideramos duplicado si el rol Y el personal son iguales (personas específicas)
-    const uniqueMap = new Map();
+  // Función consolidada para normalizar equipo y evitar duplicados críticos
+  const normalizeTeamMembers = useCallback((members: TeamMember[]): TeamMember[] => {
+    const processedMembers = new Map<string, TeamMember>();
     
     members.forEach(member => {
-      // Si es el mismo rol pero con personal específico, usamos ID completo para permitir duplicados
-      const key = member.personnelId 
-        ? `${member.roleId}_${member.personnelId}` // Rol con persona específica
-        : `role_${member.id}`; // Sólo rol (permitir múltiples del mismo rol)
+      // Crear clave única basada en datos reales del miembro
+      const key = `${member.roleId}-${member.personnelId || 'none'}-${member.hours}-${member.rate}`;
       
-      uniqueMap.set(key, member);
+      if (!processedMembers.has(key)) {
+        // Primera vez que vemos este miembro exacto
+        processedMembers.set(key, member);
+      } else {
+        const existing = processedMembers.get(key)!;
+        // Priorizar IDs de base de datos (números) sobre IDs temporales (strings con 'temp_')
+        if (typeof existing.id === 'string' && existing.id.startsWith('temp_') && 
+            typeof member.id === 'number') {
+          processedMembers.set(key, member);
+        }
+      }
     });
     
-    return Array.from(uniqueMap.values());
+    return Array.from(processedMembers.values());
   }, []);
 
   const addTeamMember = useCallback((member: Omit<TeamMember, 'id'>) => {
@@ -413,14 +419,14 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       };
       
       // Añadir al equipo evitando duplicados
-      const updatedTeam = removeDuplicateMembers([...prev.teamMembers, newMember]);
+      const updatedTeam = normalizeTeamMembers([...prev.teamMembers, newMember]);
       
       return {
         ...prev,
         teamMembers: updatedTeam
       };
     });
-  }, [removeDuplicateMembers]);
+  }, [normalizeTeamMembers]);
 
   const updateTeamMember = useCallback((id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => {
     setQuotationData(prev => {
@@ -1072,22 +1078,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         }
       }
       
-      // Prevenir duplicados
-      const uniqueTeamMembers: TeamMember[] = [];
-      const seen = new Set<string>();
-      
-      // Filtrar duplicados antes de guardar
-      quotationData.teamMembers.forEach(member => {
-        const key = `${member.roleId}-${member.personnelId || 'none'}-${member.hours}-${member.rate}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueTeamMembers.push(member);
-        } else {
-          console.log(`Miembro duplicado detectado y omitido: ${key}`);
-        }
-      });
-      
-      console.log(`Equipo filtrado: ${uniqueTeamMembers.length} miembros únicos de ${quotationData.teamMembers.length} originales`);
+      // Usar función consolidada para normalizar el equipo
+      const uniqueTeamMembers = normalizeTeamMembers(quotationData.teamMembers);
+      console.log(`Equipo normalizado: ${uniqueTeamMembers.length} miembros únicos de ${quotationData.teamMembers.length} originales`);
       
       // Guardar cada miembro del equipo
       for (const member of uniqueTeamMembers) {
