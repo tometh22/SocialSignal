@@ -283,11 +283,16 @@ const SimpleTeamConfig: React.FC = () => {
                     
                     console.log("Rol detectado:", role);
                     
+                    // VALIDACIÓN AUTOMÁTICA: Usar la tarifa oficial del personal
+                    const officialRate = selectedPerson.hourlyRate || role?.defaultRate || 0;
+                    console.log(`Aplicando tarifa oficial de ${selectedPerson.name}: $${officialRate}/hora`);
+                    
                     setNewMember(prev => ({
                       ...prev,
                       personnelId,
                       roleId,
-                      rate: role?.defaultRate || 0
+                      rate: officialRate,
+                      cost: prev.hours * officialRate
                     }));
                   }}
                 >

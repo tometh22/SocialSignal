@@ -677,6 +677,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
         console.log("Datos de miembro validados correctamente:", validatedData);
         
+        // VALIDACIÓN AUTOMÁTICA DE TARIFAS - Verificar que la tarifa coincida con la del personal
+        if (validatedData.personnelId) {
+          const personnel = await storage.getPersonnelById(validatedData.personnelId);
+          if (personnel && personnel.hourlyRate !== validatedData.rate) {
+            console.log(`Inconsistencia de tarifa detectada: Personal ${personnel.name} tiene tarifa ${personnel.hourlyRate} pero se intentó asignar con ${validatedData.rate}`);
+            return res.status(400).json({
+              message: `Tarifa inconsistente: ${personnel.name} tiene una tarifa oficial de $${personnel.hourlyRate}/hora, pero se intentó asignar con $${validatedData.rate}/hora`,
+              officialRate: personnel.hourlyRate,
+              attemptedRate: validatedData.rate,
+              personnelName: personnel.name
+            });
+          }
+        }
+        
         // Verificar si ya existe un miembro exactamente igual para evitar duplicados
         const existingMembers = await storage.getQuotationTeamMembers(validatedData.quotationId);
         
