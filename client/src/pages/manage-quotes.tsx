@@ -433,6 +433,12 @@ export default function ManageQuotes() {
                   {translateStatus(selectedQuote.status)}
                 </span>
               )}
+              {selectedQuote && selectedQuote.status === 'draft' && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
+                  <FileText className="h-3.5 w-3.5 mr-1.5" />
+                  {translateStatus(selectedQuote.status)}
+                </span>
+              )}
             </div>
 
             <div className="form-group">
