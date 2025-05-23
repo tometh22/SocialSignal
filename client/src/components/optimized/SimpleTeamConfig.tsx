@@ -141,6 +141,37 @@ const SimpleTeamConfig: React.FC = () => {
       const hours = editingMember[memberId].hours;
       const rate = editingMember[memberId].rate;
       
+      // VALIDACIÓN AUTOMÁTICA: Verificar si la tarifa editada coincide con la oficial
+      if (member.personnelId && availablePersonnel) {
+        const personnel = availablePersonnel.find(p => p.id === member.personnelId);
+        if (personnel && personnel.hourlyRate !== rate) {
+          const useOfficial = window.confirm(
+            `⚠️ INCONSISTENCIA DE TARIFA DETECTADA\n\n` +
+            `${personnel.name} tiene una tarifa oficial de $${personnel.hourlyRate}/hora\n` +
+            `Pero estás intentando guardar $${rate}/hora\n\n` +
+            `¿Deseas usar la tarifa oficial ($${personnel.hourlyRate}/hora)?`
+          );
+          
+          if (useOfficial) {
+            // Actualizar con la tarifa oficial
+            setEditingMember({
+              ...editingMember,
+              [memberId]: { hours, rate: personnel.hourlyRate }
+            });
+            
+            updateTeamMember(member.id, {
+              ...member,
+              hours,
+              rate: personnel.hourlyRate,
+              cost: hours * personnel.hourlyRate
+            });
+            setIsEditing({...isEditing, [memberId]: false});
+            return;
+          }
+        }
+      }
+      
+      // Proceder con la tarifa manual si el usuario lo confirma
       updateTeamMember(member.id, {
         ...member,
         hours,
