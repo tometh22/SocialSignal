@@ -14,10 +14,7 @@ import Admin from "@/pages/admin";
 import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
-import ProjectSummary from "@/pages/project-summary";
-import ProjectSummaryImproved from "@/pages/project-summary-improved";
-import ProjectSummarySuper from "@/pages/project-summary-super";
-import ProjectSummaryFixed from "@/pages/project-summary-fixed";
+// Dashboard moderno mantenido - todos los antiguos eliminados
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
 import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
@@ -112,11 +109,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/new" component={NewActiveProject} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
-                  {/* Redirección de la ruta antigua a la nueva */}
+                  {/* Ruta moderna para proyecto analytics */}
                   <ProtectedRoute path="/project-summary/:projectId" component={ProjectAnalyticsView} />
-                  <ProtectedRoute path="/project-summary-new/:projectId" component={ProjectSummaryImproved} />
-                  <ProtectedRoute path="/project-summary-super/:projectId" component={ProjectSummarySuper} />
-                  <ProtectedRoute path="/project-summary-fixed/:projectId" component={ProjectSummaryFixed} />
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
