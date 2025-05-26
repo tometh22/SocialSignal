@@ -645,7 +645,31 @@ const OptimizedFinancialReview: React.FC = () => {
                   Recomendar equipo óptimo
                 </Button>
                 
-                {/* Botón eliminado - usar el panel de configuración de equipo en el paso 3 */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => {
+                    // Regresar al paso 3 para agregar más miembros
+                    if (window.confirm("¿Quieres agregar más miembros al equipo? Te llevaré de vuelta al paso de configuración de equipo.")) {
+                      // Función para ir al paso 3 - esto debería estar disponible desde el contexto
+                      const stepButtons = document.querySelectorAll('[data-step="3"]');
+                      if (stepButtons.length > 0) {
+                        (stepButtons[0] as HTMLElement).click();
+                      } else {
+                        // Fallback: recargar la página en el paso 3
+                        window.location.hash = '#step-3';
+                        window.location.reload();
+                      }
+                    }
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-blue-600">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                  Agregar más miembros
+                </Button>
               </div>
               
               {/* Análisis del equipo */}
