@@ -409,7 +409,13 @@ const SimpleTeamConfig: React.FC = () => {
 
           <div className="mt-4 flex justify-end">
             <Button
-              onClick={handleAddMember}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("🔔 Botón clickeado - iniciando handleAddMember");
+                handleAddMember();
+              }}
+              type="button"
               variant="default"
               size="sm"
               className="bg-primary hover:bg-primary/90"
