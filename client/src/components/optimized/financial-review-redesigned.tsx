@@ -645,39 +645,7 @@ const OptimizedFinancialReview: React.FC = () => {
                   Recomendar equipo óptimo
                 </Button>
                 
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs h-7 text-green-600 border-green-200 hover:bg-green-50"
-                  onClick={() => {
-                    if (availableRoles && availableRoles.length > 0) {
-                      // Encontrar el primer rol disponible y el primer personal
-                      const firstRole = availableRoles[0];
-                      const firstPersonId = availablePersonnel && availablePersonnel.length > 0 
-                        ? availablePersonnel[0].id 
-                        : null;
-                        
-                      // Calcular tarifa y costo
-                      const rate = firstRole.defaultRate || 10;
-                      const hours = 10;
-                      
-                      // Añadir con valores por defecto
-                      addTeamMember({
-                        roleId: firstRole.id,
-                        personnelId: firstPersonId,
-                        hours: hours,
-                        rate: rate,
-                        cost: hours * rate
-                      });
-                    }
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-green-600">
-                    <path d="M12 5v14"></path>
-                    <path d="M5 12h14"></path>
-                  </svg>
-                  Agregar rol
-                </Button>
+                {/* Botón eliminado - usar el panel de configuración de equipo en el paso 3 */}
               </div>
               
               {/* Análisis del equipo */}
