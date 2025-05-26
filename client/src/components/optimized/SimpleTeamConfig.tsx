@@ -326,21 +326,14 @@ const SimpleTeamConfig: React.FC = () => {
                     
                     console.log("Personal seleccionado:", selectedPerson);
                     
-                    const roleId = selectedPerson.roleId || 0;
-                    const role = availableRoles?.find(r => r.id === roleId);
-                    
-                    console.log("Rol detectado:", role);
-                    
-                    // VALIDACIÓN AUTOMÁTICA: Usar la tarifa oficial del personal
-                    const officialRate = selectedPerson.hourlyRate || role?.defaultRate || 0;
+                    // Solo actualizar personal y tarifa, NO cambiar el rol automáticamente
+                    const officialRate = selectedPerson.hourlyRate || 0;
                     console.log(`Aplicando tarifa oficial de ${selectedPerson.name}: $${officialRate}/hora`);
                     
                     setNewMember(prev => ({
                       ...prev,
                       personnelId,
-                      roleId,
-                      rate: officialRate,
-                      cost: prev.hours * officialRate
+                      rate: officialRate
                     }));
                   }}
                 >
