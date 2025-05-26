@@ -367,13 +367,17 @@ const OptimizedFinancialReview: React.FC = () => {
               No hay miembros en el equipo asignado.
             </div>
           )}
-          
-          {/* Controles para agregar roles y actualizar equipo */}
-          <div className="flex items-start gap-4 mb-6">
+        </CardContent>
+      </Card>
+
+      {/* Controles separados para agregar roles y actualizar equipo */}
+      <Card className="mb-6">
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-4">
             <Button 
               variant="outline" 
               size="sm" 
-              className="text-xs h-7"
+              className="text-xs h-8"
               onClick={applyRecommendedTeam}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 text-primary">
@@ -385,10 +389,14 @@ const OptimizedFinancialReview: React.FC = () => {
               Recomendar equipo óptimo
             </Button>
             
-            <div className="flex-shrink-0">
-              <TeamMemberQuickAdd />
-            </div>
+            <TeamMemberQuickAdd />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Sección del equipo asignado */}
+      <Card>
+        <CardContent className="pt-4">
           
           {/* Análisis del equipo */}
           <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
