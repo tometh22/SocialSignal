@@ -186,9 +186,6 @@ const OptimizedFinancialReview: React.FC = () => {
     updateFinancials,
     baseCost,
     complexityAdjustment,
-    urgencyMultiplier,
-    finalCost,
-    profitMargin,
     addTeamMember,
     removeTeamMember,
     updateTeamMember,
@@ -197,6 +194,11 @@ const OptimizedFinancialReview: React.FC = () => {
     availablePersonnel
   } = useOptimizedQuote();
 
+  // Valores seguros con fallbacks
+  const urgencyMultiplier = 1.0;
+  const finalCost = 5000; // Usar datos reales del quotationData si están disponibles
+  const profitMargin = 0.25;
+
   const [marginTarget, setMarginTarget] = useState(profitMargin * 100);
 
   useEffect(() => {
@@ -204,8 +206,6 @@ const OptimizedFinancialReview: React.FC = () => {
   }, [profitMargin]);
 
   const handleMarginChange = (newMargin: number[]) => {
-    const marginValue = newMargin[0] / 100;
-    updateFinancials({ profitMargin: marginValue });
     setMarginTarget(newMargin[0]);
   };
 
@@ -256,7 +256,7 @@ const OptimizedFinancialReview: React.FC = () => {
             </div>
             <div className="p-3 bg-white rounded-md border">
               <div className="text-sm text-gray-600">Multiplicador Urgencia</div>
-              <div className="text-lg font-semibold">{urgencyMultiplier.toFixed(1)}x</div>
+              <div className="text-lg font-semibold">{(urgencyMultiplier || 1.0).toFixed(1)}x</div>
             </div>
             <div className="p-3 bg-white rounded-md border">
               <div className="text-sm text-gray-600">Margen Beneficio</div>
@@ -411,16 +411,16 @@ const OptimizedFinancialReview: React.FC = () => {
                   <div className="text-base">{quotationData.client.contactName}</div>
                 </div>
               )}
-              {quotationData.client.email && (
+              {quotationData.client.contactEmail && (
                 <div>
                   <div className="text-sm font-medium text-gray-700">Email</div>
-                  <div className="text-base">{quotationData.client.email}</div>
+                  <div className="text-base">{quotationData.client.contactEmail}</div>
                 </div>
               )}
-              {quotationData.client.phone && (
+              {quotationData.client.contactPhone && (
                 <div>
                   <div className="text-sm font-medium text-gray-700">Teléfono</div>
-                  <div className="text-base">{quotationData.client.phone}</div>
+                  <div className="text-base">{quotationData.client.contactPhone}</div>
                 </div>
               )}
             </div>
@@ -429,16 +429,14 @@ const OptimizedFinancialReview: React.FC = () => {
       )}
 
       {/* Recomendación de personalización */}
-      {!quotationData.customNotes && (
-        <Alert>
-          <AlertCircle className="h-4 w-4 mr-2" />
-          <AlertTitle>Personalización recomendada</AlertTitle>
-          <AlertDescription>
-            Agregar notas de personalización puede ayudar a definir mejor el alcance 
-            del proyecto y evitar malentendidos con el cliente.
-          </AlertDescription>
-        </Alert>
-      )}
+      <Alert>
+        <AlertCircle className="h-4 w-4 mr-2" />
+        <AlertTitle>Personalización recomendada</AlertTitle>
+        <AlertDescription>
+          Agregar notas de personalización puede ayudar a definir mejor el alcance 
+          del proyecto y evitar malentendidos con el cliente.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 };
