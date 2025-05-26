@@ -22,11 +22,11 @@ const TeamMemberQuickAdd: React.FC = () => {
   const [hours, setHours] = useState('10');
   const [rate, setRate] = useState('');
   
-  const { addTeamMember } = useOptimizedQuote();
+  const { addTeamMember, availableRoles: contextRoles, availablePersonnel: contextPersonnel } = useOptimizedQuote();
   
-  // Obtener datos disponibles con tipado correcto
-  const { data: roles = [] } = useQuery<Array<{id: number, name: string, defaultRate?: number}>>({ queryKey: ['/api/roles'] });
-  const { data: personnel = [] } = useQuery<Array<{id: number, name: string}>>({ queryKey: ['/api/personnel'] });
+  // Usar los datos del contexto que ya están disponibles
+  const roles = contextRoles || [];
+  const personnel = contextPersonnel || [];
   
   const handleAddMember = () => {
     if (!selectedRole || !hours || !rate) return;
@@ -52,12 +52,19 @@ const TeamMemberQuickAdd: React.FC = () => {
   
   const handleRoleChange = (roleId: string) => {
     setSelectedRole(roleId);
+    setSelectedPersonnel('0'); // Reset persona cuando cambie el rol
+    
     // Auto-llenar rate basado en el rol
     const role = roles.find(r => r.id === parseInt(roleId));
     if (role?.defaultRate) {
       setRate(role.defaultRate.toString());
     }
   };
+
+  // Filtrar personal disponible basado en el rol seleccionado
+  const availablePersonnelForRole = selectedRole 
+    ? personnel.filter(person => person.roleId === parseInt(selectedRole))
+    : [];
 
   if (!showAddForm) {
     return (
@@ -74,16 +81,16 @@ const TeamMemberQuickAdd: React.FC = () => {
   }
 
   return (
-    <div className="p-3 border rounded-md bg-blue-50 space-y-3">
+    <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 space-y-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center text-sm font-medium text-blue-800">
-          <UserPlus className="h-4 w-4 mr-1.5" />
+        <div className="flex items-center text-sm font-semibold text-blue-900">
+          <UserPlus className="h-4 w-4 mr-2 text-blue-600" />
           Agregar nuevo miembro
         </div>
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+          className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600 hover:bg-white/50 rounded-full"
           onClick={() => setShowAddForm(false)}
         >
           ×
@@ -108,14 +115,18 @@ const TeamMemberQuickAdd: React.FC = () => {
         </div>
         
         <div>
-          <Label className="text-xs text-blue-700">Persona</Label>
-          <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel}>
+          <Label className="text-xs text-blue-700">
+            Persona {selectedRole && availablePersonnelForRole.length === 0 && (
+              <span className="text-orange-600">(Sin personal disponible)</span>
+            )}
+          </Label>
+          <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel} disabled={!selectedRole}>
             <SelectTrigger className="h-7 text-xs">
-              <SelectValue placeholder="Sin asignar" />
+              <SelectValue placeholder={selectedRole ? "Seleccionar persona" : "Primero selecciona un rol"} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0">Sin asignar</SelectItem>
-              {personnel.map(person => (
+              {availablePersonnelForRole.map(person => (
                 <SelectItem key={person.id} value={person.id.toString()}>
                   {person.name}
                 </SelectItem>
@@ -125,34 +136,36 @@ const TeamMemberQuickAdd: React.FC = () => {
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-3">
         <div>
-          <Label className="text-xs text-blue-700">Horas</Label>
+          <Label className="text-xs font-medium text-blue-700">Horas</Label>
           <Input
             type="number"
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            className="h-7 text-xs"
+            className="h-8 text-xs bg-white border-blue-200 focus:border-blue-400"
             min="0"
             step="0.5"
+            placeholder="10"
           />
         </div>
         
         <div>
-          <Label className="text-xs text-blue-700">Tarifa USD</Label>
+          <Label className="text-xs font-medium text-blue-700">Tarifa USD</Label>
           <Input
             type="number"
             value={rate}
             onChange={(e) => setRate(e.target.value)}
-            className="h-7 text-xs"
+            className="h-8 text-xs bg-white border-blue-200 focus:border-blue-400"
             min="0"
             step="0.01"
+            placeholder="15.00"
           />
         </div>
         
         <div>
-          <Label className="text-xs text-blue-700">Costo</Label>
-          <div className="h-7 px-2 py-1 text-xs bg-gray-100 rounded border flex items-center">
+          <Label className="text-xs font-medium text-blue-700">Costo Total</Label>
+          <div className="h-8 px-3 py-1 text-xs bg-white border border-blue-200 rounded-md flex items-center font-semibold text-green-700">
             ${hours && rate ? (parseFloat(hours) * parseFloat(rate)).toFixed(2) : '0.00'}
           </div>
         </div>
