@@ -99,27 +99,44 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Manejar la adición de nuevo miembro
   const handleAddMember = () => {
+    console.log("🔄 Intentando agregar miembro:", newMember);
+    console.log("🔍 Estado actual del equipo:", quotationData.teamMembers);
+    
     // Validación
     if (newMember.roleId <= 0 || newMember.hours <= 0 || newMember.rate <= 0) {
+      console.error("❌ Validación fallida:", {
+        roleId: newMember.roleId,
+        hours: newMember.hours,
+        rate: newMember.rate
+      });
       alert("Por favor completa todos los campos requeridos");
       return;
     }
     
-    // Añadir miembro
-    addTeamMember({
-      roleId: newMember.roleId,
-      personnelId: newMember.personnelId,
-      hours: newMember.hours,
-      rate: newMember.rate,
-      cost: newMember.hours * newMember.rate
-    });
-    
-    // Limpiar formulario pero mantener el rol seleccionado
-    setNewMember(prev => ({
-      ...prev,
-      personnelId: null,
-      hours: 10
-    }));
+    try {
+      console.log("✅ Validación pasada, agregando miembro...");
+      
+      // Añadir miembro
+      addTeamMember({
+        roleId: newMember.roleId,
+        personnelId: newMember.personnelId,
+        hours: newMember.hours,
+        rate: newMember.rate,
+        cost: newMember.hours * newMember.rate
+      });
+      
+      console.log("✅ Miembro agregado exitosamente");
+      
+      // Limpiar formulario pero mantener el rol seleccionado
+      setNewMember(prev => ({
+        ...prev,
+        personnelId: null,
+        hours: 10
+      }));
+    } catch (error) {
+      console.error("❌ Error al agregar miembro:", error);
+      alert("Error al agregar miembro. Revisa la consola para más detalles.");
+    }
   };
 
   // Funciones para edición inline
