@@ -461,18 +461,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     }));
   }, []);
 
-  // Función para actualizar un miembro del equipo existente
-  const updateTeamMember = useCallback((id: string | number, updates: Partial<TeamMember>) => {
-    setQuotationData(prev => ({
-      ...prev,
-      teamMembers: prev.teamMembers.map(member => 
-        member.id === id 
-          ? { ...member, ...updates }
-          : member
-      )
-    }));
-  }, []);
-
   const applyRecommendedTeam = useCallback(async () => {
     // Si no hay roles disponibles o recomendados, no hacemos nada
     if (!availableRoles || !recommendedRoleIds.length) {
