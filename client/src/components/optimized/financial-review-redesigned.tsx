@@ -21,65 +21,6 @@ const TeamMemberQuickAdd: React.FC = () => {
   const [selectedPersonnel, setSelectedPersonnel] = useState('');
   const [hours, setHours] = useState('10');
   const [rate, setRate] = useState('');
-
-// Componente para editar celdas inline
-const EditableCell: React.FC<{
-  value: number;
-  type: 'hours' | 'rate';
-  onSave: (value: number) => void;
-}> = ({ value, type, onSave }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value.toString());
-
-  const handleSave = () => {
-    const numValue = parseFloat(editValue);
-    if (!isNaN(numValue) && numValue > 0) {
-      onSave(numValue);
-      setIsEditing(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setEditValue(value.toString());
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          type="number"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          className="h-6 w-16 text-xs"
-          step={type === 'rate' ? '0.01' : '0.5'}
-          min="0"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSave();
-            if (e.key === 'Escape') handleCancel();
-          }}
-          autoFocus
-        />
-        <Button size="sm" className="h-6 w-6 p-0" onClick={handleSave}>
-          ✓
-        </Button>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={handleCancel}>
-          ✕
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className="cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded text-right"
-      onClick={() => setIsEditing(true)}
-      title="Clic para editar"
-    >
-      {type === 'rate' ? value.toFixed(1) : value}
-    </div>
-  );
-};
   
   const { addTeamMember, availableRoles: contextRoles, availablePersonnel: contextPersonnel } = useOptimizedQuote();
   
@@ -265,6 +206,65 @@ const OptimizedFinancialReview: React.FC = () => {
     availableRoles,
     availablePersonnel
   } = useOptimizedQuote();
+
+  // Componente para editar celdas inline - definido dentro del componente
+  const EditableCell: React.FC<{
+    value: number;
+    type: 'hours' | 'rate';
+    onSave: (value: number) => void;
+  }> = ({ value, type, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(value.toString());
+
+    const handleSave = () => {
+      const numValue = parseFloat(editValue);
+      if (!isNaN(numValue) && numValue > 0) {
+        onSave(numValue);
+        setIsEditing(false);
+      }
+    };
+
+    const handleCancel = () => {
+      setEditValue(value.toString());
+      setIsEditing(false);
+    };
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-6 w-16 text-xs"
+            step={type === 'rate' ? '0.01' : '0.5'}
+            min="0"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') handleCancel();
+            }}
+            autoFocus
+          />
+          <Button size="sm" className="h-6 w-6 p-0" onClick={handleSave}>
+            ✓
+          </Button>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={handleCancel}>
+            ✕
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className="cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded text-right"
+        onClick={() => setIsEditing(true)}
+        title="Clic para editar"
+      >
+        {type === 'rate' ? value.toFixed(1) : value}
+      </div>
+    );
+  };
 
   // Valores seguros con fallbacks
   const urgencyMultiplier = 1.0;
