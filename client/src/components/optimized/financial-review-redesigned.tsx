@@ -369,7 +369,7 @@ const OptimizedFinancialReview: React.FC = () => {
           )}
           
           {/* Controles para agregar roles y actualizar equipo */}
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-start mb-4">
             <Button 
               variant="outline" 
               size="sm" 
@@ -385,7 +385,9 @@ const OptimizedFinancialReview: React.FC = () => {
               Recomendar equipo óptimo
             </Button>
             
-            <TeamMemberQuickAdd />
+            <div className="flex-1 max-w-lg ml-4">
+              <TeamMemberQuickAdd />
+            </div>
           </div>
           
           {/* Análisis del equipo */}

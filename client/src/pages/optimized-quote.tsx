@@ -172,7 +172,7 @@ const OptimizedQuoteContent = () => {
     <div className="flex flex-col h-full bg-background">
       {/* Header compacto integrado */}
       <div className="border-b bg-white shadow-sm sticky top-0 z-10">
-        <div className="container py-2">
+        <div className="w-full px-4 py-2">
           <div className="flex items-center justify-between">
             {/* Título y stepper en una sola línea */}
             <div className="flex items-center gap-6">
@@ -257,7 +257,7 @@ const OptimizedQuoteContent = () => {
 
       {/* Indicador de paso actual como subtítulo */}
       <div className="bg-gray-50 border-b">
-        <div className="container py-2">
+        <div className="w-full px-4 py-2">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-medium text-gray-700">
