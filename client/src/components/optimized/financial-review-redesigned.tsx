@@ -36,7 +36,7 @@ const TeamMemberQuickAdd: React.FC = () => {
     
     addTeamMember({
       roleId: parseInt(selectedRole),
-      personnelId: selectedPersonnel ? parseInt(selectedPersonnel) : null,
+      personnelId: selectedPersonnel && selectedPersonnel !== "0" ? parseInt(selectedPersonnel) : null,
       hours: hoursNum,
       rate: rateNum,
       cost: hoursNum * rateNum
@@ -114,7 +114,7 @@ const TeamMemberQuickAdd: React.FC = () => {
               <SelectValue placeholder="Sin asignar" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sin asignar</SelectItem>
+              <SelectItem value="0">Sin asignar</SelectItem>
               {personnel.map(person => (
                 <SelectItem key={person.id} value={person.id.toString()}>
                   {person.name}
