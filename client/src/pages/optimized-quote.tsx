@@ -170,110 +170,129 @@ const OptimizedQuoteContent = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header integrado con la navegación de pasos */}
+      {/* Header compacto integrado */}
       <div className="border-b bg-white shadow-sm sticky top-0 z-10">
-        <div className="container py-3">
-          <div className="flex flex-col">
-            {/* Título principal */}
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-medium text-gray-800">
+        <div className="container py-2">
+          <div className="flex items-center justify-between">
+            {/* Título y stepper en una sola línea */}
+            <div className="flex items-center gap-6">
+              <h1 className="text-lg font-medium text-gray-800 flex items-center">
                 {isEditing 
-                  ? "Editar Borrador de Cotización" 
+                  ? "Editar Borrador" 
                   : isRecotizacion 
-                    ? "Recotizar Propuesta" 
+                    ? "Recotizar" 
                     : "Nueva Cotización"}
                 {quotationId && 
-                  <span className="ml-2 text-xs text-neutral-500">
-                    (ID: {quotationId})
+                  <span className="ml-2 text-xs text-neutral-500 font-normal">
+                    ID: {quotationId}
                   </span>
                 }
               </h1>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs h-8 border-slate-200 text-slate-700"
-                  onClick={() => setLocation('/manage-quotes')}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs h-8 border-primary/30 text-primary bg-primary/5"
-                  onClick={handleSave}
-                  disabled={isSavingInProgress}
-                >
-                  <Save className="h-3.5 w-3.5 mr-1.5" /> 
-                  {isSavingInProgress 
-                    ? "Guardando..." 
-                    : isEditing 
-                      ? "Actualizar Borrador" 
-                      : isRecotizacion 
-                        ? "Guardar Recotización" 
-                        : "Guardar Borrador"}
-                </Button>
-              </div>
-            </div>
-            
-            {/* Barra de progreso y pasos */}
-            <div className="relative">
-              {/* Barra de progreso */}
-              <div className="absolute h-0.5 bg-neutral-100 left-0 right-0 top-[18px]"></div>
-              <div className="absolute h-0.5 bg-primary left-0 top-[18px]" style={{ 
-                width: `${(currentStep-1)/((quotationData.project?.type === 'always-on' ? 5 : 4)-1)*100}%`, 
-                transition: 'width 0.3s ease-out' 
-              }}></div>
               
-              {/* Indicadores de pasos */}
-              <div className={`grid ${quotationData.project?.type === 'always-on' ? 'grid-cols-5' : 'grid-cols-4'} relative`}>
+              {/* Stepper horizontal compacto */}
+              <div className="flex items-center gap-3">
                 {[
-                  { num: 1, title: "Información Básica" },
-                  { num: 2, title: "Selección de Plantilla" },
-                  { num: 3, title: "Configuración de Equipo" },
-                  ...(quotationData.project?.type === 'always-on' ? [{ num: 4, title: "Configuración Entregables" }] : []),
-                  { num: quotationData.project?.type === 'always-on' ? 5 : 4, title: "Revisión y Ajustes" }
-                ].map((step) => (
-                  <div key={step.num} className="flex flex-col items-center">
+                  { num: 1, title: "Info" },
+                  { num: 2, title: "Plantilla" },
+                  { num: 3, title: "Equipo" },
+                  ...(quotationData.project?.type === 'always-on' ? [{ num: 4, title: "Entregables" }] : []),
+                  { num: quotationData.project?.type === 'always-on' ? 5 : 4, title: "Revisión" }
+                ].map((step, index, array) => (
+                  <div key={step.num} className="flex items-center">
                     <div 
                       onClick={() => step.num < currentStep && goToStep(step.num)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs z-10 mb-1 transition-all 
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all 
                       ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
                       ${currentStep >= step.num 
-                        ? 'bg-primary text-white shadow-md' 
-                        : 'bg-white text-neutral-400 border border-neutral-200'}`}
+                        ? 'bg-primary text-white shadow-sm' 
+                        : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
                     >
-                      {step.num}
+                      {step.num < currentStep ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        step.num
+                      )}
                     </div>
-                    <span className={`text-xs font-medium text-center transition-colors pb-2
-                      ${currentStep === step.num ? 'text-primary' : 'text-neutral-500'}`}>
+                    <span className={`ml-1.5 text-xs font-medium transition-colors
+                      ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
                       {step.title}
                     </span>
+                    {index < array.length - 1 && (
+                      <div className={`mx-3 h-px w-8 transition-colors
+                        ${step.num < currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
+                    )}
                   </div>
                 ))}
               </div>
+            </div>
+            
+            {/* Botones de acción */}
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-7 px-3 border-slate-200 text-slate-700"
+                onClick={() => setLocation('/manage-quotes')}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-7 px-3 border-primary/30 text-primary bg-primary/5"
+                onClick={handleSave}
+                disabled={isSavingInProgress}
+              >
+                <Save className="h-3 w-3 mr-1" /> 
+                {isSavingInProgress 
+                  ? "Guardando..." 
+                  : isEditing 
+                    ? "Actualizar" 
+                    : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Indicador de paso actual como subtítulo */}
+      <div className="bg-gray-50 border-b">
+        <div className="container py-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-700">
+                {currentStep === 1 && "Información Básica"}
+                {currentStep === 2 && "Selección de Plantilla"}
+                {currentStep === 3 && "Configuración de Equipo"}
+                {currentStep === 4 && quotationData.project?.type === 'always-on' && "Configuración de Entregables"}
+                {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
+                  (currentStep === 5 && quotationData.project?.type === 'always-on')) && "Revisión y Ajustes"}
+              </h2>
+              <p className="text-xs text-gray-500">
+                {currentStep === 1 && "Define los detalles básicos del proyecto"}
+                {currentStep === 2 && "Selecciona la plantilla más adecuada"}
+                {currentStep === 3 && "Configura el equipo de trabajo"}
+                {currentStep === 4 && quotationData.project?.type === 'always-on' && "Define los entregables específicos y sus frecuencias"}
+                {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
+                  (currentStep === 5 && quotationData.project?.type === 'always-on')) && "Revisa todos los detalles antes de guardar"}
+              </p>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Main content */}
+      {/* Contenido principal */}
       <div className="flex-1 overflow-auto">
-        <div className="container py-6">
-          
-          {/* Content for current step */}
-          <Card className="bg-white border border-neutral-100 shadow-sm mb-10 scale-in">
+        <div className="container py-4">
+          {/* Contenido del paso actual */}
+          <Card className="bg-white border border-neutral-100 shadow-sm">
             <CardContent className="p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
-              {/* Paso de configuración de entregables para proyectos Always-On */}
+              {currentStep === 3 && <OptimizedTeamConfig />}
+              {/* Configuración de entregables para proyectos Always-On */}
               {currentStep === 4 && quotationData.project?.type === 'always-on' && (
                 <div className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">Configuración de Entregables</h2>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Define los entregables específicos y sus frecuencias para este proyecto Always-On.
-                  </p>
-                  
                   <DeliverableConfiguration 
                     isAlwaysOnProject={true}
                     onIsAlwaysOnProjectChange={(value) => {
@@ -281,7 +300,6 @@ const OptimizedQuoteContent = () => {
                     }}
                     deliverables={quotationData.deliverables || []}
                     onDeliverablesChange={(deliverables) => {
-                      // Actualizar el estado del contexto con los nuevos entregables
                       console.log("Actualizando entregables:", deliverables);
                     }}
                     additionalCost={quotationData.additionalDeliverableCost || 0}
@@ -291,8 +309,11 @@ const OptimizedQuoteContent = () => {
                   />
                 </div>
               )}
-              {currentStep === 3 && <OptimizedTeamConfig />}
-              {currentStep === 4 && <OptimizedFinancialReview />}
+              {/* Revisión financiera */}
+              {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
+                (currentStep === 5 && quotationData.project?.type === 'always-on')) && (
+                <OptimizedFinancialReview />
+              )}
             </CardContent>
           </Card>
           
