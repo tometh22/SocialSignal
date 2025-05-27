@@ -170,27 +170,27 @@ const OptimizedQuoteContent = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header ultra-compacto */}
+      {/* Header compacto integrado */}
       <div className="border-b bg-white shadow-sm sticky top-0 z-10">
-        <div className="w-full px-4 py-1">
+        <div className="w-full px-4 py-2">
           <div className="flex items-center justify-between">
             {/* Título y stepper en una sola línea */}
-            <div className="flex items-center gap-4">
-              <h1 className="text-sm font-medium text-gray-800 flex items-center">
+            <div className="flex items-center gap-6">
+              <h1 className="text-lg font-medium text-gray-800 flex items-center">
                 {isEditing 
                   ? "Editar Borrador" 
                   : isRecotizacion 
                     ? "Recotizar" 
                     : "Nueva Cotización"}
                 {quotationId && 
-                  <span className="ml-1 text-xs text-neutral-500 font-normal">
-                    #{quotationId}
+                  <span className="ml-2 text-xs text-neutral-500 font-normal">
+                    ID: {quotationId}
                   </span>
                 }
               </h1>
               
-              {/* Stepper ultra-compacto */}
-              <div className="flex items-center gap-1">
+              {/* Stepper horizontal compacto */}
+              <div className="flex items-center gap-3">
                 {[
                   { num: 1, title: "Info" },
                   { num: 2, title: "Plantilla" },
@@ -201,50 +201,51 @@ const OptimizedQuoteContent = () => {
                   <div key={step.num} className="flex items-center">
                     <div 
                       onClick={() => step.num < currentStep && goToStep(step.num)}
-                      className={`w-4 h-4 rounded-full flex items-center justify-center text-xs transition-all 
-                      ${step.num < currentStep ? 'cursor-pointer' : ''}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all 
+                      ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
                       ${currentStep >= step.num 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-200 text-gray-500'}`}
+                        ? 'bg-primary text-white shadow-sm' 
+                        : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
                     >
                       {step.num < currentStep ? (
-                        <Check className="h-2 w-2" />
+                        <Check className="h-3 w-3" />
                       ) : (
                         step.num
                       )}
                     </div>
-                    <span className={`ml-1 text-xs transition-colors
-                      ${currentStep === step.num ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+                    <span className={`ml-1.5 text-xs font-medium transition-colors
+                      ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
                       {step.title}
                     </span>
                     {index < array.length - 1 && (
-                      <div className={`mx-1 h-px w-3 transition-colors
-                        ${step.num < currentStep ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
+                      <div className={`mx-3 h-px w-8 transition-colors
+                        ${step.num < currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
                     )}
                   </div>
                 ))}
               </div>
             </div>
             
-            {/* Botones ultra-compactos */}
-            <div className="flex gap-1">
+            {/* Botones de acción */}
+            <div className="flex gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="text-xs h-6 px-2 border-gray-300 text-gray-600"
+                className="text-xs h-7 px-3 border-slate-200 text-slate-700"
                 onClick={() => setLocation('/manage-quotes')}
               >
                 Cancelar
               </Button>
               <Button 
+                variant="outline" 
                 size="sm" 
-                className="text-xs h-6 px-2 bg-blue-500 hover:bg-blue-600"
+                className="text-xs h-7 px-3 border-primary/30 text-primary bg-primary/5"
                 onClick={handleSave}
                 disabled={isSavingInProgress}
               >
-                <Save className="h-2 w-2 mr-1" /> 
+                <Save className="h-3 w-3 mr-1" /> 
                 {isSavingInProgress 
-                  ? "..." 
+                  ? "Guardando..." 
                   : isEditing 
                     ? "Actualizar" 
                     : "Guardar"}
@@ -254,11 +255,35 @@ const OptimizedQuoteContent = () => {
         </div>
       </div>
 
-
+      {/* Indicador de paso actual como subtítulo */}
+      <div className="bg-gray-50 border-b">
+        <div className="w-full px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-gray-700">
+                {currentStep === 1 && "Información Básica"}
+                {currentStep === 2 && "Selección de Plantilla"}
+                {currentStep === 3 && "Configuración de Equipo"}
+                {currentStep === 4 && quotationData.project?.type === 'always-on' && "Configuración de Entregables"}
+                {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
+                  (currentStep === 5 && quotationData.project?.type === 'always-on')) && "Revisión y Ajustes"}
+              </h2>
+              <p className="text-xs text-gray-500">
+                {currentStep === 1 && "Define los detalles básicos del proyecto"}
+                {currentStep === 2 && "Selecciona la plantilla más adecuada"}
+                {currentStep === 3 && "Configura el equipo de trabajo"}
+                {currentStep === 4 && quotationData.project?.type === 'always-on' && "Define los entregables específicos y sus frecuencias"}
+                {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
+                  (currentStep === 5 && quotationData.project?.type === 'always-on')) && "Revisa todos los detalles antes de guardar"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {/* Contenido principal */}
       <div className="flex-1 overflow-auto">
-        <div className="container py-2">
+        <div className="container py-4">
           {/* Contenido del paso actual */}
           <Card className="bg-white border border-neutral-100 shadow-sm">
             <CardContent className="p-0 overflow-visible">
