@@ -310,7 +310,20 @@ const OptimizedFinancialReview: React.FC = () => {
   const totalAmount = finalCost || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Análisis de costos compacto arriba */}
+      <div className="bg-blue-50/80 rounded-lg border border-blue-200/60 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
+          <h3 className="text-sm font-semibold text-blue-800">Análisis de Costos</h3>
+        </div>
+        <p className="text-xs text-blue-700">
+          El costo del equipo ({formatCurrency(teamTotal)}) representa el {((teamTotal / totalAmount) * 100).toFixed(0)}% del costo total 
+          del proyecto. Incluye {quotationData.teamMembers?.length || 0} roles distribuidos en {teamHours} horas totales, 
+          con una tarifa promedio de {formatCurrency(teamHours > 0 ? teamTotal / teamHours : 0)} por hora.
+        </p>
+      </div>
+
       {/* Resumen financiero principal */}
       <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-white">
         <CardHeader className="pb-3">
@@ -517,18 +530,7 @@ const OptimizedFinancialReview: React.FC = () => {
         )}
       </div>
 
-      {/* Análisis del equipo */}
-      <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-100">
-        <div className="flex items-center text-sm font-medium text-blue-800 mb-1">
-          <Info className="h-4 w-4 mr-1.5" />
-          Análisis de Costos
-        </div>
-        <p className="text-xs text-blue-700">
-          El costo del equipo ({formatCurrency(teamTotal)}) representa el {((teamTotal / totalAmount) * 100).toFixed(0)}% del costo total 
-          del proyecto. Incluye {quotationData.teamMembers.length} roles distribuidos en {teamHours} horas totales, 
-          con una tarifa promedio de {formatCurrency(teamHours > 0 ? teamTotal / teamHours : 0)} por hora.
-        </p>
-      </div>
+
 
       {/* Información de contacto */}
       {quotationData.client && (
