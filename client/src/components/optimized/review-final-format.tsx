@@ -152,21 +152,25 @@ const ReviewFinalFormat: React.FC = () => {
                       {getPersonnelName(member.personnelId)}
                     </td>
                     <td className="px-4 py-2 text-sm font-mono text-neutral-900">
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={member.rate || 0}
-                        onChange={(e) => {
-                          const newRate = parseFloat(e.target.value) || 0;
-                          updateTeamMember(member.id, {
-                            ...member,
-                            rate: newRate,
-                            cost: (member.hours || 0) * newRate
-                          });
-                        }}
-                        className="w-24 h-8 text-sm font-mono"
-                      />
+                      <div className="flex items-center">
+                        <span className="text-gray-500 mr-1">$</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={member.rate || 0}
+                          onChange={(e) => {
+                            const newRate = parseFloat(e.target.value) || 0;
+                            updateTeamMember(member.id, {
+                              ...member,
+                              rate: newRate,
+                              cost: (member.hours || 0) * newRate
+                            });
+                          }}
+                          className="w-20 h-8 text-sm font-mono text-right border-gray-300"
+                          placeholder="0"
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-sm text-neutral-900">
                       <Input
@@ -181,11 +185,12 @@ const ReviewFinalFormat: React.FC = () => {
                             cost: newHours * (member.rate || 0)
                           });
                         }}
-                        className="w-20 h-8 text-sm"
+                        className="w-16 h-8 text-sm text-center border-gray-300"
+                        placeholder="0"
                       />
                     </td>
-                    <td className="px-4 py-2 text-sm font-mono text-neutral-900">
-                      {formatCurrency(member.cost || 0)}
+                    <td className="px-4 py-2 text-sm font-mono text-neutral-900 font-semibold">
+                      US$ {((member.hours || 0) * (member.rate || 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))
@@ -198,8 +203,8 @@ const ReviewFinalFormat: React.FC = () => {
               )}
               <tr className="bg-neutral-50">
                 <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Costo Base Total</td>
-                <td className="px-4 py-2 text-sm font-mono font-medium text-neutral-900">
-                  {formatCurrency(baseCost)}
+                <td className="px-4 py-2 text-sm font-mono font-bold text-neutral-900">
+                  US$ {baseCost.toFixed(2)}
                 </td>
               </tr>
             </tbody>
@@ -219,7 +224,7 @@ const ReviewFinalFormat: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-neutral-700">Costo Base (Horas de Equipo)</span>
                     <span className="text-sm font-mono font-medium text-neutral-900">
-                      {formatCurrency(baseCost)}
+                      US$ {baseCost.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -230,7 +235,7 @@ const ReviewFinalFormat: React.FC = () => {
                       Ajustes por Complejidad ({baseCost > 0 ? (complexityAdjustment / baseCost * 100).toFixed(0) : 0}%)
                     </span>
                     <span className="text-sm font-mono font-medium text-neutral-900">
-                      {formatCurrency(complexityAdjustment)}
+                      US$ {complexityAdjustment.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -239,7 +244,7 @@ const ReviewFinalFormat: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-neutral-700">Margen Estándar (2×)</span>
                     <span className="text-sm font-mono font-medium text-neutral-900">
-                      {formatCurrency(markupAmount)}
+                      US$ {markupAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -248,7 +253,7 @@ const ReviewFinalFormat: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-base font-medium text-primary">Cotización Total</span>
                     <span className="text-base font-mono font-medium text-primary">
-                      {formatCurrency(adjustedAmount || totalAmount)}
+                      US$ {(adjustedAmount || totalAmount).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -260,16 +265,20 @@ const ReviewFinalFormat: React.FC = () => {
               <div className="mb-3">
                 <Label className="block text-sm font-medium text-neutral-700 mb-1">Ajustar Cotización Final</Label>
                 <div className="flex items-center">
+                  <span className="text-gray-500 mr-2">US$</span>
                   <Input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="0.5"
                     value={adjustedAmount || totalAmount}
                     onChange={handleAdjustedAmountChange}
-                    className="w-full font-mono"
-                    placeholder="Monto final ajustado"
+                    className="w-full font-mono text-right border-gray-300"
+                    placeholder={`${totalAmount.toFixed(2)}`}
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Original: US$ {totalAmount.toFixed(2)}
+                </p>
               </div>
               
               <div className="mb-3">
