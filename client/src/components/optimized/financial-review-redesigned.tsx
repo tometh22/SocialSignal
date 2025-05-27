@@ -208,6 +208,82 @@ const OptimizedFinancialReview: React.FC = () => {
     availablePersonnel
   } = useOptimizedQuote();
 
+  // Componente para editar factores financieros
+  const EditableFinancialCell: React.FC<{
+    value: number;
+    type: 'percentage' | 'multiplier' | 'currency';
+    suffix?: string;
+    onSave: (value: number) => void;
+  }> = ({ value, type, suffix, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editValue, setEditValue] = useState(value.toString());
+
+    const handleSave = () => {
+      const numValue = parseFloat(editValue);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onSave(numValue);
+        setIsEditing(false);
+      }
+    };
+
+    const handleCancel = () => {
+      setEditValue(value.toString());
+      setIsEditing(false);
+    };
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1 bg-white rounded border border-blue-300 p-1">
+          <Input
+            type="number"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-6 w-16 text-sm text-center border-0 p-0"
+            step={type === 'percentage' ? '1' : '0.1'}
+            min="0"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') handleCancel();
+            }}
+            autoFocus
+            onBlur={handleSave}
+          />
+          <button 
+            onClick={handleSave}
+            className="w-4 h-4 rounded bg-green-500 text-white flex items-center justify-center hover:bg-green-600"
+          >
+            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div 
+        className="group cursor-pointer hover:bg-blue-50/60 px-2 py-1 rounded text-center transition-colors"
+        onClick={() => setIsEditing(true)}
+        title="Clic para editar"
+      >
+        <span className="text-lg font-semibold text-gray-900">
+          {type === 'percentage' ? value.toFixed(0) : 
+           type === 'multiplier' ? value.toFixed(1) : 
+           formatCurrency(value)}
+          {suffix && <span className="text-sm ml-1">{suffix}</span>}
+        </span>
+        <svg 
+          className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 inline"
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </div>
+    );
+  };
+
   // Componente EditableCell ultra-compacto
   const EditableCell: React.FC<{
     value: number;
@@ -368,19 +444,56 @@ const OptimizedFinancialReview: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-3 bg-white rounded-md border">
               <div className="text-sm text-gray-600">Costo Base</div>
-              <div className="text-lg font-semibold">{formatCurrency(baseCost)}</div>
+              <div className="text-lg font-semibold">{formatCurrency(teamTotal)}</div>
             </div>
-            <div className="p-3 bg-white rounded-md border">
-              <div className="text-sm text-gray-600">Ajuste Complejidad</div>
-              <div className="text-lg font-semibold">{(complexityAdjustment * 100).toFixed(0)}%</div>
+            <div className="p-3 bg-white rounded-md border group hover:bg-blue-50/30 transition-colors">
+              <div className="text-sm text-gray-600">Factor Complejidad</div>
+              <EditableFinancialCell 
+                value={quotationData.analysisType === 'comprehensive' ? 200 : 100} 
+                type="percentage"
+                suffix="%"
+                onSave={async (newValue) => {
+                  console.log(`Actualizando factor de complejidad: ${newValue}%`);
+                }}
+              />
             </div>
-            <div className="p-3 bg-white rounded-md border">
+            <div className="p-3 bg-white rounded-md border group hover:bg-blue-50/30 transition-colors">
               <div className="text-sm text-gray-600">Multiplicador Urgencia</div>
-              <div className="text-lg font-semibold">{(urgencyMultiplier || 1.0).toFixed(1)}x</div>
+              <EditableFinancialCell 
+                value={quotationData.urgencyMultiplier || 1.0} 
+                type="multiplier"
+                suffix="x"
+                onSave={async (newValue) => {
+                  updateQuotationData({ urgencyMultiplier: newValue });
+                  try {
+                    await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', {
+                      urgencyMultiplier: newValue
+                    });
+                    console.log(`✅ Multiplicador actualizado: ${newValue}x`);
+                  } catch (error) {
+                    console.error('Error:', error);
+                  }
+                }}
+              />
             </div>
-            <div className="p-3 bg-white rounded-md border">
+            <div className="p-3 bg-white rounded-md border group hover:bg-blue-50/30 transition-colors">
               <div className="text-sm text-gray-600">Margen Beneficio</div>
-              <div className="text-lg font-semibold text-green-600">{(profitMargin * 100).toFixed(0)}%</div>
+              <EditableFinancialCell 
+                value={quotationData.profitMargin || 25} 
+                type="percentage"
+                suffix="%"
+                onSave={async (newValue) => {
+                  updateQuotationData({ profitMargin: newValue });
+                  try {
+                    await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', {
+                      profitMargin: newValue
+                    });
+                    console.log(`✅ Margen actualizado: ${newValue}%`);
+                  } catch (error) {
+                    console.error('Error:', error);
+                  }
+                }}
+              />
             </div>
           </div>
 
