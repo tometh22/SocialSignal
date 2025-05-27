@@ -386,114 +386,136 @@ const OptimizedFinancialReview: React.FC = () => {
         </CardHeader>
         <CardContent>
           {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b-2 border-gray-200 bg-gray-100">
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4">Rol</TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4">Personal</TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right w-20">
-                      <div className="flex items-center justify-end gap-1">
-                        <span>Horas</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              {/* Encabezado moderno */}
+              <div className="grid grid-cols-6 gap-4 bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b">
+                <div className="col-span-2 text-sm font-semibold text-slate-700">
+                  Miembro del Equipo
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-700">
+                    <span>Horas</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-700">
+                    <span>Tarifa</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div className="text-center text-sm font-semibold text-slate-700">
+                  Costo
+                </div>
+                <div className="text-center text-sm font-semibold text-slate-700">
+                  Acciones
+                </div>
+              </div>
+              
+              {/* Filas de datos */}
+              <div className="divide-y divide-slate-100">
+                {quotationData.teamMembers.map((member, index) => {
+                  const role = availableRoles?.find(r => r.id === member.roleId);
+                  const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                  
+                  return (
+                    <div key={member.id || index} className="grid grid-cols-6 gap-4 px-6 py-4 hover:bg-blue-50/50 transition-colors group">
+                      <div className="col-span-2">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-slate-900">{role?.name || 'Rol no encontrado'}</span>
+                          <span className="text-xs text-slate-500">{person?.name || 'Sin asignar'}</span>
+                        </div>
                       </div>
-                    </TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right w-20">
-                      <div className="flex items-center justify-end gap-1">
-                        <span>Tarifa</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                          <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
+                      
+                      <div className="flex justify-center">
+                        <EditableCell 
+                          value={member.hours || 0} 
+                          type="hours"
+                          onSave={async (newHours) => {
+                            const newCost = newHours * (member.rate || 0);
+                            updateTeamMember(member.id, { hours: newHours, cost: newCost });
+                            
+                            try {
+                              await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
+                                hours: newHours,
+                                rate: member.rate,
+                                cost: newCost
+                              });
+                              console.log(`✅ Horas actualizadas: ${newHours}`);
+                            } catch (error) {
+                              console.error('Error al actualizar horas:', error);
+                            }
+                          }}
+                        />
                       </div>
-                    </TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right">Costo</TableHead>
-                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-center w-20">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quotationData.teamMembers.map((member, index) => {
-                    const role = availableRoles?.find(r => r.id === member.roleId);
-                    const person = availablePersonnel?.find(p => p.id === member.personnelId);
-                    
-                    return (
-                      <TableRow key={member.id || index} className="group hover:bg-blue-50 border-b border-gray-100">
-                        <TableCell className="py-3 px-4 text-sm font-medium text-gray-800">{role?.name || 'Rol no encontrado'}</TableCell>
-                        <TableCell className="py-3 px-4 text-sm text-gray-700">{person?.name || 'Sin asignar'}</TableCell>
-                        <TableCell className="py-3 px-4 text-sm w-20">
-                          <EditableCell 
-                            value={member.hours || 0} 
-                            type="hours"
-                            onSave={async (newHours) => {
-                              const newCost = newHours * (member.rate || 0);
-                              updateTeamMember(member.id, { hours: newHours, cost: newCost });
-                              
-                              // Guardar en la base de datos inmediatamente
-                              try {
-                                await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
-                                  hours: newHours,
-                                  rate: member.rate,
-                                  cost: newCost
-                                });
-                                console.log(`✅ Horas actualizadas en la base de datos: ${newHours}`);
-                              } catch (error) {
-                                console.error('Error al actualizar horas en la base de datos:', error);
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="py-3 px-4 text-sm w-20">
-                          <EditableCell 
-                            value={member.rate || 0} 
-                            type="rate"
-                            onSave={async (newRate) => {
-                              const newCost = (member.hours || 0) * newRate;
-                              updateTeamMember(member.id, { rate: newRate, cost: newCost });
-                              
-                              // Guardar en la base de datos inmediatamente
-                              try {
-                                await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
-                                  hours: member.hours,
-                                  rate: newRate,
-                                  cost: newCost
-                                });
-                                console.log(`✅ Tarifa actualizada en la base de datos: ${newRate}`);
-                              } catch (error) {
-                                console.error('Error al actualizar tarifa en la base de datos:', error);
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="py-3 px-4 text-sm text-right font-semibold text-gray-800">${member.cost?.toFixed(2)}</TableCell>
-                        <TableCell className="py-3 px-4 text-center">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => removeTeamMember(member.id)}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
-                              <path d="M3 6h18"></path>
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                            </svg>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  <TableRow className="bg-blue-50 border-t-2 border-blue-200">
-                    <TableCell colSpan={2} className="py-2 px-3 text-sm font-bold text-blue-900">TOTALES</TableCell>
-                    <TableCell className="py-2 px-3 text-sm text-right font-bold text-blue-900 w-20">{teamHours}</TableCell>
-                    <TableCell className="py-2 px-3 text-sm text-center text-gray-400 w-20">-</TableCell>
-                    <TableCell className="py-2 px-3 text-sm text-right font-bold text-blue-900">${teamTotal.toFixed(2)}</TableCell>
-                    <TableCell className="py-2 px-3"></TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                      
+                      <div className="flex justify-center">
+                        <EditableCell 
+                          value={member.rate || 0} 
+                          type="rate"
+                          onSave={async (newRate) => {
+                            const newCost = (member.hours || 0) * newRate;
+                            updateTeamMember(member.id, { rate: newRate, cost: newCost });
+                            
+                            try {
+                              await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
+                                hours: member.hours,
+                                rate: newRate,
+                                cost: newCost
+                              });
+                              console.log(`✅ Tarifa actualizada: ${newRate}`);
+                            } catch (error) {
+                              console.error('Error al actualizar tarifa:', error);
+                            }
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="text-center">
+                        <span className="text-sm font-semibold text-slate-900">${member.cost?.toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="flex justify-center">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:bg-red-50"
+                          onClick={() => removeTeamMember(member.id)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                          </svg>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Fila de totales moderna */}
+              <div className="grid grid-cols-6 gap-4 px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-t-2 border-blue-200">
+                <div className="col-span-2">
+                  <span className="text-base font-bold text-blue-900">TOTALES</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-base font-bold text-blue-900">{teamHours}</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-sm text-slate-400">-</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-base font-bold text-blue-900">${teamTotal.toFixed(2)}</span>
+                </div>
+                <div></div>
+              </div>
             </div>
           ) : (
             <div className="text-center text-sm text-gray-500 py-8 border rounded-md mb-4">
