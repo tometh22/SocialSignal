@@ -389,13 +389,29 @@ const OptimizedFinancialReview: React.FC = () => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b bg-gray-50">
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3">Rol</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3">Personal</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3 text-right">Horas</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3 text-right">Tarifa</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3 text-right">Costo</TableHead>
-                    <TableHead className="text-xs font-medium text-gray-600 py-2 px-3">Acciones</TableHead>
+                  <TableRow className="border-b-2 border-gray-200 bg-gray-100">
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4">Rol</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4">Personal</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right w-20">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Horas</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right w-20">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Tarifa</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-right">Costo</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-700 py-3 px-4 text-center w-20">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -404,10 +420,10 @@ const OptimizedFinancialReview: React.FC = () => {
                     const person = availablePersonnel?.find(p => p.id === member.personnelId);
                     
                     return (
-                      <TableRow key={member.id || index} className="group hover:bg-gray-50">
-                        <TableCell className="py-1.5 px-3 text-xs font-medium">{role?.name || 'Rol no encontrado'}</TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs">{person?.name || 'Sin asignar'}</TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs w-20">
+                      <TableRow key={member.id || index} className="group hover:bg-blue-50 border-b border-gray-100">
+                        <TableCell className="py-3 px-4 text-sm font-medium text-gray-800">{role?.name || 'Rol no encontrado'}</TableCell>
+                        <TableCell className="py-3 px-4 text-sm text-gray-700">{person?.name || 'Sin asignar'}</TableCell>
+                        <TableCell className="py-3 px-4 text-sm w-20">
                           <EditableCell 
                             value={member.hours || 0} 
                             type="hours"
@@ -429,7 +445,7 @@ const OptimizedFinancialReview: React.FC = () => {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs w-20">
+                        <TableCell className="py-3 px-4 text-sm w-20">
                           <EditableCell 
                             value={member.rate || 0} 
                             type="rate"
@@ -451,8 +467,8 @@ const OptimizedFinancialReview: React.FC = () => {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs text-right font-medium">${member.cost?.toFixed(2)}</TableCell>
-                        <TableCell className="py-1.5 px-3">
+                        <TableCell className="py-3 px-4 text-sm text-right font-semibold text-gray-800">${member.cost?.toFixed(2)}</TableCell>
+                        <TableCell className="py-3 px-4 text-center">
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -469,12 +485,12 @@ const OptimizedFinancialReview: React.FC = () => {
                       </TableRow>
                     );
                   })}
-                  <TableRow className="bg-gray-50 border-t">
-                    <TableCell colSpan={2} className="py-1.5 px-3 text-xs font-medium">TOTALES</TableCell>
-                    <TableCell className="py-1.5 px-3 text-xs text-right font-medium">{teamHours}</TableCell>
-                    <TableCell className="py-1.5 px-3 text-xs text-right"></TableCell>
-                    <TableCell className="py-1.5 px-3 text-xs text-right font-medium">${teamTotal.toFixed(2)}</TableCell>
-                    <TableCell></TableCell>
+                  <TableRow className="bg-blue-50 border-t-2 border-blue-200">
+                    <TableCell colSpan={2} className="py-2 px-3 text-sm font-bold text-blue-900">TOTALES</TableCell>
+                    <TableCell className="py-2 px-3 text-sm text-right font-bold text-blue-900 w-20">{teamHours}</TableCell>
+                    <TableCell className="py-2 px-3 text-sm text-center text-gray-400 w-20">-</TableCell>
+                    <TableCell className="py-2 px-3 text-sm text-right font-bold text-blue-900">${teamTotal.toFixed(2)}</TableCell>
+                    <TableCell className="py-2 px-3"></TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
