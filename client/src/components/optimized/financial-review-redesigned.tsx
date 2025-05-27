@@ -532,53 +532,48 @@ const OptimizedFinancialReview: React.FC = () => {
 
 
 
-      {/* Información de contacto */}
+      {/* Información del cliente compacta */}
       {quotationData.client && (
-        <Card className="bg-slate-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center">
-              <Mail className="h-5 w-5 mr-2 text-gray-600" />
-              Información del Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium text-gray-700">Cliente</div>
-                <div className="text-base">{quotationData.client.name}</div>
-              </div>
-              {quotationData.client.contactName && (
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Contacto</div>
-                  <div className="text-base">{quotationData.client.contactName}</div>
-                </div>
-              )}
-              {quotationData.client.contactEmail && (
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Email</div>
-                  <div className="text-base">{quotationData.client.contactEmail}</div>
-                </div>
-              )}
-              {quotationData.client.contactPhone && (
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Teléfono</div>
-                  <div className="text-base">{quotationData.client.contactPhone}</div>
-                </div>
-              )}
+        <div className="bg-gray-50/80 rounded-lg border border-gray-200/60 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Mail className="h-4 w-4 text-gray-600" />
+            <h3 className="text-sm font-semibold text-gray-800">Información del Cliente</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div>
+              <span className="text-gray-500">Cliente:</span>
+              <p className="font-medium text-gray-900">{quotationData.client.name}</p>
             </div>
-          </CardContent>
-        </Card>
+            {quotationData.client.contactName && (
+              <div>
+                <span className="text-gray-500">Contacto:</span>
+                <p className="font-medium text-gray-900">{quotationData.client.contactName}</p>
+              </div>
+            )}
+            {quotationData.client.contactEmail && (
+              <div>
+                <span className="text-gray-500">Email:</span>
+                <p className="font-medium text-gray-900">{quotationData.client.contactEmail}</p>
+              </div>
+            )}
+            {quotationData.client.contactPhone && (
+              <div>
+                <span className="text-gray-500">Teléfono:</span>
+                <p className="font-medium text-gray-900">{quotationData.client.contactPhone}</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Recomendación de personalización */}
-      <Alert>
-        <AlertCircle className="h-4 w-4 mr-2" />
-        <AlertTitle>Personalización recomendada</AlertTitle>
-        <AlertDescription>
-          Agregar notas de personalización puede ayudar a definir mejor el alcance 
-          del proyecto y evitar malentendidos con el cliente.
-        </AlertDescription>
-      </Alert>
+      {/* Recomendación compacta */}
+      <div className="bg-amber-50/80 rounded-lg border border-amber-200/60 p-2">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-3 w-3 text-amber-600" />
+          <span className="text-xs font-medium text-amber-800">Personalización recomendada:</span>
+          <span className="text-xs text-amber-700">Agregar notas específicas puede mejorar la claridad del proyecto.</span>
+        </div>
+      </div>
     </div>
   );
 };
