@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatNumericInput, parseDecimal } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
 // Componente para agregar miembros de equipo inline
 const TeamMemberQuickAdd: React.FC = () => {
@@ -231,12 +232,12 @@ const OptimizedFinancialReview: React.FC = () => {
 
     if (isEditing) {
       return (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1 w-full min-w-[100px]">
           <Input
             type="number"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="h-6 w-16 text-xs"
+            className="h-6 w-14 text-xs text-right"
             step={type === 'rate' ? '0.01' : '0.5'}
             min="0"
             onKeyDown={(e) => {
@@ -245,10 +246,10 @@ const OptimizedFinancialReview: React.FC = () => {
             }}
             autoFocus
           />
-          <Button size="sm" className="h-6 w-6 p-0" onClick={handleSave}>
+          <Button size="sm" className="h-6 w-6 p-0 text-green-600 hover:bg-green-50" onClick={handleSave}>
             ✓
           </Button>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={handleCancel}>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600 hover:bg-red-50" onClick={handleCancel}>
             ✕
           </Button>
         </div>
@@ -257,11 +258,26 @@ const OptimizedFinancialReview: React.FC = () => {
 
     return (
       <div 
-        className="cursor-pointer hover:bg-blue-50 px-1 py-0.5 rounded text-right"
+        className="group cursor-pointer hover:bg-blue-50 px-2 py-1 rounded text-right relative flex items-center justify-end gap-2"
         onClick={() => setIsEditing(true)}
         title="Clic para editar"
       >
-        {type === 'rate' ? value.toFixed(1) : value}
+        <span>{type === 'rate' ? value.toFixed(1) : value}</span>
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="12" 
+          height="12" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="m18.5 2.5 a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
       </div>
     );
   };
@@ -391,23 +407,47 @@ const OptimizedFinancialReview: React.FC = () => {
                       <TableRow key={member.id || index} className="group hover:bg-gray-50">
                         <TableCell className="py-1.5 px-3 text-xs font-medium">{role?.name || 'Rol no encontrado'}</TableCell>
                         <TableCell className="py-1.5 px-3 text-xs">{person?.name || 'Sin asignar'}</TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs">
+                        <TableCell className="py-1.5 px-3 text-xs w-20">
                           <EditableCell 
                             value={member.hours || 0} 
                             type="hours"
-                            onSave={(newHours) => {
+                            onSave={async (newHours) => {
                               const newCost = newHours * (member.rate || 0);
                               updateTeamMember(member.id, { hours: newHours, cost: newCost });
+                              
+                              // Guardar en la base de datos inmediatamente
+                              try {
+                                await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
+                                  hours: newHours,
+                                  rate: member.rate,
+                                  cost: newCost
+                                });
+                                console.log(`✅ Horas actualizadas en la base de datos: ${newHours}`);
+                              } catch (error) {
+                                console.error('Error al actualizar horas en la base de datos:', error);
+                              }
                             }}
                           />
                         </TableCell>
-                        <TableCell className="py-1.5 px-3 text-xs">
+                        <TableCell className="py-1.5 px-3 text-xs w-20">
                           <EditableCell 
                             value={member.rate || 0} 
                             type="rate"
-                            onSave={(newRate) => {
+                            onSave={async (newRate) => {
                               const newCost = (member.hours || 0) * newRate;
                               updateTeamMember(member.id, { rate: newRate, cost: newCost });
+                              
+                              // Guardar en la base de datos inmediatamente
+                              try {
+                                await apiRequest(`/api/quotation-team/${member.id}`, 'PUT', {
+                                  hours: member.hours,
+                                  rate: newRate,
+                                  cost: newCost
+                                });
+                                console.log(`✅ Tarifa actualizada en la base de datos: ${newRate}`);
+                              } catch (error) {
+                                console.error('Error al actualizar tarifa en la base de datos:', error);
+                              }
                             }}
                           />
                         </TableCell>
