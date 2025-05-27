@@ -14,7 +14,7 @@ import OptimizedTemplateSelection from '@/components/optimized/template-selectio
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import DirectTeamSelector from '@/components/quotation/DirectTeamSelector';
 import TeamMemberSelector from '@/components/quotation/TeamMemberSelector';
-import OptimizedFinancialReview from '@/components/optimized/financial-review';
+import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 
 // Interfaces para los props
