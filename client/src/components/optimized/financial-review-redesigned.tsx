@@ -311,7 +311,28 @@ const OptimizedFinancialReview: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Análisis de costos compacto arriba */}
+      {/* Información del cliente ultra-compacta arriba */}
+      {quotationData.client && (
+        <div className="flex items-center gap-4 bg-gray-50/60 rounded px-3 py-1.5 border border-gray-200/40">
+          <div className="flex items-center gap-1">
+            <Mail className="h-3 w-3 text-gray-500" />
+            <span className="text-xs text-gray-600">Cliente:</span>
+            <span className="text-xs font-medium text-gray-900">{quotationData.client.name}</span>
+          </div>
+          {quotationData.client.contactName && (
+            <div className="text-xs text-gray-600">
+              <span className="text-gray-500">Contacto:</span> {quotationData.client.contactName}
+            </div>
+          )}
+          {quotationData.client.contactEmail && (
+            <div className="text-xs text-gray-600">
+              <span className="text-gray-500">Email:</span> {quotationData.client.contactEmail}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Análisis de costos compacto */}
       <div className="bg-blue-50/80 rounded-lg border border-blue-200/60 p-3">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
@@ -532,39 +553,7 @@ const OptimizedFinancialReview: React.FC = () => {
 
 
 
-      {/* Información del cliente compacta */}
-      {quotationData.client && (
-        <div className="bg-gray-50/80 rounded-lg border border-gray-200/60 p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Mail className="h-4 w-4 text-gray-600" />
-            <h3 className="text-sm font-semibold text-gray-800">Información del Cliente</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-            <div>
-              <span className="text-gray-500">Cliente:</span>
-              <p className="font-medium text-gray-900">{quotationData.client.name}</p>
-            </div>
-            {quotationData.client.contactName && (
-              <div>
-                <span className="text-gray-500">Contacto:</span>
-                <p className="font-medium text-gray-900">{quotationData.client.contactName}</p>
-              </div>
-            )}
-            {quotationData.client.contactEmail && (
-              <div>
-                <span className="text-gray-500">Email:</span>
-                <p className="font-medium text-gray-900">{quotationData.client.contactEmail}</p>
-              </div>
-            )}
-            {quotationData.client.contactPhone && (
-              <div>
-                <span className="text-gray-500">Teléfono:</span>
-                <p className="font-medium text-gray-900">{quotationData.client.contactPhone}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* Recomendación compacta */}
       <div className="bg-amber-50/80 rounded-lg border border-amber-200/60 p-2">
