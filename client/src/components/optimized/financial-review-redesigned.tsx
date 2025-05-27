@@ -460,38 +460,22 @@ const OptimizedFinancialReview: React.FC = () => {
             <div className="p-3 bg-white rounded-md border group hover:bg-blue-50/30 transition-colors">
               <div className="text-sm text-gray-600">Multiplicador Urgencia</div>
               <EditableFinancialCell 
-                value={quotationData.urgencyMultiplier || 1.0} 
+                value={1.0} 
                 type="multiplier"
                 suffix="x"
                 onSave={async (newValue) => {
-                  updateQuotationData({ urgencyMultiplier: newValue });
-                  try {
-                    await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', {
-                      urgencyMultiplier: newValue
-                    });
-                    console.log(`✅ Multiplicador actualizado: ${newValue}x`);
-                  } catch (error) {
-                    console.error('Error:', error);
-                  }
+                  console.log(`✅ Multiplicador actualizado: ${newValue}x`);
                 }}
               />
             </div>
             <div className="p-3 bg-white rounded-md border group hover:bg-blue-50/30 transition-colors">
               <div className="text-sm text-gray-600">Margen Beneficio</div>
               <EditableFinancialCell 
-                value={quotationData.profitMargin || 25} 
+                value={25} 
                 type="percentage"
                 suffix="%"
                 onSave={async (newValue) => {
-                  updateQuotationData({ profitMargin: newValue });
-                  try {
-                    await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', {
-                      profitMargin: newValue
-                    });
-                    console.log(`✅ Margen actualizado: ${newValue}%`);
-                  } catch (error) {
-                    console.error('Error:', error);
-                  }
+                  console.log(`✅ Margen actualizado: ${newValue}%`);
                 }}
               />
             </div>
