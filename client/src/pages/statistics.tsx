@@ -147,31 +147,24 @@ export default function Statistics() {
       <div className="flex-1 overflow-y-auto">
         <div className="container-xl fade-in">
           <div className="section-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-section">
-              <h1 className="text-display text-balance text-neutral-900">Desempeño del Sistema</h1>
+            <div className="flex-between mb-6">
+              <h1 className="heading-page">Estadísticas y Análisis</h1>
             </div>
             
             <div className="mb-section">
-              <Card className="glass-card shadow-medium mb-6 scale-in">
-                <CardHeader className="pb-3 border-b border-white/10">
-                  <CardTitle className="text-heading flex items-center">
-                    <span className="bg-accent/20 p-2 rounded-full mr-2">
-                      <Search className="h-5 w-5 text-accent" />
-                    </span>
-                    Filtros de Análisis
-                  </CardTitle>
-                  <CardDescription>
-                    Ajusta los parámetros para analizar métricas específicas
-                  </CardDescription>
+              <Card className="standard-card">
+                <CardHeader>
+                  <CardTitle className="heading-card">Filtros de Análisis</CardTitle>
+                  <CardDescription>Ajusta los parámetros para analizar métricas específicas</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col md:flex-row gap-4 form-group slide-in">
-                    <div className="relative flex-grow form-group">
+                <CardContent className="card-content">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-grow">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
                         <Input
                           placeholder="Buscar por nombre de proyecto..."
-                          className="pl-10 shadow-soft focus:shadow-medium transition-shadow"
+                          className="pl-10"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
