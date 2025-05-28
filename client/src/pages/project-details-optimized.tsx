@@ -53,6 +53,14 @@ export default function ProjectDetailsOptimized() {
 
   const { data: timeEntries = [], isLoading: timeEntriesLoading, refetch: refetchTimeEntries } = useQuery({
     queryKey: ['/api/time-entries/project', id],
+    queryFn: async () => {
+      if (!id) return [];
+      const response = await fetch(`/api/time-entries/project/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch time entries');
+      }
+      return response.json();
+    },
     enabled: !!id
   });
 
@@ -62,11 +70,35 @@ export default function ProjectDetailsOptimized() {
 
   const queryClient = useQueryClient();
 
-  // Cálculos optimizados
-  const filteredEntries = timeEntries.filter((entry: any) => {
-    if (!selectedDates?.from || !selectedDates?.to) return true;
-    const entryDate = new Date(entry.date);
-    return isWithinInterval(entryDate, { start: selectedDates.from, end: selectedDates.to });
+  // Cálculos optimizados con filtros
+  const filteredEntries = (timeEntries || []).filter((entry: any) => {
+    // Aplicar filtro de fechas si está seleccionado
+    if (selectedDates?.from && selectedDates?.to) {
+      const entryDate = new Date(entry.date);
+      const isInRange = isWithinInterval(entryDate, { start: selectedDates.from, end: selectedDates.to });
+      if (!isInRange) return false;
+    }
+    
+    // Aplicar filtros rápidos
+    if (quickFilter !== 'all') {
+      const entryDate = new Date(entry.date);
+      const now = new Date();
+      
+      switch (quickFilter) {
+        case 'today':
+          return entryDate.toDateString() === now.toDateString();
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return entryDate >= weekAgo;
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          return entryDate >= monthAgo;
+        default:
+          return true;
+      }
+    }
+    
+    return true;
   });
 
   const totalHours = filteredEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
@@ -234,22 +266,29 @@ export default function ProjectDetailsOptimized() {
           </Card>
         </div>
 
-        {/* Filtros rápidos */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">Filtros rápidos:</span>
-          {['all', 'today', 'week', 'month'].map((filter) => (
-            <Button
-              key={filter}
-              variant={quickFilter === filter ? "default" : "outline"}
-              size="sm"
-              onClick={() => setQuickFilter(filter as any)}
-              className="h-7 px-3 text-xs"
-            >
-              {filter === 'all' ? 'Todo' : 
-               filter === 'today' ? 'Hoy' :
-               filter === 'week' ? 'Semana' : 'Mes'}
-            </Button>
-          ))}
+        {/* Filtros rápidos con contador */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Filtros rápidos:</span>
+            {['all', 'today', 'week', 'month'].map((filter) => (
+              <Button
+                key={filter}
+                variant={quickFilter === filter ? "default" : "outline"}
+                size="sm"
+                onClick={() => setQuickFilter(filter as any)}
+                className="h-7 px-3 text-xs"
+              >
+                {filter === 'all' ? 'Todo' : 
+                 filter === 'today' ? 'Hoy' :
+                 filter === 'week' ? 'Semana' : 'Mes'}
+              </Button>
+            ))}
+          </div>
+          {filteredEntries.length > 0 && (
+            <span className="text-xs text-gray-500">
+              {filteredEntries.length} de {timeEntries?.length || 0} entradas
+            </span>
+          )}
         </div>
 
         {/* Contenido principal */}
