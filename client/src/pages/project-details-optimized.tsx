@@ -78,35 +78,45 @@ export default function ProjectDetailsOptimized() {
 
   const queryClient = useQueryClient();
 
-  // Cálculos optimizados con filtros
+  // Cálculos optimizados con filtros mejorados
   const filteredEntries = (timeEntries || []).filter((entry: any) => {
-    // Aplicar filtro de fechas si está seleccionado
-    if (selectedDates?.from && selectedDates?.to) {
-      const entryDate = new Date(entry.date);
-      const isInRange = isWithinInterval(entryDate, { start: selectedDates.from, end: selectedDates.to });
-      if (!isInRange) return false;
-    }
+    if (!entry?.date) return false; // Verificar que existe la fecha
     
-    // Aplicar filtros rápidos
-    if (quickFilter !== 'all') {
-      const entryDate = new Date(entry.date);
-      const now = new Date();
-      
-      switch (quickFilter) {
-        case 'today':
-          return entryDate.toDateString() === now.toDateString();
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          return entryDate >= weekAgo;
-        case 'month':
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          return entryDate >= monthAgo;
-        default:
-          return true;
+    const entryDate = new Date(entry.date);
+    const now = new Date();
+    
+    // Aplicar filtro de rango de fechas personalizado si está seleccionado
+    if (selectedDates?.from && selectedDates?.to) {
+      try {
+        const isInRange = isWithinInterval(entryDate, { 
+          start: selectedDates.from, 
+          end: selectedDates.to 
+        });
+        if (!isInRange) return false;
+      } catch (error) {
+        console.log('Error en filtro de fechas:', error);
+        return true; // En caso de error, mostrar la entrada
       }
     }
     
-    return true;
+    // Aplicar filtros rápidos predefinidos
+    switch (quickFilter) {
+      case 'today':
+        return entryDate.toDateString() === now.toDateString();
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - 7);
+        weekStart.setHours(0, 0, 0, 0);
+        return entryDate >= weekStart;
+      case 'month':
+        const monthStart = new Date(now);
+        monthStart.setDate(now.getDate() - 30);
+        monthStart.setHours(0, 0, 0, 0);
+        return entryDate >= monthStart;
+      case 'all':
+      default:
+        return true;
+    }
   });
 
   const totalHours = filteredEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
@@ -321,29 +331,67 @@ export default function ProjectDetailsOptimized() {
           </CardContent>
         </Card>
 
-        {/* Filtros rápidos con contador */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Filtros rápidos:</span>
+        {/* Filtros mejorados con contador y selector de fecha */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Filtros:</span>
             {['all', 'today', 'week', 'month'].map((filter) => (
               <Button
                 key={filter}
                 variant={quickFilter === filter ? "default" : "outline"}
                 size="sm"
-                onClick={() => setQuickFilter(filter as any)}
-                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  setQuickFilter(filter as any);
+                  // Limpiar filtro de calendario cuando se usa filtro rápido
+                  if (filter !== 'all') {
+                    setSelectedDates(undefined);
+                  }
+                }}
+                className="h-8 px-3 text-xs"
               >
                 {filter === 'all' ? 'Todo' : 
                  filter === 'today' ? 'Hoy' :
-                 filter === 'week' ? 'Semana' : 'Mes'}
+                 filter === 'week' ? 'Últimos 7 días' : 'Últimos 30 días'}
               </Button>
             ))}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCalendar(!showCalendar)}
+              className="h-8 px-3 text-xs gap-1"
+            >
+              <Calendar className="h-3 w-3" />
+              Rango personalizado
+            </Button>
+            
+            {/* Limpiar filtros */}
+            {(quickFilter !== 'all' || selectedDates) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQuickFilter('all');
+                  setSelectedDates(undefined);
+                  setShowCalendar(false);
+                }}
+                className="h-8 px-2 text-xs text-gray-500 hover:text-gray-700"
+              >
+                ✕ Limpiar
+              </Button>
+            )}
           </div>
-          {filteredEntries.length > 0 && (
+          
+          <div className="flex items-center gap-2">
+            {selectedDates?.from && selectedDates?.to && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                {format(selectedDates.from, 'dd/MM/yy')} - {format(selectedDates.to, 'dd/MM/yy')}
+              </span>
+            )}
             <span className="text-xs text-gray-500">
               {filteredEntries.length} de {timeEntries?.length || 0} entradas
             </span>
-          )}
+          </div>
         </div>
 
         {/* Contenido principal */}
