@@ -13,6 +13,7 @@ import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
 import ActiveProjects from "@/pages/active-projects-modern";
+import ProjectDetails from "@/pages/project-details";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 // Dashboard moderno mantenido - todos los antiguos eliminados
