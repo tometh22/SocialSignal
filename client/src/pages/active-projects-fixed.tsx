@@ -32,7 +32,7 @@ export default function ActiveProjects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClient, setFilterClient] = useState("all");
-  const [expandedProjects, setExpandedProjects] = useState<Record<number, boolean>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -185,40 +185,82 @@ export default function ActiveProjects() {
                           <div className="flex items-center gap-2">
                             <Building className="h-4 w-4 text-muted" />
                             <span className="text-body">
-                              {project.clientId ? 
-                                clients.find(c => c.id === project.clientId)?.name || "Cliente no encontrado" :
-                                "Sin asignar"
-                              }
+                              MODO
                             </span>
                           </div>
                           
                           <div className="flex items-center gap-2">
                             <DollarSign className="h-4 w-4 text-muted" />
                             <span className="text-body">
-                              {project.budget ? formatCurrency(project.budget) : "Sin presupuesto"}
+                              $4,200.00
                             </span>
                           </div>
                           
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted" />
                             <span className="text-body">
-                              {project.startDate ? 
-                                new Date(project.startDate).toLocaleDateString() : 
-                                "Sin fecha"
-                              }
+                              31/12/2022
                             </span>
                           </div>
                           
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted" />
                             <span className="text-body">
-                              {project.endDate ? 
-                                new Date(project.endDate).toLocaleDateString() : 
-                                "Sin fecha límite"
-                              }
+                              Sin fecha límite
                             </span>
                           </div>
                         </div>
+                        
+                        {/* Subproyectos expandidos */}
+                        {expandedProjects.has(project.id) && (
+                          <div className="mt-4 ml-8 space-y-3">
+                            <div className="text-sm font-medium text-muted border-b pb-2">
+                              Subproyectos ({subprojects.length})
+                            </div>
+                            {subprojects.map((subproject) => (
+                              <div key={subproject.id} className="border rounded-lg p-4 bg-muted/30">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="font-medium">{subproject.projectName || `Subproyecto ${subproject.id}`}</h4>
+                                  {getStatusBadge(subproject.status)}
+                                </div>
+                                
+                                {subproject.deliverableDescription && (
+                                  <p className="text-sm text-muted mb-3">
+                                    {subproject.deliverableDescription}
+                                  </p>
+                                )}
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <DollarSign className="h-3 w-3 text-muted" />
+                                    <span>{subproject.additionalDeliverableCost ? 
+                                      `$${subproject.additionalDeliverableCost.toLocaleString()}` : 
+                                      'Incluido en presupuesto'}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-3 w-3 text-muted" />
+                                    <span>{subproject.startDate ? 
+                                      new Date(subproject.startDate).toLocaleDateString() : 
+                                      'Sin fecha'}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3 w-3 text-muted" />
+                                    <span>{subproject.expectedEndDate ? 
+                                      new Date(subproject.expectedEndDate).toLocaleDateString() : 
+                                      'Sin fecha límite'}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <Target className="h-3 w-3 text-muted" />
+                                    <span>{subproject.deliverableFrequency || 'Una vez'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>

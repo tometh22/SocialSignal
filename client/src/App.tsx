@@ -12,7 +12,7 @@ import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
-import ActiveProjects from "@/pages/active-projects-fixed";
+import ActiveProjects from "@/pages/active-projects-restored";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 // Dashboard moderno mantenido - todos los antiguos eliminados
