@@ -262,19 +262,26 @@ export default function ProjectDetailsOptimized() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-purple-500">
+          <Card className={`border-l-4 ${isOverLimit ? 'border-l-red-500' : isNearLimit ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-600">Margen</p>
-                  <p className={`text-xl font-bold ${remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${remainingBudget.toLocaleString()}
+                  <p className="text-xs font-medium text-gray-600">Límite de Costo</p>
+                  <p className={`text-xl font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                    ${remainingCostLimit.toLocaleString()}
                   </p>
-                  <p className="text-xs text-purple-600">
-                    {((remainingBudget / (projectBudget || 1)) * 100).toFixed(1)}%
+                  <p className="text-xs text-gray-500">
+                    {isOverLimit ? 'SUPERADO' : isNearLimit ? 'CERCA DEL LÍMITE' : 'DISPONIBLE'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Límite: ${subprojectCostLimit.toLocaleString()}
                   </p>
                 </div>
-                <PieChart className="h-8 w-8 text-purple-600 opacity-80" />
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isOverLimit ? 'bg-red-100' : isNearLimit ? 'bg-yellow-100' : 'bg-green-100'}`}>
+                  <span className={`text-sm font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {costUsagePercentage.toFixed(0)}%
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
