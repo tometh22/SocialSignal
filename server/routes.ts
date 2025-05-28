@@ -1344,6 +1344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(sql`time_entries.project_id = ${projectId}`)
       .orderBy(sql`time_entries.date DESC`);
       
+      console.log(`Fetched ${entries.length} time entries for project ${projectId}`);
       res.json(entries);
     } catch (error) {
       console.error("Error fetching project time entries:", error);

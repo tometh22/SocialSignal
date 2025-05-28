@@ -43,7 +43,7 @@ export default function ProjectDetailsOptimized() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [quickFilter, setQuickFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -356,57 +356,48 @@ export default function ProjectDetailsOptimized() {
               </CardHeader>
               <CardContent className="p-0">
                 {filteredEntries.length > 0 ? (
-                  <div className={viewMode === 'grid' ? 
-                    "grid grid-cols-1 xl:grid-cols-2 gap-3 p-4" : 
-                    "space-y-2 p-4"
-                  }>
-                    {filteredEntries.map((entry: any) => (
-                      <div key={entry.id} className={`border rounded-lg p-3 bg-white hover:bg-gray-50 transition-all duration-200 hover:shadow-sm ${viewMode === 'list' ? 'border-l-4 border-l-blue-200' : 'border-gray-200'}`}>
+                  <div className="divide-y divide-gray-100">
+                    {filteredEntries.map((entry: any, index: number) => (
+                      <div key={entry.id} className="p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-r from-blue-100 to-blue-200 rounded-full">
-                                <span className="text-xs font-semibold text-blue-700">
-                                  {entry.personnelName ? entry.personnelName.split(' ').map((n: string) => n[0]).join('') : 'N/A'}
-                                </span>
-                              </div>
-                              <div>
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-100 to-blue-200 rounded-full mt-1">
+                              <span className="text-xs font-semibold text-blue-700">
+                                {entry.personnelName ? entry.personnelName.split(' ').map((n: string) => n[0]).join('') : 'N/A'}
+                              </span>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
                                 <h4 className="text-sm font-semibold text-gray-900">
                                   {entry.personnelName || 'Personal no identificado'}
                                 </h4>
-                                <p className="text-xs text-gray-600">{entry.roleName || 'Rol no especificado'}</p>
+                                <span className="text-xs text-gray-500">•</span>
+                                <span className="text-xs font-medium text-blue-600">{entry.roleName || 'Rol no especificado'}</span>
+                              </div>
+                              <p className="text-sm text-gray-700 mb-3 leading-relaxed">{entry.description}</p>
+                              <div className="flex items-center gap-4 text-xs text-gray-600">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(entry.date), 'dd MMM yyyy', { locale: es })}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {entry.hours}h trabajadas
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  ${entry.hourlyRate}/hora
+                                </span>
                               </div>
                             </div>
-                            {viewMode === 'grid' && (
-                              <p className="text-xs text-gray-700 mb-3 line-clamp-2 leading-relaxed">{entry.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 text-xs text-gray-600">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {format(new Date(entry.date), 'dd/MM/yy', { locale: es })}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {entry.hours}h
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />
-                                ${entry.hourlyRate}/h
-                              </span>
-                            </div>
                           </div>
-                          <div className="text-right ml-3">
-                            <p className="text-sm font-bold text-green-600">
+                          <div className="text-right ml-4">
+                            <p className="text-lg font-bold text-green-600">
                               ${(entry.hours * entry.hourlyRate).toLocaleString()}
                             </p>
-                            <p className="text-xs text-gray-500">total</p>
+                            <p className="text-xs text-gray-500">costo total</p>
                           </div>
                         </div>
-                        {viewMode === 'list' && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-xs text-gray-700 leading-relaxed">{entry.description}</p>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
