@@ -119,6 +119,7 @@ function AppRoutes() {
                   </ProtectedRoute>
                   <ProtectedRoute path="/admin" component={Admin} />
                   {/* Rutas para gestión de proyectos activos */}
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetails} />
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewActiveProject} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
