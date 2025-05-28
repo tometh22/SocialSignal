@@ -59,79 +59,74 @@ const ReviewCleanDesign: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Header con información del cliente */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{getClientName()}</h2>
-                <p className="text-gray-600">{quotationData.project?.name || "Proyecto sin nombre"}</p>
-              </div>
+    <div className="max-w-6xl mx-auto p-4 space-y-4">
+      {/* Header compacto */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-white" />
             </div>
-            <Badge variant="outline" className="text-sm">
-              {getTemplateName()}
-            </Badge>
+            <div>
+              <h2 className="font-semibold text-gray-900">{getClientName()}</h2>
+              <p className="text-sm text-gray-600">{quotationData.project?.name || "Proyecto sin nombre"}</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Badge variant="outline" className="text-xs">
+            {getTemplateName()}
+          </Badge>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Columna izquierda - Equipo */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>Equipo del Proyecto</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-2 border-b border-gray-100 flex items-center space-x-2">
+              <Users className="w-4 h-4 text-gray-600" />
+              <span className="font-medium text-sm">Equipo ({quotationData.teamMembers?.length || 0})</span>
+            </div>
+            <div className="p-3">
               {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {quotationData.teamMembers.map((member, index) => (
-                    <div key={member.id || index} className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-white" />
+                    <div key={member.id || index} className="bg-gray-50 rounded p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
+                            <span className="text-xs text-white font-medium">
+                              {getRoleName(member.roleId).charAt(0)}
+                            </span>
                           </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">{getRoleName(member.roleId)}</h4>
-                            <p className="text-sm text-gray-600">{getPersonnelName(member.personnelId)}</p>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">{getRoleName(member.roleId)}</h4>
+                            <p className="text-xs text-gray-600 truncate">{getPersonnelName(member.personnelId)}</p>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-3 gap-2 text-xs">
                         <div>
-                          <Label className="text-xs text-gray-500 uppercase tracking-wide">Tarifa/Hora</Label>
-                          <div className="flex items-center mt-1">
-                            <span className="text-gray-400 mr-1">$</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={member.rate || 0}
-                              onChange={(e) => {
-                                const newRate = parseFloat(e.target.value) || 0;
-                                updateTeamMember(member.id, {
-                                  ...member,
-                                  rate: newRate,
-                                  cost: (member.hours || 0) * newRate
-                                });
-                              }}
-                              className="w-full text-right font-mono"
-                            />
-                          </div>
+                          <label className="text-gray-500 block mb-1">$/h</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={member.rate || 0}
+                            onChange={(e) => {
+                              const newRate = parseFloat(e.target.value) || 0;
+                              updateTeamMember(member.id, {
+                                ...member,
+                                rate: newRate,
+                                cost: (member.hours || 0) * newRate
+                              });
+                            }}
+                            className="h-7 text-xs text-right font-mono"
+                          />
                         </div>
                         
                         <div>
-                          <Label className="text-xs text-gray-500 uppercase tracking-wide">Horas</Label>
+                          <label className="text-gray-500 block mb-1">hrs</label>
                           <Input
                             type="number"
                             min="0"
@@ -144,163 +139,164 @@ const ReviewCleanDesign: React.FC = () => {
                                 cost: newHours * (member.rate || 0)
                               });
                             }}
-                            className="w-full text-center mt-1"
+                            className="h-7 text-xs text-center"
                           />
                         </div>
                         
                         <div>
-                          <Label className="text-xs text-gray-500 uppercase tracking-wide">Costo Total</Label>
-                          <div className="mt-1 p-2 bg-white rounded border font-mono text-right font-semibold">
-                            ${((member.hours || 0) * (member.rate || 0)).toFixed(2)}
+                          <label className="text-gray-500 block mb-1">total</label>
+                          <div className="h-7 px-2 bg-white rounded border text-xs font-mono text-right leading-7 font-semibold">
+                            ${((member.hours || 0) * (member.rate || 0)).toFixed(0)}
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
                   
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center text-lg font-bold">
-                      <span>Costo Base Total</span>
-                      <span className="text-blue-600">${baseCost.toFixed(2)}</span>
+                  <div className="border-t pt-2 mt-3">
+                    <div className="flex justify-between items-center text-sm font-bold">
+                      <span>Costo Base</span>
+                      <span className="text-blue-600 font-mono">${baseCost.toFixed(0)}</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                  <p>No hay miembros asignados al proyecto</p>
+                <div className="text-center py-6 text-gray-500">
+                  <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">Sin miembros</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Notas Adicionales */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Notas del Proyecto</CardTitle>
-            </CardHeader>
-            <CardContent>
+          {/* Notas compactas */}
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <span className="font-medium text-sm">Notas</span>
+            </div>
+            <div className="p-3">
               <Textarea
                 value={additionalNotes}
                 onChange={(e) => setAdditionalNotes(e.target.value)}
-                placeholder="Notas adicionales sobre el proyecto..."
-                className="min-h-[100px]"
+                placeholder="Notas adicionales..."
+                className="min-h-[60px] text-sm"
+                rows={3}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
         {/* Columna derecha - Resumen Financiero */}
-        <div className="space-y-6">
-          <Card className="border-green-200 bg-green-50">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-green-800">
-                <DollarSign className="w-5 h-5" />
-                <span>Resumen Financiero</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-green-200">
-                  <span className="text-sm text-green-700">Costo Base</span>
-                  <span className="font-mono font-medium">${baseCost.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center py-2 border-b border-green-200">
-                  <span className="text-sm text-green-700">Ajuste Complejidad</span>
-                  <span className="font-mono font-medium">${complexityAdjustment.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center py-2 border-b border-green-200">
-                  <span className="text-sm text-green-700">Margen</span>
-                  <span className="font-mono font-medium">${markupAmount.toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center py-3 bg-green-100 px-3 rounded-lg">
-                  <span className="font-semibold text-green-800">Total</span>
-                  <span className="text-xl font-bold text-green-800 font-mono">
-                    ${(adjustedAmount || totalAmount).toFixed(2)}
+        <div className="space-y-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg">
+            <div className="px-4 py-2 border-b border-green-200 flex items-center space-x-2">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              <span className="font-medium text-sm text-green-800">Financiero</span>
+            </div>
+            <div className="p-3 space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-green-700">Base</span>
+                <span className="font-mono font-medium">${baseCost.toFixed(0)}</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-green-700">Complejidad</span>
+                <span className="font-mono font-medium">${complexityAdjustment.toFixed(0)}</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-green-700">Margen</span>
+                <span className="font-mono font-medium">${markupAmount.toFixed(0)}</span>
+              </div>
+              
+              <div className="border-t border-green-200 pt-2 mt-2">
+                <div className="flex justify-between items-center bg-green-100 px-2 py-1 rounded">
+                  <span className="font-semibold text-green-800 text-sm">Total</span>
+                  <span className="text-lg font-bold text-green-800 font-mono">
+                    ${(adjustedAmount || totalAmount).toFixed(0)}
                   </span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Ajustes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Edit3 className="w-5 h-5" />
-                <span>Ajustes</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* Ajustes compactos */}
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-2 border-b border-gray-100 flex items-center space-x-2">
+              <Edit3 className="w-4 h-4 text-gray-600" />
+              <span className="font-medium text-sm">Ajustar</span>
+            </div>
+            <div className="p-3 space-y-3">
               <div>
-                <Label>Monto Final</Label>
-                <div className="flex items-center mt-1">
-                  <span className="text-gray-400 mr-2">$</span>
+                <label className="text-xs text-gray-500 block mb-1">Monto Final</label>
+                <div className="flex items-center">
+                  <span className="text-gray-400 mr-1 text-sm">$</span>
                   <Input
                     type="number"
                     min="0"
                     step="1"
                     value={adjustedAmount || totalAmount}
                     onChange={handleAdjustedAmountChange}
-                    className="font-mono text-right"
+                    className="font-mono text-right text-sm h-8"
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Original: ${totalAmount.toFixed(2)}
+                  Original: ${totalAmount.toFixed(0)}
                 </p>
               </div>
               
               <div>
-                <Label>Razón del Ajuste</Label>
+                <label className="text-xs text-gray-500 block mb-1">Razón</label>
                 <Textarea
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
-                  placeholder="¿Por qué se ajustó el monto?"
-                  className="mt-1"
-                  rows={3}
+                  placeholder="¿Por qué?"
+                  className="text-sm"
+                  rows={2}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Información del Proyecto */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalles del Proyecto</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          {/* Detalles compactos */}
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <span className="font-medium text-sm">Detalles</span>
+            </div>
+            <div className="p-3 space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Análisis</span>
-                <span className="text-sm font-medium">{quotationData.analysisType || "No especificado"}</span>
+                <span className="text-gray-600">Análisis</span>
+                <span className="font-medium truncate ml-2">{quotationData.analysisType || "—"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Menciones</span>
-                <span className="text-sm font-medium">{quotationData.mentionsVolume || "No especificado"}</span>
+                <span className="text-gray-600">Menciones</span>
+                <span className="font-medium truncate ml-2">{quotationData.mentionsVolume || "—"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Países</span>
-                <span className="text-sm font-medium">{quotationData.countriesCovered || "No especificado"}</span>
+                <span className="text-gray-600">Países</span>
+                <span className="font-medium truncate ml-2">{quotationData.countriesCovered || "—"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Participación</span>
-                <span className="text-sm font-medium">{quotationData.clientEngagement || "No especificado"}</span>
+                <span className="text-gray-600">Participación</span>
+                <span className="font-medium truncate ml-2">{quotationData.clientEngagement || "—"}</span>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Botones de acción */}
-      <div className="flex justify-between items-center pt-6 border-t">
-        <div className="text-sm text-gray-600">
-          Última modificación: Ahora
+      {/* Botones compactos */}
+      <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+        <div className="text-xs text-gray-500">
+          Modificado: Ahora
         </div>
-        <div className="flex space-x-3">
-          <Button variant="outline">Vista Previa</Button>
-          <Button className="bg-blue-600 hover:bg-blue-700">Guardar Cambios</Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" className="h-8 px-3 text-xs">
+            Vista Previa
+          </Button>
+          <Button size="sm" className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700">
+            Guardar
+          </Button>
         </div>
       </div>
     </div>
