@@ -11,7 +11,7 @@ import QuoteRedirect from "@/pages/quote-redirect";
 import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics";
-import Admin from "@/pages/admin";
+import Admin from "@/pages/admin-fixed";
 import ActiveProjects from "@/pages/active-projects";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";

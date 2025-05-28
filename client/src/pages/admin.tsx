@@ -863,64 +863,42 @@ export default function Admin() {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center h-20 px-6 border-b border-slate-200 bg-white shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Panel de Administración</h1>
-          <p className="text-sm text-slate-500 mt-1">Gestiona roles, personal y plantillas para las cotizaciones</p>
-        </div>
-        <div className="ml-auto flex items-center space-x-3">
-          <Button variant="outline" size="sm" className="text-xs">
-            <FileText className="h-3.5 w-3.5 mr-1" />
-            Exportar Datos
-          </Button>
-          <Button size="sm" className="text-xs">
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-            Actualizar
-          </Button>
-        </div>
+    <div className="page-container">
+      <div className="flex-between mb-6">
+        <h1 className="heading-page">Panel de Administración</h1>
       </div>
-      
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50/80">
-        <div className="max-w-7xl mx-auto">
+
+      <div className="standard-card">
+        <div className="card-content">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">Configuración del Sistema</h2>
-                <p className="text-sm text-slate-500">Administra los componentes principales del sistema de cotización</p>
-              </div>
-              <TabsList className="ml-auto p-1 bg-slate-100/80 border">
-                <TabsTrigger value="roles" className="flex items-center data-[state=active]:bg-white">
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Roles
-                </TabsTrigger>
-                <TabsTrigger value="personnel" className="flex items-center data-[state=active]:bg-white">
-                  <Users className="mr-2 h-4 w-4" />
-                  Personal
-                </TabsTrigger>
-                <TabsTrigger value="templates" className="flex items-center data-[state=active]:bg-white">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Plantillas
-                </TabsTrigger>
-              </TabsList>
-            </div>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="roles" className="flex items-center">
+                <UserCog className="mr-2 h-4 w-4" />
+                Roles
+              </TabsTrigger>
+              <TabsTrigger value="personnel" className="flex items-center">
+                <Users className="mr-2 h-4 w-4" />
+                Personal
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="flex items-center">
+                <FileText className="mr-2 h-4 w-4" />
+                Plantillas
+              </TabsTrigger>
+            </TabsList>
             
             <TabsContent value="roles">
-              <Card className="shadow-sm border-slate-200">
-                <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-b from-white to-slate-50 border-b pb-6">
-                  <div className="flex items-center">
-                    <div className="mr-4 h-12 w-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                      <Briefcase className="h-6 w-6 text-blue-600" />
-                    </div>
+              <Card className="standard-card mt-6">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle className="text-lg text-slate-800">Roles de Equipo</CardTitle>
-                      <CardDescription className="text-slate-500">Administrar roles y tarifas por hora predeterminadas</CardDescription>
+                      <CardTitle className="heading-card">Roles del Sistema</CardTitle>
+                      <CardDescription>Gestiona los roles disponibles para las cotizaciones</CardDescription>
                     </div>
+                    <Button onClick={openNewRoleDialog} className="gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Añadir Nuevo Rol
+                    </Button>
                   </div>
-                  <Button onClick={openNewRoleDialog} className="gap-2 bg-blue-600 hover:bg-blue-700">
-                    <PlusCircle className="h-4 w-4" />
-                    Añadir Nuevo Rol
-                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   {rolesLoading ? (
@@ -2333,6 +2311,9 @@ export default function Admin() {
           </div>
         </DialogContent>
       </Dialog>
+      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

@@ -307,31 +307,26 @@ export default function Statistics() {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card shadow-medium hover-lift scale-in">
-                  <CardHeader className="pb-2 border-b border-white/10">
-                    <CardTitle className="text-heading flex items-center">
-                      <span className="bg-success/20 p-2 rounded-full mr-2">
-                        <LineChart className="h-5 w-5 text-success" />
-                      </span>
-                      Resumen Financiero
-                    </CardTitle>
+                <Card className="standard-card">
+                  <CardHeader>
+                    <CardTitle className="heading-card">Resumen Financiero</CardTitle>
                     <CardDescription>Métricas financieras agregadas</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="card-content">
                     <div className="space-y-6 py-4">
-                      <div className="glass-pill p-4 rounded-md shadow-soft slide-in" style={{animationDelay: '0.1s'}}>
-                        <p className="text-sm text-neutral-500 font-medium mb-1">Total de Cotizaciones</p>
-                        <p className="text-2xl font-semibold text-neutral-900">
+                      <div className="p-4 rounded-md">
+                        <p className="text-label mb-1">Total de Cotizaciones</p>
+                        <p className="text-stat">
                           {isLoading ? 
                             <span className="animate-pulse">...</span> : 
-                            <span className="fade-in">{filteredQuotations.length}</span>
+                            <span>{filteredQuotations.length}</span>
                           }
                         </p>
                       </div>
                       
-                      <div className="glass-pill p-4 rounded-md shadow-soft slide-in" style={{animationDelay: '0.2s'}}>
-                        <p className="text-sm text-neutral-500 font-medium mb-1">Valor Total</p>
-                        <p className="text-2xl font-semibold text-neutral-900">
+                      <div className="p-4 rounded-md">
+                        <p className="text-label mb-1">Valor Total</p>
+                        <p className="text-stat">
                           {isLoading ? 
                             <span className="animate-pulse">...</span> : 
                             <span className="fade-in">{`$${filteredQuotations.reduce((sum, quote) => sum + quote.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
