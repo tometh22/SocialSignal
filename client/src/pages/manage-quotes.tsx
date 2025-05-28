@@ -44,7 +44,6 @@ export default function ManageQuotes() {
     queryKey: ["/api/quotations"],
   });
   
-  // Cargamos la información de todos los clientes
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
@@ -227,31 +226,26 @@ export default function ManageQuotes() {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-subheading text-neutral-900">Gestionar Cotizaciones</h2>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        <div className="container-xl fade-in">
-          <div className="section-sm">
-            <Card className="shadow-soft">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-heading sr-only">Cotizaciones</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row gap-4 mb-6 form-group">
-                  <div className="relative flex-grow form-group">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
-                      <Input
-                        placeholder="Buscar por nombre de proyecto..."
-                        className="pl-10"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
+    <>
+      <div className="page-container">
+        <div className="flex-between mb-6">
+          <h1 className="heading-page">Gestionar Cotizaciones</h1>
+        </div>
+
+        <Card className="standard-card">
+          <CardContent className="card-content">
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-grow">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+                <Input
+                  placeholder="Buscar por nombre de proyecto..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
                   <div className="w-full md:w-64">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger>
@@ -394,8 +388,6 @@ export default function ManageQuotes() {
               </CardContent>
             </Card>
           </div>
-        </div>
-      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
@@ -498,6 +490,6 @@ export default function ManageQuotes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
