@@ -271,28 +271,28 @@ export default function ManageQuotes() {
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead>
-                        <tr className="border-b border-neutral-200">
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Proyecto</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Cliente</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Tipo de Proyecto</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Creación</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Estado</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Total</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Acciones</th>
+                        <tr className="border-b">
+                          <th className="px-4 py-3 text-left text-label">Nombre del Proyecto</th>
+                          <th className="px-4 py-3 text-left text-label">Cliente</th>
+                          <th className="px-4 py-3 text-left text-label">Tipo de Proyecto</th>
+                          <th className="px-4 py-3 text-left text-label">Creación</th>
+                          <th className="px-4 py-3 text-left text-label">Estado</th>
+                          <th className="px-4 py-3 text-left text-label">Total</th>
+                          <th className="px-4 py-3 text-left text-label">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredQuotations.map((quote) => (
-                          <tr key={quote.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">{quote.projectName}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{getClientName(quote.clientId)}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{quote.projectType || "Always On"}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">
+                          <tr key={quote.id} className="border-b hover:bg-muted/50 transition-colors">
+                            <td className="px-4 py-3 text-body font-medium">{quote.projectName}</td>
+                            <td className="px-4 py-3 text-body">{getClientName(quote.clientId)}</td>
+                            <td className="px-4 py-3 text-body">{quote.projectType || "Always On"}</td>
+                            <td className="px-4 py-3 text-body">
                               {new Date(quote.createdAt).toLocaleDateString()}
                             </td>
                             <td className="px-4 py-3">
                               {quote.status === 'approved' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-success/10 text-success-dark">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                   <CheckCircle className="h-3.5 w-3.5 mr-1" />
                                   {translateStatus(quote.status)}
                                 </span>
