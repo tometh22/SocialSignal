@@ -48,6 +48,14 @@ export default function ProjectDetailsOptimized() {
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['/api/active-projects', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const response = await fetch(`/api/active-projects/${id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch project');
+      }
+      return response.json();
+    },
     enabled: !!id
   });
 
@@ -105,8 +113,10 @@ export default function ProjectDetailsOptimized() {
   const totalCost = filteredEntries.reduce((sum: number, entry: any) => 
     sum + ((entry.hours || 0) * (entry.hourlyRate || 0)), 0);
 
-  const remainingBudget = (project?.budget || 0) - totalCost;
-  const budgetUsagePercentage = project?.budget ? (totalCost / project.budget) * 100 : 0;
+  // Usar el presupuesto de la cotización si el proyecto no tiene presupuesto específico
+  const projectBudget = project?.budget || project?.quotationBudget || 0;
+  const remainingBudget = projectBudget - totalCost;
+  const budgetUsagePercentage = projectBudget ? (totalCost / projectBudget) * 100 : 0;
 
   const handleTimeEntrySuccess = () => {
     refetchTimeEntries();
@@ -148,7 +158,7 @@ export default function ProjectDetailsOptimized() {
               <Building2 className="h-5 w-5 text-blue-600" />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900 leading-tight">
-                  {project?.name || 'Cargando...'}
+                  {project?.subprojectName || project?.name || 'Cargando...'}
                 </h1>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span>ID: {project?.id}</span>
@@ -205,7 +215,7 @@ export default function ProjectDetailsOptimized() {
                 <div>
                   <p className="text-xs font-medium text-gray-600">Presupuesto</p>
                   <p className="text-xl font-bold text-gray-900">
-                    ${project?.budget?.toLocaleString() || '0'}
+                    ${projectBudget?.toLocaleString() || '0'}
                   </p>
                   <p className="text-xs text-green-600">
                     {budgetUsagePercentage.toFixed(1)}% usado
@@ -257,7 +267,7 @@ export default function ProjectDetailsOptimized() {
                     ${remainingBudget.toLocaleString()}
                   </p>
                   <p className="text-xs text-purple-600">
-                    {((remainingBudget / (project?.budget || 1)) * 100).toFixed(1)}%
+                    {((remainingBudget / (projectBudget || 1)) * 100).toFixed(1)}%
                   </p>
                 </div>
                 <PieChart className="h-8 w-8 text-purple-600 opacity-80" />
