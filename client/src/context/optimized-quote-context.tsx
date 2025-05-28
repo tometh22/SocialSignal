@@ -1257,20 +1257,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   // Efecto para cargar una cotización existente si hay quotationId
   useEffect(() => {
     if (quotationId) {
-      // Verificar si es la cotización de Huggies (ID 30) - SOLO para esa cotización específica
-      if (quotationId === 30) {
-        console.log("COTIZACIÓN HUGGIES DETECTADA - Aplicando configuración especial");
-        
-        // Forzar paso 4 SOLO para Huggies
-        setCurrentStep(4);
-        
-        // Guardar en localStorage para persistencia
-        localStorage.setItem('quote_step_30', '4');
-      } else {
-        // Para todas las demás cotizaciones, iniciar en paso 1 con datos cargados
-        console.log(`Cargando cotización normal ID: ${quotationId} - Iniciando en paso 1`);
-        setCurrentStep(1);
-      }
+      console.log(`Cargando cotización existente ID: ${quotationId} para edición`);
+      
+      // Para edición, siempre ir al paso de revisión después de cargar los datos
+      // No establecer el paso aquí, se hará después de cargar los datos
       
       const loadExistingQuotation = async () => {
         try {
@@ -1502,31 +1492,24 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             localStorage.setItem(`quote_step_${quotationId}`, "4");
           }
           
-          // Verificar si hay un paso guardado en localStorage
-          const savedStep = localStorage.getItem(`quote_step_${quotationId}`);
-          let finalStep = detectedStep;
+          // Para edición de cotizaciones, ir directamente al paso de revisión
+          let finalStep;
           
-          if (savedStep) {
-            const parsedStep = parseInt(savedStep);
-            if (!isNaN(parsedStep) && parsedStep >= 1 && parsedStep <= 4) {
-              console.log(`Usando paso guardado localmente: ${parsedStep}`);
-              finalStep = parsedStep;
-            }
+          if (!isRequote) {
+            // Si es edición normal, ir al paso de revisión final
+            finalStep = updatedData.project?.type === 'always-on' ? 5 : 4;
+            console.log(`Edición de cotización - dirigiendo al paso de revisión: ${finalStep}`);
+          } else {
+            // Si es recotización, empezar desde el paso 1
+            finalStep = 1;
+            console.log("Recotización - iniciando desde el paso 1");
           }
           
-          // Para cotizaciones con equipo, garantizar que siempre está en paso 4
-          if (teamMembers.length > 0 && finalStep < 4) {
-            console.log("Ajuste: cotización con equipo debe estar en paso 4");
-            finalStep = 4;
-            localStorage.setItem(`quote_step_${quotationId}`, "4");
-          }
-          
-          // Restaurar al paso detectado o guardado
-          console.log(`Restaurando al paso ${finalStep} para esta cotización`);
-          // Primero guardamos el paso en localStorage antes de cambiarlo
-          localStorage.setItem(`quote_step_${quotationId}`, finalStep.toString());
-          // Luego actualizamos el estado
+          // Actualizar el estado del paso
           setCurrentStep(finalStep);
+          
+          // Guardar en localStorage para persistencia
+          localStorage.setItem(`quote_step_${quotationId}`, finalStep.toString());
           
           // Actualizar el estado con los datos cargados
           setBaseCost(quotation.baseCost || 0);

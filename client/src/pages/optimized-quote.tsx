@@ -26,11 +26,15 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
     previousStep,
     goToStep,
     quotationData,
-    saveQuotation
+    saveQuotation,
+    loadQuotation
   } = useOptimizedQuote();
 
   const isEditing = Boolean(quotationId);
   const [isSaving, setIsSaving] = useState(false);
+
+  // El contexto ya maneja la carga de datos y navegación automática al paso correcto
+  // No necesitamos lógica adicional aquí
 
   const handleSave = async () => {
     try {
