@@ -50,11 +50,11 @@ export default function ActiveProjects() {
   });
 
   const filteredProjects = projects.filter((project) => {
-    const matchesSearch = (project.projectName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (project.quotation?.projectName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (project.deliverableDescription || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || project.status === filterStatus;
     const matchesClient = filterClient === "all" || 
-                         (project.clientId && project.clientId.toString() === filterClient);
+                         (project.quotation?.clientId && project.quotation.clientId.toString() === filterClient);
     
     return matchesSearch && matchesStatus && matchesClient;
   });
@@ -171,7 +171,7 @@ export default function ActiveProjects() {
                               <ChevronRight className="h-4 w-4" />
                             )}
                           </Button>
-                          <h3 className="heading-card">{project.projectName || 'Proyecto sin nombre'}</h3>
+                          <h3 className="heading-card">MODO Always-On - Presupuesto Global</h3>
                           {getStatusBadge(project.status)}
                         </div>
                         
