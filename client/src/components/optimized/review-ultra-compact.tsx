@@ -45,38 +45,38 @@ const ReviewUltraCompact: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-3 space-y-3">
-      {/* Cliente en una línea */}
-      <div className="flex items-center justify-between bg-blue-50 rounded px-3 py-1 text-sm">
+    <div className="page-container space-y-4">
+      {/* Cliente en una línea con diseño estándar */}
+      <div className="flex-between card-compact bg-blue-50 text-body-sm">
         <span className="font-medium">{getClientName()} • {quotationData.project?.name || "Sin nombre"}</span>
         <span className="text-xs text-blue-600">{getTemplateName()}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 grid-compact">
         {/* Equipo */}
         <div className="lg:col-span-2 space-y-3">
-          <div className="bg-white border border-gray-200 rounded p-3">
+          <div className="card-standard">
             {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {quotationData.teamMembers.map((member, index) => (
-                  <div key={member.id || index} className="bg-gray-50 rounded p-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
+                  <div key={member.id || index} className="card-compact bg-gray-50">
+                    <div className="flex-between mb-2">
+                      <div className="flex items-center gap-2">
                         <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
                           <span className="text-xs text-white font-medium">
                             {getRoleName(member.roleId).charAt(0)}
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <h4 className="text-xs font-medium text-gray-900 truncate">{getRoleName(member.roleId)}</h4>
-                          <p className="text-xs text-gray-600 truncate">{getPersonnelName(member.personnelId)}</p>
+                          <h4 className="text-body-sm font-medium truncate">{getRoleName(member.roleId)}</h4>
+                          <p className="text-caption text-muted-foreground truncate">{getPersonnelName(member.personnelId)}</p>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-gray-500 block mb-1">$/h</label>
+                        <label className="label-standard text-caption">$/h</label>
                         <Input
                           type="number"
                           min="0"

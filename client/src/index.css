@@ -2,6 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================
+   SISTEMA DE DISEÑO UNIFICADO
+   ======================================== */
+
+/* Variables tipográficas consistentes */
+:root {
+  /* Escala tipográfica estandarizada */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  
+  /* Pesos de fuente estándar */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Espaciado consistente */
+  --space-1: 0.25rem;     /* 4px */
+  --space-2: 0.5rem;      /* 8px */
+  --space-3: 0.75rem;     /* 12px */
+  --space-4: 1rem;        /* 16px */
+  --space-6: 1.5rem;      /* 24px */
+  --space-8: 2rem;        /* 32px */
+}
+
+/* ========================================
+   TIPOGRAFÍA ESTÁNDAR PARA TODA LA APP
+   ======================================== */
+
+/* Títulos principales */
+.heading-page {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  line-height: 1.25;
+  color: hsl(var(--foreground));
+  margin-bottom: var(--space-6);
+}
+
+.heading-section {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: 1.3;
+  color: hsl(var(--foreground));
+  margin-bottom: var(--space-4);
+}
+
+.heading-card {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+  margin-bottom: var(--space-3);
+}
+
+/* Texto del cuerpo estándar */
+.text-body {
+  font-size: var(--text-base);
+  font-weight: var(--font-normal);
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+}
+
+.text-body-sm {
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+}
+
+/* Labels consistentes */
+.label-standard {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+  margin-bottom: var(--space-2);
+  display: block;
+}
+
+/* ========================================
+   COMPONENTES ESTANDARIZADOS
+   ======================================== */
+
+/* Cards con estilo consistente */
+.card-standard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: var(--space-6);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.card-compact {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: var(--space-4);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Botones estandarizados */
+.btn-standard {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* Inputs estandarizados */
+.input-standard {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  transition: all 0.2s ease-in-out;
+  width: 100%;
+}
+
+.input-standard:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+/* ========================================
+   LAYOUT CONSISTENTE
+   ======================================== */
+
+/* Contenedores de página */
+.page-container {
+  padding: var(--space-4);
+  max-width: 100%;
+}
+
+/* Grid y flex layouts estándar */
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.grid-standard {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.grid-compact {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* ========================================
+   ESPACIADO Y UTILIDADES
+   ======================================== */
+
+.space-y-2 > * + * { margin-top: var(--space-2); }
+.space-y-3 > * + * { margin-top: var(--space-3); }
+.space-y-4 > * + * { margin-top: var(--space-4); }
+.space-y-6 > * + * { margin-top: var(--space-6); }
+
+/* Divisores */
+.divider {
+  height: 1px;
+  background: hsl(var(--border));
+  margin: var(--space-6) 0;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 768px) {
+  .heading-page {
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-4);
+  }
+  
+  .heading-section {
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-3);
+  }
+  
+  .page-container {
+    padding: var(--space-3);
+  }
+}
+
 /* Estilos visuales mejorados */
 .glass-card {
   background: #ffffff !important;
