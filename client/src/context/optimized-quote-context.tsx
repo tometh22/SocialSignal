@@ -195,7 +195,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [recommendedRoleIds, setRecommendedRoleIds] = useState<number[]>([]);
-  const [currentStep, setCurrentStep] = useState(1);
+  // Determinar paso inicial basado en si es edición
+  const initialStep = quotationId && !isRequote ? 4 : 1;
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [availableRoles, setAvailableRoles] = useState<Role[] | null>(null);
   const [availablePersonnel, setAvailablePersonnel] = useState<Personnel[] | null>(null);
   
