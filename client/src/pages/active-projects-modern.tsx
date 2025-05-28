@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,9 @@ import {
   Clock,
   Building2,
   Target,
-  TrendingUp
+  TrendingUp,
+  ExternalLink,
+  Eye
 } from "lucide-react";
 
 export default function ActiveProjectsModern() {
@@ -24,6 +27,7 @@ export default function ActiveProjectsModern() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClient, setFilterClient] = useState("all");
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set([16])); // MODO expandido por defecto
+  const [, setLocation] = useLocation();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["/api/active-projects"],
@@ -217,42 +221,50 @@ export default function ActiveProjectsModern() {
                           {subprojects.map((subproject: any) => (
                             <div 
                               key={subproject.id} 
-                              className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow"
+                              className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all cursor-pointer group"
+                              onClick={() => setLocation(`/active-projects/${subproject.id}`)}
                             >
                               <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-medium text-gray-900 text-sm">
-                                  {subproject.id === 5 ? "Ejecutivo Sony One" :
-                                   subproject.id === 6 ? "Mensual Enero" :
-                                   subproject.id === 7 ? "Ejecutivo Telepase" :
-                                   subproject.id === 8 ? "Mensual Febrero" :
-                                   subproject.id === 9 ? "Ejecutivo NFC" :
-                                   subproject.id === 10 ? "Ejecutivo Sony One Febrero" :
-                                   subproject.id === 11 ? "Mensual Marzo" :
-                                   subproject.id === 12 ? "Ejecutivo 2" :
-                                   subproject.id === 13 ? "Ejecutivo Comercios" :
-                                   subproject.id === 14 ? "Mensual Abril" :
-                                   subproject.id === 15 ? "Ejecutivo 1" :
-                                   `Entregable ${subproject.id}`}
-                                </h4>
-                                {getStatusBadge("en_progreso")}
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-gray-900 text-sm group-hover:text-blue-600 transition-colors">
+                                    {subproject.id === 5 ? "Ejecutivo Sony One" :
+                                     subproject.id === 6 ? "Mensual Enero" :
+                                     subproject.id === 7 ? "Ejecutivo Telepase" :
+                                     subproject.id === 8 ? "Mensual Febrero" :
+                                     subproject.id === 9 ? "Ejecutivo NFC" :
+                                     subproject.id === 10 ? "Ejecutivo Sony One Febrero" :
+                                     subproject.id === 11 ? "Mensual Marzo" :
+                                     subproject.id === 12 ? "Ejecutivo 2" :
+                                     subproject.id === 13 ? "Ejecutivo Comercios" :
+                                     subproject.id === 14 ? "Mensual Abril" :
+                                     subproject.id === 15 ? "Ejecutivo 1" :
+                                     `Entregable ${subproject.id}`}
+                                  </h4>
+                                  <Eye className="h-3 w-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {getStatusBadge("en_progreso")}
+                                  <ExternalLink className="h-3 w-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
                               </div>
                               
-                              <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-                                {subproject.id === 5 ? 'Entregable "Ejecutivo Sony One" del programa Always-On MODO' :
-                                 subproject.id === 6 ? 'Entregable "Mensual Enero" del programa Always-On MODO' :
-                                 subproject.id === 7 ? 'Entregable "Ejecutivo Telepase" del programa Always-On MODO' :
-                                 subproject.id === 8 ? 'Entregable "Mensual Febrero" del programa Always-On MODO' :
-                                 subproject.id === 9 ? 'Entregable "Ejecutivo NFC" del programa Always-On MODO' :
-                                 subproject.id === 10 ? 'Entregable "Ejecutivo Sony One Febrero" del programa Always-On MODO' :
-                                 subproject.id === 11 ? 'Entregable "Mensual Marzo" del programa Always-On MODO' :
-                                 subproject.id === 12 ? 'Entregable "Ejecutivo 2" del programa Always-On MODO' :
-                                 subproject.id === 13 ? 'Entregable "Ejecutivo Comercios" del programa Always-On MODO' :
-                                 subproject.id === 14 ? 'Entregable "Mensual Abril" del programa Always-On MODO' :
-                                 subproject.id === 15 ? 'Entregable "Ejecutivo 1" del programa Always-On MODO' :
-                                 'Entregable del programa Always-On'}
+                              <p className="text-xs text-gray-600 mb-3 leading-relaxed group-hover:text-gray-700 transition-colors">
+                                {subproject.notes || 
+                                 (subproject.id === 5 ? 'Entregable "Ejecutivo Sony One" del programa Always-On MODO' :
+                                  subproject.id === 6 ? 'Entregable "Mensual Enero" del programa Always-On MODO' :
+                                  subproject.id === 7 ? 'Entregable "Ejecutivo Telepase" del programa Always-On MODO' :
+                                  subproject.id === 8 ? 'Entregable "Mensual Febrero" del programa Always-On MODO' :
+                                  subproject.id === 9 ? 'Entregable "Ejecutivo NFC" del programa Always-On MODO' :
+                                  subproject.id === 10 ? 'Entregable "Ejecutivo Sony One Febrero" del programa Always-On MODO' :
+                                  subproject.id === 11 ? 'Entregable "Mensual Marzo" del programa Always-On MODO' :
+                                  subproject.id === 12 ? 'Entregable "Ejecutivo 2" del programa Always-On MODO' :
+                                  subproject.id === 13 ? 'Entregable "Ejecutivo Comercios" del programa Always-On MODO' :
+                                  subproject.id === 14 ? 'Entregable "Mensual Abril" del programa Always-On MODO' :
+                                  subproject.id === 15 ? 'Entregable "Ejecutivo 1" del programa Always-On MODO' :
+                                  'Entregable del programa Always-On')}
                               </p>
                               
-                              <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <div className="flex items-center gap-4 text-xs text-gray-500 group-hover:text-gray-600 transition-colors">
                                 <div className="flex items-center gap-1">
                                   <DollarSign className="h-3 w-3" />
                                   <span>Incluido en presupuesto</span>
@@ -260,26 +272,31 @@ export default function ActiveProjectsModern() {
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
                                   <span>
-                                    {subproject.id === 5 || subproject.id === 7 ? "01/01/2023" :
-                                     subproject.id === 6 ? "01/02/2023" :
-                                     subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "01/03/2023" :
-                                     subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "01/04/2023" :
-                                     "01/05/2023"}
+                                    {subproject.startDate ? new Date(subproject.startDate).toLocaleDateString('es-ES') :
+                                     (subproject.id === 5 || subproject.id === 7 ? "01/01/2023" :
+                                      subproject.id === 6 ? "01/02/2023" :
+                                      subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "01/03/2023" :
+                                      subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "01/04/2023" :
+                                      "01/05/2023")}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   <span>
-                                    {subproject.id === 5 || subproject.id === 7 ? "28/01/2023" :
-                                     subproject.id === 6 ? "28/02/2023" :
-                                     subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "28/03/2023" :
-                                     subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "28/04/2023" :
-                                     "28/05/2023"}
+                                    {subproject.expectedEndDate ? new Date(subproject.expectedEndDate).toLocaleDateString('es-ES') :
+                                     (subproject.id === 5 || subproject.id === 7 ? "28/01/2023" :
+                                      subproject.id === 6 ? "28/02/2023" :
+                                      subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "28/03/2023" :
+                                      subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "28/04/2023" :
+                                      "28/05/2023")}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <Target className="h-3 w-3" />
-                                  <span>Mensual</span>
+                                  <span>{subproject.trackingFrequency || "Mensual"}</span>
+                                </div>
+                                <div className="text-blue-600 group-hover:text-blue-700 font-medium">
+                                  Ver detalles →
                                 </div>
                               </div>
                             </div>
