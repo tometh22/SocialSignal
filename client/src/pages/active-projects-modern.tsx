@@ -195,7 +195,7 @@ export default function ActiveProjectsModern() {
                           <div className="flex items-center gap-1.5">
                             <DollarSign className="h-4 w-4" />
                             <span className="font-semibold text-gray-900">$4,200.00</span>
-                            <span className="text-gray-500">/mes</span>
+                            <span className="text-gray-500">/mes (consolidado)</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-4 w-4" />

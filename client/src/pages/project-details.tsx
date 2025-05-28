@@ -160,8 +160,17 @@ export default function ProjectDetails() {
                 <p className="text-sm text-gray-600">Cliente Always-On</p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">$4,200.00</div>
-                <p className="text-sm text-gray-600">Presupuesto mensual</p>
+                {isSubproject ? (
+                  <div>
+                    <div className="text-lg font-semibold text-gray-700">Incluido</div>
+                    <p className="text-sm text-gray-600">En presupuesto principal</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">$4,200.00</div>
+                    <p className="text-sm text-gray-600">Presupuesto mensual</p>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
