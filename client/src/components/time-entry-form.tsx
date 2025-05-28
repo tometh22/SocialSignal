@@ -51,7 +51,7 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
       });
       // Invalidar múltiples cachés relacionados
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
       queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
       onOpenChange(false);
       resetForm();

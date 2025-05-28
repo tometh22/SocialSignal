@@ -44,8 +44,8 @@ export default function ProjectDetails() {
   });
 
   const { data: timeEntries = [] } = useQuery({
-    queryKey: ["/api/time-entries", projectId],
-    queryFn: () => fetch(`/api/time-entries?projectId=${projectId}`).then(res => res.json()),
+    queryKey: ["/api/time-entries/project", projectId],
+    queryFn: () => fetch(`/api/time-entries/project/${projectId}`).then(res => res.json()),
     enabled: !!projectId,
   });
 
