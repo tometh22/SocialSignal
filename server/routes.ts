@@ -1334,7 +1334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hours: sql`time_entries.hours`,
         description: sql`time_entries.description`,
         date: sql`time_entries.date`,
-        hourlyRate: sql`time_entries.hourly_rate`,
+        hourlyRate: sql`personnel.hourly_rate`,
         personnelName: sql`personnel.name`,
         roleName: sql`roles.name`
       })
