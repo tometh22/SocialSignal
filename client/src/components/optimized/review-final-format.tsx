@@ -58,101 +58,84 @@ const ReviewFinalFormat: React.FC = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-semibold text-neutral-900 mb-6">Revisar y Ajustar Cotización</h3>
+      <div className="border-b border-gray-200 pb-4 mb-6">
+        <h3 className="text-xl font-semibold text-neutral-900">Revisar y Ajustar Cotización</h3>
+        <p className="text-sm text-gray-600 mt-1">Revisa todos los detalles antes de finalizar</p>
+      </div>
       
       <div className="mb-6">
         <h4 className="text-lg font-medium text-neutral-800 mb-4">Resumen del Proyecto</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <h5 className="text-sm font-medium text-neutral-600 mb-2">Cliente y Detalles del Proyecto</h5>
-            <div className="p-4 bg-neutral-100 rounded-lg">
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Cliente</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {getClientName()}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Nombre del Proyecto</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.project?.name || "--"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Tipo de Análisis</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.analysisType || "--"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Tipo de Proyecto</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.project?.type || "--"}
-                  </dd>
-                </div>
-              </dl>
+        {/* Información compacta del cliente en la parte superior */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                {getClientName().charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">{getClientName()}</h3>
+                <p className="text-sm text-gray-600">{quotationData.project?.name || "Proyecto sin nombre"}</p>
+              </div>
             </div>
-          </div>
-          
-          <div>
-            <h5 className="text-sm font-medium text-neutral-600 mb-2">Parámetros de Alcance</h5>
-            <div className="p-4 bg-neutral-100 rounded-lg">
-              <dl className="space-y-3">
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Menciones</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.mentionsVolume || "--"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Países Cubiertos</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.countriesCovered || "--"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Participación del Cliente</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {quotationData.clientEngagement || "--"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-neutral-600">Plantilla</dt>
-                  <dd className="text-sm font-medium text-neutral-900">
-                    {getTemplateName()}
-                  </dd>
-                </div>
-              </dl>
+            <div className="text-right">
+              <div className="text-sm text-gray-600">Plantilla</div>
+              <div className="font-medium text-gray-900">{getTemplateName()}</div>
             </div>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm text-gray-600 mb-1">Tipo de Análisis</div>
+            <div className="font-medium text-gray-900">{quotationData.analysisType || "No especificado"}</div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm text-gray-600 mb-1">Volumen de Menciones</div>
+            <div className="font-medium text-gray-900">{quotationData.mentionsVolume || "No especificado"}</div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm text-gray-600 mb-1">Países Cubiertos</div>
+            <div className="font-medium text-gray-900">{quotationData.countriesCovered || "No especificado"}</div>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="text-sm text-gray-600 mb-1">Participación del Cliente</div>
+            <div className="font-medium text-gray-900">{quotationData.clientEngagement || "No especificado"}</div>
+          </div>
+        </div>
         
-        <h5 className="text-sm font-medium text-neutral-600 mb-2">Equipo y Recursos</h5>
-        <div className="overflow-hidden rounded-lg border border-neutral-200 mb-6">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-neutral-50">
+        <div className="border-t border-gray-200 pt-6">
+          <h4 className="text-lg font-medium text-neutral-800 mb-4 flex items-center">
+            <span className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-2">
+              <span className="text-green-600 text-sm">👥</span>
+            </span>
+            Equipo y Recursos
+          </h4>
+        </div>
+        
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+          <table className="min-w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Rol</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Miembro del Equipo</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Tarifa</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Horas</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Costo</th>
+                <th scope="col" className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ROL</th>
+                <th scope="col" className="px-6 py-3 text-left text-sm font-semibold text-gray-700">MIEMBRO DEL EQUIPO</th>
+                <th scope="col" className="px-6 py-3 text-center text-sm font-semibold text-gray-700">TARIFA</th>
+                <th scope="col" className="px-6 py-3 text-center text-sm font-semibold text-gray-700">HORAS</th>
+                <th scope="col" className="px-6 py-3 text-right text-sm font-semibold text-gray-700">COSTO</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-neutral-200">
+            <tbody className="bg-white">
               {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
                 quotationData.teamMembers.map((member, index) => (
-                  <tr key={member.id || index}>
-                    <td className="px-4 py-2 text-sm text-neutral-900">
+                  <tr key={member.id || index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {getRoleName(member.roleId)}
                     </td>
-                    <td className="px-4 py-2 text-sm text-neutral-900">
+                    <td className="px-6 py-4 text-sm text-gray-900">
                       {getPersonnelName(member.personnelId)}
                     </td>
-                    <td className="px-4 py-2 text-sm font-mono text-neutral-900">
-                      <div className="flex items-center">
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center">
                         <span className="text-gray-500 mr-1">$</span>
                         <Input
                           type="number"
@@ -167,12 +150,12 @@ const ReviewFinalFormat: React.FC = () => {
                               cost: (member.hours || 0) * newRate
                             });
                           }}
-                          className="w-20 h-8 text-sm font-mono text-right border-gray-300"
+                          className="w-20 h-9 text-sm font-mono text-right border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                           placeholder="0"
                         />
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-sm text-neutral-900">
+                    <td className="px-6 py-4 text-center">
                       <Input
                         type="number"
                         min="0"
@@ -185,25 +168,29 @@ const ReviewFinalFormat: React.FC = () => {
                             cost: newHours * (member.rate || 0)
                           });
                         }}
-                        className="w-16 h-8 text-sm text-center border-gray-300"
+                        className="w-16 h-9 text-sm text-center border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         placeholder="0"
                       />
                     </td>
-                    <td className="px-4 py-2 text-sm font-mono text-neutral-900 font-semibold">
+                    <td className="px-6 py-4 text-right text-sm font-mono font-semibold text-gray-900">
                       US$ {((member.hours || 0) * (member.rate || 0)).toFixed(2)}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-neutral-500">
-                    No hay miembros del equipo asignados
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center">
+                      <span className="text-2xl mb-2">👥</span>
+                      <span className="font-medium">No hay miembros del equipo asignados</span>
+                      <span className="text-sm mt-1">Agrega miembros para completar la cotización</span>
+                    </div>
                   </td>
                 </tr>
               )}
-              <tr className="bg-neutral-50">
-                <td colSpan={4} className="px-4 py-2 text-sm font-medium text-neutral-900">Costo Base Total</td>
-                <td className="px-4 py-2 text-sm font-mono font-bold text-neutral-900">
+              <tr className="bg-blue-50 border-t-2 border-blue-200">
+                <td colSpan={4} className="px-6 py-4 text-sm font-bold text-gray-900 uppercase tracking-wide">Costo Base Total</td>
+                <td className="px-6 py-4 text-right text-lg font-bold text-blue-900">
                   US$ {baseCost.toFixed(2)}
                 </td>
               </tr>
