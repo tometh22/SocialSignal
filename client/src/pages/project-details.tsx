@@ -15,7 +15,10 @@ import {
   TrendingUp,
   Settings,
   Users,
-  MessageSquare
+  MessageSquare,
+  Plus,
+  Timer,
+  Activity
 } from "lucide-react";
 
 export default function ProjectDetails() {
@@ -35,6 +38,12 @@ export default function ProjectDetails() {
 
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
+  });
+
+  const { data: timeEntries = [] } = useQuery({
+    queryKey: ["/api/time-entries", projectId],
+    queryFn: () => fetch(`/api/time-entries?projectId=${projectId}`).then(res => res.json()),
+    enabled: !!projectId,
   });
 
   if (isLoading) {
@@ -244,19 +253,139 @@ export default function ProjectDetails() {
           </Card>
         </div>
 
+        {/* Seguimiento de Horas */}
+        <div className="grid gap-6 md:grid-cols-2 mt-6">
+          {/* Resumen de Horas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-5 w-5" />
+                  Horas Trabajadas
+                </div>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Registrar Horas
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)}h
+                    </div>
+                    <p className="text-sm text-gray-600">Total este mes</p>
+                  </div>
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      ${((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)) * 50).toLocaleString()}
+                    </div>
+                    <p className="text-sm text-blue-600">Costo estimado</p>
+                  </div>
+                </div>
+                
+                {timeEntries.length > 0 ? (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-900">Últimas entradas:</h4>
+                    {timeEntries.slice(0, 3).map((entry: any) => (
+                      <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <Activity className="h-3 w-3 text-gray-500" />
+                          <span className="text-sm">{entry.description || "Trabajo en proyecto"}</span>
+                        </div>
+                        <span className="text-sm font-medium">{entry.hours}h</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <Timer className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No hay horas registradas aún</p>
+                    <p className="text-xs">Comienza registrando el tiempo trabajado</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Análisis de Rentabilidad */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Análisis de Rentabilidad
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+                  <span className="text-sm font-medium">Presupuesto asignado</span>
+                  <span className="font-bold text-emerald-600">
+                    {isSubproject ? "Incluido" : "$4,200"}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium">Costo real (horas)</span>
+                  <span className="font-bold text-blue-600">
+                    ${((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)) * 50).toLocaleString()}
+                  </span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium">Margen estimado</span>
+                  <span className={`font-bold ${isSubproject ? 'text-gray-600' : 'text-emerald-600'}`}>
+                    {isSubproject ? "Consolidado" : 
+                     `$${(4200 - (timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50)).toLocaleString()}`}
+                  </span>
+                </div>
+                
+                <div className="pt-2">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                    <span>Progreso presupuestario</span>
+                    <span>
+                      {isSubproject ? "N/A" : 
+                       `${Math.round(((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) * 100)}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full ${
+                        isSubproject ? 'bg-gray-400' : 
+                        ((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) < 0.8 ? 
+                        'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                      style={{ 
+                        width: isSubproject ? '0%' : 
+                               `${Math.min(((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) * 100, 100)}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Acciones Rápidas */}
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+              <Activity className="h-5 w-5" />
               Acciones del Proyecto
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <Button variant="outline" className="justify-start">
                 <Users className="h-4 w-4 mr-2" />
                 Gestionar Equipo
+              </Button>
+              <Button variant="outline" className="justify-start">
+                <Timer className="h-4 w-4 mr-2" />
+                Cargar Horas
               </Button>
               <Button variant="outline" className="justify-start">
                 <Calendar className="h-4 w-4 mr-2" />
