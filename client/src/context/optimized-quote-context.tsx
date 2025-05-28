@@ -1259,8 +1259,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     if (quotationId) {
       console.log(`Cargando cotización existente ID: ${quotationId} para edición`);
       
-      // Para edición, siempre ir al paso de revisión después de cargar los datos
-      // No establecer el paso aquí, se hará después de cargar los datos
+      // Para cualquier edición, ir directamente al paso de revisión
+      if (!isRequote) {
+        const finalStep = 4; // Por defecto paso 4 (revisión), se ajustará después si es Always-On
+        console.log(`Edición detectada - dirigiendo al paso de revisión: ${finalStep}`);
+        setCurrentStep(finalStep);
+      }
       
       const loadExistingQuotation = async () => {
         try {
