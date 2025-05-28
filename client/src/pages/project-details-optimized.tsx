@@ -265,22 +265,41 @@ export default function ProjectDetailsOptimized() {
           <Card className={`border-l-4 ${isOverLimit ? 'border-l-red-500' : isNearLimit ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600">Límite de Costo</p>
-                  <p className={`text-xl font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                    ${remainingCostLimit.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {isOverLimit ? 'SUPERADO' : isNearLimit ? 'CERCA DEL LÍMITE' : 'DISPONIBLE'}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Límite: ${subprojectCostLimit.toLocaleString()}
-                  </p>
-                </div>
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isOverLimit ? 'bg-red-100' : isNearLimit ? 'bg-yellow-100' : 'bg-green-100'}`}>
-                  <span className={`text-sm font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                    {costUsagePercentage.toFixed(0)}%
-                  </span>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-gray-600">Presupuesto Subproyecto</p>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <p className="text-xl font-bold text-gray-900">
+                      ${subprojectCostLimit.toLocaleString()}
+                    </p>
+                    <span className="text-xs text-gray-500">máximo</span>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600">Gastado: ${totalCost.toLocaleString()}</span>
+                      <span className={`font-medium ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {costUsagePercentage.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all ${
+                          isOverLimit ? 'bg-red-500' : 
+                          isNearLimit ? 'bg-yellow-500' : 
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(costUsagePercentage, 100)}%` }}
+                      ></div>
+                    </div>
+                    <p className={`text-xs font-medium ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {isOverLimit ? 
+                        `¡EXCEDIDO! Sobrepasaste $${Math.abs(remainingCostLimit).toLocaleString()}` : 
+                        isNearLimit ? 
+                        `ATENCIÓN: Solo quedan $${remainingCostLimit.toLocaleString()}` : 
+                        `DISPONIBLE: $${remainingCostLimit.toLocaleString()}`
+                      }
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
