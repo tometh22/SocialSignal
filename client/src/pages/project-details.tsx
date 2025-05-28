@@ -256,15 +256,15 @@ export default function ProjectDetails() {
           </Card>
         </div>
 
-        {/* Seguimiento de Horas */}
-        <div className="grid gap-6 md:grid-cols-2 mt-6">
-          {/* Resumen de Horas */}
-          <Card>
+        {/* Seguimiento de Horas - Layout expandido */}
+        <div className="mt-6">
+          {/* Panel Principal de Seguimiento */}
+          <Card className="w-full">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Timer className="h-5 w-5" />
-                  Horas Trabajadas
+                  Control de Horas y Costos del Proyecto
                 </div>
                 <Button 
                   size="sm" 
@@ -277,132 +277,92 @@ export default function ProjectDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0).toFixed(1)}h
-                    </div>
-                    <p className="text-sm text-gray-600">Total este mes</p>
+              {/* Métricas principales */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-3xl font-bold text-gray-900">
+                    {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0).toFixed(1)}h
                   </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
-                    </div>
-                    <p className="text-sm text-blue-600">Costo real</p>
-                  </div>
+                  <p className="text-sm text-gray-600">Total trabajadas</p>
                 </div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-3xl font-bold text-blue-600">
+                    ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-blue-600">Costo real</p>
+                </div>
+                <div className="text-center p-4 bg-emerald-50 rounded-lg">
+                  <div className="text-3xl font-bold text-emerald-600">
+                    {isSubproject ? "Incluido" : "$4,200"}
+                  </div>
+                  <p className="text-sm text-emerald-600">Presupuesto</p>
+                </div>
+                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                  <div className="text-3xl font-bold text-amber-600">
+                    {isSubproject ? "N/A" : 
+                     `${Math.round((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100)}%`}
+                  </div>
+                  <p className="text-sm text-amber-600">Uso presupuesto</p>
+                </div>
+              </div>
                 
-                {timeEntries.length > 0 ? (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-gray-900">Últimas entradas por persona:</h4>
-                    {timeEntries.slice(0, 4).map((entry: any) => (
-                      <div key={entry.id} className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-medium text-blue-700">
+              {/* Detalle de entradas por persona */}
+              {timeEntries.length > 0 ? (
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-900 border-b pb-2">
+                    Registro detallado de horas trabajadas
+                  </h4>
+                  <div className="grid gap-4">
+                    {timeEntries.map((entry: any) => (
+                      <div key={entry.id} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-bold text-white">
                                 {entry.personnelName ? entry.personnelName.charAt(0).toUpperCase() : "?"}
                               </span>
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-base font-semibold text-gray-900">
                                 {entry.personnelName || "Personal no identificado"}
                               </div>
-                              <div className="text-xs text-gray-500">
+                              <div className="text-sm text-blue-600">
                                 {entry.roleName || "Rol no especificado"}
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm font-bold text-gray-900">{entry.hours}h</div>
-                            <div className="text-xs text-blue-600">
+                            <div className="text-xl font-bold text-gray-900">{entry.hours}h</div>
+                            <div className="text-sm font-medium text-green-600">
                               ${((entry.hours || 0) * (entry.hourlyRate || 0)).toFixed(0)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ${entry.hourlyRate || 0}/hora
                             </div>
                           </div>
                         </div>
-                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                          {entry.description || "Sin descripción específica"}
+                        <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded mb-2">
+                          <strong>Trabajo realizado:</strong> {entry.description || "Sin descripción específica"}
                         </div>
-                        <div className="text-xs text-gray-400 mt-1">
-                          {entry.date ? new Date(entry.date).toLocaleDateString('es-ES') : "Fecha no registrada"}
+                        <div className="text-xs text-gray-500">
+                          📅 {entry.date ? new Date(entry.date).toLocaleDateString('es-ES', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          }) : "Fecha no registrada"}
                         </div>
                       </div>
                     ))}
-                    {timeEntries.length > 4 && (
-                      <div className="text-center py-2">
-                        <span className="text-xs text-gray-500">
-                          ... y {timeEntries.length - 4} entradas más
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <Timer className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No hay horas registradas aún</p>
-                    <p className="text-xs">Comienza registrando el tiempo trabajado</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Análisis de Rentabilidad */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Análisis de Rentabilidad
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                  <span className="text-sm font-medium">Presupuesto asignado</span>
-                  <span className="font-bold text-emerald-600">
-                    {isSubproject ? "Incluido" : "$4,200"}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium">Costo real (horas)</span>
-                  <span className="font-bold text-blue-600">
-                    ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium">Margen estimado</span>
-                  <span className={`font-bold ${isSubproject ? 'text-gray-600' : 'text-emerald-600'}`}>
-                    {isSubproject ? "Consolidado" : 
-                     `$${(4200 - timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0)).toLocaleString()}`}
-                  </span>
-                </div>
-                
-                <div className="pt-2">
-                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                    <span>Progreso presupuestario</span>
-                    <span>
-                      {isSubproject ? "N/A" : 
-                       `${Math.round((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100)}%`}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        isSubproject ? 'bg-gray-400' : 
-                        (timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) < 0.8 ? 
-                        'bg-emerald-500' : 'bg-amber-500'
-                      }`}
-                      style={{ 
-                        width: isSubproject ? '0%' : 
-                               `${Math.min((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100, 100)}%` 
-                      }}
-                    ></div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Timer className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No hay horas registradas aún</p>
+                  <p className="text-sm">Comienza registrando el tiempo trabajado del equipo</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

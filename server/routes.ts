@@ -1321,17 +1321,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Obtener registros de horas por proyecto
+  // Obtener registros de horas por proyecto con información del personal
   app.get("/api/time-entries/project/:projectId", async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
     
     try {
-      const entries = await storage.getTimeEntriesByProject(projectId);
+      const entries = await db.select({
+        id: sql`time_entries.id`,
+        projectId: sql`time_entries.project_id`,
+        personnelId: sql`time_entries.personnel_id`,
+        hours: sql`time_entries.hours`,
+        description: sql`time_entries.description`,
+        date: sql`time_entries.date`,
+        hourlyRate: sql`time_entries.hourly_rate`,
+        personnelName: sql`personnel.name`,
+        roleName: sql`roles.name`
+      })
+      .from(sql`time_entries`)
+      .leftJoin(sql`personnel`, sql`time_entries.personnel_id = personnel.id`)
+      .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)
+      .where(sql`time_entries.project_id = ${projectId}`)
+      .orderBy(sql`time_entries.date DESC`);
+      
       res.json(entries);
     } catch (error) {
-      console.error("Error fetching time entries:", error);
-      res.status(500).json({ message: "Failed to fetch time entries" });
+      console.error("Error fetching project time entries:", error);
+      res.status(500).json({ message: "Failed to fetch project time entries" });
     }
   });
   
