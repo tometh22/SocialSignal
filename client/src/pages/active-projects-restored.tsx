@@ -209,21 +209,37 @@ export default function ActiveProjects() {
                           <div key={subproject.id} className="border rounded-lg p-4 bg-muted/30">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-medium">
-                                {subproject.id === 5 ? "Baby & Child Care - Semanal" :
-                                 subproject.id === 6 ? "Beauty & Fashion - Quincenal" :
-                                 subproject.id === 7 ? "Food & Beverage - Semanal" :
-                                 subproject.id === 8 ? "Gaming - Mensual" :
-                                 subproject.id === 9 ? "Tech & Electronics - Quincenal" :
-                                 subproject.id === 10 ? "Entertainment - Semanal" :
-                                 subproject.id === 11 ? "Health & Wellness - Mensual" :
-                                 subproject.id === 12 ? "Travel & Tourism - Quincenal" :
-                                 subproject.id === 13 ? "Finance & Crypto - Semanal" :
-                                 subproject.id === 14 ? "Sports & Fitness - Mensual" :
-                                 subproject.id === 15 ? "Education & Learning - Quincenal" :
+                                {subproject.id === 5 ? "Ejecutivo Sony One" :
+                                 subproject.id === 6 ? "Mensual Enero" :
+                                 subproject.id === 7 ? "Ejecutivo Telepase" :
+                                 subproject.id === 8 ? "Mensual Febrero" :
+                                 subproject.id === 9 ? "Ejecutivo NFC" :
+                                 subproject.id === 10 ? "Ejecutivo Sony One Febrero" :
+                                 subproject.id === 11 ? "Mensual Marzo" :
+                                 subproject.id === 12 ? "Ejecutivo 2" :
+                                 subproject.id === 13 ? "Ejecutivo Comercios" :
+                                 subproject.id === 14 ? "Mensual Abril" :
+                                 subproject.id === 15 ? "Ejecutivo 1" :
                                  `Subproyecto ${subproject.id}`}
                               </h4>
                               {getStatusBadge("en_progreso")}
                             </div>
+                            
+                            {/* Mostrar descripción del proyecto */}
+                            <p className="text-sm text-muted mb-3">
+                              {subproject.id === 5 ? 'Proyecto creado a partir del entregable "Ejecutivo Sony One" del Excel MODO.' :
+                               subproject.id === 6 ? 'Proyecto creado a partir del entregable "Mensual Enero" del Excel MODO.' :
+                               subproject.id === 7 ? 'Proyecto creado a partir del entregable "Ejecutivo Telepase" del Excel MODO.' :
+                               subproject.id === 8 ? 'Proyecto creado a partir del entregable "Mensual Febrero" del Excel MODO.' :
+                               subproject.id === 9 ? 'Proyecto creado a partir del entregable "Ejecutivo NFC" del Excel MODO.' :
+                               subproject.id === 10 ? 'Proyecto creado a partir del entregable "Ejecutivo Sony One Febrero" del Excel MODO.' :
+                               subproject.id === 11 ? 'Proyecto creado a partir del entregable "Mensual Marzo" del Excel MODO.' :
+                               subproject.id === 12 ? 'Proyecto creado a partir del entregable "Ejecutivo 2" del Excel MODO.' :
+                               subproject.id === 13 ? 'Proyecto creado a partir del entregable "Ejecutivo Comercios" del Excel MODO.' :
+                               subproject.id === 14 ? 'Proyecto creado a partir del entregable "Mensual Abril" del Excel MODO.' :
+                               subproject.id === 15 ? 'Proyecto creado a partir del entregable "Ejecutivo 1" del Excel MODO.' :
+                               'Sin descripción'}
+                            </p>
                             
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                               <div className="flex items-center gap-2">
@@ -255,11 +271,7 @@ export default function ActiveProjects() {
                               
                               <div className="flex items-center gap-2">
                                 <Target className="h-3 w-3 text-muted" />
-                                <span>
-                                  {subproject.id === 5 || subproject.id === 7 || subproject.id === 10 || subproject.id === 13 ? "Semanal" :
-                                   subproject.id === 6 || subproject.id === 9 || subproject.id === 12 || subproject.id === 15 ? "Quincenal" :
-                                   "Mensual"}
-                                </span>
+                                <span>Mensual</span>
                               </div>
                             </div>
                           </div>
