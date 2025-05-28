@@ -5,6 +5,15 @@ import { PlusCircle, FileText, CheckCircle, AlertCircle, Clock } from "lucide-re
 import { Link } from "wouter";
 import { Quotation } from "@shared/schema";
 import { Loader } from "@/components/ui/loader";
+import { 
+  StandardContainer, 
+  StandardHeading, 
+  StandardCard, 
+  StandardText,
+  StandardButton,
+  StandardGrid,
+  StandardFlex 
+} from "@/components/ui/standard-components";
 
 export default function Dashboard() {
   const { data: quotations, isLoading } = useQuery<Quotation[]>({
@@ -48,25 +57,21 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">      
-      <div className="flex-1 overflow-y-auto">
-        <div className="fade-in px-1">
-          <div className="py-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-5">
-              <h1 className="text-2xl font-bold text-balance text-neutral-900 slide-in">Sistema de Cotización de Escucha Social</h1>
-              <Link href="/new-quote">
-                <Button 
-                  className="mt-4 sm:mt-0 hover-lift shadow-soft hover:shadow-medium transition-all slide-in" 
-                  size="default"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Crear Nueva Cotización
-                </Button>
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-              <Card className="glass-card shadow-sm hover-lift scale-in">
+    <div className="page-container">
+      <div className="flex-between mb-6">
+        <div>
+          <h1 className="heading-page">Sistema de Cotización de Escucha Social</h1>
+        </div>
+        <Link href="/new-quote">
+          <Button className="btn-standard bg-primary text-primary-foreground hover:bg-primary/90">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Crear Nueva Cotización
+          </Button>
+        </Link>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        <Card className="glass-card shadow-sm hover-lift scale-in">
                 <CardHeader className="pb-2 border-b border-white/10 p-4">
                   <CardTitle className="text-base flex items-center">
                     <span className="bg-yellow-100/50 p-1.5 rounded-full mr-2">
@@ -159,7 +164,7 @@ export default function Dashboard() {
               </Card>
             </div>
             
-            <Card className="glass-card shadow-sm scale-in">
+          <Card className="glass-card shadow-sm scale-in">
               <CardHeader className="border-b border-white/10 p-4">
                 <CardTitle className="text-base flex items-center">
                   <span className="bg-primary/10 p-1.5 rounded-full mr-2">
