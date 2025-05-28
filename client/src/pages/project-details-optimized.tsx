@@ -213,33 +213,16 @@ export default function ProjectDetailsOptimized() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
-        {/* Métricas principales ultra-compactas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600">Presupuesto</p>
-                  <p className="text-xl font-bold text-gray-900">
-                    ${project?.quotationBudget?.toLocaleString() || '0'}
-                  </p>
-                  <p className="text-xs text-green-600">
-                    Presupuesto global
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-green-600 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-
+        {/* Métricas principales integradas y complementarias */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Card className="border-l-4 border-l-blue-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-600">Horas</p>
+                  <p className="text-xs font-medium text-gray-600">Tiempo Trabajado</p>
                   <p className="text-xl font-bold text-gray-900">{totalHours.toFixed(1)}h</p>
                   <p className="text-xs text-blue-600">
-                    {filteredEntries.length} entradas
+                    {filteredEntries.length} entradas del equipo
                   </p>
                 </div>
                 <Clock className="h-8 w-8 text-blue-600 opacity-80" />
@@ -251,7 +234,7 @@ export default function ProjectDetailsOptimized() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-600">Costo</p>
+                  <p className="text-xs font-medium text-gray-600">Costo Actual</p>
                   <p className="text-xl font-bold text-gray-900">
                     ${totalCost.toLocaleString()}
                   </p>
@@ -264,62 +247,79 @@ export default function ProjectDetailsOptimized() {
             </CardContent>
           </Card>
 
-          <Card className={`border-l-4 ${isOverLimit ? 'border-l-red-500' : isNearLimit ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
+          <Card className="border-l-4 border-l-purple-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-600">Presupuesto del Subproyecto</p>
-                  
-                  {/* Información principal */}
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-gray-700">Máximo a gastar:</span>
-                      <span className="text-lg font-bold text-gray-900">${subprojectCostLimit.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-gray-700">Ya gastado:</span>
-                      <span className="text-lg font-semibold text-orange-600">${totalCost.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Disponible:</span>
-                      <span className={`text-lg font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                        ${remainingCostLimit.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Barra de progreso */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">Progreso del gasto</span>
-                      <span className={`text-xs font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                        {costUsagePercentage.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className={`h-3 rounded-full transition-all ${
-                          isOverLimit ? 'bg-red-500' : 
-                          isNearLimit ? 'bg-yellow-500' : 
-                          'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min(costUsagePercentage, 100)}%` }}
-                      ></div>
-                    </div>
-                    <p className={`text-xs font-medium text-center ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                      {isOverLimit ? 
-                        `⚠️ PRESUPUESTO EXCEDIDO` : 
-                        isNearLimit ? 
-                        `⚡ CERCA DEL LÍMITE` : 
-                        `✅ PRESUPUESTO CONTROLADO`
-                      }
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-600">Cliente</p>
+                  <p className="text-xl font-bold text-gray-900">MODO</p>
+                  <p className="text-xs text-purple-600">
+                    Always-On Project
+                  </p>
                 </div>
+                <Building2 className="h-8 w-8 text-purple-600 opacity-80" />
               </div>
             </CardContent>
           </Card>
+
         </div>
+
+        {/* Card de presupuesto del subproyecto - separada y prominente */}
+        <Card className={`border-l-4 ${isOverLimit ? 'border-l-red-500' : isNearLimit ? 'border-l-yellow-500' : 'border-l-green-500'} mt-4`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs font-medium text-gray-600">Control de Presupuesto del Subproyecto</p>
+                
+                {/* Información principal */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-gray-700">Máximo a gastar:</span>
+                    <span className="text-lg font-bold text-gray-900">${subprojectCostLimit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-gray-700">Ya gastado:</span>
+                    <span className="text-lg font-semibold text-orange-600">${totalCost.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Disponible:</span>
+                    <span className={`text-lg font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                      ${remainingCostLimit.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Barra de progreso */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Progreso del gasto</span>
+                    <span className={`text-xs font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {costUsagePercentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className={`h-3 rounded-full transition-all ${
+                        isOverLimit ? 'bg-red-500' : 
+                        isNearLimit ? 'bg-yellow-500' : 
+                        'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(costUsagePercentage, 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className={`text-xs font-medium text-center ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {isOverLimit ? 
+                      `⚠️ PRESUPUESTO EXCEDIDO` : 
+                      isNearLimit ? 
+                      `⚡ CERCA DEL LÍMITE` : 
+                      `✅ PRESUPUESTO CONTROLADO`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filtros rápidos con contador */}
         <div className="flex items-center justify-between">
