@@ -49,7 +49,10 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
         title: "Horas registradas",
         description: "Las horas se han registrado correctamente",
       });
+      // Invalidar múltiples cachés relacionados
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
       onOpenChange(false);
       resetForm();
     },

@@ -281,15 +281,15 @@ export default function ProjectDetails() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-3 bg-gray-50 rounded-lg">
                     <div className="text-2xl font-bold text-gray-900">
-                      {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)}h
+                      {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0).toFixed(1)}h
                     </div>
                     <p className="text-sm text-gray-600">Total este mes</p>
                   </div>
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
-                      ${((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)) * 50).toLocaleString()}
+                      ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
                     </div>
-                    <p className="text-sm text-blue-600">Costo estimado</p>
+                    <p className="text-sm text-blue-600">Costo real</p>
                   </div>
                 </div>
                 
@@ -337,7 +337,7 @@ export default function ProjectDetails() {
                 <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                   <span className="text-sm font-medium">Costo real (horas)</span>
                   <span className="font-bold text-blue-600">
-                    ${((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0)) * 50).toLocaleString()}
+                    ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
                   </span>
                 </div>
                 
@@ -345,7 +345,7 @@ export default function ProjectDetails() {
                   <span className="text-sm font-medium">Margen estimado</span>
                   <span className={`font-bold ${isSubproject ? 'text-gray-600' : 'text-emerald-600'}`}>
                     {isSubproject ? "Consolidado" : 
-                     `$${(4200 - (timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50)).toLocaleString()}`}
+                     `$${(4200 - timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0)).toLocaleString()}`}
                   </span>
                 </div>
                 
@@ -354,19 +354,19 @@ export default function ProjectDetails() {
                     <span>Progreso presupuestario</span>
                     <span>
                       {isSubproject ? "N/A" : 
-                       `${Math.round(((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) * 100)}%`}
+                       `${Math.round((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100)}%`}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full ${
                         isSubproject ? 'bg-gray-400' : 
-                        ((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) < 0.8 ? 
+                        (timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) < 0.8 ? 
                         'bg-emerald-500' : 'bg-amber-500'
                       }`}
                       style={{ 
                         width: isSubproject ? '0%' : 
-                               `${Math.min(((timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0) * 50) / 4200) * 100, 100)}%` 
+                               `${Math.min((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100, 100)}%` 
                       }}
                     ></div>
                   </div>
