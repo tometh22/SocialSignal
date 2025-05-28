@@ -322,7 +322,7 @@ export default function ManageQuotes() {
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">
+                            <td className="px-4 py-3 text-stat font-medium">
                               ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                             <td className="px-4 py-3">

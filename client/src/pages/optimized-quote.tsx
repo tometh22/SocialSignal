@@ -158,8 +158,8 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
       </div>
 
       {/* Header de paso actual - ULTRA COMPACTO */}
-      <div className="bg-gray-50 border-b px-4 py-1">
-        <h2 className="text-xs font-medium text-gray-600">
+      <div className="bg-muted border-b px-4 py-1">
+        <h2 className="text-xs font-medium text-muted-foreground">
           {currentStep === 1 && "Info"}
           {currentStep === 2 && "Plantilla"}
           {currentStep === 3 && "Equipo"}
@@ -172,8 +172,8 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
       {/* Contenido principal compacto */}
       <div className="flex-1 overflow-auto">
         <div className="container py-2">
-          <div className="bg-white border border-neutral-100 shadow-sm rounded-lg">
-            <div className="p-0 overflow-visible">
+          <div className="standard-card">
+            <div className="card-content p-0 overflow-visible">
               {currentStep === 1 && <OptimizedBasicInfo />}
               {currentStep === 2 && <OptimizedTemplateSelection />}
               {currentStep === 3 && <OptimizedTeamConfig />}
