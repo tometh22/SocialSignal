@@ -123,28 +123,38 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   const { toast } = useToast();
 
   // Obtener el resumen MODO del cliente
-  const { data: clientSummaryData, isLoading: summaryLoading } = useQuery({
+  const { data: clientSummaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: [`/api/clients/${clientId}/modo-summary`],
   });
 
-  // Necesitamos confirmar el tipo manualmente para TypeScript
-  const clientSummary: ClientSummary | undefined = clientSummaryData as ClientSummary;
-
   // Obtener todos los entregables del cliente
-  const { data: deliverablesData, isLoading: deliverablesLoading } = useQuery({
+  const { data: deliverablesData, isLoading: deliverablesLoading, error: deliverablesError } = useQuery({
     queryKey: [`/api/clients/${clientId}/deliverables`],
   });
 
-  // Confirmar el tipo para TypeScript
-  const deliverables: DeliverableData[] = deliverablesData as DeliverableData[] || [];
-
   // Obtener todos los proyectos del cliente
-  const { data: projectsData, isLoading: projectsLoading } = useQuery({
+  const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: [`/api/clients/${clientId}/projects`],
   });
 
-  // Confirmar el tipo para TypeScript
-  const projects: Project[] = projectsData as Project[] || [];
+  // Log para debugging
+  console.log('ClientSummaryView Debug:', {
+    clientId,
+    summaryLoading,
+    deliverablesLoading, 
+    projectsLoading,
+    clientSummaryData,
+    deliverablesData,
+    projectsData,
+    summaryError,
+    deliverablesError,
+    projectsError
+  });
+
+  // Confirmar el tipo para TypeScript con validación
+  const clientSummary: ClientSummary | undefined = clientSummaryData as ClientSummary;
+  const deliverables: DeliverableData[] = Array.isArray(deliverablesData) ? deliverablesData as DeliverableData[] : [];
+  const projects: Project[] = Array.isArray(projectsData) ? projectsData as Project[] : [];
 
   // Preparar los datos para las gráficas
   const qualityScoresData = clientSummary ? [
@@ -228,6 +238,9 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   }));
 
   const isLoading = summaryLoading || deliverablesLoading || projectsLoading;
+  const hasErrors = summaryError || deliverablesError || projectsError;
+
+  console.log('Loading state:', { isLoading, hasErrors, clientSummary });
 
   if (isLoading) {
     return (
@@ -238,8 +251,23 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
     );
   }
 
+  if (hasErrors) {
+    return (
+      <Card>
+        <CardContent className="p-8">
+          <div className="text-center">
+            <p className="text-red-600 mb-2">Error al cargar los datos del cliente</p>
+            <p className="text-sm text-gray-500">
+              {summaryError?.message || deliverablesError?.message || projectsError?.message}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Si no hay datos, mostrar mensaje
-  if (!clientSummary || clientSummary.totalDeliverables === 0) {
+  if (!clientSummary || (clientSummary && clientSummary.totalDeliverables === 0)) {
     return (
       <Card>
         <CardHeader>
