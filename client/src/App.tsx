@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import OptimizedQuote from "@/pages/optimized-quote";
+import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
 import QuotationDetail from "@/pages/quotation-detail";
@@ -55,12 +56,14 @@ function OptimizedQuoteWrapper() {
   
   console.log(`OptimizedQuoteWrapper: id=${idParam}, clone=${cloneParam}, usando ID=${finalId}, isRequote=${isRequote}`);
   
-  // Renderizar OptimizedQuote con los parámetros apropiados
+  // Renderizar OptimizedQuote envuelto en su provider
   return (
-    <OptimizedQuote 
-      quotationId={finalId} 
-      isRequote={isRequote} 
-    />
+    <OptimizedQuoteProvider>
+      <OptimizedQuote 
+        quotationId={finalId} 
+        isRequote={isRequote} 
+      />
+    </OptimizedQuoteProvider>
   );
 }
 
