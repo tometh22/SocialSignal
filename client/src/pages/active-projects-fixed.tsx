@@ -50,8 +50,8 @@ export default function ActiveProjects() {
   });
 
   const filteredProjects = projects.filter((project) => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (project.projectName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (project.deliverableDescription || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || project.status === filterStatus;
     const matchesClient = filterClient === "all" || 
                          (project.clientId && project.clientId.toString() === filterClient);
@@ -171,13 +171,13 @@ export default function ActiveProjects() {
                               <ChevronRight className="h-4 w-4" />
                             )}
                           </Button>
-                          <h3 className="heading-card">{project.name}</h3>
+                          <h3 className="heading-card">{project.projectName || 'Proyecto sin nombre'}</h3>
                           {getStatusBadge(project.status)}
                         </div>
                         
-                        {project.description && (
+                        {project.deliverableDescription && (
                           <p className="text-body text-muted mb-3 ml-8">
-                            {project.description}
+                            {project.deliverableDescription}
                           </p>
                         )}
                         
