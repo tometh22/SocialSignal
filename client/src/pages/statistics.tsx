@@ -139,17 +139,10 @@ export default function Statistics() {
   const COLORS = ['#1976d2', '#ff6d00', '#4caf50', '#f44336'];
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex items-center h-16 px-4 border-b border-neutral-200 bg-white">
-        <h2 className="text-subheading text-neutral-900">Estadísticas y Análisis</h2>
+    <div className="page-container">
+      <div className="flex-between mb-6">
+        <h1 className="heading-page">Estadísticas y Análisis</h1>
       </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        <div className="container-xl fade-in">
-          <div className="section-sm">
-            <div className="flex-between mb-6">
-              <h1 className="heading-page">Estadísticas y Análisis</h1>
-            </div>
             
             <div className="mb-section">
               <Card className="standard-card">
