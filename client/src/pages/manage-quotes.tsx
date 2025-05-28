@@ -229,7 +229,11 @@ export default function ManageQuotes() {
     <>
       <div className="page-container">
         <div className="flex-between mb-6">
-          <h1 className="heading-page">Gestionar Cotizaciones</h1>
+          <h1 className="heading-page">Gestión de Cotizaciones</h1>
+          <Button onClick={() => navigate("/optimized-quote")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nueva Cotización
+          </Button>
         </div>
 
         <Card className="standard-card">
@@ -298,26 +302,26 @@ export default function ManageQuotes() {
                                 </span>
                               )}
                               {quote.status === 'pending' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-warning/10 text-warning-dark">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                   <Clock className="h-3.5 w-3.5 mr-1" />
                                   {translateStatus(quote.status)}
                                 </span>
                               )}
                               {quote.status === 'rejected' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-error/10 text-error-dark">
-                                  <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                  <X className="h-3.5 w-3.5 mr-1" />
                                   {translateStatus(quote.status)}
                                 </span>
                               )}
                               {quote.status === 'in-negotiation' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-primary/10 text-primary-dark">
-                                  <Edit className="h-3.5 w-3.5 mr-1" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  <MessageCircle className="h-3.5 w-3.5 mr-1" />
                                   {translateStatus(quote.status)}
                                 </span>
                               )}
                               {quote.status === 'draft' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
-                                  <FileText className="h-3.5 w-3.5 mr-1" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                  <Edit className="h-3.5 w-3.5 mr-1" />
                                   {translateStatus(quote.status)}
                                 </span>
                               )}

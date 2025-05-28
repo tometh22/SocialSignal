@@ -4,7 +4,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard-fixed";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
-import ManageQuotesFixed from "@/pages/manage-quotes-fixed";
+import ManageQuotes from "@/pages/manage-quotes";
 import QuoteDetails from "@/pages/quote-details";
 import QuotationDetail from "@/pages/quotation-detail";
 import QuoteRedirect from "@/pages/quote-redirect";
@@ -107,7 +107,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/new-quote">
                     <Redirect to="/optimized-quote" />
                   </ProtectedRoute>
-                  <ProtectedRoute path="/manage-quotes" component={ManageQuotesFixed} />
+                  <ProtectedRoute path="/manage-quotes" component={ManageQuotes} />
                   <ProtectedRoute path="/quote/:id" component={QuoteDetails} />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
                   <ProtectedRoute path="/quotation/:id" component={QuotationDetail} />
