@@ -58,11 +58,20 @@ function OptimizedQuoteWrapper() {
   
   // Renderizar OptimizedQuote envuelto en su provider
   return (
-    <OptimizedQuoteProvider>
-      <OptimizedQuote 
-        quotationId={finalId} 
-        isRequote={isRequote} 
-      />
+    <OptimizedQuoteProvider quotationId={finalId} isRequote={isRequote}>
+      <OptimizedQuote />
+    </OptimizedQuoteProvider>
+  );
+}
+
+// Wrapper para rutas con path parameters (como /optimized-quote/13)
+function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
+  const quotationId = parseInt(params.id);
+  console.log(`OptimizedQuotePathWrapper: usando ID=${quotationId} del path`);
+  
+  return (
+    <OptimizedQuoteProvider quotationId={quotationId} isRequote={false}>
+      <OptimizedQuote />
     </OptimizedQuoteProvider>
   );
 }
@@ -92,6 +101,7 @@ function AppRoutes() {
                 <Switch>
                   <ProtectedRoute path="/" component={Dashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
+                  <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   <ProtectedRoute path="/huggies" component={HuggiesPage} />
                   <ProtectedRoute path="/new-quote">
