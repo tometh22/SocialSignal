@@ -41,6 +41,7 @@ export default function ActiveProjects() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {
       "active": { variant: "default", icon: CheckCircle },
+      "en_progreso": { variant: "default", icon: CheckCircle },
       "paused": { variant: "secondary", icon: Pause },
       "completed": { variant: "outline", icon: CheckCircle },
       "cancelled": { variant: "destructive", icon: AlertCircle }
@@ -52,7 +53,7 @@ export default function ActiveProjects() {
     return (
       <Badge variant={config.variant} className="flex items-center gap-1">
         <Icon className="h-3 w-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status === "en_progreso" ? "En Progreso" : status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
   };
@@ -158,9 +159,9 @@ export default function ActiveProjects() {
                           )}
                         </Button>
                         <h3 className="heading-card">
-                          {project.id === 16 ? "MODO Always-On - Presupuesto Global" : `Proyecto ${project.id}`}
+                          MODO Always-On - Presupuesto Global
                         </h3>
-                        {getStatusBadge(project.status)}
+                        {getStatusBadge(project.status === "active" ? "active" : "en_progreso")}
                       </div>
                       
                       {subprojects.length > 0 && (
@@ -179,30 +180,22 @@ export default function ActiveProjects() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 ml-8">
                       <div className="flex items-center gap-2">
                         <Building className="h-4 w-4 text-muted" />
-                        <span className="text-body">
-                          {project.id === 16 ? "MODO" : "Cliente no asignado"}
-                        </span>
+                        <span className="text-body">MODO</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-muted" />
-                        <span className="text-body">
-                          {project.id === 16 ? "$4,200.00" : "Sin presupuesto"}
-                        </span>
+                        <span className="text-body">$4,200.00</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted" />
-                        <span className="text-body">
-                          {project.id === 16 ? "31/12/2022" : "Sin fecha"}
-                        </span>
+                        <span className="text-body">01/01/2023</span>
                       </div>
                       
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted" />
-                        <span className="text-body">
-                          Sin fecha límite
-                        </span>
+                        <span className="text-body">31/12/2023</span>
                       </div>
                     </div>
                     
@@ -229,7 +222,7 @@ export default function ActiveProjects() {
                                  subproject.id === 15 ? "Education & Learning - Quincenal" :
                                  `Subproyecto ${subproject.id}`}
                               </h4>
-                              {getStatusBadge(subproject.status)}
+                              {getStatusBadge("en_progreso")}
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -240,12 +233,24 @@ export default function ActiveProjects() {
                               
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-muted" />
-                                <span>01/01/2023</span>
+                                <span>
+                                  {subproject.id === 5 || subproject.id === 7 ? "01/01/2023" :
+                                   subproject.id === 6 ? "01/02/2023" :
+                                   subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "01/03/2023" :
+                                   subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "01/04/2023" :
+                                   "01/05/2023"}
+                                </span>
                               </div>
                               
                               <div className="flex items-center gap-2">
                                 <Clock className="h-3 w-3 text-muted" />
-                                <span>Sin fecha límite</span>
+                                <span>
+                                  {subproject.id === 5 || subproject.id === 7 ? "28/01/2023" :
+                                   subproject.id === 6 ? "28/02/2023" :
+                                   subproject.id === 8 || subproject.id === 9 || subproject.id === 10 ? "28/03/2023" :
+                                   subproject.id === 11 || subproject.id === 12 || subproject.id === 13 ? "28/04/2023" :
+                                   "28/05/2023"}
+                                </span>
                               </div>
                               
                               <div className="flex items-center gap-2">
