@@ -12,7 +12,7 @@ import {
   Search, Plus, Edit, Eye, Trash2, CheckCircle, Clock, X, 
   MessageCircle, FileText, AlertCircle 
 } from 'lucide-react';
-import Loader from '@/components/ui/loader';
+import { Loader } from '@/components/ui/loader';
 
 interface Quotation {
   id: number;
@@ -64,10 +64,20 @@ export default function ManageQuotesFixed() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      return apiRequest(`/api/quotations/${id}/status`, {
+      const response = await fetch(`/api/quotations/${id}/status`, {
         method: 'PATCH',
-        body: { status },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
       });
+      
+      if (!response.ok) {
+        throw new Error('Error al actualizar estado');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
