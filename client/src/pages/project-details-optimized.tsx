@@ -114,13 +114,15 @@ export default function ProjectDetailsOptimized() {
     sum + ((entry.hours || 0) * (entry.hourlyRate || 0)), 0);
 
   // Para subproyectos Always-On, usar el límite de costo específico del subproyecto
-  const subprojectCostLimit = project?.subprojectCostLimit || 0;
+  const subprojectCostLimit = project?.subprojectCostLimit || 700; // Default de $700 si no se especifica
   const remainingCostLimit = subprojectCostLimit - totalCost;
   const costUsagePercentage = subprojectCostLimit ? (totalCost / subprojectCostLimit) * 100 : 0;
   
   // Determinar si se está cerca del límite o lo ha superado
   const isNearLimit = costUsagePercentage > 80;
   const isOverLimit = totalCost > subprojectCostLimit;
+  
+  console.log('Proyecto:', project?.id, 'Límite:', subprojectCostLimit, 'Gastado:', totalCost, 'Disponible:', remainingCostLimit);
 
   const handleTimeEntrySuccess = () => {
     refetchTimeEntries();
@@ -266,24 +268,37 @@ export default function ProjectDetailsOptimized() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-600">Presupuesto Subproyecto</p>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <p className="text-xl font-bold text-gray-900">
-                      ${subprojectCostLimit.toLocaleString()}
-                    </p>
-                    <span className="text-xs text-gray-500">máximo</span>
-                  </div>
+                  <p className="text-xs font-medium text-gray-600">Presupuesto del Subproyecto</p>
                   
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-600">Gastado: ${totalCost.toLocaleString()}</span>
-                      <span className={`font-medium ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
-                        {costUsagePercentage.toFixed(0)}%
+                  {/* Información principal */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-700">Máximo a gastar:</span>
+                      <span className="text-lg font-bold text-gray-900">${subprojectCostLimit.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-700">Ya gastado:</span>
+                      <span className="text-lg font-semibold text-orange-600">${totalCost.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Disponible:</span>
+                      <span className={`text-lg font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                        ${remainingCostLimit.toLocaleString()}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                  </div>
+                  
+                  {/* Barra de progreso */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">Progreso del gasto</span>
+                      <span className={`text-xs font-bold ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {costUsagePercentage.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
                       <div 
-                        className={`h-2 rounded-full transition-all ${
+                        className={`h-3 rounded-full transition-all ${
                           isOverLimit ? 'bg-red-500' : 
                           isNearLimit ? 'bg-yellow-500' : 
                           'bg-green-500'
@@ -291,12 +306,12 @@ export default function ProjectDetailsOptimized() {
                         style={{ width: `${Math.min(costUsagePercentage, 100)}%` }}
                       ></div>
                     </div>
-                    <p className={`text-xs font-medium ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
+                    <p className={`text-xs font-medium text-center ${isOverLimit ? 'text-red-600' : isNearLimit ? 'text-yellow-600' : 'text-green-600'}`}>
                       {isOverLimit ? 
-                        `¡EXCEDIDO! Sobrepasaste $${Math.abs(remainingCostLimit).toLocaleString()}` : 
+                        `⚠️ PRESUPUESTO EXCEDIDO` : 
                         isNearLimit ? 
-                        `ATENCIÓN: Solo quedan $${remainingCostLimit.toLocaleString()}` : 
-                        `DISPONIBLE: $${remainingCostLimit.toLocaleString()}`
+                        `⚡ CERCA DEL LÍMITE` : 
+                        `✅ PRESUPUESTO CONTROLADO`
                       }
                     </p>
                   </div>
