@@ -232,44 +232,42 @@ export default function Clients() {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-        <div className="container-xl fade-in pt-4">
-          <div className="section-sm">
-            <Card className="shadow-soft">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-heading">Gestión de Clientes</CardTitle>
-                <Button className="hover-lift" onClick={openNewClientDialog}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Añadir Nuevo Cliente
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="relative mb-6 form-group">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input
-                      placeholder="Buscar clientes..."
-                      className="pl-10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
+    <div className="page-container">
+      <div className="flex-between mb-6">
+        <h1 className="heading-page">Clientes</h1>
+        <Button onClick={openNewClientDialog}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Añadir Nuevo Cliente
+        </Button>
+      </div>
 
-                {isLoading ? (
-                  <div className="text-center py-8">Cargando clientes...</div>
-                ) : filteredClients.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b border-neutral-200">
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Nombre del Cliente</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Persona de Contacto</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Email</th>
-                          <th className="px-4 py-3 text-left text-label text-neutral-500">Acciones</th>
-                        </tr>
-                      </thead>
+      <Card className="standard-card">
+        <CardContent className="card-content">
+          <div className="relative mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+              <Input
+                placeholder="Buscar clientes..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-8 text-muted">Cargando clientes...</div>
+          ) : filteredClients.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 text-label">Nombre del Cliente</th>
+                    <th className="text-left py-3 text-label">Persona de Contacto</th>
+                    <th className="text-left py-3 text-label">Email</th>
+                    <th className="text-left py-3 text-label">Acciones</th>
+                  </tr>
+                </thead>
                       <tbody>
                         {filteredClients.map((client) => (
                           <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
@@ -317,18 +315,15 @@ export default function Clients() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-neutral-500">
-                    {searchTerm
-                      ? "No hay clientes que coincidan con tu búsqueda."
-                      : "No se encontraron clientes. ¡Añade tu primer cliente!"}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+          ) : (
+            <div className="text-center py-8 text-muted">
+              {searchTerm
+                ? "No hay clientes que coincidan con tu búsqueda."
+                : "No se encontraron clientes. ¡Añade tu primer cliente!"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
