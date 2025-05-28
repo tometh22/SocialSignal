@@ -125,16 +125,19 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   // Obtener el resumen MODO del cliente
   const { data: clientSummaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: [`/api/clients/${clientId}/modo-summary`],
+    retry: 1,
   });
 
   // Obtener todos los entregables del cliente
   const { data: deliverablesData, isLoading: deliverablesLoading, error: deliverablesError } = useQuery({
     queryKey: [`/api/clients/${clientId}/deliverables`],
+    retry: 1,
   });
 
   // Obtener todos los proyectos del cliente
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useQuery({
     queryKey: [`/api/clients/${clientId}/projects`],
+    retry: 1,
   });
 
   // Log para debugging
@@ -151,10 +154,12 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
     projectsError
   });
 
-  // Confirmar el tipo para TypeScript con validación
-  const clientSummary: ClientSummary | undefined = clientSummaryData as ClientSummary;
-  const deliverables: DeliverableData[] = Array.isArray(deliverablesData) ? deliverablesData as DeliverableData[] : [];
-  const projects: Project[] = Array.isArray(projectsData) ? projectsData as Project[] : [];
+  // Confirmar el tipo para TypeScript con validación segura
+  const clientSummary: ClientSummary | undefined = clientSummaryData && typeof clientSummaryData === 'object' 
+    ? clientSummaryData as ClientSummary 
+    : undefined;
+  const deliverables: DeliverableData[] = Array.isArray(deliverablesData) ? deliverablesData : [];
+  const projects: Project[] = Array.isArray(projectsData) ? projectsData : [];
 
   // Preparar los datos para las gráficas
   const qualityScoresData = clientSummary ? [
@@ -252,14 +257,21 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   }
 
   if (hasErrors) {
+    console.error('Error details:', { summaryError, deliverablesError, projectsError });
     return (
       <Card>
         <CardContent className="p-8">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error al cargar los datos del cliente</p>
             <p className="text-sm text-gray-500">
-              {summaryError?.message || deliverablesError?.message || projectsError?.message}
+              Error de conexión o validación de datos. Intentando recargar...
             </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Recargar página
+            </button>
           </div>
         </CardContent>
       </Card>
