@@ -174,7 +174,7 @@ export default function ProjectDetailsOptimized() {
               <Building2 className="h-5 w-5 text-blue-600" />
               <div>
                 <h1 className="text-lg font-semibold text-gray-900 leading-tight">
-                  {project?.subprojectName || project?.name || 'Cargando...'}
+                  {project?.deliverableDescription || `Subproyecto ${project?.id}` || 'Proyecto'}
                 </h1>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span>ID: {project?.id}</span>
