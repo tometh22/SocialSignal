@@ -113,10 +113,14 @@ export default function ProjectDetailsOptimized() {
   const totalCost = filteredEntries.reduce((sum: number, entry: any) => 
     sum + ((entry.hours || 0) * (entry.hourlyRate || 0)), 0);
 
-  // Usar el presupuesto de la cotización si el proyecto no tiene presupuesto específico
-  const projectBudget = project?.budget || project?.quotationBudget || 0;
-  const remainingBudget = projectBudget - totalCost;
-  const budgetUsagePercentage = projectBudget ? (totalCost / projectBudget) * 100 : 0;
+  // Para subproyectos Always-On, usar el límite de costo específico del subproyecto
+  const subprojectCostLimit = project?.subprojectCostLimit || 0;
+  const remainingCostLimit = subprojectCostLimit - totalCost;
+  const costUsagePercentage = subprojectCostLimit ? (totalCost / subprojectCostLimit) * 100 : 0;
+  
+  // Determinar si se está cerca del límite o lo ha superado
+  const isNearLimit = costUsagePercentage > 80;
+  const isOverLimit = totalCost > subprojectCostLimit;
 
   const handleTimeEntrySuccess = () => {
     refetchTimeEntries();
@@ -215,10 +219,10 @@ export default function ProjectDetailsOptimized() {
                 <div>
                   <p className="text-xs font-medium text-gray-600">Presupuesto</p>
                   <p className="text-xl font-bold text-gray-900">
-                    ${projectBudget?.toLocaleString() || '0'}
+                    ${project?.quotationBudget?.toLocaleString() || '0'}
                   </p>
                   <p className="text-xs text-green-600">
-                    {budgetUsagePercentage.toFixed(1)}% usado
+                    Presupuesto global
                   </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600 opacity-80" />
