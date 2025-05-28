@@ -1497,8 +1497,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           
           if (!isRequote) {
             // Si es edición normal, ir al paso de revisión final
-            finalStep = updatedData.project?.type === 'always-on' ? 5 : 4;
-            console.log(`Edición de cotización - dirigiendo al paso de revisión: ${finalStep}`);
+            // Usar quotation para detectar el tipo de proyecto
+            finalStep = quotation.isAlwaysOnProject ? 5 : 4;
+            console.log(`Edición de cotización ID ${quotationId} - dirigiendo al paso de revisión: ${finalStep}`);
           } else {
             // Si es recotización, empezar desde el paso 1
             finalStep = 1;
