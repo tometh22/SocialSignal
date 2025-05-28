@@ -294,17 +294,48 @@ export default function ProjectDetails() {
                 </div>
                 
                 {timeEntries.length > 0 ? (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-gray-900">Últimas entradas:</h4>
-                    {timeEntries.slice(0, 3).map((entry: any) => (
-                      <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <Activity className="h-3 w-3 text-gray-500" />
-                          <span className="text-sm">{entry.description || "Trabajo en proyecto"}</span>
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-gray-900">Últimas entradas por persona:</h4>
+                    {timeEntries.slice(0, 4).map((entry: any) => (
+                      <div key={entry.id} className="p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-medium text-blue-700">
+                                {entry.personnelName ? entry.personnelName.charAt(0).toUpperCase() : "?"}
+                              </span>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {entry.personnelName || "Personal no identificado"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {entry.roleName || "Rol no especificado"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-gray-900">{entry.hours}h</div>
+                            <div className="text-xs text-blue-600">
+                              ${((entry.hours || 0) * (entry.hourlyRate || 0)).toFixed(0)}
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-sm font-medium">{entry.hours}h</span>
+                        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                          {entry.description || "Sin descripción específica"}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {entry.date ? new Date(entry.date).toLocaleDateString('es-ES') : "Fecha no registrada"}
+                        </div>
                       </div>
                     ))}
+                    {timeEntries.length > 4 && (
+                      <div className="text-center py-2">
+                        <span className="text-xs text-gray-500">
+                          ... y {timeEntries.length - 4} entradas más
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
