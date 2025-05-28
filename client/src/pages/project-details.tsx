@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import TimeEntryForm from "@/components/time-entry-form";
 import { 
   ArrowLeft, 
   Calendar,
@@ -24,6 +26,7 @@ import {
 export default function ProjectDetails() {
   const [match, params] = useRoute("/active-projects/:id");
   const projectId = params?.id;
+  const [showTimeEntryForm, setShowTimeEntryForm] = useState(false);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["/api/active-projects", projectId],
@@ -263,7 +266,11 @@ export default function ProjectDetails() {
                   <Timer className="h-5 w-5" />
                   Horas Trabajadas
                 </div>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  size="sm" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowTimeEntryForm(true)}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Registrar Horas
                 </Button>
@@ -383,7 +390,11 @@ export default function ProjectDetails() {
                 <Users className="h-4 w-4 mr-2" />
                 Gestionar Equipo
               </Button>
-              <Button variant="outline" className="justify-start">
+              <Button 
+                variant="outline" 
+                className="justify-start"
+                onClick={() => setShowTimeEntryForm(true)}
+              >
                 <Timer className="h-4 w-4 mr-2" />
                 Cargar Horas
               </Button>
@@ -413,6 +424,15 @@ export default function ProjectDetails() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Formulario de Registro de Horas */}
+        {projectId && (
+          <TimeEntryForm
+            projectId={projectId}
+            open={showTimeEntryForm}
+            onOpenChange={setShowTimeEntryForm}
+          />
         )}
       </div>
     </div>

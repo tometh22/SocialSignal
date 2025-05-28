@@ -209,8 +209,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Personnel routes
   app.get("/api/personnel", async (_, res) => {
-    const personnel = await storage.getPersonnel();
-    res.json(personnel);
+    try {
+      const personnel = await db.select({
+        id: sql`personnel.id`,
+        name: sql`personnel.name`,
+        roleId: sql`personnel.role_id`,
+        hourlyRate: sql`personnel.hourly_rate`,
+        roleName: sql`roles.name`
+      })
+      .from(sql`personnel`)
+      .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)
+      .orderBy(sql`personnel.name`);
+      
+      res.json(personnel);
+    } catch (error) {
+      console.error("Error fetching personnel:", error);
+      res.status(500).json({ error: "Error fetching personnel" });
+    }
   });
 
   app.get("/api/personnel/role/:roleId", async (req, res) => {
@@ -1284,6 +1299,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // ---------- RUTAS PARA REGISTRO DE HORAS ----------
   
+  // Obtener registros de horas con filtros opcionales
+  app.get("/api/time-entries", async (req, res) => {
+    try {
+      const { projectId, startDate, endDate, personnelId } = req.query;
+      
+      if (projectId) {
+        const id = parseInt(projectId as string);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+        
+        const entries = await storage.getTimeEntriesByProject(id);
+        res.json(entries);
+      } else {
+        // Si no se especifica proyecto, devolver todas las entradas
+        const entries = await storage.getAllTimeEntries();
+        res.json(entries);
+      }
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
   // Obtener registros de horas por proyecto
   app.get("/api/time-entries/project/:projectId", async (req, res) => {
     const projectId = parseInt(req.params.projectId);
