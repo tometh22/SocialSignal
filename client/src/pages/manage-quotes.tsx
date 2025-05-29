@@ -228,12 +228,23 @@ export default function ManageQuotes() {
   return (
     <>
       <div className="page-container">
-        <div className="flex-between mb-6">
-          <h1 className="heading-page">Gestión de Cotizaciones</h1>
-          <Button onClick={() => navigate("/optimized-quote")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Cotización
-          </Button>
+        {/* Breadcrumbs unificados */}
+        <div className="breadcrumb-nav">
+          <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+            <span>Dashboard</span>
+            <span>/</span>
+            <span className="text-foreground font-medium">Gestión de Cotizaciones</span>
+          </nav>
+          
+          <div className="flex-between">
+            <div>
+              <h1 className="heading-page">Gestión de Cotizaciones</h1>
+            </div>
+            <Button onClick={() => navigate("/optimized-quote")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Cotización
+            </Button>
+          </div>
         </div>
 
         <Card className="standard-card">

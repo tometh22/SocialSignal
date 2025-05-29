@@ -82,23 +82,27 @@ export default function ActiveProjectsModern() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Proyectos Activos</h1>
-              <p className="text-sm text-gray-600 mt-1">Gestión y seguimiento de proyectos en curso</p>
-            </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Proyecto
-            </Button>
+    <div className="page-container">
+      {/* Breadcrumbs unificados */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span>Dashboard</span>
+          <span>/</span>
+          <span className="text-foreground font-medium">Proyectos Activos</span>
+        </nav>
+        
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="heading-page">Proyectos Activos</h1>
           </div>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Proyecto
+          </Button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="space-y-6">
         {/* Filtros */}
         <div className="flex gap-4 mb-6">
           <div className="relative flex-1 max-w-md">

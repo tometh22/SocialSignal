@@ -135,8 +135,19 @@ export default function Admin() {
 
   return (
     <div className="page-container">
-      <div className="flex-between mb-6">
-        <h1 className="heading-page">Panel de Administración</h1>
+      {/* Breadcrumbs unificados */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span>Dashboard</span>
+          <span>/</span>
+          <span className="text-foreground font-medium">Panel de Administración</span>
+        </nav>
+        
+        <div className="flex-between">
+          <div>
+            <h1 className="heading-page">Panel de Administración</h1>
+          </div>
+        </div>
       </div>
 
       <div className="standard-card">
