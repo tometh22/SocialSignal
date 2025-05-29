@@ -15,14 +15,16 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import ClientSummaryEnhanced from "@/components/dashboard/client-summary-enhanced";
 
 const ClientSummaryPage = () => {
   const [, params] = useRoute('/client-summary/:id');
   const clientId = params?.id ? parseInt(params.id) : null;
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   
   // Obtener información del cliente
   const { data: client, isLoading: clientLoading } = useQuery({
@@ -86,10 +88,21 @@ const ClientSummaryPage = () => {
           <div>
             <h1 className="heading-page">Resumen de Cliente: {clientName}</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={() => window.history.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => navigate(`/quality-scores/${clientId}`)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Actualizar Puntuaciones
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.history.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+          </div>
         </div>
       </div>
 

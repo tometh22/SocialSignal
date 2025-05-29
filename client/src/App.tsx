@@ -20,6 +20,7 @@ import TimeEntries from "@/pages/time-entries";
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
 import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
+import QualityScores from "@/pages/quality-scores";
 import AuthPage from "@/pages/auth-page";
 import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
 import EditDeliverable from "@/pages/edit-deliverable";
@@ -129,6 +130,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummary} />
+                  <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
                   <ProtectedRoute path="/always-on-demo" component={AlwaysOnDeliverablesDemo} />
