@@ -233,12 +233,23 @@ export default function Clients() {
 
   return (
     <div className="page-container">
-      <div className="flex-between mb-6">
-        <h1 className="heading-page">Clientes</h1>
-        <Button onClick={openNewClientDialog}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Añadir Nuevo Cliente
-        </Button>
+      {/* Breadcrumbs unificados */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span>Dashboard</span>
+          <span>/</span>
+          <span className="text-foreground font-medium">Clientes</span>
+        </nav>
+        
+        <div className="flex-between">
+          <div>
+            <h1 className="heading-page">Clientes</h1>
+          </div>
+          <Button onClick={openNewClientDialog}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Añadir Nuevo Cliente
+          </Button>
+        </div>
       </div>
 
       <Card className="standard-card">
