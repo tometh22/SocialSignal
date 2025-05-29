@@ -96,8 +96,19 @@ export default function Statistics() {
 
   return (
     <div className="page-container">
-      <div className="flex-between mb-6">
-        <h1 className="heading-page">Estadísticas y Análisis</h1>
+      {/* Breadcrumbs unificados */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span>Dashboard</span>
+          <span>/</span>
+          <span className="text-foreground font-medium">Estadísticas y Análisis</span>
+        </nav>
+        
+        <div className="flex-between">
+          <div>
+            <h1 className="heading-page">Estadísticas y Análisis</h1>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
