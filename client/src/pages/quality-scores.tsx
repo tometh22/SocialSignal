@@ -52,9 +52,9 @@ const QualityScoresPage = () => {
     enabled: !!clientId,
   });
 
-  // Obtener proyectos del cliente que tienen entregables
+  // Obtener proyectos activos del cliente que tienen entregables
   const { data: allProjects } = useQuery({
-    queryKey: [`/api/clients/${clientId}/projects`],
+    queryKey: [`/api/active-projects/client/${clientId}`],
     enabled: !!clientId,
   });
 
