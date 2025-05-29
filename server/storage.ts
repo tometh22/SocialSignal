@@ -100,6 +100,7 @@ export interface IStorage {
   getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
   getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
   getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]>;
+  getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]>;
   getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
   updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
@@ -1658,6 +1659,53 @@ export class DatabaseStorage implements IStorage {
     // 3. Obtener todas las entradas de tiempo para esos proyectos
     if (projectIds.length === 0) return [];
     return await db.select().from(timeEntries).where(inArray(timeEntries.projectId, projectIds));
+  }
+
+  async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
+    try {
+      // 1. Obtener todas las cotizaciones del cliente
+      const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
+      const clientQuotationIds = clientQuotations.map(q => q.id);
+      
+      if (clientQuotationIds.length === 0) return [];
+      
+      // 2. Obtener todos los proyectos activos basados en esas cotizaciones
+      const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
+      const projectIds = projects.map(p => p.id);
+      
+      if (projectIds.length === 0) return [];
+      
+      // 3. Obtener entradas de tiempo con información del personal y roles
+      const entries = await db
+        .select({
+          id: timeEntries.id,
+          projectId: timeEntries.projectId,
+          componentId: timeEntries.componentId,
+          personnelId: timeEntries.personnelId,
+          hoursWorked: timeEntries.hoursWorked,
+          description: timeEntries.description,
+          date: timeEntries.date,
+          approved: timeEntries.approved,
+          approvedDate: timeEntries.approvedDate,
+          approvedBy: timeEntries.approvedBy,
+          createdAt: timeEntries.createdAt,
+          updatedAt: timeEntries.updatedAt,
+          personnelName: personnel.name,
+          hourlyRate: personnel.defaultRate,
+          personnelRole: roles.name
+        })
+        .from(timeEntries)
+        .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .leftJoin(roles, eq(personnel.roleId, roles.id))
+        .where(inArray(timeEntries.projectId, projectIds))
+        .orderBy(desc(timeEntries.date));
+      
+      console.log(`Found ${entries.length} time entries for client ${clientId}`);
+      return entries;
+    } catch (error) {
+      console.error("Error fetching client time entries with personnel:", error);
+      throw error;
+    }
   }
   
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {

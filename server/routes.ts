@@ -971,7 +971,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
     
     try {
-      const entries = await storage.getTimeEntriesByClient(clientId);
+      // Obtener entradas con información del personal incluida
+      const entries = await storage.getTimeEntriesByClientWithPersonnel(clientId);
       res.json(entries);
     } catch (error) {
       console.error("Error fetching client time entries:", error);
