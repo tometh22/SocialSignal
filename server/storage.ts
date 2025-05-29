@@ -1663,57 +1663,40 @@ export class DatabaseStorage implements IStorage {
 
   async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
     try {
-      console.log(`🔍 Obteniendo entradas de tiempo para cliente ${clientId}`);
+      console.log(`🔍 Ejecutando consulta SQL directa para cliente ${clientId}`);
       
-      // 1. Obtener todas las cotizaciones del cliente
-      const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
-      const clientQuotationIds = clientQuotations.map(q => q.id);
-      console.log(`📋 Encontradas ${clientQuotations.length} cotizaciones:`, clientQuotationIds);
+      // Usar una consulta SQL directa
+      const result = await db.execute(sql`
+        SELECT 
+          te.id,
+          te.project_id as "projectId",
+          te.component_id as "componentId", 
+          te.personnel_id as "personnelId",
+          te.hours as "hoursWorked",
+          te.description,
+          te.date,
+          te.approved,
+          te.approved_date as "approvedDate",
+          te.approved_by as "approvedBy",
+          te.created_at as "createdAt",
+          p.name as "personnelName",
+          r.default_rate as "hourlyRate",
+          r.name as "personnelRole"
+        FROM time_entries te
+        LEFT JOIN personnel p ON te.personnel_id = p.id
+        LEFT JOIN roles r ON p.role_id = r.id
+        LEFT JOIN active_projects ap ON te.project_id = ap.id  
+        LEFT JOIN quotations q ON ap.quotation_id = q.id
+        WHERE q.client_id = ${clientId}
+        ORDER BY te.date DESC
+      `);
       
-      if (clientQuotationIds.length === 0) {
-        console.log(`❌ No se encontraron cotizaciones para cliente ${clientId}`);
-        return [];
+      console.log(`⏰ Encontradas ${result.length} entradas de tiempo para cliente ${clientId}`);
+      if (result.length > 0) {
+        console.log(`📋 Primera entrada:`, result[0]);
       }
       
-      // 2. Obtener todos los proyectos activos basados en esas cotizaciones
-      const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
-      const projectIds = projects.map(p => p.id);
-      console.log(`🏗️ Encontrados ${projects.length} proyectos:`, projectIds);
-      
-      if (projectIds.length === 0) {
-        console.log(`❌ No se encontraron proyectos para las cotizaciones`);
-        return [];
-      }
-      
-      // 3. Obtener entradas de tiempo con información del personal y roles
-      const entries = await db
-        .select({
-          id: timeEntries.id,
-          projectId: timeEntries.projectId,
-          componentId: timeEntries.componentId,
-          personnelId: timeEntries.personnelId,
-          hoursWorked: timeEntries.hours,
-          description: timeEntries.description,
-          date: timeEntries.date,
-          approved: timeEntries.approved,
-          approvedDate: timeEntries.approvedDate,
-          approvedBy: timeEntries.approvedBy,
-          createdAt: timeEntries.createdAt,
-          personnelName: personnel.name,
-          hourlyRate: roles.defaultRate,
-          personnelRole: roles.name
-        })
-        .from(timeEntries)
-        .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-        .leftJoin(roles, eq(personnel.roleId, roles.id))
-        .where(inArray(timeEntries.projectId, projectIds))
-        .orderBy(desc(timeEntries.date));
-      
-      console.log(`⏰ Encontradas ${entries.length} entradas de tiempo para cliente ${clientId}`);
-      if (entries.length > 0) {
-        console.log(`📋 Primera entrada:`, entries[0]);
-      }
-      return entries;
+      return result as any[];
     } catch (error) {
       console.error(`❌ Error en getTimeEntriesByClientWithPersonnel para cliente ${clientId}:`, error);
       return [];
