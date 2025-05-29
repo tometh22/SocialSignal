@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Card } from "@/components/ui/card";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Save, Star } from "lucide-react";
 
@@ -27,52 +26,15 @@ interface QuarterlyNpsSurvey {
   npsCategory?: string;
 }
 
-const NPS_QUESTIONS = [
-  {
-    id: "reportQuality",
-    label: "Calidad general de los Informes de Epical",
-    description: "¿Qué tan satisfecho/a estás con la calidad general de los informes entregados este trimestre?",
-    scale: "0-10"
-  },
-  {
-    id: "insightsClarity", 
-    label: "Claridad y relevancia de los Insights",
-    description: "¿Consideras que los insights entregados fueron claros, relevantes y accionables para tus objetivos?",
-    scale: "0-10"
-  },
-  {
-    id: "briefObjectives",
-    label: "Cumplimiento de objetivos del Brief",
-    description: "¿En qué medida nuestros informes respondieron a los objetivos establecidos en el brief?",
-    scale: "0-10"
-  },
-  {
-    id: "reportPresentation",
-    label: "Presentación y formato del Informe",
-    description: "¿Qué tan satisfecho/a estás con el diseño, presentación y formato del informe?",
-    scale: "0-10"
-  }
-];
-
-const QUARTERS = [
-  { value: 1, label: "Q1 (Enero - Marzo)" },
-  { value: 2, label: "Q2 (Abril - Junio)" },
-  { value: 3, label: "Q3 (Julio - Septiembre)" },
-  { value: 4, label: "Q4 (Octubre - Diciembre)" },
-];
-
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
-
 export default function QuarterlyNpsSurvey() {
   const { clientId } = useParams<{ clientId: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<QuarterlyNpsSurvey>({
-    clientId: parseInt(clientId || "0"),
-    quarter: Math.ceil(new Date().getMonth() / 3), // Trimestre actual
-    year: CURRENT_YEAR,
+    clientId: parseInt(clientId!),
+    quarter: new Date().getMonth() < 3 ? 1 : new Date().getMonth() < 6 ? 2 : new Date().getMonth() < 9 ? 3 : 4,
+    year: new Date().getFullYear(),
     reportQuality: undefined,
     insightsClarity: undefined,
     briefObjectives: undefined,
@@ -80,51 +42,28 @@ export default function QuarterlyNpsSurvey() {
     improvementSuggestions: "",
     strengthsFeedback: "",
     npsScore: undefined,
+    npsCategory: "",
   });
 
-  // Obtener información del cliente
+  // Obtener datos del cliente
   const { data: client } = useQuery({
-    queryKey: [`/api/clients/${clientId}`],
-    enabled: !!clientId,
+    queryKey: ["/api/clients", clientId],
   });
 
-  // Obtener encuestas existentes para este cliente
-  const { data: existingSurveys } = useQuery({
-    queryKey: [`/api/clients/${clientId}/nps-surveys`],
-    enabled: !!clientId,
-  });
-
-  // Mutation para guardar la encuesta
-  const saveSurveyMutation = useMutation({
+  // Mutación para guardar la encuesta
+  const mutation = useMutation({
     mutationFn: async (data: QuarterlyNpsSurvey) => {
-      const npsCategory = data.npsScore !== undefined ? 
-        (data.npsScore >= 9 ? 'promoter' : 
-         data.npsScore >= 7 ? 'passive' : 'detractor') : undefined;
-
-      const response = await apiRequest(`/api/clients/${clientId}/nps-surveys`, {
-        method: "POST",
-        body: JSON.stringify({ 
-          ...data, 
-          npsCategory,
-          clientId: parseInt(clientId || "0") 
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Error al guardar la encuesta");
-      }
-
-      return response.json();
+      const response = await apiRequest(`/api/nps-surveys`, data);
+      return response;
     },
     onSuccess: () => {
       toast({
         title: "Encuesta guardada",
-        description: "La encuesta NPS trimestral se ha guardado correctamente.",
+        description: "Los datos de la encuesta NPS se han guardado correctamente.",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/nps-surveys`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/modo-summary`] });
+      navigate(`/client-summary/${clientId}`);
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: "No se pudo guardar la encuesta. Intenta nuevamente.",
@@ -133,36 +72,98 @@ export default function QuarterlyNpsSurvey() {
     },
   });
 
-  const handleScoreChange = (field: string, value: string) => {
-    const numValue = value === "" ? undefined : parseInt(value);
-    setFormData(prev => ({ ...prev, [field]: numValue }));
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Calcular categoría NPS automáticamente
+    if (formData.npsScore !== undefined) {
+      let category = "";
+      if (formData.npsScore >= 9) category = "Promotor";
+      else if (formData.npsScore >= 7) category = "Pasivo";
+      else category = "Detractor";
+      
+      setFormData(prev => ({ ...prev, npsCategory: category }));
+      mutation.mutate({ ...formData, npsCategory: category });
+    } else {
+      mutation.mutate(formData);
+    }
   };
 
-  const handleTextChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof QuarterlyNpsSurvey, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    saveSurveyMutation.mutate(formData);
+  const renderStarRating = (field: keyof QuarterlyNpsSurvey, label: string) => {
+    const currentValue = formData[field] as number;
+    return (
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">{label}</Label>
+        <div className="flex items-center space-x-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => handleInputChange(field, star)}
+              className={`p-1 rounded ${
+                star <= currentValue
+                  ? "text-yellow-500"
+                  : "text-gray-300 hover:text-yellow-400"
+              }`}
+            >
+              <Star className="h-6 w-6 fill-current" />
+            </button>
+          ))}
+          <span className="ml-2 text-sm text-gray-600">
+            {currentValue ? `${currentValue}/5` : "No calificado"}
+          </span>
+        </div>
+      </div>
+    );
   };
 
-  const getNpsColor = (score?: number) => {
-    if (score === undefined) return "text-gray-400";
-    if (score >= 9) return "text-green-600";
-    if (score >= 7) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const getNpsLabel = (score?: number) => {
-    if (score === undefined) return "";
-    if (score >= 9) return "Promotor";
-    if (score >= 7) return "Pasivo";
-    return "Detractor";
+  const renderNpsScore = () => {
+    return (
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">
+          Puntuación NPS (0-10): ¿Qué tan probable es que recomiende nuestros servicios?
+        </Label>
+        <div className="flex items-center space-x-2">
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
+            <button
+              key={score}
+              type="button"
+              onClick={() => handleInputChange("npsScore", score)}
+              className={`w-10 h-10 rounded border text-sm font-medium ${
+                formData.npsScore === score
+                  ? "bg-blue-500 text-white border-blue-500"
+                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {score}
+            </button>
+          ))}
+        </div>
+        <div className="text-xs text-gray-500 flex justify-between">
+          <span>0: Muy improbable</span>
+          <span>10: Extremadamente probable</span>
+        </div>
+        {formData.npsScore !== undefined && (
+          <div className="text-sm">
+            <span className="font-medium">Categoría: </span>
+            <span className={
+              formData.npsScore >= 9 ? "text-green-600" :
+              formData.npsScore >= 7 ? "text-yellow-600" : "text-red-600"
+            }>
+              {formData.npsScore >= 9 ? "Promotor" : formData.npsScore >= 7 ? "Pasivo" : "Detractor"}
+            </span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
-    <PageContainer>
+    <div className="container mx-auto px-4 py-6">
       <div className="flex items-center gap-4 mb-6">
         <Button
           variant="ghost"
@@ -175,175 +176,113 @@ export default function QuarterlyNpsSurvey() {
         </Button>
       </div>
 
-      <HeadingPage
-        title={`Encuesta NPS Trimestral - ${client?.name || 'Cliente'}`}
-        description="Carga los resultados de la encuesta de satisfacción trimestral"
-      />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">{`Encuesta NPS Trimestral - ${client?.name || 'Cliente'}`}</h1>
+        <p className="text-gray-600">Carga los resultados de la encuesta de satisfacción trimestral</p>
+      </div>
 
-      <StandardCard>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Selección de período */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="quarter">Trimestre</Label>
-              <Select 
-                value={formData.quarter.toString()} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, quarter: parseInt(value) }))}
+      <Card>
+        <CardHeader>
+          <CardTitle>Datos de la Encuesta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Selección de período */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="quarter">Trimestre</Label>
+                <Select
+                  value={formData.quarter.toString()}
+                  onValueChange={(value) => handleInputChange("quarter", parseInt(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona trimestre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Q1 (Enero - Marzo)</SelectItem>
+                    <SelectItem value="2">Q2 (Abril - Junio)</SelectItem>
+                    <SelectItem value="3">Q3 (Julio - Septiembre)</SelectItem>
+                    <SelectItem value="4">Q4 (Octubre - Diciembre)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="year">Año</Label>
+                <Input
+                  id="year"
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) => handleInputChange("year", parseInt(e.target.value))}
+                  min="2020"
+                  max="2030"
+                />
+              </div>
+            </div>
+
+            {/* Puntuaciones de calidad (1-5 estrellas) */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold">Evaluación de Calidad (1-5 estrellas)</h3>
+              
+              {renderStarRating("reportQuality", "1. Calidad general del reporte")}
+              {renderStarRating("insightsClarity", "2. Claridad de insights y conclusiones")}
+              {renderStarRating("briefObjectives", "3. Cumplimiento de objetivos del brief")}
+              {renderStarRating("reportPresentation", "4. Presentación y formato del reporte")}
+            </div>
+
+            {/* Comentarios cualitativos */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Retroalimentación Cualitativa</h3>
+              
+              <div>
+                <Label htmlFor="improvementSuggestions">
+                  5. Sugerencias de mejora para futuros reportes
+                </Label>
+                <Textarea
+                  id="improvementSuggestions"
+                  value={formData.improvementSuggestions}
+                  onChange={(e) => handleInputChange("improvementSuggestions", e.target.value)}
+                  placeholder="Describa las áreas donde podríamos mejorar..."
+                  className="h-24"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="strengthsFeedback">
+                  6. Fortalezas destacadas del servicio
+                </Label>
+                <Textarea
+                  id="strengthsFeedback"
+                  value={formData.strengthsFeedback}
+                  onChange={(e) => handleInputChange("strengthsFeedback", e.target.value)}
+                  placeholder="Mencione los aspectos más valorados del servicio..."
+                  className="h-24"
+                />
+              </div>
+            </div>
+
+            {/* Puntuación NPS */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Net Promoter Score (NPS)</h3>
+              {renderNpsScore()}
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex justify-end space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate(`/client-summary/${clientId}`)}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUARTERS.map((q) => (
-                    <SelectItem key={q.value} value={q.value.toString()}>
-                      {q.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={mutation.isPending} className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                {mutation.isPending ? "Guardando..." : "Guardar Encuesta"}
+              </Button>
             </div>
-
-            <div>
-              <Label htmlFor="year">Año</Label>
-              <Select 
-                value={formData.year.toString()} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, year: parseInt(value) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEARS.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Preguntas de calificación (0-10) */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold">Evaluación de Servicios</h3>
-            {NPS_QUESTIONS.map((question) => (
-              <div key={question.id} className="space-y-3">
-                <div>
-                  <Label className="text-base font-medium">{question.label}</Label>
-                  <p className="text-sm text-gray-600 mt-1">{question.description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">0</span>
-                  <div className="flex gap-1">
-                    {Array.from({ length: 11 }, (_, i) => (
-                      <Button
-                        key={i}
-                        type="button"
-                        variant={formData[question.id as keyof QuarterlyNpsSurvey] === i ? "default" : "outline"}
-                        size="sm"
-                        className="w-10 h-10 p-0"
-                        onClick={() => handleScoreChange(question.id, i.toString())}
-                      >
-                        {i}
-                      </Button>
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-500">10</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Preguntas de texto libre */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold">Comentarios y Sugerencias</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="improvements">¿Qué cambiarías o mejorarías de nuestros informes o servicio?</Label>
-              <Textarea
-                id="improvements"
-                placeholder="Máximo 300 caracteres"
-                maxLength={300}
-                value={formData.improvementSuggestions || ""}
-                onChange={(e) => handleTextChange("improvementSuggestions", e.target.value)}
-                className="min-h-[100px]"
-              />
-              <p className="text-xs text-gray-500">
-                {(formData.improvementSuggestions?.length || 0)}/300 caracteres
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="strengths">¿Qué estamos haciendo bien y deberíamos seguir reforzando?</Label>
-              <Textarea
-                id="strengths"
-                placeholder="Comparte tu feedback positivo"
-                value={formData.strengthsFeedback || ""}
-                onChange={(e) => handleTextChange("strengthsFeedback", e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-
-          {/* Pregunta NPS */}
-          <div className="space-y-4 border-t pt-6">
-            <div>
-              <Label className="text-base font-medium">Net Promoter Score (NPS)</Label>
-              <p className="text-sm text-gray-600 mt-1">
-                En una escala de 0 a 10, ¿qué tan probable es que recomiendes nuestro servicio a un colega o conocido?
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">0<br />Not likely at all</span>
-              <div className="flex gap-1">
-                {Array.from({ length: 11 }, (_, i) => (
-                  <Button
-                    key={i}
-                    type="button"
-                    variant={formData.npsScore === i ? "default" : "outline"}
-                    size="sm"
-                    className="w-10 h-10 p-0"
-                    onClick={() => handleScoreChange("npsScore", i.toString())}
-                  >
-                    {i}
-                  </Button>
-                ))}
-              </div>
-              <span className="text-sm text-gray-500">10<br />Extremely likely</span>
-            </div>
-
-            {formData.npsScore !== undefined && (
-              <div className="flex items-center gap-2">
-                <Star className={`h-5 w-5 ${getNpsColor(formData.npsScore)}`} />
-                <span className={`font-medium ${getNpsColor(formData.npsScore)}`}>
-                  {getNpsLabel(formData.npsScore)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Botones de acción */}
-          <div className="flex gap-4 pt-4 border-t">
-            <Button
-              type="submit"
-              disabled={saveSurveyMutation.isPending}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {saveSurveyMutation.isPending ? "Guardando..." : "Guardar Encuesta"}
-            </Button>
-            
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(`/client-summary/${clientId}`)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </form>
-      </StandardCard>
-    </PageContainer>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
