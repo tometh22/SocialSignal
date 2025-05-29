@@ -110,9 +110,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
   }));
 
   // Procesar datos de recursos humanos y costos
-  const resourceAnalysis = React.useMemo(() => {
-    if (!timeEntries.length) return null;
-
+  const resourceAnalysis = timeEntries.length > 0 ? (() => {
     // Agrupar por persona
     const personnelMap = new Map();
     let totalCost = 0;
@@ -154,7 +152,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
       averageRate: totalHours > 0 ? totalCost / totalHours : 0,
       activePersonnel: personnelData.length
     };
-  }, [timeEntries]);
+  })() : null;
 
   return (
     <div className="space-y-4">
