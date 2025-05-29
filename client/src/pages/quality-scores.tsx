@@ -60,18 +60,48 @@ const QualityScoresPage = () => {
 
   // Filtrar solo proyectos que tienen entregables (según los logs, son: 5,16,6,8,9,7,10,11,12,13,14,15)
   const projectsWithDeliverables = React.useMemo(() => {
-    if (!allProjects || !Array.isArray(allProjects)) return [];
+    console.log("Processing projects:", allProjects);
+    console.log("Type of allProjects:", typeof allProjects);
+    console.log("Is array?", Array.isArray(allProjects));
+    
+    if (!allProjects) {
+      console.log("No projects data");
+      return [];
+    }
+    
+    // Si allProjects no es un array, puede estar en una propiedad anidada
+    let projectsArray = allProjects;
+    if (!Array.isArray(allProjects) && typeof allProjects === 'object') {
+      // Buscar el array en las propiedades del objeto
+      const keys = Object.keys(allProjects);
+      console.log("Object keys:", keys);
+      
+      for (const key of keys) {
+        if (Array.isArray(allProjects[key])) {
+          projectsArray = allProjects[key];
+          console.log(`Found array in property ${key}:`, projectsArray);
+          break;
+        }
+      }
+    }
+    
+    if (!Array.isArray(projectsArray)) {
+      console.log("Still not an array after processing");
+      return [];
+    }
     
     // IDs de proyectos que sabemos tienen entregables basado en los logs
     const projectsWithDeliverablesIds = [5, 16, 6, 8, 9, 7, 10, 11, 12, 13, 14, 15];
     
-    return allProjects.filter((project: any) => 
+    const filtered = projectsArray.filter((project: any) => 
       projectsWithDeliverablesIds.includes(project.id)
     );
+    
+    console.log("Filtered projects:", filtered);
+    return filtered;
   }, [allProjects]);
 
-  console.log("Todos los proyectos:", allProjects);
-  console.log("Proyectos con entregables:", projectsWithDeliverables);
+  console.log("Final projects with deliverables:", projectsWithDeliverables);
 
   // Obtener entregables del proyecto seleccionado
   const { data: deliverables } = useQuery({
