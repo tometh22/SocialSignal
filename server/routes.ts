@@ -971,8 +971,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
     
     try {
+      console.log(`🚀 Endpoint time-entries/client/${clientId} llamado`);
       // Obtener entradas con información del personal incluida
       const entries = await storage.getTimeEntriesByClientWithPersonnel(clientId);
+      console.log(`📊 Devolviendo ${entries.length} entradas de tiempo`);
+      
+      // Evitar caché para debug
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.json(entries);
     } catch (error) {
       console.error("Error fetching client time entries:", error);
