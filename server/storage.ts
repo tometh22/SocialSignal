@@ -1663,17 +1663,27 @@ export class DatabaseStorage implements IStorage {
 
   async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
     try {
+      console.log(`🔍 Obteniendo entradas de tiempo para cliente ${clientId}`);
+      
       // 1. Obtener todas las cotizaciones del cliente
       const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
       const clientQuotationIds = clientQuotations.map(q => q.id);
+      console.log(`📋 Encontradas ${clientQuotations.length} cotizaciones:`, clientQuotationIds);
       
-      if (clientQuotationIds.length === 0) return [];
+      if (clientQuotationIds.length === 0) {
+        console.log(`❌ No se encontraron cotizaciones para cliente ${clientId}`);
+        return [];
+      }
       
       // 2. Obtener todos los proyectos activos basados en esas cotizaciones
       const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
       const projectIds = projects.map(p => p.id);
+      console.log(`🏗️ Encontrados ${projects.length} proyectos:`, projectIds);
       
-      if (projectIds.length === 0) return [];
+      if (projectIds.length === 0) {
+        console.log(`❌ No se encontraron proyectos para las cotizaciones`);
+        return [];
+      }
       
       // 3. Obtener entradas de tiempo con información del personal y roles
       const entries = await db
