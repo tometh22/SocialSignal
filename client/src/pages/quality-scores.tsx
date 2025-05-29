@@ -144,10 +144,13 @@ const QualityScoresPage = () => {
         title: "Puntuaciones actualizadas",
         description: "Las puntuaciones de calidad se han guardado correctamente.",
       });
-      // Invalidar caché relacionado
+      // Invalidar caché relacionado y recargar datos
       queryClient.invalidateQueries({ queryKey: [`/api/deliverables/${selectedDeliverable}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/modo-summary`] });
       queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deliverables`] });
+      
+      // Recargar datos del entregable inmediatamente
+      queryClient.refetchQueries({ queryKey: [`/api/deliverables/${selectedDeliverable}`] });
     },
     onError: (error: any) => {
       toast({
