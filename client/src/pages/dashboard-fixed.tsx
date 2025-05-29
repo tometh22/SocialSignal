@@ -49,17 +49,23 @@ export default function Dashboard() {
 
   return (
     <div className="page-container">
-      {/* Header con sistema de diseño unificado */}
-      <div className="flex-between mb-6">
-        <div>
-          <h1 className="heading-page">Sistema de Cotización de Escucha Social</h1>
+      {/* Breadcrumbs unificados */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span className="text-foreground font-medium">Dashboard</span>
+        </nav>
+        
+        <div className="flex-between">
+          <div>
+            <h1 className="heading-page">Sistema de Cotización de Escucha Social</h1>
+          </div>
+          <Link href="/new-quote">
+            <Button className="btn-standard bg-primary text-primary-foreground hover:bg-primary/90">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Crear Nueva Cotización
+            </Button>
+          </Link>
         </div>
-        <Link href="/new-quote">
-          <Button className="btn-standard bg-primary text-primary-foreground hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Crear Nueva Cotización
-          </Button>
-        </Link>
       </div>
 
       {/* Cards de estadísticas con diseño estándar */}
