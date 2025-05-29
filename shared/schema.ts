@@ -658,3 +658,49 @@ export type InsertDeliverable = z.infer<typeof insertDeliverableSchema>;
 
 export type ClientModoComment = typeof clientModoComments.$inferSelect;
 export type InsertClientModoComment = z.infer<typeof insertClientModoCommentSchema>;
+
+// ==================== ENCUESTAS NPS TRIMESTRALES ====================
+// Tabla de encuestas NPS trimestrales a clientes
+export const quarterlyNpsSurveys = pgTable("quarterly_nps_surveys", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  quarter: integer("quarter").notNull(), // 1, 2, 3, 4
+  year: integer("year").notNull(),
+  // Pregunta 2: Calidad general de los informes (0-10)
+  reportQuality: integer("report_quality"),
+  // Pregunta 3: Claridad y relevancia de los insights (0-10)
+  insightsClarity: integer("insights_clarity"),
+  // Pregunta 4: Cumplimiento de objetivos del brief (0-10)
+  briefObjectives: integer("brief_objectives"),
+  // Pregunta 5: Presentación y formato del informe (0-10)
+  reportPresentation: integer("report_presentation"),
+  // Pregunta 6: Qué cambiarías o mejorarías (texto libre)
+  improvementSuggestions: text("improvement_suggestions"),
+  // Pregunta 7: Qué estamos haciendo bien (texto libre)
+  strengthsFeedback: text("strengths_feedback"),
+  // Pregunta 8: NPS - Probabilidad de recomendación (0-10)
+  npsScore: integer("nps_score"),
+  // Campo calculado para clasificación NPS
+  npsCategory: text("nps_category"), // 'promoter', 'passive', 'detractor'
+  // Metadatos
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+// Relaciones de encuestas NPS
+export const quarterlyNpsSurveysRelations = relations(quarterlyNpsSurveys, ({ one }) => ({
+  client: one(clients, { fields: [quarterlyNpsSurveys.clientId], references: [clients.id] }),
+  creator: one(users, { fields: [quarterlyNpsSurveys.createdBy], references: [users.id] }),
+}));
+
+// Esquema para crear encuestas NPS
+export const insertQuarterlyNpsSurveySchema = createInsertSchema(quarterlyNpsSurveys).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  npsCategory: true, // Se calcula automáticamente
+});
+
+export type QuarterlyNpsSurvey = typeof quarterlyNpsSurveys.$inferSelect;
+export type InsertQuarterlyNpsSurvey = z.infer<typeof insertQuarterlyNpsSurveySchema>;
