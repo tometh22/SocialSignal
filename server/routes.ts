@@ -1106,18 +1106,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let allDeliverables: any[] = [];
       
-      // Obtener entregables de cada subproyecto
+      // Obtener entregables de cada subproyecto usando consulta directa
       for (const projectId of subProjectIds) {
         try {
-          const deliverables = await storage.getDeliverables(projectId);
-          if (deliverables && Array.isArray(deliverables)) {
+          console.log(`Buscando entregables para proyecto ${projectId}`);
+          
+          // Consulta directa a la base de datos para obtener entregables
+          const result = await db.execute(
+            `SELECT * FROM deliverables WHERE project_id = ${projectId}`
+          );
+          
+          if (result.rows && result.rows.length > 0) {
+            console.log(`Entregables encontrados para proyecto ID ${projectId}: ${result.rows.length}`);
+            
             // Agregar información del subproyecto a cada entregable
-            const deliverablesWithProject = deliverables.map((d: any) => ({
+            const deliverablesWithProject = result.rows.map((d: any) => ({
               ...d,
               subProjectId: projectId,
               displayTitle: `${d.title || `Entregable ${d.id}`} (Subproyecto ${projectId})`
             }));
             allDeliverables = allDeliverables.concat(deliverablesWithProject);
+          } else {
+            console.log(`No se encontraron entregables para proyecto ${projectId}`);
           }
         } catch (error) {
           console.warn(`Error obteniendo entregables del proyecto ${projectId}:`, error);
