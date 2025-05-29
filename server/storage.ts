@@ -2587,23 +2587,31 @@ export class DatabaseStorage implements IStorage {
       
       console.log("Datos de actualización preparados:", updateData);
       
-      // Construimos un SET dinámico para la consulta SQL
-      const setClauses = Object.keys(updateData).map((key, index) => `${key} = $${index + 2}`).join(', ');
-      const values = [id, ...Object.values(updateData)];
+      // Construimos una consulta SQL usando interpolación directa (más segura para este caso)
+      const setClauses = Object.keys(updateData).map(key => {
+        const value = updateData[key];
+        if (typeof value === 'string') {
+          return `${key} = '${value.replace(/'/g, "''")}'`;
+        } else if (typeof value === 'number') {
+          return `${key} = ${value}`;
+        } else if (value === null) {
+          return `${key} = NULL`;
+        }
+        return `${key} = '${String(value)}'`;
+      }).join(', ');
       
       // Ejecutamos la consulta SQL directa
-      const { rows } = await db.execute(
-        `UPDATE deliverables SET ${setClauses} WHERE id = $1 RETURNING *`,
-        values
+      const result = await db.execute(
+        `UPDATE deliverables SET ${setClauses} WHERE id = ${id} RETURNING *`
       );
       
-      if (rows.length === 0) {
+      if (!result.rows || result.rows.length === 0) {
         console.log(`No se encontró el entregable con ID ${id}`);
         return undefined;
       }
       
       console.log(`Entregable ID ${id} actualizado correctamente`);
-      return rows[0];
+      return result.rows[0];
     } catch (error) {
       console.error(`Error al actualizar entregable ID ${id}:`, error);
       throw error;
