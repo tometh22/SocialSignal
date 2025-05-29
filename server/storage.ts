@@ -13,8 +13,9 @@ import {
   type User, type InsertUser,
   type Deliverable, type InsertDeliverable,
   type ClientModoComment, type InsertClientModoComment,
+  type ClientNpsSurvey, type InsertClientNpsSurvey,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
-  activeProjects, projectComponents, timeEntries, progressReports, users,
+  activeProjects, projectComponents, timeEntries, progressReports, users, clientNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
@@ -144,6 +145,13 @@ export interface IStorage {
   getProjectStatusOptions(): Promise<typeof projectStatusOptions>;
   getTrackingFrequencyOptions(): Promise<typeof trackingFrequencyOptions>;
   
+  // NPS Survey operations
+  getNpsSurveysByClient(clientId: number): Promise<ClientNpsSurvey[]>;
+  getNpsSurvey(id: number): Promise<ClientNpsSurvey | undefined>;
+  createNpsSurvey(survey: InsertClientNpsSurvey): Promise<ClientNpsSurvey>;
+  updateNpsSurvey(id: number, survey: Partial<InsertClientNpsSurvey>): Promise<ClientNpsSurvey | undefined>;
+  deleteNpsSurvey(id: number): Promise<boolean>;
+
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -2616,6 +2624,61 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`Error al actualizar entregable ID ${id}:`, error);
       throw error;
+    }
+  }
+
+  // Implementación de métodos NPS Survey
+  async getNpsSurveysByClient(clientId: number): Promise<ClientNpsSurvey[]> {
+    try {
+      const surveys = await db.select().from(clientNpsSurveys).where(eq(clientNpsSurveys.clientId, clientId));
+      return surveys;
+    } catch (error) {
+      console.error(`Error al obtener encuestas NPS del cliente ${clientId}:`, error);
+      return [];
+    }
+  }
+
+  async getNpsSurvey(id: number): Promise<ClientNpsSurvey | undefined> {
+    try {
+      const [survey] = await db.select().from(clientNpsSurveys).where(eq(clientNpsSurveys.id, id));
+      return survey;
+    } catch (error) {
+      console.error(`Error al obtener encuesta NPS ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async createNpsSurvey(survey: InsertClientNpsSurvey): Promise<ClientNpsSurvey> {
+    try {
+      const [newSurvey] = await db.insert(clientNpsSurveys).values(survey).returning();
+      console.log(`Encuesta NPS creada para cliente ${survey.clientId}`);
+      return newSurvey;
+    } catch (error) {
+      console.error(`Error al crear encuesta NPS:`, error);
+      throw error;
+    }
+  }
+
+  async updateNpsSurvey(id: number, survey: Partial<InsertClientNpsSurvey>): Promise<ClientNpsSurvey | undefined> {
+    try {
+      const [updatedSurvey] = await db.update(clientNpsSurveys)
+        .set(survey)
+        .where(eq(clientNpsSurveys.id, id))
+        .returning();
+      return updatedSurvey;
+    } catch (error) {
+      console.error(`Error al actualizar encuesta NPS ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async deleteNpsSurvey(id: number): Promise<boolean> {
+    try {
+      await db.delete(clientNpsSurveys).where(eq(clientNpsSurveys.id, id));
+      return true;
+    } catch (error) {
+      console.error(`Error al eliminar encuesta NPS ${id}:`, error);
+      return false;
     }
   }
 }

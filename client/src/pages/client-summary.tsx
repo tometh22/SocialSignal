@@ -15,7 +15,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft, BarChart3, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import ClientSummaryEnhanced from "@/components/dashboard/client-summary-enhanced";

@@ -1918,6 +1918,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== RUTAS PARA ENCUESTAS NPS ===========
+  
+  // Crear nueva encuesta NPS
+  app.post("/api/nps-surveys", async (req, res) => {
+    try {
+      const surveyData = req.body;
+      const newSurvey = await storage.createNpsSurvey(surveyData);
+      res.status(201).json(newSurvey);
+    } catch (error) {
+      console.error("Error creating NPS survey:", error);
+      res.status(500).json({ message: "Failed to create NPS survey" });
+    }
+  });
+
+  // Obtener encuestas NPS por cliente
+  app.get("/api/clients/:clientId/nps-surveys", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      if (isNaN(clientId)) {
+        return res.status(400).json({ message: "Invalid client ID" });
+      }
+      
+      const surveys = await storage.getNpsSurveysByClient(clientId);
+      res.json(surveys);
+    } catch (error) {
+      console.error("Error fetching NPS surveys:", error);
+      res.status(500).json({ message: "Failed to fetch NPS surveys" });
+    }
+  });
+
+  // Obtener encuesta NPS específica
+  app.get("/api/nps-surveys/:id", async (req, res) => {
+    try {
+      const surveyId = parseInt(req.params.id);
+      if (isNaN(surveyId)) {
+        return res.status(400).json({ message: "Invalid survey ID" });
+      }
+      
+      const survey = await storage.getNpsSurvey(surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "NPS survey not found" });
+      }
+      
+      res.json(survey);
+    } catch (error) {
+      console.error("Error fetching NPS survey:", error);
+      res.status(500).json({ message: "Failed to fetch NPS survey" });
+    }
+  });
+
+  // Actualizar encuesta NPS
+  app.put("/api/nps-surveys/:id", async (req, res) => {
+    try {
+      const surveyId = parseInt(req.params.id);
+      if (isNaN(surveyId)) {
+        return res.status(400).json({ message: "Invalid survey ID" });
+      }
+      
+      const updateData = req.body;
+      const updatedSurvey = await storage.updateNpsSurvey(surveyId, updateData);
+      
+      if (!updatedSurvey) {
+        return res.status(404).json({ message: "NPS survey not found" });
+      }
+      
+      res.json(updatedSurvey);
+    } catch (error) {
+      console.error("Error updating NPS survey:", error);
+      res.status(500).json({ message: "Failed to update NPS survey" });
+    }
+  });
+
+  // Eliminar encuesta NPS
+  app.delete("/api/nps-surveys/:id", async (req, res) => {
+    try {
+      const surveyId = parseInt(req.params.id);
+      if (isNaN(surveyId)) {
+        return res.status(400).json({ message: "Invalid survey ID" });
+      }
+      
+      const deleted = await storage.deleteNpsSurvey(surveyId);
+      if (!deleted) {
+        return res.status(404).json({ message: "NPS survey not found" });
+      }
+      
+      res.json({ message: "NPS survey deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting NPS survey:", error);
+      res.status(500).json({ message: "Failed to delete NPS survey" });
+    }
+  });
+
   // =========== RUTAS PARA MODO (SEGUIMIENTO OPERACIONES) ===========
   
   // Obtener todos los entregables (opcionalmente filtrados por cliente)
