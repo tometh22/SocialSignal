@@ -247,36 +247,36 @@ export default function ManageQuotes() {
           </div>
         </div>
 
+        {/* Filtros separados */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+            <Input
+              placeholder="Buscar por nombre de proyecto..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="w-full md:w-64">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los Estados</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="pending">Pendiente</SelectItem>
+                <SelectItem value="approved">Aprobada</SelectItem>
+                <SelectItem value="rejected">Rechazada</SelectItem>
+                <SelectItem value="in-negotiation">En Negociación</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <Card className="standard-card">
           <CardContent className="card-content">
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-grow">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
-                <Input
-                  placeholder="Buscar por nombre de proyecto..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-                  <div className="w-full md:w-64">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Filtrar por estado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los Estados</SelectItem>
-                        <SelectItem value="draft">Borrador</SelectItem>
-                        <SelectItem value="pending">Pendiente</SelectItem>
-                        <SelectItem value="approved">Aprobada</SelectItem>
-                        <SelectItem value="rejected">Rechazada</SelectItem>
-                        <SelectItem value="in-negotiation">En Negociación</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
                 {isLoading ? (
                   <div className="flex justify-center py-8">
