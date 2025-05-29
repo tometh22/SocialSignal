@@ -37,7 +37,10 @@ import {
   PieChart as PieChartIcon,
   Activity,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign,
+  UserCheck,
+  Users
 } from "lucide-react";
 
 interface ClientSummaryEnhancedProps {
@@ -64,9 +67,15 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
     retry: false,
   });
 
-  console.log('Enhanced Debug:', { summaryData, deliverablesData, projectsData });
+  // Obtener datos de entradas de tiempo para análisis de recursos
+  const { data: timeEntriesData, isLoading: timeEntriesLoading } = useQuery({
+    queryKey: [`/api/time-entries/client/${clientId}`],
+    retry: false,
+  });
 
-  const isLoading = summaryLoading || deliverablesLoading || projectsLoading;
+  console.log('Enhanced Debug:', { summaryData, deliverablesData, projectsData, timeEntriesData });
+
+  const isLoading = summaryLoading || deliverablesLoading || projectsLoading || timeEntriesLoading;
 
   if (isLoading) {
     return (
@@ -81,6 +90,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
   const summary = summaryData || {};
   const deliverables = Array.isArray(deliverablesData) ? deliverablesData : [];
   const projects = Array.isArray(projectsData) ? projectsData : [];
+  const timeEntries = Array.isArray(timeEntriesData) ? timeEntriesData : [];
 
   // Preparar datos para gráficos
   const qualityScoresData = summary.averageScores ? [
@@ -98,6 +108,53 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
     puntuacion: Math.round((Math.random() * 2 + 3) * 10) / 10, // Simulado por ahora
     puntualidad: Math.round(Math.random() * 40 + 60),
   }));
+
+  // Procesar datos de recursos humanos y costos
+  const resourceAnalysis = React.useMemo(() => {
+    if (!timeEntries.length) return null;
+
+    // Agrupar por persona
+    const personnelMap = new Map();
+    let totalCost = 0;
+    let totalHours = 0;
+
+    timeEntries.forEach(entry => {
+      const key = entry.personnelName || `ID ${entry.personnelId}`;
+      if (!personnelMap.has(key)) {
+        personnelMap.set(key, {
+          name: key,
+          role: entry.personnelRole || 'No especificado',
+          hours: 0,
+          cost: 0,
+          rate: entry.hourlyRate || 0,
+          entries: 0
+        });
+      }
+      
+      const person = personnelMap.get(key);
+      const hours = entry.hoursWorked || 0;
+      const cost = hours * (entry.hourlyRate || 0);
+      
+      person.hours += hours;
+      person.cost += cost;
+      person.entries += 1;
+      
+      totalHours += hours;
+      totalCost += cost;
+    });
+
+    // Convertir a array y ordenar por horas trabajadas
+    const personnelData = Array.from(personnelMap.values())
+      .sort((a, b) => b.hours - a.hours);
+
+    return {
+      personnelData,
+      totalCost,
+      totalHours,
+      averageRate: totalHours > 0 ? totalCost / totalHours : 0,
+      activePersonnel: personnelData.length
+    };
+  }, [timeEntries]);
 
   return (
     <div className="space-y-4">
@@ -179,6 +236,153 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Análisis de Recursos Humanos y Costos */}
+              {resourceAnalysis && (
+                <Card className="border-t-4 border-t-indigo-500">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-indigo-600" />
+                      <CardTitle>Análisis de Recursos y Costos</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Distribución de horas trabajadas y análisis de costos por persona
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Métricas generales */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-2xl font-bold text-indigo-700">
+                                    ${resourceAnalysis.totalCost.toFixed(0)}
+                                  </p>
+                                  <p className="text-xs font-medium text-indigo-600">Costo Total</p>
+                                </div>
+                                <div className="p-2 bg-indigo-200 rounded-full">
+                                  <DollarSign className="h-4 w-4 text-indigo-700" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-2xl font-bold text-emerald-700">
+                                    {resourceAnalysis.totalHours.toFixed(1)}h
+                                  </p>
+                                  <p className="text-xs font-medium text-emerald-600">Horas Totales</p>
+                                </div>
+                                <div className="p-2 bg-emerald-200 rounded-full">
+                                  <Clock className="h-4 w-4 text-emerald-700" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <Card className="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-2xl font-bold text-teal-700">
+                                    ${resourceAnalysis.averageRate.toFixed(0)}
+                                  </p>
+                                  <p className="text-xs font-medium text-teal-600">Tarifa Promedio</p>
+                                  <p className="text-xs text-teal-500 font-semibold">por hora</p>
+                                </div>
+                                <div className="p-2 bg-teal-200 rounded-full">
+                                  <TrendingUp className="h-4 w-4 text-teal-700" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-2xl font-bold text-cyan-700">
+                                    {resourceAnalysis.activePersonnel}
+                                  </p>
+                                  <p className="text-xs font-medium text-cyan-600">Personal Activo</p>
+                                </div>
+                                <div className="p-2 bg-cyan-200 rounded-full">
+                                  <UserCheck className="h-4 w-4 text-cyan-700" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+
+                      {/* Gráfico de distribución de horas */}
+                      <div>
+                        <h4 className="font-medium text-gray-700 mb-4">Distribución de Horas por Persona</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={resourceAnalysis.personnelData.slice(0, 8)}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="name" 
+                                tick={{ fontSize: 11 }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                              />
+                              <YAxis tick={{ fontSize: 12 }} />
+                              <Tooltip 
+                                formatter={(value, name) => [
+                                  name === 'hours' ? `${Number(value).toFixed(1)}h` : `$${Number(value).toFixed(0)}`,
+                                  name === 'hours' ? 'Horas' : 'Costo'
+                                ]}
+                                labelStyle={{ color: '#333' }}
+                                contentStyle={{ 
+                                  backgroundColor: '#fff', 
+                                  border: '1px solid #ccc',
+                                  borderRadius: '8px'
+                                }}
+                              />
+                              <Bar dataKey="hours" fill="#3b82f6" name="hours" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lista detallada de personal */}
+                    <div className="mt-6">
+                      <h4 className="font-medium text-gray-700 mb-4">Detalle por Persona</h4>
+                      <div className="space-y-2">
+                        {resourceAnalysis.personnelData.slice(0, 6).map((person, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                {person.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{person.name}</p>
+                                <p className="text-sm text-gray-500">{person.role}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-gray-900">{person.hours.toFixed(1)}h</p>
+                              <p className="text-sm text-gray-500">${person.cost.toFixed(0)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Métricas de rendimiento mejoradas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
