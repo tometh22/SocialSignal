@@ -1682,16 +1682,15 @@ export class DatabaseStorage implements IStorage {
           projectId: timeEntries.projectId,
           componentId: timeEntries.componentId,
           personnelId: timeEntries.personnelId,
-          hoursWorked: timeEntries.hoursWorked,
+          hoursWorked: timeEntries.hours,
           description: timeEntries.description,
           date: timeEntries.date,
           approved: timeEntries.approved,
           approvedDate: timeEntries.approvedDate,
           approvedBy: timeEntries.approvedBy,
           createdAt: timeEntries.createdAt,
-          updatedAt: timeEntries.updatedAt,
           personnelName: personnel.name,
-          hourlyRate: personnel.defaultRate,
+          hourlyRate: roles.defaultRate,
           personnelRole: roles.name
         })
         .from(timeEntries)
