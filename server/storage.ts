@@ -2729,6 +2729,11 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
   }
+
+  // Método para MemStorage - no se usa en producción
+  async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
+    return [];
+  }
 }
 
 // Exportar la implementación de la base de datos en lugar de la memoria
