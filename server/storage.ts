@@ -1709,11 +1709,14 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(timeEntries.projectId, projectIds))
         .orderBy(desc(timeEntries.date));
       
-      console.log(`Found ${entries.length} time entries for client ${clientId}`);
+      console.log(`⏰ Encontradas ${entries.length} entradas de tiempo para cliente ${clientId}`);
+      if (entries.length > 0) {
+        console.log(`📋 Primera entrada:`, entries[0]);
+      }
       return entries;
     } catch (error) {
-      console.error("Error fetching client time entries with personnel:", error);
-      throw error;
+      console.error(`❌ Error en getTimeEntriesByClientWithPersonnel para cliente ${clientId}:`, error);
+      return [];
     }
   }
   
