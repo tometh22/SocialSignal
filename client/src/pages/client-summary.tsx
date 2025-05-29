@@ -71,18 +71,26 @@ const ClientSummaryPage = () => {
     : "Cliente";
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Resumen de Cliente</h1>
-          <p className="text-muted-foreground">
-            Análisis global de todos los proyectos de {clientName}
-          </p>
+    <div className="page-container">
+      {/* Breadcrumbs compactos */}
+      <div className="breadcrumb-nav">
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+          <span>Dashboard</span>
+          <span>/</span>
+          <span>Clientes</span>
+          <span>/</span>
+          <span className="text-foreground font-medium">{clientName}</span>
+        </nav>
+        
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="heading-page">Resumen de Cliente: {clientName}</h1>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => window.history.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => window.history.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
-        </Button>
       </div>
 
       <ClientSummaryEnhanced clientId={clientId} clientName={clientName} />

@@ -100,86 +100,80 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
   }));
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen Avanzado del Cliente: {clientName}</CardTitle>
-          <CardDescription>
-            Análisis completo con gráficos y métricas detalladas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="space-y-4">
+      <Card className="standard-card">
+        <CardContent className="p-4">
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">Resumen</TabsTrigger>
-              <TabsTrigger value="quality">Calidad</TabsTrigger>
-              <TabsTrigger value="projects">Proyectos</TabsTrigger>
-              <TabsTrigger value="deliverables">Entregables</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsTrigger value="overview" className="text-sm">Resumen</TabsTrigger>
+              <TabsTrigger value="quality" className="text-sm">Calidad</TabsTrigger>
+              <TabsTrigger value="projects" className="text-sm">Proyectos</TabsTrigger>
+              <TabsTrigger value="deliverables" className="text-sm">Entregables</TabsTrigger>
             </TabsList>
             
             {/* Tab: Resumen General */}
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-3xl font-bold text-blue-700">{summary.totalDeliverables || 0}</p>
-                        <p className="text-sm font-medium text-blue-600">Entregables Totales</p>
+                        <p className="text-2xl font-bold text-blue-700">{summary.totalDeliverables || 0}</p>
+                        <p className="text-xs font-medium text-blue-600">Entregables Totales</p>
                       </div>
-                      <div className="p-3 bg-blue-200 rounded-full">
-                        <Target className="h-6 w-6 text-blue-700" />
+                      <div className="p-2 bg-blue-200 rounded-full">
+                        <Target className="h-4 w-4 text-blue-700" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-3xl font-bold text-green-700">{summary.onTimeDeliveries || 0}</p>
-                        <p className="text-sm font-medium text-green-600">Entregas a Tiempo</p>
+                        <p className="text-2xl font-bold text-green-700">{summary.onTimeDeliveries || 0}</p>
+                        <p className="text-xs font-medium text-green-600">Entregas a Tiempo</p>
                         <p className="text-xs text-green-500 font-semibold">
                           {summary.onTimePercentage ? `${Math.round(summary.onTimePercentage)}%` : '0%'} de puntualidad
                         </p>
                       </div>
-                      <div className="p-3 bg-green-200 rounded-full">
-                        <CheckCircle2 className="h-6 w-6 text-green-700" />
+                      <div className="p-2 bg-green-200 rounded-full">
+                        <CheckCircle2 className="h-4 w-4 text-green-700" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-3xl font-bold text-purple-700">
+                        <p className="text-2xl font-bold text-purple-700">
                           {summary.averageScores ? 
                             (Object.values(summary.averageScores).reduce((a, b) => a + b, 0) / 
                              Object.values(summary.averageScores).length).toFixed(1) : 
                             '0.0'}
                         </p>
-                        <p className="text-sm font-medium text-purple-600">Puntuación Promedio</p>
+                        <p className="text-xs font-medium text-purple-600">Puntuación Promedio</p>
                         <p className="text-xs text-purple-500 font-semibold">sobre 5.0 puntos</p>
                       </div>
-                      <div className="p-3 bg-purple-200 rounded-full">
-                        <Star className="h-6 w-6 text-purple-700" />
+                      <div className="p-2 bg-purple-200 rounded-full">
+                        <Star className="h-4 w-4 text-purple-700" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-                  <CardContent className="p-6">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-3xl font-bold text-orange-700">{summary.totalComments || 0}</p>
-                        <p className="text-sm font-medium text-orange-600">Comentarios Recibidos</p>
+                        <p className="text-2xl font-bold text-orange-700">{summary.totalComments || 0}</p>
+                        <p className="text-xs font-medium text-orange-600">Comentarios Recibidos</p>
                       </div>
-                      <div className="p-3 bg-orange-200 rounded-full">
-                        <MessageSquare className="h-6 w-6 text-orange-700" />
+                      <div className="p-2 bg-orange-200 rounded-full">
+                        <MessageSquare className="h-4 w-4 text-orange-700" />
                       </div>
                     </div>
                   </CardContent>
@@ -187,7 +181,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
               </div>
 
               {/* Métricas de rendimiento mejoradas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="border-l-4 border-l-blue-500">
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-2">
