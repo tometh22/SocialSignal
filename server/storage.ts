@@ -100,7 +100,6 @@ export interface IStorage {
   getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
   getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
   getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]>;
-  getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]>;
   getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
   updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
@@ -1660,48 +1659,6 @@ export class DatabaseStorage implements IStorage {
     if (projectIds.length === 0) return [];
     return await db.select().from(timeEntries).where(inArray(timeEntries.projectId, projectIds));
   }
-
-  async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
-    try {
-      console.log(`🔍 Ejecutando consulta SQL directa para cliente ${clientId}`);
-      
-      // Usar una consulta SQL directa
-      const result = await db.execute(sql`
-        SELECT 
-          te.id,
-          te.project_id as "projectId",
-          te.component_id as "componentId", 
-          te.personnel_id as "personnelId",
-          te.hours as "hoursWorked",
-          te.description,
-          te.date,
-          te.approved,
-          te.approved_date as "approvedDate",
-          te.approved_by as "approvedBy",
-          te.created_at as "createdAt",
-          p.name as "personnelName",
-          r.default_rate as "hourlyRate",
-          r.name as "personnelRole"
-        FROM time_entries te
-        LEFT JOIN personnel p ON te.personnel_id = p.id
-        LEFT JOIN roles r ON p.role_id = r.id
-        LEFT JOIN active_projects ap ON te.project_id = ap.id  
-        LEFT JOIN quotations q ON ap.quotation_id = q.id
-        WHERE q.client_id = ${clientId}
-        ORDER BY te.date DESC
-      `);
-      
-      console.log(`⏰ Encontradas ${result.length} entradas de tiempo para cliente ${clientId}`);
-      if (result.length > 0) {
-        console.log(`📋 Primera entrada:`, result[0]);
-      }
-      
-      return result as any[];
-    } catch (error) {
-      console.error(`❌ Error en getTimeEntriesByClientWithPersonnel para cliente ${clientId}:`, error);
-      return [];
-    }
-  }
   
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
     const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
@@ -2723,11 +2680,6 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error al eliminar encuesta NPS ${id}:`, error);
       return false;
     }
-  }
-
-  // Método para MemStorage - no se usa en producción
-  async getTimeEntriesByClientWithPersonnel(clientId: number): Promise<any[]> {
-    return [];
   }
 }
 
