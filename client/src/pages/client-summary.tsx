@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import ClientSummaryView from "@/components/dashboard/client-summary-view";
+import ClientSummaryEnhanced from "@/components/dashboard/client-summary-enhanced";
 
 const ClientSummaryPage = () => {
   const [, params] = useRoute('/client-summary/:id');
@@ -85,7 +85,7 @@ const ClientSummaryPage = () => {
         </Button>
       </div>
 
-      <ClientSummaryView clientId={clientId} clientName={clientName} />
+      <ClientSummaryEnhanced clientId={clientId} clientName={clientName} />
     </div>
   );
 };
