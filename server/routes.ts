@@ -1096,6 +1096,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Obtener entregables de todos los subproyectos Always-On de MODO
+  app.get("/api/projects/always-on/deliverables", async (req, res) => {
+    try {
+      console.log("Obteniendo entregables de todos los subproyectos Always-On de MODO");
+      
+      // IDs de los subproyectos de MODO Always-On
+      const subProjectIds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+      
+      let allDeliverables: any[] = [];
+      
+      // Obtener entregables de cada subproyecto
+      for (const projectId of subProjectIds) {
+        try {
+          const deliverables = await storage.getDeliverables(projectId);
+          if (deliverables && Array.isArray(deliverables)) {
+            // Agregar información del subproyecto a cada entregable
+            const deliverablesWithProject = deliverables.map((d: any) => ({
+              ...d,
+              subProjectId: projectId,
+              displayTitle: `${d.title || `Entregable ${d.id}`} (Subproyecto ${projectId})`
+            }));
+            allDeliverables = allDeliverables.concat(deliverablesWithProject);
+          }
+        } catch (error) {
+          console.warn(`Error obteniendo entregables del proyecto ${projectId}:`, error);
+        }
+      }
+      
+      console.log(`Total de entregables encontrados: ${allDeliverables.length}`);
+      res.json(allDeliverables);
+    } catch (error) {
+      console.error("Error obteniendo entregables Always-On:", error);
+      res.status(500).json({ message: "Error al obtener entregables" });
+    }
+  });
+
   // Crear un nuevo proyecto activo desde una cotización
   app.post("/api/active-projects", async (req, res) => {
     try {

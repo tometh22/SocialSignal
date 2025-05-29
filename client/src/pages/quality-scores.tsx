@@ -58,54 +58,42 @@ const QualityScoresPage = () => {
     enabled: !!clientId,
   });
 
-  // Filtrar solo proyectos que tienen entregables (según los logs, son: 5,16,6,8,9,7,10,11,12,13,14,15)
-  const projectsWithDeliverables = React.useMemo(() => {
+  // Agrupar proyectos por jerarquía para MODO (Always-On)
+  const projectsGrouped = React.useMemo(() => {
     console.log("Processing projects:", allProjects);
-    console.log("Type of allProjects:", typeof allProjects);
-    console.log("Is array?", Array.isArray(allProjects));
     
-    if (!allProjects) {
-      console.log("No projects data");
+    if (!allProjects || !Array.isArray(allProjects)) {
+      console.log("No projects data or not array");
       return [];
     }
     
-    // Si allProjects no es un array, puede estar en una propiedad anidada
-    let projectsArray = allProjects;
-    if (!Array.isArray(allProjects) && typeof allProjects === 'object') {
-      // Buscar el array en las propiedades del objeto
-      const keys = Object.keys(allProjects);
-      console.log("Object keys:", keys);
-      
-      for (const key of keys) {
-        if (Array.isArray(allProjects[key])) {
-          projectsArray = allProjects[key];
-          console.log(`Found array in property ${key}:`, projectsArray);
-          break;
-        }
-      }
-    }
-    
-    if (!Array.isArray(projectsArray)) {
-      console.log("Still not an array after processing");
-      return [];
-    }
-    
-    // IDs de proyectos que sabemos tienen entregables basado en los logs
-    const projectsWithDeliverablesIds = [5, 16, 6, 8, 9, 7, 10, 11, 12, 13, 14, 15];
-    
-    const filtered = projectsArray.filter((project: any) => 
-      projectsWithDeliverablesIds.includes(project.id)
+    // Para MODO, el proyecto padre es ID 16 (Always-On) y tiene subproyectos 5,6,7,8,9,10,11,12,13,14,15
+    const parentProject = allProjects.find((p: any) => p.id === 16);
+    const subProjects = allProjects.filter((p: any) => 
+      [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(p.id)
     );
     
-    console.log("Filtered projects:", filtered);
-    return filtered;
+    console.log("Parent project (ID 16):", parentProject);
+    console.log("Sub projects:", subProjects);
+    
+    if (parentProject) {
+      return [{
+        ...parentProject,
+        displayName: "MODO Always-On",
+        subProjects: subProjects
+      }];
+    }
+    
+    return allProjects;
   }, [allProjects]);
 
-  console.log("Final projects with deliverables:", projectsWithDeliverables);
+  console.log("Final grouped projects:", projectsGrouped);
 
-  // Obtener entregables del proyecto seleccionado
+  // Obtener entregables del proyecto seleccionado o de todos los subproyectos si es el padre
   const { data: deliverables } = useQuery({
-    queryKey: [`/api/projects/${selectedProject}/deliverables`],
+    queryKey: selectedProject === "16" 
+      ? [`/api/projects/always-on/deliverables`] 
+      : [`/api/projects/${selectedProject}/deliverables`],
     enabled: !!selectedProject,
   });
 
@@ -265,9 +253,9 @@ const QualityScoresPage = () => {
                     <SelectValue placeholder="Selecciona un proyecto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projectsWithDeliverables && projectsWithDeliverables.length > 0 ? projectsWithDeliverables.map((project: any) => (
+                    {projectsGrouped && projectsGrouped.length > 0 ? projectsGrouped.map((project: any) => (
                       <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.quotation?.projectName || project.name || `Proyecto ${project.id}`}
+                        {project.displayName || project.quotation?.projectName || project.name || `Proyecto ${project.id}`}
                       </SelectItem>
                     )) : (
                       <SelectItem disabled value="no-projects">
@@ -288,7 +276,7 @@ const QualityScoresPage = () => {
                     <SelectContent>
                       {deliverables && Array.isArray(deliverables) && deliverables.map((deliverable: any) => (
                         <SelectItem key={deliverable.id} value={deliverable.id.toString()}>
-                          {deliverable.title || deliverable.name || `Entregable ${deliverable.id}`}
+                          {deliverable.displayTitle || deliverable.title || deliverable.name || `Entregable ${deliverable.id}`}
                         </SelectItem>
                       ))}
                     </SelectContent>
