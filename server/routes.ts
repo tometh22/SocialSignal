@@ -1911,6 +1911,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al obtener datos MODO" });
     }
   });
+
+  // Obtener todos los entregables de un proyecto específico (para calidad de puntuaciones)
+  app.get("/api/projects/:projectId/deliverables", async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ message: "ID de proyecto inválido" });
+    }
+    
+    try {
+      const { rows } = await db.execute(
+        `SELECT * FROM deliverables WHERE project_id = ${projectId} ORDER BY created_at DESC`
+      );
+      
+      console.log(`Entregables encontrados para proyecto ID ${projectId}: ${rows.length}`);
+      res.json(rows);
+    } catch (error) {
+      console.error(`Error al obtener entregables del proyecto ID ${projectId}:`, error);
+      res.status(500).json({ message: "Error al obtener entregables del proyecto" });
+    }
+  });
   
   // Obtener un entregable por ID
   app.get("/api/deliverables/:id", async (req, res) => {
