@@ -234,7 +234,7 @@ export default function Clients() {
   return (
     <div className="page-container">
       {/* Breadcrumbs unificados */}
-      <div className="breadcrumb-nav">
+      <div className="breadcrumb-nav mb-6">
         <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
           <span>Dashboard</span>
           <span>/</span>
