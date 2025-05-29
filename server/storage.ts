@@ -2569,19 +2569,20 @@ export class DatabaseStorage implements IStorage {
       if (data.onTime !== undefined) updateData.on_time = data.onTime;
       if (data.deliveryOnTime !== undefined) updateData.on_time = data.deliveryOnTime;
       if (data.on_time !== undefined) updateData.on_time = data.on_time;
-      if (data.narrativeQuality !== undefined) updateData.narrative_quality = data.narrativeQuality;
+      // Mapear campos con sufijo _score (del frontend) a campos sin sufijo (base de datos)
+      if (data.narrative_quality_score !== undefined) updateData.narrative_quality = data.narrative_quality_score;
       if (data.narrative_quality !== undefined) updateData.narrative_quality = data.narrative_quality;
-      if (data.graphicsEffectiveness !== undefined) updateData.graphics_effectiveness = data.graphicsEffectiveness;
+      if (data.graphics_effectiveness_score !== undefined) updateData.graphics_effectiveness = data.graphics_effectiveness_score;
       if (data.graphics_effectiveness !== undefined) updateData.graphics_effectiveness = data.graphics_effectiveness;
-      if (data.formatDesign !== undefined) updateData.format_design = data.formatDesign;
+      if (data.format_design_score !== undefined) updateData.format_design = data.format_design_score;
       if (data.format_design !== undefined) updateData.format_design = data.format_design;
-      if (data.relevantInsights !== undefined) updateData.relevant_insights = data.relevantInsights;
+      if (data.relevant_insights_score !== undefined) updateData.relevant_insights = data.relevant_insights_score;
       if (data.relevant_insights !== undefined) updateData.relevant_insights = data.relevant_insights;
-      if (data.operationsFeedback !== undefined) updateData.operations_feedback = data.operationsFeedback;
+      if (data.operations_feedback_score !== undefined) updateData.operations_feedback = data.operations_feedback_score;
       if (data.operations_feedback !== undefined) updateData.operations_feedback = data.operations_feedback;
-      if (data.clientFeedback !== undefined) updateData.client_feedback = data.clientFeedback;
+      if (data.client_feedback_score !== undefined) updateData.client_feedback = data.client_feedback_score;
       if (data.client_feedback !== undefined) updateData.client_feedback = data.client_feedback;
-      if (data.briefCompliance !== undefined) updateData.brief_compliance = data.briefCompliance;
+      if (data.brief_compliance_score !== undefined) updateData.brief_compliance = data.brief_compliance_score;
       if (data.brief_compliance !== undefined) updateData.brief_compliance = data.brief_compliance;
       if (data.notes !== undefined) updateData.notes = data.notes;
       
