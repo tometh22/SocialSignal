@@ -52,11 +52,26 @@ const QualityScoresPage = () => {
     enabled: !!clientId,
   });
 
-  // Obtener proyectos del cliente
-  const { data: projects } = useQuery({
+  // Obtener proyectos del cliente que tienen entregables
+  const { data: allProjects } = useQuery({
     queryKey: [`/api/clients/${clientId}/projects`],
     enabled: !!clientId,
   });
+
+  // Filtrar solo proyectos que tienen entregables (según los logs, son: 5,16,6,8,9,7,10,11,12,13,14,15)
+  const projectsWithDeliverables = React.useMemo(() => {
+    if (!allProjects || !Array.isArray(allProjects)) return [];
+    
+    // IDs de proyectos que sabemos tienen entregables basado en los logs
+    const projectsWithDeliverablesIds = [5, 16, 6, 8, 9, 7, 10, 11, 12, 13, 14, 15];
+    
+    return allProjects.filter((project: any) => 
+      projectsWithDeliverablesIds.includes(project.id)
+    );
+  }, [allProjects]);
+
+  console.log("Todos los proyectos:", allProjects);
+  console.log("Proyectos con entregables:", projectsWithDeliverables);
 
   // Obtener entregables del proyecto seleccionado
   const { data: deliverables } = useQuery({
@@ -72,18 +87,19 @@ const QualityScoresPage = () => {
 
   // Cargar datos del entregable cuando se selecciona
   React.useEffect(() => {
-    if (deliverableData) {
+    if (deliverableData && typeof deliverableData === 'object') {
+      const data = deliverableData as any;
       setScores({
-        narrative_quality_score: deliverableData.narrative_quality_score?.toString() || "",
-        graphics_effectiveness_score: deliverableData.graphics_effectiveness_score?.toString() || "",
-        format_design_score: deliverableData.format_design_score?.toString() || "",
-        relevant_insights_score: deliverableData.relevant_insights_score?.toString() || "",
-        operations_feedback_score: deliverableData.operations_feedback_score?.toString() || "",
-        client_feedback_score: deliverableData.client_feedback_score?.toString() || "",
-        brief_compliance_score: deliverableData.brief_compliance_score?.toString() || "",
-        hours_available: deliverableData.hours_available?.toString() || "",
-        hours_real: deliverableData.hours_real?.toString() || "",
-        notes: deliverableData.notes || ""
+        narrative_quality_score: data.narrative_quality_score?.toString() || data.narrative_quality?.toString() || "",
+        graphics_effectiveness_score: data.graphics_effectiveness_score?.toString() || data.graphics_effectiveness?.toString() || "",
+        format_design_score: data.format_design_score?.toString() || data.format_design?.toString() || "",
+        relevant_insights_score: data.relevant_insights_score?.toString() || data.relevant_insights?.toString() || "",
+        operations_feedback_score: data.operations_feedback_score?.toString() || data.operations_feedback?.toString() || "",
+        client_feedback_score: data.client_feedback_score?.toString() || data.client_feedback?.toString() || "",
+        brief_compliance_score: data.brief_compliance_score?.toString() || data.brief_compliance?.toString() || "",
+        hours_available: data.hours_available?.toString() || "",
+        hours_real: data.hours_real?.toString() || "",
+        notes: data.notes || ""
       });
     }
   }, [deliverableData]);
@@ -91,10 +107,19 @@ const QualityScoresPage = () => {
   // Mutación para actualizar puntuaciones
   const updateScoresMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/deliverables/${selectedDeliverable}`, {
+      const response = await fetch(`/api/deliverables/${selectedDeliverable}`, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(data),
       });
+      
+      if (!response.ok) {
+        throw new Error("Error al actualizar puntuaciones");
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -210,11 +235,15 @@ const QualityScoresPage = () => {
                     <SelectValue placeholder="Selecciona un proyecto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects && Array.isArray(projects) && projects.map((project: any) => (
+                    {projectsWithDeliverables && projectsWithDeliverables.length > 0 ? projectsWithDeliverables.map((project: any) => (
                       <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.name || `Proyecto ${project.id}`}
+                        {project.quotation?.projectName || project.name || `Proyecto ${project.id}`}
                       </SelectItem>
-                    ))}
+                    )) : (
+                      <SelectItem disabled value="no-projects">
+                        No hay proyectos disponibles
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
