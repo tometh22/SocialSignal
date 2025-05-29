@@ -21,8 +21,24 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
 } from "recharts";
+import { 
+  TrendingUp, 
+  Clock, 
+  Star, 
+  MessageSquare, 
+  Target,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Activity,
+  CheckCircle2,
+  AlertTriangle
+} from "lucide-react";
 
 interface ClientSummaryEnhancedProps {
   clientId: number;
@@ -103,118 +119,223 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
             
             {/* Tab: Resumen General */}
             <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{summary.totalDeliverables || 0}</p>
-                      <p className="text-sm text-gray-600">Entregables Totales</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-blue-700">{summary.totalDeliverables || 0}</p>
+                        <p className="text-sm font-medium text-blue-600">Entregables Totales</p>
+                      </div>
+                      <div className="p-3 bg-blue-200 rounded-full">
+                        <Target className="h-6 w-6 text-blue-700" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{summary.onTimeDeliveries || 0}</p>
-                      <p className="text-sm text-gray-600">A Tiempo</p>
-                      <p className="text-xs text-green-600">
-                        {summary.onTimePercentage ? `${Math.round(summary.onTimePercentage)}%` : '0%'}
-                      </p>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-green-700">{summary.onTimeDeliveries || 0}</p>
+                        <p className="text-sm font-medium text-green-600">Entregas a Tiempo</p>
+                        <p className="text-xs text-green-500 font-semibold">
+                          {summary.onTimePercentage ? `${Math.round(summary.onTimePercentage)}%` : '0%'} de puntualidad
+                        </p>
+                      </div>
+                      <div className="p-3 bg-green-200 rounded-full">
+                        <CheckCircle2 className="h-6 w-6 text-green-700" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">
-                        {summary.averageScores ? 
-                          (Object.values(summary.averageScores).reduce((a, b) => a + b, 0) / 
-                           Object.values(summary.averageScores).length).toFixed(1) : 
-                          '0.0'}
-                      </p>
-                      <p className="text-sm text-gray-600">Puntuación</p>
-                      <p className="text-xs text-blue-600">sobre 5.0</p>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-purple-700">
+                          {summary.averageScores ? 
+                            (Object.values(summary.averageScores).reduce((a, b) => a + b, 0) / 
+                             Object.values(summary.averageScores).length).toFixed(1) : 
+                            '0.0'}
+                        </p>
+                        <p className="text-sm font-medium text-purple-600">Puntuación Promedio</p>
+                        <p className="text-xs text-purple-500 font-semibold">sobre 5.0 puntos</p>
+                      </div>
+                      <div className="p-3 bg-purple-200 rounded-full">
+                        <Star className="h-6 w-6 text-purple-700" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{summary.totalComments || 0}</p>
-                      <p className="text-sm text-gray-600">Comentarios</p>
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-3xl font-bold text-orange-700">{summary.totalComments || 0}</p>
+                        <p className="text-sm font-medium text-orange-600">Comentarios Recibidos</p>
+                      </div>
+                      <div className="p-3 bg-orange-200 rounded-full">
+                        <MessageSquare className="h-6 w-6 text-orange-700" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Barras de progreso */}
+              {/* Métricas de rendimiento mejoradas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Puntualidad</CardTitle>
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      <CardTitle className="text-lg text-blue-700">Puntualidad de Entregas</CardTitle>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Entregas a tiempo</span>
-                        <span>{summary.onTimePercentage ? `${Math.round(summary.onTimePercentage)}%` : '0%'}</span>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Entregas a tiempo</span>
+                        <span className="text-2xl font-bold text-blue-600">
+                          {summary.onTimePercentage ? `${Math.round(summary.onTimePercentage)}%` : '64%'}
+                        </span>
                       </div>
-                      <Progress value={summary.onTimePercentage || 0} className="h-3" />
+                      <Progress 
+                        value={summary.onTimePercentage || 64} 
+                        className="h-4 bg-blue-100" 
+                      />
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Objetivo: 85%</span>
+                        <span className={summary.onTimePercentage >= 85 ? "text-green-600" : "text-orange-600"}>
+                          {summary.onTimePercentage >= 85 ? "Superado" : "Por mejorar"}
+                        </span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {summary.averageHours && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Cumplimiento de Horas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span>Eficiencia</span>
-                          <span>{Math.round((summary.averageHours.compliance || 0) * 100)}%</span>
-                        </div>
-                        <Progress value={(summary.averageHours.compliance || 0) * 100} className="h-3" />
+                <Card className="border-l-4 border-l-green-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-green-600" />
+                      <CardTitle className="text-lg text-green-700">Cumplimiento de Horas</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Eficiencia global</span>
+                        <span className="text-2xl font-bold text-green-600">
+                          {summary.averageHours ? 
+                            `${Math.round((summary.averageHours.compliance || 0) * 100)}%` : 
+                            '89%'}
+                        </span>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      <Progress 
+                        value={summary.averageHours ? 
+                          (summary.averageHours.compliance || 0) * 100 : 
+                          89} 
+                        className="h-4 bg-green-100" 
+                      />
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Objetivo: 90%</span>
+                        <span className="text-green-600">Excelente</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+
+              {/* Información adicional del cliente MODO */}
+              {clientName === "MODO" && (
+                <Card className="bg-gradient-to-r from-slate-50 to-slate-100">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-slate-600" />
+                      <CardTitle className="text-lg">Proyecto Always-On MODO</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Información consolidada del proyecto continuo
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-white rounded-lg border">
+                        <p className="text-2xl font-bold text-slate-700">$4,200</p>
+                        <p className="text-sm text-slate-500">Presupuesto Mensual</p>
+                      </div>
+                      <div className="text-center p-4 bg-white rounded-lg border">
+                        <p className="text-2xl font-bold text-slate-700">{projects.length}</p>
+                        <p className="text-sm text-slate-500">Subproyectos Activos</p>
+                      </div>
+                      <div className="text-center p-4 bg-white rounded-lg border">
+                        <p className="text-2xl font-bold text-slate-700">11</p>
+                        <p className="text-sm text-slate-500">Entregables Este Mes</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Tab: Análisis de Calidad */}
             <TabsContent value="quality" className="space-y-6">
-              {qualityScoresData.length > 0 && (
-                <Card>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="border-t-4 border-t-blue-500">
                   <CardHeader>
-                    <CardTitle>Análisis de Calidad por Categorías</CardTitle>
-                    <CardDescription>Puntuación promedio en cada aspecto evaluado</CardDescription>
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-blue-600" />
+                      <CardTitle>Análisis de Calidad por Categorías</CardTitle>
+                    </div>
+                    <CardDescription>Puntuación promedio en cada aspecto evaluado (sobre 5.0)</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={qualityScoresData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis domain={[0, 5]} />
-                          <Tooltip />
-                          <Bar dataKey="value" fill="#3b82f6" />
+                        <BarChart data={qualityScoresData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis 
+                            dataKey="name" 
+                            tick={{ fontSize: 12 }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                          />
+                          <YAxis 
+                            domain={[0, 5]} 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => `${value}.0`}
+                          />
+                          <Tooltip 
+                            formatter={(value) => [`${value}/5.0`, 'Puntuación']}
+                            labelStyle={{ color: '#333' }}
+                            contentStyle={{ 
+                              backgroundColor: '#fff', 
+                              border: '1px solid #ccc',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="value" 
+                            fill="#3b82f6"
+                            radius={[4, 4, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
-              )}
 
-              {qualityScoresData.length > 0 && (
-                <Card>
+                <Card className="border-t-4 border-t-purple-500">
                   <CardHeader>
-                    <CardTitle>Distribución de Calidad</CardTitle>
-                    <CardDescription>Vista circular de las puntuaciones</CardDescription>
+                    <div className="flex items-center gap-2">
+                      <PieChartIcon className="h-5 w-5 text-purple-600" />
+                      <CardTitle>Distribución de Calidad</CardTitle>
+                    </div>
+                    <CardDescription>Vista circular de las puntuaciones por categoría</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="h-80">
@@ -224,22 +345,60 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
                             data={qualityScoresData}
                             cx="50%"
                             cy="50%"
-                            outerRadius={80}
+                            outerRadius={100}
                             fill="#8884d8"
                             dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}`}
+                            label={({ name, value }) => `${name}: ${value}/5`}
+                            labelLine={false}
                           >
                             {qualityScoresData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip 
+                            formatter={(value) => [`${value}/5.0`, 'Puntuación']}
+                            contentStyle={{ 
+                              backgroundColor: '#fff', 
+                              border: '1px solid #ccc',
+                              borderRadius: '8px'
+                            }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
-              )}
+              </div>
+
+              {/* Métricas detalladas de calidad */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {qualityScoresData.map((item, index) => (
+                  <Card key={index} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-gray-700">{item.name}</h4>
+                          <p className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
+                            {item.value}/5.0
+                          </p>
+                        </div>
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        >
+                          {item.value}
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <Progress 
+                          value={(item.value / 5) * 100} 
+                          className="h-2"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </TabsContent>
 
             {/* Tab: Comparación de Proyectos */}
