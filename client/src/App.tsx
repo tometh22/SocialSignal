@@ -1,7 +1,7 @@
 import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard-fixed";
+import Dashboard from "@/pages/dashboard-fixed-corrected";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
