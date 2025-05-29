@@ -278,8 +278,8 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
     );
   }
 
-  // Si no hay datos, mostrar mensaje
-  if (!clientSummary || (clientSummary && clientSummary.totalDeliverables === 0)) {
+  // Si no hay datos, mostrar mensaje - pero proceder con datos disponibles
+  if (!clientSummary && deliverables.length === 0) {
     return (
       <Card>
         <CardHeader>
