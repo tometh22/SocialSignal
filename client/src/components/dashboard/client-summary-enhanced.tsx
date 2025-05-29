@@ -304,7 +304,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
                             tickFormatter={(value) => `${value}.0`}
                           />
                           <Tooltip 
-                            formatter={(value) => [`${value}/5.0`, 'Puntuación']}
+                            formatter={(value) => [`${Number(value).toFixed(2)}/5.0`, 'Puntuación']}
                             labelStyle={{ color: '#333' }}
                             contentStyle={{ 
                               backgroundColor: '#fff', 
@@ -342,7 +342,7 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="value"
-                            label={({ name, value }) => `${name}: ${value}/5`}
+                            label={({ name, value }) => `${name}: ${Number(value).toFixed(2)}/5`}
                             labelLine={false}
                           >
                             {qualityScoresData.map((entry, index) => (
@@ -373,14 +373,14 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
                         <div>
                           <h4 className="font-medium text-gray-700">{item.name}</h4>
                           <p className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
-                            {item.value}/5.0
+                            {item.value.toFixed(2)}/5.0
                           </p>
                         </div>
                         <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
                           style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         >
-                          {item.value}
+                          {item.value.toFixed(2)}
                         </div>
                       </div>
                       <div className="mt-3">
