@@ -139,18 +139,32 @@ const QualityScoresPage = () => {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedData) => {
       toast({
         title: "Puntuaciones actualizadas",
         description: "Las puntuaciones de calidad se han guardado correctamente.",
       });
-      // Invalidar caché relacionado y recargar datos
+      
+      // Actualizar directamente los campos del formulario con los datos devueltos
+      if (updatedData) {
+        setScores({
+          narrative_quality_score: updatedData.narrative_quality?.toString() || scores.narrative_quality_score,
+          graphics_effectiveness_score: updatedData.graphics_effectiveness?.toString() || scores.graphics_effectiveness_score,
+          format_design_score: updatedData.format_design?.toString() || scores.format_design_score,
+          relevant_insights_score: updatedData.relevant_insights?.toString() || scores.relevant_insights_score,
+          operations_feedback_score: updatedData.operations_feedback?.toString() || scores.operations_feedback_score,
+          client_feedback_score: updatedData.client_feedback?.toString() || scores.client_feedback_score,
+          brief_compliance_score: updatedData.brief_compliance?.toString() || scores.brief_compliance_score,
+          hours_available: updatedData.hours_available?.toString() || scores.hours_available,
+          hours_real: updatedData.hours_real?.toString() || scores.hours_real,
+          notes: updatedData.notes || scores.notes
+        });
+      }
+      
+      // Invalidar caché relacionado
       queryClient.invalidateQueries({ queryKey: [`/api/deliverables/${selectedDeliverable}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/modo-summary`] });
       queryClient.invalidateQueries({ queryKey: [`/api/clients/${clientId}/deliverables`] });
-      
-      // Recargar datos del entregable inmediatamente
-      queryClient.refetchQueries({ queryKey: [`/api/deliverables/${selectedDeliverable}`] });
     },
     onError: (error: any) => {
       toast({
