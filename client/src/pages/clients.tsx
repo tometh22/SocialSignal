@@ -252,19 +252,19 @@ export default function Clients() {
         </div>
       </div>
 
+      {/* Buscador separado */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+        <Input
+          placeholder="Buscar clientes..."
+          className="pl-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
       <Card className="standard-card">
         <CardContent className="card-content">
-          <div className="relative mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
-              <Input
-                placeholder="Buscar clientes..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
 
           {isLoading ? (
             <div className="text-center py-8 text-muted">Cargando clientes...</div>
