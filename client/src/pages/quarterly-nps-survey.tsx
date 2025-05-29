@@ -16,14 +16,17 @@ interface QuarterlyNpsSurvey {
   clientId: number;
   quarter: number;
   year: number;
-  reportQuality?: number;
-  insightsClarity?: number;
-  briefObjectives?: number;
-  reportPresentation?: number;
-  improvementSuggestions?: string;
-  strengthsFeedback?: string;
-  npsScore?: number;
-  npsCategory?: string;
+  reportQuality?: number | null;
+  insightsClarity?: number | null;
+  briefObjectives?: number | null;
+  reportPresentation?: number | null;
+  improvementSuggestions?: string | null;
+  strengthsFeedback?: string | null;
+  npsScore?: number | null;
+  npsCategory?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: number | null;
 }
 
 export default function QuarterlyNpsSurvey() {
@@ -47,14 +50,24 @@ export default function QuarterlyNpsSurvey() {
 
   // Obtener datos del cliente
   const { data: client } = useQuery({
-    queryKey: ["/api/clients", clientId],
+    queryKey: [`/api/clients/${clientId}`],
+    enabled: !!clientId,
   });
 
   // Mutación para guardar la encuesta
   const mutation = useMutation({
     mutationFn: async (data: QuarterlyNpsSurvey) => {
-      const response = await apiRequest(`/api/nps-surveys`, data);
-      return response;
+      const response = await fetch('/api/nps-surveys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save survey');
+      }
+      return response.json();
     },
     onSuccess: () => {
       toast({

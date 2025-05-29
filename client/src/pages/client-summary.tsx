@@ -92,6 +92,15 @@ const ClientSummaryPage = () => {
             <Button 
               variant="default" 
               size="sm" 
+              onClick={() => navigate(`/quarterly-nps/${clientId}`)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Encuesta NPS
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm" 
               onClick={() => navigate(`/quality-scores/${clientId}`)}
               className="bg-blue-600 hover:bg-blue-700"
             >

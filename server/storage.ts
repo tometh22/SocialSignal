@@ -13,9 +13,9 @@ import {
   type User, type InsertUser,
   type Deliverable, type InsertDeliverable,
   type ClientModoComment, type InsertClientModoComment,
-  type ClientNpsSurvey, type InsertClientNpsSurvey,
+  type QuarterlyNpsSurvey, type InsertQuarterlyNpsSurvey,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
-  activeProjects, projectComponents, timeEntries, progressReports, users, clientNpsSurveys,
+  activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
@@ -146,10 +146,10 @@ export interface IStorage {
   getTrackingFrequencyOptions(): Promise<typeof trackingFrequencyOptions>;
   
   // NPS Survey operations
-  getNpsSurveysByClient(clientId: number): Promise<ClientNpsSurvey[]>;
-  getNpsSurvey(id: number): Promise<ClientNpsSurvey | undefined>;
-  createNpsSurvey(survey: InsertClientNpsSurvey): Promise<ClientNpsSurvey>;
-  updateNpsSurvey(id: number, survey: Partial<InsertClientNpsSurvey>): Promise<ClientNpsSurvey | undefined>;
+  getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]>;
+  getNpsSurvey(id: number): Promise<QuarterlyNpsSurvey | undefined>;
+  createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey>;
+  updateNpsSurvey(id: number, survey: Partial<InsertQuarterlyNpsSurvey>): Promise<QuarterlyNpsSurvey | undefined>;
   deleteNpsSurvey(id: number): Promise<boolean>;
 
   // User operations
@@ -2628,9 +2628,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Implementación de métodos NPS Survey
-  async getNpsSurveysByClient(clientId: number): Promise<ClientNpsSurvey[]> {
+  async getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]> {
     try {
-      const surveys = await db.select().from(clientNpsSurveys).where(eq(clientNpsSurveys.clientId, clientId));
+      const surveys = await db.select().from(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.clientId, clientId));
       return surveys;
     } catch (error) {
       console.error(`Error al obtener encuestas NPS del cliente ${clientId}:`, error);
@@ -2638,9 +2638,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getNpsSurvey(id: number): Promise<ClientNpsSurvey | undefined> {
+  async getNpsSurvey(id: number): Promise<QuarterlyNpsSurvey | undefined> {
     try {
-      const [survey] = await db.select().from(clientNpsSurveys).where(eq(clientNpsSurveys.id, id));
+      const [survey] = await db.select().from(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.id, id));
       return survey;
     } catch (error) {
       console.error(`Error al obtener encuesta NPS ${id}:`, error);
@@ -2648,9 +2648,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createNpsSurvey(survey: InsertClientNpsSurvey): Promise<ClientNpsSurvey> {
+  async createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey> {
     try {
-      const [newSurvey] = await db.insert(clientNpsSurveys).values(survey).returning();
+      const [newSurvey] = await db.insert(quarterlyNpsSurveys).values(survey).returning();
       console.log(`Encuesta NPS creada para cliente ${survey.clientId}`);
       return newSurvey;
     } catch (error) {
@@ -2659,11 +2659,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateNpsSurvey(id: number, survey: Partial<InsertClientNpsSurvey>): Promise<ClientNpsSurvey | undefined> {
+  async updateNpsSurvey(id: number, survey: Partial<InsertQuarterlyNpsSurvey>): Promise<QuarterlyNpsSurvey | undefined> {
     try {
-      const [updatedSurvey] = await db.update(clientNpsSurveys)
+      const [updatedSurvey] = await db.update(quarterlyNpsSurveys)
         .set(survey)
-        .where(eq(clientNpsSurveys.id, id))
+        .where(eq(quarterlyNpsSurveys.id, id))
         .returning();
       return updatedSurvey;
     } catch (error) {
@@ -2674,7 +2674,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNpsSurvey(id: number): Promise<boolean> {
     try {
-      await db.delete(clientNpsSurveys).where(eq(clientNpsSurveys.id, id));
+      await db.delete(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.id, id));
       return true;
     } catch (error) {
       console.error(`Error al eliminar encuesta NPS ${id}:`, error);
