@@ -1679,7 +1679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           filteredSubprojects = subprojects.filter(subproject => {
             const startDate = new Date(subproject.startDate);
-            const endDate = new Date(subproject.expectedEndDate);
+            const endDate = subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : new Date();
             
             return (startDate <= lastDayOfMonth && endDate >= firstDayOfMonth);
           });
@@ -1698,7 +1698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           filteredSubprojects = subprojects.filter(subproject => {
             const projectStartDate = new Date(subproject.startDate);
-            const projectEndDate = new Date(subproject.expectedEndDate);
+            const projectEndDate = subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : new Date();
             
             return (projectStartDate <= endDate && projectEndDate >= startDate);
           });

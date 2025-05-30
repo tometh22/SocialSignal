@@ -204,7 +204,7 @@ export class DatabaseStorage implements IStorage {
     const currentCost = await this.calculateProjectTotalCost(entry.projectId);
     
     // Validar límite de presupuesto
-    const totalBudget = project.quotation.totalBudget || 0;
+    const totalBudget = project.quotation.baseCost || 0;
     if (currentCost + entryCost > totalBudget) {
       throw new Error(`Esta entrada excedería el presupuesto del proyecto. Límite: $${totalBudget}, Actual: $${currentCost}, Nueva entrada: $${entryCost}`);
     }
