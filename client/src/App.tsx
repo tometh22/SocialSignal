@@ -107,18 +107,14 @@ function AppRoutes() {
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   <ProtectedRoute path="/huggies" component={HuggiesPage} />
-                  <ProtectedRoute path="/new-quote">
-                    <Redirect to="/optimized-quote" />
-                  </ProtectedRoute>
+                  <ProtectedRoute path="/new-quote" component={() => <Redirect to="/optimized-quote" />} />
                   <ProtectedRoute path="/manage-quotes" component={ManageQuotes} />
                   <ProtectedRoute path="/quote/:id" component={QuoteDetails} />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
                   <ProtectedRoute path="/quotation/:id" component={QuotationDetail} />
                   <ProtectedRoute path="/clients" component={Clients} />
                   <ProtectedRoute path="/statistics" component={Statistics} />
-                  <ProtectedRoute path="/history">
-                    <Redirect to="/statistics" />
-                  </ProtectedRoute>
+                  <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
                   <ProtectedRoute path="/admin" component={Admin} />
                   {/* Rutas para gestión de proyectos activos */}
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsOptimized} />

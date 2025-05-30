@@ -60,7 +60,7 @@ export default function ActiveProjectsModern() {
       "completed": { className: "bg-gray-100 text-gray-700 hover:bg-gray-100", label: "Completado" }
     };
     
-    const statusConfig = config[status] || config.active;
+    const statusConfig = config[status as keyof typeof config] || config.active;
     
     return (
       <Badge variant="secondary" className={`text-xs font-medium px-2 py-1 ${statusConfig.className}`}>
@@ -133,7 +133,7 @@ export default function ActiveProjectsModern() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los clientes</SelectItem>
-              {clients.map((client: any) => (
+              {(clients as any[]).map((client: any) => (
                 <SelectItem key={client.id} value={client.id.toString()}>
                   {client.name}
                 </SelectItem>
@@ -144,7 +144,7 @@ export default function ActiveProjectsModern() {
 
         {/* Lista de Proyectos */}
         <div className="space-y-4">
-          {projects.map((project: any) => {
+          {(projects as any[]).map((project: any) => {
             const subprojects = allProjects.filter((p: any) => p.parentProjectId === project.id);
             const isExpanded = expandedProjects.has(project.id);
             const isModoProject = project.id === 16;
@@ -315,7 +315,7 @@ export default function ActiveProjectsModern() {
           })}
         </div>
 
-        {projects.length === 0 && (
+        {(projects as any[]).length === 0 && (
           <div className="text-center py-12">
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay proyectos activos</h3>

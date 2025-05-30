@@ -498,8 +498,8 @@ export default function Admin() {
       complexity: template.complexity,
       pageRange: template.pageRange || "",
       features: template.features || "",
-      platformCost: template.platformCost,
-      deviationPercentage: template.deviationPercentage
+      platformCost: template.platformCost ?? undefined,
+      deviationPercentage: template.deviationPercentage ?? undefined
     });
     setCurrentTemplate(template);
     setIsEditing(true);
