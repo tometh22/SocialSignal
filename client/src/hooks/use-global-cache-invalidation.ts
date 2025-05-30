@@ -53,6 +53,11 @@ export const useGlobalCacheInvalidation = () => {
   };
 
   const updatePersonnelInCache = (updatedPersonnel: any) => {
+    // Forzar actualización inmediata eliminando el caché y recargando
+    queryClient.removeQueries({ queryKey: ["/api/personnel"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    
+    // También actualizar manualmente para mayor velocidad
     queryClient.setQueryData(["/api/personnel"], (oldData: any[] | undefined) => {
       if (!oldData) return [updatedPersonnel];
       return oldData.map(item => item.id === updatedPersonnel.id ? updatedPersonnel : item);

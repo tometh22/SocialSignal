@@ -69,24 +69,47 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       };
       
       console.log("Enviando datos procesados:", processedData);
-      const response = await apiRequest("PATCH", `/api/personnel/${id}`, processedData);
+      const response = await fetch(`/api/personnel/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(processedData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al actualizar personal');
+      }
+      
       return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
+      // Actualización instantánea del estado local PRIMERO
       setUpdatedPerson(updatedData);
+      setEditName(updatedData.name);
+      setEditRoleId(updatedData.roleId);
+      setEditRate(updatedData.hourlyRate);
+      setEditRateText(updatedData.hourlyRate.toString().replace('.', ','));
       
-      // Notificar al componente padre si existe onUpdate
+      // Actualizar inmediatamente el caché con los nuevos datos
+      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      
+      // Notificar al componente padre DESPUÉS de actualizar el estado
       if (onUpdate) {
         onUpdate(updatedData);
       }
       
-      // Actualizar caché inmediatamente y invalidar datos relacionados
-      updatePersonnelInCache(updatedData);
-      invalidatePersonnelData();
+      // Forzar un re-render completo invalidando las consultas
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      }, 50);
       
       toast({
         title: "Éxito",
-        description: "Miembro del equipo actualizado correctamente.",
+        description: `Tarifa actualizada a $${updatedData.hourlyRate}/hr`,
       });
       setIsEditing(false);
     },
