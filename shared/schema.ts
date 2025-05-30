@@ -173,6 +173,7 @@ export const insertTemplateRoleAssignmentSchema = createInsertSchema(templateRol
 export const activeProjects = pgTable("active_projects", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
   status: text("status").notNull().default("active"), // active, completed, cancelled, on-hold
   startDate: timestamp("start_date").notNull(),
   expectedEndDate: timestamp("expected_end_date"),

@@ -1149,14 +1149,14 @@ export class DatabaseStorage implements IStorage {
 
   async getClientCostSummary(clientId: number): Promise<any> {
     try {
-      const projects = await db.select().from(activeProjects).where(eq(activeProjects.client_id, clientId));
+      const projects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, clientId));
       const allTimeEntries = await db.select().from(timeEntries);
       
       let totalCost = 0;
       let totalBudget = 0;
       
       for (const project of projects) {
-        totalBudget += parseFloat(project.costLimit || '0');
+        totalBudget += parseFloat(project.deliverableBudget || '0');
         const projectTimeEntries = allTimeEntries.filter((te: any) => te.projectId === project.id);
         for (const entry of projectTimeEntries) {
           totalCost += parseFloat(entry.totalCost || '0');
