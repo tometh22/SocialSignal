@@ -21,7 +21,10 @@ import {
   trackingFrequencyOptions,
   deliverables,
   clientModoComments,
-  activeProjects
+  activeProjects,
+  quotations,
+  timeEntries,
+  personnel
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -1358,7 +1361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(entries);
       } else {
         // Si no se especifica proyecto, devolver todas las entradas
-        const entries = await storage.getAllTimeEntries();
+        const entries = await storage.getTimeEntries();
         res.json(entries);
       }
     } catch (error) {
