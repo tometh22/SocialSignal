@@ -232,7 +232,7 @@ export default function Admin() {
       return await apiRequest(`/api/roles/${id}`, "PATCH", data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      invalidateAllRelatedData();
       setRoleDialogOpen(false);
       roleForm.reset();
       toast({
@@ -254,7 +254,7 @@ export default function Admin() {
       return await apiRequest(`/api/roles/${id}`, "DELETE");
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      invalidateAllRelatedData();
       toast({
         title: "Éxito",
         description: "Rol eliminado correctamente.",
@@ -273,7 +273,7 @@ export default function Admin() {
   const createPersonnelMutation = useMutation({
     mutationFn: (personnel: InsertPersonnel) => apiRequest("/api/personnel", "POST", personnel),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      invalidatePersonnelData();
       setPersonnelDialogOpen(false);
       personnelForm.reset();
       toast({
@@ -295,7 +295,7 @@ export default function Admin() {
       return await apiRequest(`/api/personnel/${id}`, "PATCH", data);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      invalidatePersonnelData();
       setPersonnelDialogOpen(false);
       personnelForm.reset();
       toast({
@@ -317,7 +317,7 @@ export default function Admin() {
       return await apiRequest(`/api/personnel/${id}`, "DELETE");
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      invalidatePersonnelData();
       toast({
         title: "Éxito",
         description: "Miembro del equipo eliminado correctamente.",
@@ -336,7 +336,7 @@ export default function Admin() {
   const createTemplateMutation = useMutation({
     mutationFn: (template: InsertReportTemplate) => apiRequest("/api/templates", "POST", template),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      invalidateAllRelatedData();
       setTemplateDialogOpen(false);
       templateForm.reset();
       toast({
