@@ -500,7 +500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!status) return res.status(400).json({ message: "Status is required" });
 
-      const updatedQuotation = await storage.updateQuotationStatus(id, status);
+      const updatedQuotation = await storage.updateQuotation(id, { status });
       console.log(`[API] Resultado de actualización:`, updatedQuotation);
       
       if (!updatedQuotation) {
