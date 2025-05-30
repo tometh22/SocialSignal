@@ -184,7 +184,7 @@ export const activeProjects = pgTable("active_projects", {
   createdBy: integer("created_by").references(() => users.id),
   
   // Campos para proyectos macro y subproyectos
-  parentProjectId: integer("parent_project_id").references(() => activeProjects.id), // Referencia al proyecto padre (para subproyectos)
+  parentProjectId: integer("parent_project_id"), // Referencia al proyecto padre (para subproyectos)
   isAlwaysOnMacro: boolean("is_always_on_macro").default(false), // Indica si es un proyecto macro "Always On"
   macroMonthlyBudget: doublePrecision("macro_monthly_budget"), // Presupuesto mensual consolidado para proyectos "Always On"
   

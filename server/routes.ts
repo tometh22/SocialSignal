@@ -1159,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertActiveProjectSchema.parse(processedData);
       
       // Verificar que la cotización existe
-      const quotation = validatedData.quotationId ? await storage.getQuotation(validatedData.quotationId) : null;
+      const quotation = validatedData.quotationId ? await storage.getQuotation(Number(validatedData.quotationId)) : null;
       if (!quotation) {
         return res.status(404).json({ message: "Cotización no encontrada" });
       }

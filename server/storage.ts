@@ -1646,6 +1646,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(timeEntries).where(eq(timeEntries.personnelId, personnelId));
   }
   
+  async getTimeEntries(): Promise<TimeEntry[]> {
+    return await db.select().from(timeEntries);
+  }
+
   async getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]> {
     // 1. Obtener todas las cotizaciones del cliente
     const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
@@ -2170,60 +2174,7 @@ export class DatabaseStorage implements IStorage {
     return newDeliverable;
   }
   
-  async updateDeliverable(id: number, deliverable: any): Promise<any | undefined> {
-    try {
-      const existingDeliverable = await this.getDeliverable(id);
-      if (!existingDeliverable) {
-        return undefined;
-      }
-      
-      // Añadir fecha de actualización
-      if (!deliverable.updated_at) {
-        deliverable.updated_at = new Date();
-      }
-      
-      // Construir la consulta SET dinámicamente
-      let setClause = '';
-      const entries = Object.entries(deliverable);
-      
-      entries.forEach(([key, value], index) => {
-        // Agregar la coma si no es el primer elemento
-        if (index > 0) setClause += ', ';
-        
-        // Manejar el valor según su tipo
-        if (value === null) {
-          setClause += `${key} = NULL`;
-        } else if (typeof value === 'string') {
-          setClause += `${key} = '${value.replace(/'/g, "''")}'`; // Escapar comillas simples
-        } else if (value instanceof Date) {
-          setClause += `${key} = '${value.toISOString()}'`;
-        } else {
-          setClause += `${key} = ${value}`;
-        }
-      });
-      
-      if (!setClause) {
-        return existingDeliverable; // No hay cambios que hacer
-      }
-      
-      const query = `
-        UPDATE deliverables 
-        SET ${setClause} 
-        WHERE id = ${id} 
-        RETURNING *
-      `;
-      
-      const result = await db.execute(query);
-      
-      if (result.rows && result.rows.length > 0) {
-        return result.rows[0];
-      }
-      return undefined;
-    } catch (error) {
-      console.error("Error updating deliverable:", error);
-      return undefined;
-    }
-  }
+
   
   async deleteDeliverable(id: number): Promise<boolean> {
     try {
