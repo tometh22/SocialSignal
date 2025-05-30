@@ -829,7 +829,7 @@ export class DatabaseStorage implements IStorage {
       
       console.log(`Obteniendo entregables para los proyectos: ${projectIds.join(", ")}`);
       
-      const deliverableList = await db.select().from(deliverables).where(inArray(deliverables.projectId, projectIds));
+      const deliverableList = await db.select().from(deliverables).where(inArray(deliverables.project_id, projectIds));
       
       console.log(`Encontrados ${deliverableList.length} entregables`);
       return deliverableList;
@@ -844,21 +844,22 @@ export class DatabaseStorage implements IStorage {
       console.log("Datos recibidos para crear entregable:", deliverable);
       
       const dataToInsert = {
-        projectId: deliverable.projectId || deliverable.project_id,
+        project_id: deliverable.projectId || deliverable.project_id,
         name: deliverable.name || deliverable.title,
-        deliveryDate: deliverable.deliveryDate || new Date(),
-        dueDate: deliverable.dueDate || deliverable.due_date || new Date(),
-        onTime: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
-        narrativeQuality: deliverable.narrativeQuality || deliverable.narrative_quality,
-        graphicsEffectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness,
-        formatDesign: deliverable.formatDesign || deliverable.format_design,
-        relevantInsights: deliverable.relevantInsights || deliverable.relevant_insights,
-        operationsFeedback: deliverable.operationsFeedback || deliverable.operations_feedback,
-        clientFeedback: deliverable.clientFeedback || deliverable.client_feedback,
-        briefCompliance: deliverable.briefCompliance || deliverable.brief_compliance,
+        client_id: deliverable.clientId || deliverable.client_id,
+        delivery_month: deliverable.deliveryMonth || new Date().toISOString().substring(0, 7),
+        due_date: deliverable.dueDate || deliverable.due_date || new Date(),
+        delivery_on_time: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
+        narrative_quality: deliverable.narrativeQuality || deliverable.narrative_quality || 0,
+        graphics_effectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness || 0,
+        format_design: deliverable.formatDesign || deliverable.format_design || 0,
+        relevant_insights: deliverable.relevantInsights || deliverable.relevant_insights || 0,
+        operations_feedback: deliverable.operationsFeedback || deliverable.operations_feedback || 0,
+        client_feedback: deliverable.clientFeedback || deliverable.client_feedback || 0,
+        brief_compliance: deliverable.briefCompliance || deliverable.brief_compliance || 0,
         notes: deliverable.notes || "",
-        createdAt: new Date(),
-        updatedAt: new Date()
+        created_at: new Date(),
+        updated_at: new Date()
       };
       
       console.log("Datos a insertar:", dataToInsert);
