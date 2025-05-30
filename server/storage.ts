@@ -864,7 +864,7 @@ export class DatabaseStorage implements IStorage {
       
       console.log("Datos a insertar:", dataToInsert);
       
-      const [newDeliverable] = await db.insert(deliverables).values(dataToInsert).returning();
+      const [newDeliverable] = await db.insert(deliverables).values([dataToInsert]).returning();
       return newDeliverable;
     } catch (error) {
       console.error("Error al crear entregable:", error);
