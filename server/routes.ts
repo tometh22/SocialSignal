@@ -1733,7 +1733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: subproject.id,
               name: quotation?.projectName || 'Unnamed Project',
               startDate: new Date(subproject.startDate),
-              endDate: new Date(subproject.expectedEndDate),
+              endDate: subproject.expectedEndDate ? new Date(subproject.expectedEndDate) : null,
               costs: {
                 estimatedCost: quotation?.totalAmount || 0,
                 actualCost,
@@ -2019,7 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliverables", async (req, res) => {
     try {
       const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : undefined;
-      const deliverables = await storage.getDeliverables(clientId);
+      const deliverables = clientId ? await storage.getDeliverablesByProjects([clientId]) : await storage.getDeliverables([]);
       res.json(deliverables);
     } catch (error) {
       console.error("Error fetching deliverables:", error);
@@ -2224,7 +2224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
     
     try {
-      const comment = await storage.getClientModoComment(id);
+      const comment = await storage.getClientModoComment(id, 1, 2024);
       if (!comment) {
         return res.status(404).json({ message: "MODO comment not found" });
       }
