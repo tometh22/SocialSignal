@@ -509,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedQuotation);
     } catch (error) {
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
-      res.status(500).json({ message: "Failed to update quotation status", error: error.message });
+      res.status(500).json({ message: "Failed to update quotation status", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
   
@@ -654,7 +654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Actualizar el proyecto para usar la nueva cotización
         updatedProject = await storage.updateActiveProject(projectId, { 
-          quotationId: createdQuotation.id 
+          quotationId: createdQuotation.id as any
         });
       } else {
         // Si solo hay un proyecto, simplemente actualizar el cliente en la cotización existente
@@ -1091,7 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error al guardar asignaciones de presupuesto:", error);
       res.status(500).json({ 
         message: "Error al procesar la asignación de presupuesto",
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
@@ -1156,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertActiveProjectSchema.parse(processedData);
       
       // Verificar que la cotización existe
-      const quotation = await storage.getQuotation(validatedData.quotationId);
+      const quotation = validatedData.quotationId ? await storage.getQuotation(validatedData.quotationId) : null;
       if (!quotation) {
         return res.status(404).json({ message: "Cotización no encontrada" });
       }

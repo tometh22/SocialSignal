@@ -39,7 +39,7 @@ export default function Statistics() {
         
         let matchesAnalysisType = true;
         if (analysisType !== "all") {
-          matchesAnalysisType = quote.complexity === analysisType;
+          matchesAnalysisType = (quote as any).complexity === analysisType;
         }
         
         return matchesSearch && matchesTimeFrame && matchesAnalysisType;

@@ -529,7 +529,7 @@ export default function Admin() {
       assignRoleToTemplateMutation.mutate({
         templateId: currentTemplate.id,
         roleId: values.roleId,
-        hours: values.hours
+        hours: values.hours.toString()
       });
     }
   };
@@ -833,7 +833,7 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {templates.length} plantillas configuradas</span>
                   <span className="text-blue-600 font-medium">
-                    Costo promedio: ${(templates.reduce((sum, template) => sum + template.platformCost, 0) / templates.length).toFixed(2)}
+                    Costo promedio: ${(templates.reduce((sum, template) => sum + (template.platformCost || 0), 0) / templates.length).toFixed(2)}
                   </span>
                 </div>
               </div>
