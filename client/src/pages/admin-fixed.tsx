@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useGlobalCacheInvalidation } from "@/hooks/use-global-cache-invalidation";
 import { 
   Dialog, 
   DialogContent, 
@@ -141,6 +142,11 @@ export default function Admin() {
   const [newRoleHours, setNewRoleHours] = useState(0);
   
   const { toast } = useToast();
+  const { 
+    updatePersonnelInCache, 
+    invalidatePersonnelData,
+    invalidateAllRelatedData 
+  } = useGlobalCacheInvalidation();
   
   // Obtener datos necesarios
   const { data: roles, isLoading: rolesLoading } = useQuery<Role[]>({
@@ -204,7 +210,7 @@ export default function Admin() {
   const createRoleMutation = useMutation({
     mutationFn: (role: InsertRole) => apiRequest("/api/roles", "POST", role),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      invalidateAllRelatedData();
       setRoleDialogOpen(false);
       roleForm.reset();
       toast({

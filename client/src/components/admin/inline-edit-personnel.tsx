@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useGlobalCacheInvalidation } from "@/hooks/use-global-cache-invalidation";
 import { Personnel, Role } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
   const [editRateText, setEditRateText] = useState(person.hourlyRate.toString().replace('.', ','));
   const [updatedPerson, setUpdatedPerson] = useState<Personnel>(person);
   const { toast } = useToast();
+  const { updatePersonnelInCache, invalidatePersonnelData } = useGlobalCacheInvalidation();
 
   // Update when the person prop changes
   useEffect(() => {
@@ -78,13 +80,10 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         onUpdate(updatedData);
       }
       
-      // Actualizar de inmediato la caché local
-      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-        if (!oldData) return [updatedData];
-        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
-      });
-      // Invalidar la consulta para refrescar los datos
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      // Actualizar caché inmediatamente y invalidar datos relacionados
+      updatePersonnelInCache(updatedData);
+      invalidatePersonnelData();
+      
       toast({
         title: "Éxito",
         description: "Miembro del equipo actualizado correctamente.",
