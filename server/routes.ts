@@ -1844,7 +1844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Actualizar el proyecto para usar la nueva cotización
         const updatedProject = await storage.updateActiveProject(id, {
-          quotationId: createdQuotation.id
+          quotationId: createdQuotation.id as any
         });
         
         if (!updatedProject) {
