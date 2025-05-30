@@ -54,7 +54,21 @@ export interface IStorage {
   updateReportTemplate(id: number, template: Partial<InsertReportTemplate>): Promise<ReportTemplate | undefined>;
   deleteReportTemplate(id: number): Promise<boolean>;
 
-  // Template role assignments operations
+  // Quotation operations
+  getQuotations(): Promise<Quotation[]>;
+  getQuotationsByClient(clientId: number): Promise<Quotation[]>;
+  getQuotation(id: number): Promise<Quotation | undefined>;
+  createQuotation(quotation: InsertQuotation): Promise<Quotation>;
+  updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined>;
+  deleteQuotation(id: number): Promise<boolean>;
+
+  // Quotation team member operations
+  getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
+  createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
+  updateQuotationTeamMember(id: number, member: Partial<InsertQuotationTeamMember>): Promise<QuotationTeamMember | undefined>;
+  deleteQuotationTeamMember(id: number): Promise<boolean>;
+
+  // Template role assignment operations
   getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]>;
   getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]>;
   createTemplateRoleAssignment(assignment: InsertTemplateRoleAssignment): Promise<TemplateRoleAssignment>;
@@ -62,81 +76,7 @@ export interface IStorage {
   deleteTemplateRoleAssignment(id: number): Promise<boolean>;
   deleteTemplateRoleAssignments(templateId: number): Promise<void>;
 
-  // Quotation operations
-  getQuotations(): Promise<Quotation[]>;
-  getQuotationsByClient(clientId: number): Promise<Quotation[]>;
-  getQuotation(id: number): Promise<Quotation | undefined>;
-  createQuotation(quotation: InsertQuotation): Promise<Quotation>;
-  updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined>;
-  updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined>;
-  deleteQuotation(id: number): Promise<boolean>;
-
-  // Quotation team members operations
-  getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
-  createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
-  deleteQuotationTeamMembers(quotationId: number): Promise<void>;
-  deleteQuotationTeamMemberById(id: number): Promise<void>;
-
-  // Active project operations
-  getActiveProjects(): Promise<ActiveProject[]>;
-  getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]>;
-  getActiveProject(id: number): Promise<ActiveProject | undefined>;
-  createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
-  updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
-  getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
-  getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
-  getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]>;
-  deleteActiveProject(id: number): Promise<boolean>;
-  
-  // Project component operations
-  getProjectComponents(projectId: number): Promise<ProjectComponent[]>;
-  getProjectComponent(id: number): Promise<ProjectComponent | undefined>;
-  createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent>;
-  updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined>;
-  deleteProjectComponent(id: number): Promise<boolean>;
-  getDefaultProjectComponent(projectId: number): Promise<ProjectComponent | undefined>;
-  
-  // Time entry operations
-  getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
-  getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
-  getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]>;
-  getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
-  createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
-  updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
-  deleteTimeEntry(id: number): Promise<boolean>;
-  approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined>;
-  
-  // Progress report operations
-  getProgressReportsByProject(projectId: number): Promise<ProgressReport[]>;
-  getProgressReport(id: number): Promise<ProgressReport | undefined>;
-  createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
-  updateProgressReport(id: number, report: Partial<InsertProgressReport>): Promise<ProgressReport | undefined>;
-  
-  // Financial comparison operations
-  getProjectCostSummary(projectId: number): Promise<{
-    estimatedCost: number;
-    actualCost: number;
-    variance: number;
-    percentageUsed: number;
-  }>;
-  
-  getClientCostSummary(clientId: number): Promise<{
-    totalEstimatedCost: number;
-    totalActualCost: number;
-    totalVariance: number;
-    averagePercentageUsed: number;
-    projectCount: number;
-    projectsData: Array<{
-      projectId: number;
-      projectName: string;
-      estimatedCost: number;
-      actualCost: number;
-      variance: number;
-      percentageUsed: number;
-    }>;
-  }>;
-  
-  // Get option lists
+  // Option lists
   getAnalysisTypes(): Promise<typeof analysisTypes>;
   getProjectTypes(): Promise<typeof projectTypes>;
   getMentionsVolumeOptions(): Promise<typeof mentionsVolumeOptions>;
@@ -144,55 +84,69 @@ export interface IStorage {
   getClientEngagementOptions(): Promise<typeof clientEngagementOptions>;
   getProjectStatusOptions(): Promise<typeof projectStatusOptions>;
   getTrackingFrequencyOptions(): Promise<typeof trackingFrequencyOptions>;
-  
-  // NPS Survey operations
-  getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]>;
-  getNpsSurvey(id: number): Promise<QuarterlyNpsSurvey | undefined>;
-  createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey>;
-  updateNpsSurvey(id: number, survey: Partial<InsertQuarterlyNpsSurvey>): Promise<QuarterlyNpsSurvey | undefined>;
-  deleteNpsSurvey(id: number): Promise<boolean>;
+
+  // Active project operations
+  getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } })[]>;
+  getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]>;
+  getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined>;
+  createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
+  updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
+  deleteActiveProject(id: number): Promise<boolean>;
+
+  // Project component operations
+  getProjectComponents(projectId: number): Promise<ProjectComponent[]>;
+  createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent>;
+  updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined>;
+  deleteProjectComponent(id: number): Promise<boolean>;
+
+  // Time entry operations
+  getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]>;
+  getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]>;
+  getTimeEntries(): Promise<TimeEntry[]>;
+  getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]>;
+  getTimeEntryById(id: number): Promise<TimeEntry | undefined>;
+  createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
+  deleteTimeEntry(id: number): Promise<boolean>;
+  approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined>;
+
+  // Progress report operations
+  getProgressReports(projectId: number): Promise<ProgressReport[]>;
+  createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
+  updateProgressReport(id: number, report: Partial<InsertProgressReport>): Promise<ProgressReport | undefined>;
+  deleteProgressReport(id: number): Promise<boolean>;
 
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+
+  // Session store for authentication
+  sessionStore: session.Store;
+
   // Chat operations
-  createChatConversation(data: any): Promise<any>;
-  getDirectConversation(user1Id: number, user2Id: number): Promise<any | undefined>;
-  getChatConversationWithDetails(conversationId: number): Promise<any>;
-  getUserConversations(userId: number): Promise<any[]>;
-  getChatMessages(conversationId: number): Promise<any[]>;
-  createChatMessage(data: any): Promise<any>;
-  addConversationParticipant(data: any): Promise<any>;
-  getConversationParticipants(conversationId: number): Promise<any[]>;
-  isConversationParticipant(conversationId: number, userId: number): Promise<boolean>;
+  getConversations(): Promise<any[]>;
+  createConversation(conversation: any): Promise<any>;
+  getMessages(conversationId: number): Promise<any[]>;
+  createMessage(message: any): Promise<any>;
+  addParticipantToConversation(conversationId: number, userId: number): Promise<boolean>;
   updateConversationLastActivity(conversationId: number): Promise<void>;
   markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void>;
-  
-  // Session store
-  sessionStore: session.Store;
-  
-  // MODO operations
-  getDeliverables(clientId?: number): Promise<Deliverable[]>;
-  getDeliverable(id: number): Promise<Deliverable | undefined>;
-  createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable>;
-  updateDeliverable(id: number, deliverable: Partial<InsertDeliverable>): Promise<Deliverable | undefined>;
-  deleteDeliverable(id: number): Promise<boolean>;
-  
+
+  // Deliverable operations
+  getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]>;
+  createDeliverable(deliverable: any): Promise<Deliverable>;
+  updateDeliverable(id: number, data: any): Promise<Deliverable | undefined>;
+
+  // Client MODO operations
   getClientModoComments(clientId: number): Promise<ClientModoComment[]>;
-  getClientModoComment(id: number): Promise<ClientModoComment | undefined>;
-  getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<ClientModoComment | undefined>;
-  createClientModoComment(comment: InsertClientModoComment): Promise<ClientModoComment>;
-  updateClientModoComment(id: number, comment: Partial<InsertClientModoComment>): Promise<ClientModoComment | undefined>;
-  deleteClientModoComment(id: number): Promise<boolean>;
-  
-  // MODO analytics
-  getClientModoSummary(clientId: number): Promise<{
+  createClientModoComment(comment: any): Promise<ClientModoComment>;
+  getClientStatistics(clientId: number): Promise<{
     totalDeliverables: number;
     onTimeDeliveries: number;
-    onTimePercentage: number;
-    averageScores: {
+    deliveryRate: number;
+    qualityScores: {
       narrativeQuality: number;
       graphicsEffectiveness: number;
       formatDesign: number;
@@ -204,689 +158,172 @@ export interface IStorage {
     totalComments: number;
     latestComment?: ClientModoComment;
   }>;
+
+  // NPS Survey operations
+  getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]>;
+  getNpsSurvey(id: number): Promise<QuarterlyNpsSurvey | undefined>;
+  createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey>;
+  updateNpsSurvey(id: number, survey: Partial<InsertQuarterlyNpsSurvey>): Promise<QuarterlyNpsSurvey | undefined>;
+  deleteNpsSurvey(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  sessionStore: session.Store;
-  
-  private clients: Map<number, Client>;
-  private roles: Map<number, Role>;
-  private personnel: Map<number, Personnel>;
-  private reportTemplates: Map<number, ReportTemplate>;
-  private quotations: Map<number, Quotation>;
-  private quotationTeamMembers: Map<number, QuotationTeamMember>;
-  private templateRoleAssignments: Map<number, TemplateRoleAssignment>;
-  private activeProjects: Map<number, ActiveProject>;
-  private projectComponents: Map<number, ProjectComponent>;
-  private timeEntries: Map<number, TimeEntry>;
-  private progressReports: Map<number, ProgressReport>;
-  
-  private clientId: number;
-  private roleId: number;
-  private personnelId: number;
-  private templateId: number;
-  private quotationId: number;
-  private quotationTeamMemberId: number;
-  private templateRoleAssignmentId: number;
-  private activeProjectId: number;
-  private timeEntryId: number;
-  private progressReportId: number;
-
-  constructor() {
-    // Usar PostgreSQL para almacenamiento persistente de sesiones
-    const PgStore = require('connect-pg-simple')(session);
-    this.sessionStore = new PgStore({
-      pool, // Usar la conexión de pool existente desde db.ts
-      tableName: 'sessions', // Tabla para almacenar sesiones
-      createTableIfMissing: true, // Crear la tabla si no existe
-      pruneSessionInterval: 3600, // Limpiar sesiones expiradas cada hora
-      // Configuración para alta disponibilidad y persistencia
-      disableTouch: false, // Actualizar fecha de expiración con cada request
-      errorLog: (err) => console.error('Error en PgSessionStore:', err)
-    });
-    this.clients = new Map();
-    this.roles = new Map();
-    this.personnel = new Map();
-    this.reportTemplates = new Map();
-    this.quotations = new Map();
-    this.quotationTeamMembers = new Map();
-    this.templateRoleAssignments = new Map();
-    this.activeProjects = new Map();
-    this.timeEntries = new Map();
-    this.progressReports = new Map();
-    
-    this.clientId = 1;
-    this.roleId = 1;
-    this.personnelId = 1;
-    this.templateId = 1;
-    this.quotationId = 1;
-    this.quotationTeamMemberId = 1;
-    this.templateRoleAssignmentId = 1;
-    this.activeProjectId = 1;
-    this.timeEntryId = 1;
-    this.progressReportId = 1;
-    
-    // Initialize with sample data
-    this.initializeSampleData();
-  }
-
-  private initializeSampleData() {
-    // Add sample roles
-    const seniorAnalyst = this.createRole({ name: "Senior Analyst", description: "Provides expertise in analyzing complex social data and creating strategic insights.", defaultRate: 85 });
-    const dataScientist = this.createRole({ name: "Data Scientist", description: "Develops custom metrics and advanced data modeling for deeper insights.", defaultRate: 95 });
-    const contentSpecialist = this.createRole({ name: "Content Specialist", description: "Creates engaging visualizations and narrative for report presentation.", defaultRate: 75 });
-    const projectManager = this.createRole({ name: "Project Manager", description: "Oversees project delivery and client communication.", defaultRate: 80 });
-
-    // Add sample personnel
-    this.createPersonnel({ name: "John Davis", roleId: seniorAnalyst.id, hourlyRate: 85 });
-    this.createPersonnel({ name: "Sarah Miller", roleId: seniorAnalyst.id, hourlyRate: 90 });
-    this.createPersonnel({ name: "Michael Wong", roleId: seniorAnalyst.id, hourlyRate: 85 });
-    this.createPersonnel({ name: "Alex Chen", roleId: dataScientist.id, hourlyRate: 95 });
-    this.createPersonnel({ name: "Emma Rodriguez", roleId: dataScientist.id, hourlyRate: 100 });
-    this.createPersonnel({ name: "Rachel Kim", roleId: contentSpecialist.id, hourlyRate: 75 });
-    this.createPersonnel({ name: "Jason Thompson", roleId: contentSpecialist.id, hourlyRate: 80 });
-    this.createPersonnel({ name: "David Johnson", roleId: projectManager.id, hourlyRate: 80 });
-
-    // Add sample clients
-    this.createClient({ name: "Acme Corporation", contactName: "Jane Doe", contactEmail: "jane@acmecorp.com", contactPhone: "+1-555-123-4567" });
-    this.createClient({ name: "TechStart Inc.", contactName: "John Smith", contactEmail: "john@techstart.com", contactPhone: "+1-555-987-6543" });
-    this.createClient({ name: "Global Media Group", contactName: "Emily Wilson", contactEmail: "emily@globalmedia.com", contactPhone: "+1-555-456-7890" });
-
-    // Add sample report templates
-    const panelEjecutivo = this.createReportTemplate({
-      name: "Panel Ejecutivo",
-      description: "Métricas concisas de alto nivel con ideas clave y recomendaciones estratégicas. Ideal para directivos.",
-      complexity: "low",
-      pageRange: "5-10 páginas",
-      features: "Métricas principales"
-    });
-    
-    const analisisCompleto = this.createReportTemplate({
-      name: "Análisis Completo",
-      description: "Evaluación detallada con métricas extensas, segmentación de audiencia y desglose demográfico.",
-      complexity: "medium",
-      pageRange: "15-25 páginas",
-      features: "Métricas avanzadas"
-    });
-    
-    const rendimientoCampana = this.createReportTemplate({
-      name: "Rendimiento de Campaña",
-      description: "Análisis previo, durante y posterior a la campaña con seguimiento de KPI y datos comparativos de referencia.",
-      complexity: "high",
-      pageRange: "20-30 páginas",
-      features: "Análisis de tendencias"
-    });
-    
-    const plantillaPersonalizada = this.createReportTemplate({
-      name: "Plantilla Personalizada",
-      description: "Estructura de informe personalizada basada en requisitos específicos del cliente y objetivos del proyecto.",
-      complexity: "variable",
-      pageRange: "Longitud variable",
-      features: "Métricas personalizadas"
-    });
-    
-    const informeCrisis = this.createReportTemplate({
-      name: "Informe de Crisis",
-      description: "Monitoreo intensivo y análisis de situaciones críticas que requieren respuesta inmediata.",
-      complexity: "high",
-      pageRange: "10-20 páginas",
-      features: "Alertas y recomendaciones"
-    });
-    
-    const informePrecios = this.createReportTemplate({
-      name: "Informe de Precios",
-      description: "Análisis comparativo de precios del mercado con identificación de oportunidades y riesgos.",
-      complexity: "medium",
-      pageRange: "15-25 páginas",
-      features: "Análisis competitivo"
-    });
-    
-    const analisisConversacion = this.createReportTemplate({
-      name: "Análisis de Conversación Digital",
-      description: "Estudio profundo de conversaciones en redes sociales con análisis de sentimiento y temas emergentes.",
-      complexity: "high",
-      pageRange: "20-30 páginas",
-      features: "Análisis semántico"
-    });
-    
-    const informeMensual = this.createReportTemplate({
-      name: "Informe Mensual",
-      description: "Resumen periódico de KPIs principales, tendencias del mes y recomendaciones tácticas.",
-      complexity: "medium",
-      pageRange: "15-25 páginas",
-      features: "Comparativa mensual"
-    });
-    
-    const informeSemanal = this.createReportTemplate({
-      name: "Informe Semanal",
-      description: "Actualización rápida con datos clave de la semana y alertas de cambios significativos.",
-      complexity: "low",
-      pageRange: "5-10 páginas",
-      features: "Métricas ágiles"
-    });
-    
-    const informeSOV = this.createReportTemplate({
-      name: "Informe SOV (Share of Voice)",
-      description: "Análisis de la cuota de conversación de la marca respecto a competidores en canales digitales.",
-      complexity: "medium",
-      pageRange: "10-20 páginas",
-      features: "Visualización comparativa"
-    });
-
-    // Add sample template role assignments
-    
-    // Panel Ejecutivo - Informe básico y corto
-    this.createTemplateRoleAssignment({
-      templateId: panelEjecutivo.id,
-      roleId: seniorAnalyst.id,
-      hours: "6"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: panelEjecutivo.id,
-      roleId: contentSpecialist.id,
-      hours: "4"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: panelEjecutivo.id,
-      roleId: projectManager.id,
-      hours: "2"
-    });
-    
-    // Análisis Completo - Informe detallado con análisis profundo
-    this.createTemplateRoleAssignment({
-      templateId: analisisCompleto.id,
-      roleId: seniorAnalyst.id,
-      hours: "12"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisCompleto.id,
-      roleId: dataScientist.id,
-      hours: "8"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisCompleto.id,
-      roleId: contentSpecialist.id,
-      hours: "10"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisCompleto.id,
-      roleId: projectManager.id,
-      hours: "6"
-    });
-    
-    // Rendimiento de Campaña - Análisis extenso antes, durante y después de campaña
-    this.createTemplateRoleAssignment({
-      templateId: rendimientoCampana.id,
-      roleId: seniorAnalyst.id,
-      hours: "15"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: rendimientoCampana.id,
-      roleId: dataScientist.id,
-      hours: "10"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: rendimientoCampana.id,
-      roleId: contentSpecialist.id,
-      hours: "12"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: rendimientoCampana.id,
-      roleId: projectManager.id,
-      hours: "8"
-    });
-    
-    // Informe de Crisis - Monitoreo intensivo y alerta temprana
-    this.createTemplateRoleAssignment({
-      templateId: informeCrisis.id,
-      roleId: seniorAnalyst.id,
-      hours: "20"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeCrisis.id,
-      roleId: dataScientist.id,
-      hours: "10"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeCrisis.id,
-      roleId: contentSpecialist.id,
-      hours: "8"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeCrisis.id,
-      roleId: projectManager.id,
-      hours: "12"
-    });
-    
-    // Análisis de Conversación Digital - Análisis semántico complejo
-    this.createTemplateRoleAssignment({
-      templateId: analisisConversacion.id,
-      roleId: seniorAnalyst.id,
-      hours: "18"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisConversacion.id,
-      roleId: dataScientist.id,
-      hours: "15"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisConversacion.id,
-      roleId: contentSpecialist.id,
-      hours: "10"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: analisisConversacion.id,
-      roleId: projectManager.id,
-      hours: "8"
-    });
-    
-    // Informe Mensual - Actualización periódica con tendencias
-    this.createTemplateRoleAssignment({
-      templateId: informeMensual.id,
-      roleId: seniorAnalyst.id,
-      hours: "8"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeMensual.id,
-      roleId: contentSpecialist.id,
-      hours: "6"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeMensual.id,
-      roleId: projectManager.id,
-      hours: "4"
-    });
-    
-    // Informe Semanal - Actualizaciones rápidas
-    this.createTemplateRoleAssignment({
-      templateId: informeSemanal.id,
-      roleId: seniorAnalyst.id,
-      hours: "3"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeSemanal.id,
-      roleId: contentSpecialist.id,
-      hours: "2"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeSemanal.id,
-      roleId: projectManager.id,
-      hours: "1"
-    });
-    
-    // Informe SOV - Análisis de cuota de voz
-    this.createTemplateRoleAssignment({
-      templateId: informeSOV.id,
-      roleId: seniorAnalyst.id,
-      hours: "10"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeSOV.id,
-      roleId: dataScientist.id,
-      hours: "6"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeSOV.id,
-      roleId: contentSpecialist.id,
-      hours: "8"
-    });
-    this.createTemplateRoleAssignment({
-      templateId: informeSOV.id,
-      roleId: projectManager.id,
-      hours: "5"
-    });
-  }
-
-  // Client operations
-  async getClients(): Promise<Client[]> {
-    return Array.from(this.clients.values());
-  }
-
-  async getClient(id: number): Promise<Client | undefined> {
-    return this.clients.get(id);
-  }
-
-  async createClient(client: InsertClient): Promise<Client> {
-    const id = this.clientId++;
-    const newClient: Client = { ...client, id };
-    this.clients.set(id, newClient);
-    return newClient;
-  }
-
-  async updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined> {
-    const existingClient = this.clients.get(id);
-    if (!existingClient) return undefined;
-    
-    const updatedClient = { ...existingClient, ...client };
-    this.clients.set(id, updatedClient);
-    return updatedClient;
-  }
-
-  // Role operations
-  async getRoles(): Promise<Role[]> {
-    return Array.from(this.roles.values());
-  }
-
-  async getRole(id: number): Promise<Role | undefined> {
-    return this.roles.get(id);
-  }
-
-  async createRole(role: InsertRole): Promise<Role> {
-    const id = this.roleId++;
-    const newRole: Role = { ...role, id };
-    this.roles.set(id, newRole);
-    return newRole;
-  }
-
-  async updateRole(id: number, role: Partial<InsertRole>): Promise<Role | undefined> {
-    const existingRole = this.roles.get(id);
-    if (!existingRole) return undefined;
-    
-    const updatedRole = { ...existingRole, ...role };
-    this.roles.set(id, updatedRole);
-    return updatedRole;
-  }
-  
-  async deleteRole(id: number): Promise<boolean> {
-    // Primero verificar si hay personal asociado a este rol
-    const personnelWithRole = await this.getPersonnelByRole(id);
-    if (personnelWithRole.length > 0) {
-      // No podemos eliminar un rol que tenga personal asociado
-      return false;
-    }
-    
-    const result = this.roles.delete(id);
-    return result;
-  }
-
-  // Personnel operations
-  async getPersonnel(): Promise<Personnel[]> {
-    try {
-      // Usar directamente la base de datos para obtener todo el personal
-      const result = await db.select().from(personnel);
-      console.log(`Obtenidos ${result.length} miembros del personal desde la base de datos`);
-      return result;
-    } catch (error) {
-      console.error("Error al obtener personal desde la base de datos:", error);
-      throw error;
-    }
-  }
-
-  async getPersonnelByRole(roleId: number): Promise<Personnel[]> {
-    try {
-      // Usar la base de datos para filtrar por rol
-      const result = await db.select().from(personnel).where(eq(personnel.roleId, roleId));
-      console.log(`Obtenidos ${result.length} miembros del personal con rol ${roleId} desde la base de datos`);
-      return result;
-    } catch (error) {
-      console.error(`Error al obtener personal con rol ${roleId} desde la base de datos:`, error);
-      throw error;
-    }
-  }
-
-  async getPersonnelById(id: number): Promise<Personnel | undefined> {
-    try {
-      // Usar la base de datos para obtener una persona específica por ID
-      const [result] = await db.select().from(personnel).where(eq(personnel.id, id));
-      
-      if (result) {
-        console.log(`Obtenido miembro del personal ID ${id} desde la base de datos:`, result.name);
-      } else {
-        console.log(`No se encontró miembro del personal con ID ${id} en la base de datos`);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error(`Error al obtener miembro del personal con ID ${id} desde la base de datos:`, error);
-      throw error;
-    }
-  }
-
-  async createPersonnel(newPersonnel: InsertPersonnel): Promise<Personnel> {
-    try {
-      // Usar la base de datos para crear un nuevo miembro del personal
-      const [result] = await db.insert(personnel).values(newPersonnel).returning();
-      console.log(`Creado nuevo miembro del personal en la base de datos:`, result);
-      return result;
-    } catch (error) {
-      console.error("Error al crear miembro del personal en la base de datos:", error);
-      throw error;
-    }
-  }
-
-  async updatePersonnel(id: number, personnelData: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
-    try {
-      // Verificar si el miembro del personal existe
-      const existingPerson = await this.getPersonnelById(id);
-      if (!existingPerson) {
-        console.log(`No se encontró miembro del personal con ID ${id} para actualizar`);
-        return undefined;
-      }
-      
-      // Usar la base de datos para actualizar el miembro del personal
-      const [result] = await db
-        .update(personnel)
-        .set(personnelData)
-        .where(eq(personnel.id, id))
-        .returning();
-      
-      console.log(`Actualizado miembro del personal ID ${id} en la base de datos:`, result);
-      return result;
-    } catch (error) {
-      console.error(`Error al actualizar miembro del personal ID ${id} en la base de datos:`, error);
-      throw error;
-    }
-  }
-
-  // Report template operations
-  async getReportTemplates(): Promise<ReportTemplate[]> {
-    return Array.from(this.reportTemplates.values());
-  }
-
-  async getReportTemplate(id: number): Promise<ReportTemplate | undefined> {
-    return this.reportTemplates.get(id);
-  }
-
-  async createReportTemplate(template: InsertReportTemplate): Promise<ReportTemplate> {
-    const id = this.templateId++;
-    const newTemplate: ReportTemplate = { ...template, id };
-    this.reportTemplates.set(id, newTemplate);
-    return newTemplate;
-  }
-
-  async updateReportTemplate(id: number, template: Partial<InsertReportTemplate>): Promise<ReportTemplate | undefined> {
-    const existingTemplate = this.reportTemplates.get(id);
-    if (!existingTemplate) return undefined;
-    
-    const updatedTemplate = { ...existingTemplate, ...template };
-    this.reportTemplates.set(id, updatedTemplate);
-    return updatedTemplate;
-  }
-  
-  async deleteReportTemplate(id: number): Promise<boolean> {
-    // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
-    await this.deleteTemplateRoleAssignments(id);
-    
-    // Verificar si la plantilla existe
-    if (!this.reportTemplates.has(id)) {
-      return false;
-    }
-    
-    // Eliminar la plantilla
-    return this.reportTemplates.delete(id);
-  }
-
-  // Quotation operations
-  async getQuotations(): Promise<Quotation[]> {
-    return Array.from(this.quotations.values());
-  }
-
-  async getQuotationsByClient(clientId: number): Promise<Quotation[]> {
-    return Array.from(this.quotations.values()).filter(q => q.clientId === clientId);
-  }
-
-  async getQuotation(id: number): Promise<Quotation | undefined> {
-    return this.quotations.get(id);
-  }
-
-  async createQuotation(quotation: InsertQuotation): Promise<Quotation> {
-    const id = this.quotationId++;
-    const now = new Date();
-    
-    const newQuotation: Quotation = {
-      ...quotation,
-      id,
-      createdAt: now,
-      updatedAt: now
-    };
-    
-    this.quotations.set(id, newQuotation);
-    return newQuotation;
-  }
-
-  async updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined> {
-    const existingQuotation = this.quotations.get(id);
-    if (!existingQuotation) return undefined;
-    
-    const updatedQuotation = {
-      ...existingQuotation,
-      ...quotation,
-      updatedAt: new Date()
-    };
-    
-    this.quotations.set(id, updatedQuotation);
-    return updatedQuotation;
-  }
-
-  async updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined> {
-    const existingQuotation = this.quotations.get(id);
-    if (!existingQuotation) return undefined;
-    
-    const updatedQuotation = {
-      ...existingQuotation,
-      status,
-      updatedAt: new Date()
-    };
-    
-    this.quotations.set(id, updatedQuotation);
-    return updatedQuotation;
-  }
-
-  // Quotation team members operations
-  async getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]> {
-    return Array.from(this.quotationTeamMembers.values()).filter(q => q.quotationId === quotationId);
-  }
-
-  async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
-    const id = this.quotationTeamMemberId++;
-    const newMember: QuotationTeamMember = { ...member, id };
-    this.quotationTeamMembers.set(id, newMember);
-    return newMember;
-  }
-
-  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
-    for (const [id, member] of this.quotationTeamMembers.entries()) {
-      if (member.quotationId === quotationId) {
-        this.quotationTeamMembers.delete(id);
-      }
-    }
-  }
-  
-  async deleteQuotationTeamMemberById(id: number): Promise<void> {
-    this.quotationTeamMembers.delete(id);
-  }
-
-  // Template role assignments operations
-  async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
-    return Array.from(this.templateRoleAssignments.values()).filter(
-      (a) => a.templateId === templateId
-    );
-  }
-
-  async getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]> {
-    const assignments = await this.getTemplateRoleAssignments(templateId);
-    return Promise.all(
-      assignments.map(async (assignment) => {
-        const role = await this.getRole(assignment.roleId);
-        return {
-          ...assignment,
-          role: role!
-        };
-      })
-    );
-  }
-
-  async createTemplateRoleAssignment(assignment: InsertTemplateRoleAssignment): Promise<TemplateRoleAssignment> {
-    const id = this.templateRoleAssignmentId++;
-    const newAssignment: TemplateRoleAssignment = { ...assignment, id };
-    this.templateRoleAssignments.set(id, newAssignment);
-    return newAssignment;
-  }
-
-  async updateTemplateRoleAssignment(id: number, assignment: Partial<InsertTemplateRoleAssignment>): Promise<TemplateRoleAssignment | undefined> {
-    const existingAssignment = this.templateRoleAssignments.get(id);
-    if (!existingAssignment) return undefined;
-    
-    const updatedAssignment = { ...existingAssignment, ...assignment };
-    this.templateRoleAssignments.set(id, updatedAssignment);
-    return updatedAssignment;
-  }
-
-  async deleteTemplateRoleAssignment(id: number): Promise<boolean> {
-    return this.templateRoleAssignments.delete(id);
-  }
-
-  async deleteTemplateRoleAssignments(templateId: number): Promise<void> {
-    for (const [id, assignment] of this.templateRoleAssignments.entries()) {
-      if (assignment.templateId === templateId) {
-        this.templateRoleAssignments.delete(id);
-      }
-    }
-  }
-
-  // Get option lists
-  async getAnalysisTypes() {
-    return analysisTypes;
-  }
-
-  async getProjectTypes() {
-    return projectTypes;
-  }
-
-  async getMentionsVolumeOptions() {
-    return mentionsVolumeOptions;
-  }
-
-  async getCountriesCoveredOptions() {
-    return countriesCoveredOptions;
-  }
-
-  async getClientEngagementOptions() {
-    return clientEngagementOptions;
-  }
-}
-
-// Implementación de la base de datos
+// IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
   
   constructor() {
-    // Crear store para sesiones usando PostgreSQL con configuración optimizada para alta disponibilidad
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
       pool,
-      tableName: 'sessions', // Estandarizado a 'sessions' con 's' para consistencia
+      tableName: 'sessions',
       createTableIfMissing: true,
-      // Configuración crítica para asegurar persistencia extrema
-      pruneSessionInterval: 86400, // Limpiar solo una vez al día (cada 24 horas)
-      errorLog: (err) => {
+      pruneSessionInterval: 86400,
+      errorLog: (err: any) => {
         console.error('ERROR CRÍTICO EN SESSION STORE:', err);
-        // Registrar errores críticos para solucionar problemas rápidamente
       },
-      // Configuración para operaciones prolongadas y formas intensivas
-      disableTouch: false, // Actualizar consistentemente la fecha de expiración
-      ttl: 60 * 60 * 24 * 180, // 180 días (6 meses) para máxima persistencia
+      disableTouch: false,
+      ttl: 60 * 60 * 24 * 180,
     });
+  }
+
+  // **VALIDACIÓN CRÍTICA 1: VALIDACIÓN DE PRESUPUESTO EN TIME ENTRIES**
+  async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
+    // Obtener información del proyecto y personal para validar presupuesto
+    const project = await this.getActiveProject(entry.projectId);
+    const personnel = await this.getPersonnelById(entry.personnelId);
+    
+    if (!project || !personnel) {
+      throw new Error("Proyecto o personal no encontrado");
+    }
+    
+    // Calcular costo de esta entrada
+    const entryCost = entry.hours * personnel.hourlyRate;
+    
+    // Obtener total gastado hasta ahora
+    const existingEntries = await this.getTimeEntriesByProject(entry.projectId);
+    const currentCost = await this.calculateProjectTotalCost(entry.projectId);
+    
+    // Validar límite de presupuesto
+    const totalBudget = project.quotation.totalBudget || 0;
+    if (currentCost + entryCost > totalBudget) {
+      throw new Error(`Esta entrada excedería el presupuesto del proyecto. Límite: $${totalBudget}, Actual: $${currentCost}, Nueva entrada: $${entryCost}`);
+    }
+    
+    // Alerta cuando se acerca al límite (90%)
+    if (currentCost + entryCost > totalBudget * 0.9) {
+      console.warn(`ALERTA: El proyecto ${project.id} está cerca del límite de presupuesto (${((currentCost + entryCost) / totalBudget * 100).toFixed(1)}%)`);
+    }
+    
+    const [newEntry] = await db.insert(timeEntries).values(entry).returning();
+    return newEntry;
+  }
+
+  // **VALIDACIÓN CRÍTICA 2: PREVENIR RELACIONES CIRCULARES EN PROYECTOS**
+  async createActiveProject(project: InsertActiveProject): Promise<ActiveProject> {
+    // Validar relaciones parent-child para evitar ciclos
+    if (project.parentProjectId) {
+      const isValidParent = await this.validateProjectHierarchy(project.parentProjectId, project.quotationId);
+      if (!isValidParent) {
+        throw new Error("La relación padre-hijo crearía un ciclo en la jerarquía de proyectos");
+      }
+    }
+    
+    const [newProject] = await db.insert(activeProjects).values(project).returning();
+    return newProject;
+  }
+
+  async updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined> {
+    // Validar relaciones parent-child si se está actualizando parentProjectId
+    if (project.parentProjectId !== undefined) {
+      if (project.parentProjectId === id) {
+        throw new Error("Un proyecto no puede ser padre de sí mismo");
+      }
+      
+      if (project.parentProjectId) {
+        const isValidParent = await this.validateProjectHierarchy(project.parentProjectId, id);
+        if (!isValidParent) {
+          throw new Error("La relación padre-hijo crearía un ciclo en la jerarquía de proyectos");
+        }
+      }
+    }
+
+    const [updatedProject] = await db
+      .update(activeProjects)
+      .set(project)
+      .where(eq(activeProjects.id, id))
+      .returning();
+    return updatedProject;
+  }
+
+  // **VALIDACIÓN CRÍTICA 3: ELIMINACIÓN SEGURA CON CONSTRAINTS**
+  async deleteActiveProject(id: number): Promise<boolean> {
+    try {
+      console.log(`Eliminando proyecto ID ${id} de forma segura...`);
+      
+      // Usar transacción para garantizar integridad
+      await db.transaction(async (tx) => {
+        // 1. Eliminar conversaciones de chat
+        await tx.delete(chatConversations).where(eq(chatConversations.projectId, id));
+        
+        // 2. Eliminar entradas de tiempo
+        await tx.delete(timeEntries).where(eq(timeEntries.projectId, id));
+        
+        // 3. Eliminar informes de progreso
+        await tx.delete(progressReports).where(eq(progressReports.projectId, id));
+        
+        // 4. Eliminar componentes del proyecto
+        await tx.delete(projectComponents).where(eq(projectComponents.projectId, id));
+        
+        // 5. Actualizar proyectos hijos para quitar la referencia padre
+        await tx.update(activeProjects)
+          .set({ parentProjectId: null })
+          .where(eq(activeProjects.parentProjectId, id));
+        
+        // 6. Finalmente eliminar el proyecto
+        await tx.delete(activeProjects).where(eq(activeProjects.id, id));
+      });
+      
+      console.log(`Proyecto ${id} eliminado correctamente`);
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar el proyecto activo:", error);
+      return false;
+    }
+  }
+
+  // **MÉTODOS DE VALIDACIÓN Y UTILIDAD**
+  private async validateProjectHierarchy(parentId: number, childId: number): Promise<boolean> {
+    // Verificar que el padre no sea descendiente del hijo (prevenir ciclos)
+    const checkCycle = async (currentId: number, targetId: number, visited: Set<number> = new Set()): Promise<boolean> => {
+      if (visited.has(currentId)) return false; // Ciclo detectado
+      if (currentId === targetId) return false; // Ciclo directo
+      
+      visited.add(currentId);
+      
+      const [parent] = await db.select()
+        .from(activeProjects)
+        .where(eq(activeProjects.id, currentId));
+      
+      if (!parent || !parent.parentProjectId) return true;
+      
+      return await checkCycle(parent.parentProjectId, targetId, visited);
+    };
+    
+    return await checkCycle(parentId, childId);
+  }
+
+  private async calculateProjectTotalCost(projectId: number): Promise<number> {
+    const entries = await this.getTimeEntriesByProject(projectId);
+    let totalCost = 0;
+    
+    for (const entry of entries) {
+      const personnel = await this.getPersonnelById(entry.personnelId);
+      if (personnel) {
+        totalCost += entry.hours * personnel.hourlyRate;
+      }
+    }
+    
+    return totalCost;
   }
 
   // User operations
@@ -901,224 +338,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(user).returning();
-    return result[0];
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
   }
-  
-  // Chat operations
-  async createChatConversation(data: any): Promise<any> {
-    const result = await db.insert(chatConversations).values(data).returning();
-    return result[0];
-  }
-  
-  async getDirectConversation(user1Id: number, user2Id: number): Promise<any | undefined> {
-    // Buscar conversaciones 1:1 (no grupales) donde participen los dos usuarios
-    const participants = await db
-      .select()
-      .from(chatConversationParticipants)
-      .innerJoin(
-        chatConversations,
-        eq(chatConversationParticipants.conversationId, chatConversations.id)
-      )
-      .where(
-        and(
-          eq(chatConversations.isGroup, false),
-          eq(chatConversationParticipants.userId, user1Id)
-        )
-      );
-    
-    if (!participants.length) return undefined;
-    
-    // Obtener IDs de esas conversaciones
-    const conversationIds = participants.map(p => p.chat_conversation_participants.conversationId);
-    
-    // Buscar si el usuario 2 participa en alguna de esas conversaciones
-    const conversations = await db
-      .select()
-      .from(chatConversationParticipants)
-      .where(
-        and(
-          inArray(chatConversationParticipants.conversationId, conversationIds),
-          eq(chatConversationParticipants.userId, user2Id)
-        )
-      );
-    
-    if (!conversations.length) return undefined;
-    
-    // Obtener la primera conversación que coincida
-    const conversationId = conversations[0].conversationId;
-    const conversation = await db
-      .select()
-      .from(chatConversations)
-      .where(eq(chatConversations.id, conversationId));
-    
-    return conversation[0];
-  }
-  
-  async getChatConversationWithDetails(conversationId: number): Promise<any> {
-    // Obtener la conversación
-    const [conversation] = await db
-      .select()
-      .from(chatConversations)
-      .where(eq(chatConversations.id, conversationId));
-    
-    if (!conversation) return null;
-    
-    // Obtener participantes
-    const participants = await db
-      .select({
-        id: chatConversationParticipants.id,
-        userId: chatConversationParticipants.userId,
-        conversationId: chatConversationParticipants.conversationId,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        email: users.email,
-        avatar: users.avatar,
-      })
-      .from(chatConversationParticipants)
-      .innerJoin(users, eq(chatConversationParticipants.userId, users.id))
-      .where(eq(chatConversationParticipants.conversationId, conversationId));
-    
-    // Obtener mensajes recientes
-    const messages = await db
-      .select()
-      .from(chatMessages)
-      .where(eq(chatMessages.conversationId, conversationId))
-      .orderBy(sql`${chatMessages.createdAt} DESC`)
-      .limit(20);
-    
-    return {
-      ...conversation,
-      participants,
-      messages: messages.reverse(),
-    };
-  }
-  
-  async getUserConversations(userId: number): Promise<any[]> {
-    // Obtener IDs de conversaciones donde el usuario participa
-    const participations = await db
-      .select()
-      .from(chatConversationParticipants)
-      .where(eq(chatConversationParticipants.userId, userId));
-    
-    if (!participations.length) return [];
-    
-    const conversationIds = participations.map(p => p.conversationId);
-    
-    // Obtener las conversaciones con detalles básicos
-    const conversations = await db
-      .select()
-      .from(chatConversations)
-      .where(inArray(chatConversations.id, conversationIds))
-      .orderBy(sql`${chatConversations.lastMessageAt} DESC`);
-    
-    // Para cada conversación, obtener participantes
-    const result = [];
-    
-    for (const conversation of conversations) {
-      const participants = await db
-        .select({
-          id: chatConversationParticipants.id,
-          userId: chatConversationParticipants.userId,
-          conversationId: chatConversationParticipants.conversationId,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
-          avatar: users.avatar,
-        })
-        .from(chatConversationParticipants)
-        .innerJoin(users, eq(chatConversationParticipants.userId, users.id))
-        .where(eq(chatConversationParticipants.conversationId, conversation.id));
-      
-      // Obtener último mensaje
-      const [lastMessage] = await db
-        .select()
-        .from(chatMessages)
-        .where(eq(chatMessages.conversationId, conversation.id))
-        .orderBy(sql`${chatMessages.createdAt} DESC`)
-        .limit(1);
-      
-      result.push({
-        ...conversation,
-        participants,
-        lastMessage,
-      });
-    }
-    
-    return result;
-  }
-  
-  async getChatMessages(conversationId: number): Promise<any[]> {
-    const messages = await db
-      .select({
-        id: chatMessages.id,
-        conversationId: chatMessages.conversationId,
-        senderId: chatMessages.senderId,
-        content: chatMessages.content,
-        imageUrl: chatMessages.imageUrl,
-        createdAt: chatMessages.createdAt,
-        seen: chatMessages.seen,
-        senderFirstName: users.firstName,
-        senderLastName: users.lastName,
-        senderAvatar: users.avatar,
-      })
-      .from(chatMessages)
-      .innerJoin(users, eq(chatMessages.senderId, users.id))
-      .where(eq(chatMessages.conversationId, conversationId))
-      .orderBy(sql`${chatMessages.createdAt} ASC`);
-    
-    return messages;
-  }
-  
-  async createChatMessage(data: any): Promise<any> {
-    const result = await db.insert(chatMessages).values(data).returning();
-    return result[0];
-  }
-  
-  async addConversationParticipant(data: any): Promise<any> {
-    const result = await db.insert(chatConversationParticipants).values(data).returning();
-    return result[0];
-  }
-  
-  async getConversationParticipants(conversationId: number): Promise<any[]> {
-    return await db
-      .select()
-      .from(chatConversationParticipants)
-      .where(eq(chatConversationParticipants.conversationId, conversationId));
-  }
-  
-  async isConversationParticipant(conversationId: number, userId: number): Promise<boolean> {
-    const result = await db
-      .select()
-      .from(chatConversationParticipants)
-      .where(
-        and(
-          eq(chatConversationParticipants.conversationId, conversationId),
-          eq(chatConversationParticipants.userId, userId)
-        )
-      );
-    
-    return result.length > 0;
-  }
-  
-  async updateConversationLastActivity(conversationId: number): Promise<void> {
-    await db
-      .update(chatConversations)
-      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
-      .where(eq(chatConversations.id, conversationId));
-  }
-  
-  async markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void> {
-    // Utilizar SQL raw para simplificar la operación
-    await db
-      .update(chatMessages)
-      .set({ seen: true })
-      .where(
-        and(
-          eq(chatMessages.conversationId, conversationId),
-          sql`${chatMessages.senderId} <> ${userId}`
-        )
-      );
+
+  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(user)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
   }
 
   // Client operations
@@ -1138,28 +368,15 @@ export class DatabaseStorage implements IStorage {
 
   async updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined> {
     try {
-      console.log("DatabaseStorage.updateClient: Actualizando cliente con ID:", id);
-      console.log("DatabaseStorage.updateClient: Datos a actualizar:", client);
-      
-      // Verificar primero si el cliente existe
-      const existingClient = await this.getClient(id);
-      if (!existingClient) {
-        console.log("DatabaseStorage.updateClient: Cliente no encontrado con ID:", id);
-        return undefined;
-      }
-      
-      // Realizar la actualización
       const [updatedClient] = await db
         .update(clients)
         .set(client)
         .where(eq(clients.id, id))
         .returning();
-      
-      console.log("DatabaseStorage.updateClient: Cliente actualizado:", updatedClient);
       return updatedClient;
     } catch (error) {
-      console.error("DatabaseStorage.updateClient: Error al actualizar cliente:", error);
-      throw error;
+      console.error("Error al actualizar cliente:", error);
+      return undefined;
     }
   }
 
@@ -1186,20 +403,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedRole;
   }
-  
+
   async deleteRole(id: number): Promise<boolean> {
-    // Verificar primero si hay personal asociado a este rol
-    const personnelWithRole = await this.getPersonnelByRole(id);
-    if (personnelWithRole.length > 0) {
-      // No podemos eliminar un rol que tenga personal asociado
-      return false;
-    }
-    
-    // Si no hay personal asociado, eliminar el rol
     await db.delete(roles).where(eq(roles.id, id));
-    // Verificar si el rol todavía existe
-    const roleExists = await this.getRole(id);
-    return !roleExists;
+    const role = await db.select().from(roles).where(eq(roles.id, id));
+    return role.length === 0;
   }
 
   // Personnel operations
@@ -1217,20 +425,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPersonnel(person: InsertPersonnel): Promise<Personnel> {
-    const [newPersonnel] = await db.insert(personnel).values(person).returning();
-    return newPersonnel;
+    const [newPerson] = await db.insert(personnel).values(person).returning();
+    return newPerson;
   }
 
   async updatePersonnel(id: number, person: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
-    const [updatedPersonnel] = await db
+    const [updatedPerson] = await db
       .update(personnel)
       .set(person)
       .where(eq(personnel.id, id))
       .returning();
-    return updatedPersonnel;
+    return updatedPerson;
   }
 
-  // Report template operations
+  // Template operations
   async getReportTemplates(): Promise<ReportTemplate[]> {
     return await db.select().from(reportTemplates);
   }
@@ -1253,24 +461,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedTemplate;
   }
-  
+
   async deleteReportTemplate(id: number): Promise<boolean> {
-    // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
-    await this.deleteTemplateRoleAssignments(id);
-    
-    // Por ahora, simplemente procedemos con la eliminación de la plantilla
-    // ya que aún no tenemos quotations con templates asociados
-    
-    // Eliminar la plantilla
     await db.delete(reportTemplates).where(eq(reportTemplates.id, id));
-    
-    // Verificar si la plantilla fue eliminada
-    const [template] = await db
-      .select()
-      .from(reportTemplates)
-      .where(eq(reportTemplates.id, id));
-      
-    return !template;
+    const template = await db.select().from(reportTemplates).where(eq(reportTemplates.id, id));
+    return template.length === 0;
   }
 
   // Quotation operations
@@ -1295,73 +490,19 @@ export class DatabaseStorage implements IStorage {
   async updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined> {
     const [updatedQuotation] = await db
       .update(quotations)
-      .set({ ...quotation, updatedAt: new Date() })
+      .set(quotation)
       .where(eq(quotations.id, id))
       .returning();
     return updatedQuotation;
   }
 
-  async updateQuotationStatus(id: number, status: string): Promise<Quotation | undefined> {
-    try {
-      console.log(`[STORAGE] Actualizando estado de cotización ID ${id} a: ${status}`);
-      
-      const [updatedQuotation] = await db
-        .update(quotations)
-        .set({ status, updatedAt: new Date() })
-        .where(eq(quotations.id, id))
-        .returning();
-      
-      console.log(`[STORAGE] Resultado de la actualización:`, updatedQuotation);
-      return updatedQuotation;
-    } catch (error) {
-      console.error(`[STORAGE] Error actualizando estado de cotización ID ${id}:`, error);
-      throw error;
-    }
-  }
-  
   async deleteQuotation(id: number): Promise<boolean> {
-    try {
-      console.log(`[DEBUG] Iniciando eliminación de cotización ID ${id}`);
-      
-      // 1. Verificar que la cotización exista
-      const quotation = await this.getQuotation(id);
-      console.log(`[DEBUG] Cotización encontrada:`, quotation ? 'Sí' : 'No');
-      
-      if (!quotation) {
-        console.log(`Cotización con ID ${id} no encontrada para eliminar`);
-        return false;
-      }
-      
-      // 2. Verificar si la cotización está asociada a algún proyecto activo
-      const activeProjects = await this.getActiveProjectsByQuotationId(id);
-      console.log(`[DEBUG] Proyectos activos asociados: ${activeProjects.length}`);
-      console.log(`[DEBUG] IDs de proyectos activos:`, activeProjects.map(p => p.id));
-      
-      if (activeProjects.length > 0) {
-        console.log(`No se puede eliminar la cotización ID ${id} porque está asociada a ${activeProjects.length} proyectos activos`);
-        return false;
-      }
-      
-      console.log(`[DEBUG] Eliminando miembros del equipo de cotización`);
-      // 3. Eliminar los miembros del equipo de cotización asociados
-      await this.deleteQuotationTeamMembers(id);
-      
-      console.log(`[DEBUG] Eliminando la cotización de la base de datos`);
-      // 4. Eliminar la cotización
-      await db.delete(quotations).where(eq(quotations.id, id));
-      
-      // 5. Verificar que la cotización haya sido eliminada
-      const checkQuotation = await this.getQuotation(id);
-      console.log(`[DEBUG] Verificación final - Cotización aún existe:`, checkQuotation ? 'Sí' : 'No');
-      
-      return checkQuotation === undefined;
-    } catch (error) {
-      console.error(`Error al eliminar la cotización ID ${id}:`, error);
-      return false;
-    }
+    await db.delete(quotations).where(eq(quotations.id, id));
+    const quotation = await db.select().from(quotations).where(eq(quotations.id, id));
+    return quotation.length === 0;
   }
 
-  // Quotation team members operations
+  // Quotation team member operations
   async getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]> {
     return await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
   }
@@ -1371,30 +512,36 @@ export class DatabaseStorage implements IStorage {
     return newMember;
   }
 
-  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
-    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
-  }
-  
-  async deleteQuotationTeamMemberById(id: number): Promise<void> {
-    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+  async updateQuotationTeamMember(id: number, member: Partial<InsertQuotationTeamMember>): Promise<QuotationTeamMember | undefined> {
+    const [updatedMember] = await db
+      .update(quotationTeamMembers)
+      .set(member)
+      .where(eq(quotationTeamMembers.id, id))
+      .returning();
+    return updatedMember;
   }
 
-  // Template role assignments operations
+  async deleteQuotationTeamMember(id: number): Promise<boolean> {
+    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+    const member = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+    return member.length === 0;
+  }
+
+  // Template role assignment operations
   async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
     return await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
   }
 
   async getTemplateRoleAssignmentsWithRoles(templateId: number): Promise<(TemplateRoleAssignment & { role: Role })[]> {
-    const result = await db
-      .select({
-        assignment: templateRoleAssignments,
-        role: roles
-      })
-      .from(templateRoleAssignments)
-      .innerJoin(roles, eq(templateRoleAssignments.roleId, roles.id))
-      .where(eq(templateRoleAssignments.templateId, templateId));
-
-    return result.map(item => ({
+    const assignments = await db.select({
+      assignment: templateRoleAssignments,
+      role: roles
+    })
+    .from(templateRoleAssignments)
+    .innerJoin(roles, eq(templateRoleAssignments.roleId, roles.id))
+    .where(eq(templateRoleAssignments.templateId, templateId));
+    
+    return assignments.map(item => ({
       ...item.assignment,
       role: item.role
     }));
@@ -1499,7 +646,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined> {
-    const results = await db.select({
+    const projects = await db.select({
       project: activeProjects,
       quotation: quotations,
       client: clients
@@ -1509,132 +656,41 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(clients, eq(quotations.clientId, clients.id))
     .where(eq(activeProjects.id, id));
     
-    if (results.length === 0) return undefined;
+    if (projects.length === 0) return undefined;
     
+    const item = projects[0];
     return {
-      ...results[0].project,
+      ...item.project,
       quotation: {
-        ...results[0].quotation,
-        client: results[0].client || undefined
+        ...item.quotation,
+        client: item.client || undefined
       }
     };
   }
   
-  async createActiveProject(project: InsertActiveProject): Promise<ActiveProject> {
-    const [newProject] = await db.insert(activeProjects).values(project).returning();
-    return newProject;
+  // Project component operations
+  async getProjectComponents(projectId: number): Promise<ProjectComponent[]> {
+    return await db.select().from(projectComponents).where(eq(projectComponents.projectId, projectId));
   }
   
-  async updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined> {
-    const [updatedProject] = await db
-      .update(activeProjects)
-      .set({
-        ...project,
-        updatedAt: new Date()
-      })
-      .where(eq(activeProjects.id, id))
+  async createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent> {
+    const [newComponent] = await db.insert(projectComponents).values(component).returning();
+    return newComponent;
+  }
+  
+  async updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined> {
+    const [updatedComponent] = await db
+      .update(projectComponents)
+      .set(component)
+      .where(eq(projectComponents.id, id))
       .returning();
-    return updatedProject;
+    return updatedComponent;
   }
   
-  async getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
-    return await db
-      .select()
-      .from(activeProjects)
-      .where(eq(activeProjects.quotationId, quotationId));
-  }
-  
-  async getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
-    console.log(`[DEBUG] Buscando proyectos activos para la cotización ID ${quotationId}`);
-    const projects = await db
-      .select()
-      .from(activeProjects)
-      .where(eq(activeProjects.quotationId, quotationId));
-    
-    console.log(`[DEBUG] Proyectos encontrados para cotización ${quotationId}:`, projects.length);
-    if (projects.length > 0) {
-      console.log(`[DEBUG] IDs de los proyectos encontrados:`, projects.map(p => p.id));
-    }
-    
-    return projects;
-  }
-  
-  async getActiveProjectsByParentId(parentId: number): Promise<(ActiveProject & { quotation?: Quotation & { client?: Client } })[]> {
-    console.log(`[DEBUG] Buscando subproyectos para el proyecto padre ID ${parentId}`);
-    
-    try {
-      const results = await db.select({
-        project: activeProjects,
-        quotation: quotations,
-        client: clients
-      })
-      .from(activeProjects)
-      .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-      .leftJoin(clients, eq(quotations.clientId, clients.id))
-      .where(eq(activeProjects.parentProjectId, parentId));
-      
-      console.log(`[DEBUG] Subproyectos encontrados para proyecto padre ${parentId}:`, results.length);
-      
-      return results.map(result => ({
-        ...result.project,
-        quotation: {
-          ...result.quotation,
-          client: result.client || undefined
-        }
-      }));
-    } catch (error) {
-      console.error(`Error al obtener subproyectos para proyecto padre ${parentId}:`, error);
-      return [];
-    }
-  }
-  
-  async deleteActiveProject(id: number): Promise<boolean> {
-    try {
-      // 1. Verificar que el proyecto exista
-      const project = await this.getActiveProject(id);
-      if (!project) {
-        console.log(`Proyecto con ID ${id} no encontrado para eliminar`);
-        return false;
-      }
-      
-      console.log(`Eliminando proyecto ID ${id}...`);
-      
-      // Usar SQL directo para asegurar la eliminación correcta
-      try {
-        // 1. Eliminar conversaciones de chat relacionadas con el proyecto
-        const chatDeleteQuery = `DELETE FROM chat_conversations WHERE project_id = $1`;
-        await pool.query(chatDeleteQuery, [id]);
-        console.log(`Conversaciones de chat eliminadas para el proyecto ${id}`);
-        
-        // 2. Eliminar entradas de tiempo
-        const timeDeleteQuery = `DELETE FROM time_entries WHERE project_id = $1`;
-        await pool.query(timeDeleteQuery, [id]);
-        console.log(`Entradas de tiempo eliminadas para el proyecto ${id}`);
-        
-        // 3. Eliminar informes de progreso
-        const progressDeleteQuery = `DELETE FROM progress_reports WHERE project_id = $1`;
-        await pool.query(progressDeleteQuery, [id]);
-        console.log(`Informes de progreso eliminados para el proyecto ${id}`);
-        
-        // 4. Eliminar componentes del proyecto
-        const componentsDeleteQuery = `DELETE FROM project_components WHERE project_id = $1`;
-        await pool.query(componentsDeleteQuery, [id]);
-        console.log(`Componentes eliminados para el proyecto ${id}`);
-        
-        // 5. Finalmente eliminar el proyecto
-        const projectDeleteQuery = `DELETE FROM active_projects WHERE id = $1`;
-        const result = await pool.query(projectDeleteQuery, [id]);
-        console.log(`Resultado de eliminación SQL: ${result.rowCount} fila(s) eliminada(s)`);
-        
-        return result.rowCount > 0;
-      } catch (sqlError) {
-        console.error("Error SQL al eliminar el proyecto:", sqlError);
-        throw sqlError;
-      }
-    } catch (error) {
-      console.error("Error al eliminar el proyecto activo:", error);
-      return false;
-    }
+  async deleteProjectComponent(id: number): Promise<boolean> {
+    await db.delete(projectComponents).where(eq(projectComponents.id, id));
+    const component = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
+    return component.length === 0;
   }
   
   // Time entry operations
@@ -1651,15 +707,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]> {
-    // 1. Obtener todas las cotizaciones del cliente
     const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
     const clientQuotationIds = clientQuotations.map(q => q.id);
     
-    // 2. Obtener todos los proyectos activos basados en esas cotizaciones
     const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
     const projectIds = projects.map(p => p.id);
     
-    // 3. Obtener todas las entradas de tiempo para esos proyectos
     if (projectIds.length === 0) return [];
     return await db.select().from(timeEntries).where(inArray(timeEntries.projectId, projectIds));
   }
@@ -1667,11 +720,6 @@ export class DatabaseStorage implements IStorage {
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
     const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
     return entry;
-  }
-  
-  async createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry> {
-    const [newEntry] = await db.insert(timeEntries).values(entry).returning();
-    return newEntry;
   }
   
   async updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined> {
@@ -1703,13 +751,8 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Progress report operations
-  async getProgressReportsByProject(projectId: number): Promise<ProgressReport[]> {
+  async getProgressReports(projectId: number): Promise<ProgressReport[]> {
     return await db.select().from(progressReports).where(eq(progressReports.projectId, projectId));
-  }
-  
-  async getProgressReport(id: number): Promise<ProgressReport | undefined> {
-    const [report] = await db.select().from(progressReports).where(eq(progressReports.id, id));
-    return report;
   }
   
   async createProgressReport(report: InsertProgressReport): Promise<ProgressReport> {
@@ -1726,539 +769,171 @@ export class DatabaseStorage implements IStorage {
     return updatedReport;
   }
   
-  // Financial comparison operations
-  async getProjectCostSummary(
-    projectId: number,
-    filters?: {
-      startDate?: Date;
-      endDate?: Date;
-      period?: 'month' | 'quarter' | 'custom';
-      monthYear?: string;
-      quarter?: string;
-    }
-  ): Promise<any> {
-    const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
-    if (!project) throw new Error(`Project with ID ${projectId} not found`);
-    
-    const [quotation] = await db.select().from(quotations).where(eq(quotations.id, project.quotationId));
-    if (!quotation) throw new Error(`Quotation with ID ${project.quotationId} not found`);
-    
-    // Verificar si es un proyecto Always-On y tiene subproyectos
-    let periodLabel: string | undefined = undefined;
-    const isAlwaysOnMacro = project.isAlwaysOnMacro;
-    
-    // Establecer el período de fechas según los filtros
-    let effectiveStartDate: Date | undefined = undefined;
-    let effectiveEndDate: Date | undefined = undefined;
-    
-    if (filters) {
-      if (filters.monthYear) {
-        // Si se proporciona un mes específico (YYYY-MM)
-        const [yearStr, monthStr] = filters.monthYear.split('-');
-        const year = parseInt(yearStr);
-        const month = parseInt(monthStr) - 1; // Meses en JS son 0-indexados
-        
-        effectiveStartDate = new Date(year, month, 1);
-        effectiveEndDate = new Date(year, month + 1, 0); // Último día del mes
-        periodLabel = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(effectiveStartDate);
-      } else if (filters.quarter) {
-        // Si se proporciona un trimestre específico (YYYY-Q1, YYYY-Q2, etc.)
-        const [yearStr, quarterStr] = filters.quarter.split('-');
-        const year = parseInt(yearStr);
-        const quarterNum = parseInt(quarterStr.substring(1));
-        
-        // Calcular meses para el trimestre (Q1: 0-2, Q2: 3-5, Q3: 6-8, Q4: 9-11)
-        const startMonth = (quarterNum - 1) * 3;
-        
-        effectiveStartDate = new Date(year, startMonth, 1);
-        effectiveEndDate = new Date(year, startMonth + 3, 0); // Último día del último mes del trimestre
-        periodLabel = `Q${quarterNum} ${year}`;
-      } else if (filters.period === 'month') {
-        // Filtrar por el mes actual
-        const now = new Date();
-        effectiveStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        effectiveEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Último día del mes
-        periodLabel = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric' }).format(effectiveStartDate);
-      } else if (filters.period === 'quarter') {
-        // Filtrar por el trimestre actual
-        const now = new Date();
-        const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
-        const startMonth = (currentQuarter - 1) * 3;
-        
-        effectiveStartDate = new Date(now.getFullYear(), startMonth, 1);
-        effectiveEndDate = new Date(now.getFullYear(), startMonth + 3, 0); // Último día del último mes del trimestre
-        periodLabel = `Q${currentQuarter} ${now.getFullYear()}`;
-      } else if (filters.startDate && filters.endDate) {
-        // Filtrar por rango de fechas personalizado
-        effectiveStartDate = filters.startDate;
-        effectiveEndDate = filters.endDate;
-        
-        // Formatear etiqueta para el período personalizado
-        const formatDate = (date: Date) => {
-          return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-        };
-        periodLabel = `${formatDate(effectiveStartDate)} al ${formatDate(effectiveEndDate)}`;
-      }
-    }
-    
-    // Obtener subproyectos si es un proyecto Always-On
-    let subprojectsData: Array<{
-      id: number;
-      name: string;
-      startDate: Date;
-      endDate: Date;
-      costs: {
-        estimatedCost: number;
-        actualCost: number;
-        percentageUsed: number;
-      }
-    }> = [];
-    
-    if (isAlwaysOnMacro) {
-      // Obtener todos los subproyectos
-      const subprojects = await db
-        .select()
-        .from(activeProjects)
-        .where(eq(activeProjects.parentProjectId, projectId));
-        
-      // Para cada subproyecto, obtener sus datos de costos
-      for (const subproject of subprojects) {
-        const subQuotation = await db
-          .select()
-          .from(quotations)
-          .where(eq(quotations.id, subproject.quotationId))
-          .then(rows => rows[0]);
-          
-        if (!subQuotation) continue;
-        
-        // Verificar si el subproyecto debe incluirse según el filtro de fecha
-        const subStartDate = new Date(subproject.startDate);
-        const subEndDate = new Date(subproject.expectedEndDate);
-        
-        let includeSubproject = true;
-        
-        // Si hay filtros de fecha, verificar si el subproyecto está dentro del rango
-        if (effectiveStartDate && effectiveEndDate) {
-          // Un subproyecto se incluye si su periodo se superpone con el periodo del filtro
-          includeSubproject = 
-            (subStartDate <= effectiveEndDate && subEndDate >= effectiveStartDate);
-        }
-        
-        if (includeSubproject) {
-          // Obtener las entradas de tiempo para este subproyecto
-          const subEntries = await db.select({
-            timeEntry: timeEntries,
-            personnel: personnel
-          })
-          .from(timeEntries)
-          .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-          .where(eq(timeEntries.projectId, subproject.id));
-          
-          // Calcular costos del subproyecto
-          let subActualCost = 0;
-          for (const entry of subEntries) {
-            if (entry.timeEntry.billable) {
-              // Si hay filtro de fechas y la entrada tiene fecha, verificar si está dentro del rango
-              if (effectiveStartDate && effectiveEndDate && entry.timeEntry.date) {
-                const entryDate = new Date(entry.timeEntry.date);
-                if (entryDate < effectiveStartDate || entryDate > effectiveEndDate) {
-                  continue; // Omitir esta entrada si está fuera del rango de fechas
-                }
-              }
-              subActualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
-            }
-          }
-          
-          const subEstimatedCost = subQuotation.totalAmount;
-          const subPercentageUsed = subEstimatedCost > 0 ? (subActualCost / subEstimatedCost) * 100 : 0;
-          
-          subprojectsData.push({
-            id: subproject.id,
-            name: subQuotation.projectName,
-            startDate: subStartDate,
-            endDate: subEndDate,
-            costs: {
-              estimatedCost: subEstimatedCost,
-              actualCost: subActualCost,
-              percentageUsed: subPercentageUsed
-            }
-          });
-        }
-      }
-    }
-    
-    // Construir la consulta para las entradas de tiempo del proyecto principal
-    let query = db.select({
-      timeEntry: timeEntries,
-      personnel: personnel
-    })
-    .from(timeEntries)
-    .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-    .where(eq(timeEntries.projectId, projectId));
-    
-    // Aplicar filtro de fechas si está presente
-    if (effectiveStartDate && effectiveEndDate) {
-      query = query.where(
-        and(
-          sql`${timeEntries.date} >= ${effectiveStartDate}`,
-          sql`${timeEntries.date} <= ${effectiveEndDate}`
-        )
-      );
-    }
-    
-    const entries = await query;
-    
-    // Calcular el costo real basado en las horas registradas
-    let actualCost = 0;
-    for (const entry of entries) {
-      if (entry.timeEntry.billable) {
-        actualCost += entry.personnel.hourlyRate * entry.timeEntry.hours;
-      }
-    }
-    
-    // Si es un proyecto Always-On con presupuesto mensual, usar ese valor como estimado
-    let estimatedCost = quotation.totalAmount;
-    if (isAlwaysOnMacro && project.macroMonthlyBudget && filters && 
-        (filters.monthYear || filters.period === 'month')) {
-      // Para filtro por mes, usar el presupuesto mensual en lugar del total
-      estimatedCost = project.macroMonthlyBudget;
-    }
-    
-    // Si estamos filtrando por trimestre y es Always-On, multiplicar el presupuesto mensual por 3
-    if (isAlwaysOnMacro && project.macroMonthlyBudget && filters && 
-        (filters.quarter || filters.period === 'quarter')) {
-      estimatedCost = project.macroMonthlyBudget * 3;
-    }
-    
-    const variance = estimatedCost - actualCost;
-    const percentageUsed = estimatedCost > 0 ? (actualCost / estimatedCost) * 100 : 0;
-    
-    // Construir el resultado
-    const result: any = {
-      estimatedCost,
-      actualCost,
-      variance,
-      percentageUsed
-    };
-    
-    // Agregar la etiqueta del período si existe
-    if (periodLabel) {
-      result.periodLabel = periodLabel;
-    }
-    
-    // Agregar subproyectos si existen y es un proyecto Always-On
-    if (isAlwaysOnMacro && subprojectsData.length > 0) {
-      result.subprojects = subprojectsData;
-    }
-    
-    return result;
-  }
-  
-  async getClientCostSummary(clientId: number): Promise<{
-    totalEstimatedCost: number;
-    totalActualCost: number;
-    totalVariance: number;
-    averagePercentageUsed: number;
-    projectCount: number;
-    projectsData: Array<{
-      projectId: number;
-      projectName: string;
-      estimatedCost: number;
-      actualCost: number;
-      variance: number;
-      percentageUsed: number;
-    }>;
-  }> {
-    // 1. Obtener todas las cotizaciones del cliente
-    const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
-    if (clientQuotations.length === 0) {
-      return {
-        totalEstimatedCost: 0,
-        totalActualCost: 0,
-        totalVariance: 0,
-        averagePercentageUsed: 0,
-        projectCount: 0,
-        projectsData: []
-      };
-    }
-    
-    // 2. Obtener todos los proyectos activos basados en esas cotizaciones
-    const clientQuotationIds = clientQuotations.map(q => q.id);
-    const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
-    
-    if (projects.length === 0) {
-      return {
-        totalEstimatedCost: 0,
-        totalActualCost: 0,
-        totalVariance: 0,
-        averagePercentageUsed: 0,
-        projectCount: 0,
-        projectsData: []
-      };
-    }
-    
-    // 3. Obtener resumen de costos para cada proyecto
-    let totalEstimatedCost = 0;
-    let totalActualCost = 0;
-    let totalVariance = 0;
-    let totalPercentageUsed = 0;
-    const projectsData = [];
-    
-    for (const project of projects) {
-      try {
-        // Obtener el nombre del proyecto desde la cotización
-        const quotation = clientQuotations.find(q => q.id === project.quotationId);
-        const projectName = quotation ? quotation.projectName : 'Proyecto sin nombre';
-        
-        // Calcular costos
-        const costSummary = await this.getProjectCostSummary(project.id);
-        
-        totalEstimatedCost += costSummary.estimatedCost;
-        totalActualCost += costSummary.actualCost;
-        totalVariance += costSummary.variance;
-        totalPercentageUsed += costSummary.percentageUsed;
-        
-        projectsData.push({
-          projectId: project.id,
-          projectName,
-          ...costSummary
-        });
-      } catch (error) {
-        console.error(`Error getting cost summary for project ${project.id}:`, error);
-      }
-    }
-    
-    const averagePercentageUsed = projects.length > 0 ? totalPercentageUsed / projects.length : 0;
-    
-    return {
-      totalEstimatedCost,
-      totalActualCost,
-      totalVariance,
-      averagePercentageUsed,
-      projectCount: projects.length,
-      projectsData
-    };
-  }
-  
-  // Project Component Operations
-  async getProjectComponents(projectId: number): Promise<ProjectComponent[]> {
-    const result = await db.select().from(projectComponents).where(eq(projectComponents.projectId, projectId));
-    return result;
+  async deleteProgressReport(id: number): Promise<boolean> {
+    await db.delete(progressReports).where(eq(progressReports.id, id));
+    const report = await db.select().from(progressReports).where(eq(progressReports.id, id));
+    return report.length === 0;
   }
 
-  async getProjectComponent(id: number): Promise<ProjectComponent | undefined> {
-    const [component] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
-    return component;
+  // Chat operations
+  async getConversations(): Promise<any[]> {
+    return await db.select().from(chatConversations);
   }
 
-  async createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent> {
-    // Si isDefault es true, primero establecemos todos los demás componentes como no predeterminados
-    if (component.isDefault) {
-      await db.update(projectComponents)
-        .set({ isDefault: false })
-        .where(eq(projectComponents.projectId, component.projectId));
-    }
-    
-    const [newComponent] = await db.insert(projectComponents).values(component).returning();
-    return newComponent;
+  async createConversation(conversation: any): Promise<any> {
+    const [newConversation] = await db.insert(chatConversations).values(conversation).returning();
+    return newConversation;
   }
 
-  async updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined> {
-    // Si isDefault es true, primero establecemos todos los demás componentes como no predeterminados
-    if (component.isDefault) {
-      // Obtener el componente para tener el projectId
-      const [currentComponent] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
-      if (currentComponent) {
-        await db.update(projectComponents)
-          .set({ isDefault: false })
-          .where(and(
-            eq(projectComponents.projectId, currentComponent.projectId),
-            ne(projectComponents.id, id)
-          ));
-      }
-    }
-    
-    const [updatedComponent] = await db.update(projectComponents)
-      .set(component)
-      .where(eq(projectComponents.id, id))
-      .returning();
-    
-    return updatedComponent;
+  async getMessages(conversationId: number): Promise<any[]> {
+    return await db.select().from(chatMessages).where(eq(chatMessages.conversationId, conversationId));
   }
 
-  async deleteProjectComponent(id: number): Promise<boolean> {
-    try {
-      // 1. Verificar si el componente existe
-      const [component] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
-      if (!component) {
-        return false;
-      }
-      
-      // 2. Comprobar si hay entradas de tiempo asociadas a este componente
-      const timeEntriesWithComponent = await db.select()
-        .from(timeEntries)
-        .where(eq(timeEntries.componentId, id));
-      
-      if (timeEntriesWithComponent.length > 0) {
-        // Hay entradas de tiempo, actualizar a NULL el componente en lugar de eliminar
-        await db.update(timeEntries)
-          .set({ componentId: null })
-          .where(eq(timeEntries.componentId, id));
-      }
-      
-      // 3. Eliminar el componente
-      const [deletedComponent] = await db.delete(projectComponents)
-        .where(eq(projectComponents.id, id))
-        .returning();
-      
-      return !!deletedComponent;
-    } catch (error) {
-      console.error(`Error al eliminar componente de proyecto ${id}:`, error);
-      return false;
-    }
+  async createMessage(message: any): Promise<any> {
+    const [newMessage] = await db.insert(chatMessages).values(message).returning();
+    return newMessage;
   }
 
-  async getDefaultProjectComponent(projectId: number): Promise<ProjectComponent | undefined> {
-    const [component] = await db.select()
-      .from(projectComponents)
-      .where(and(
-        eq(projectComponents.projectId, projectId),
-        eq(projectComponents.isDefault, true)
-      ));
+  async addParticipantToConversation(conversationId: number, userId: number): Promise<boolean> {
+    const [participant] = await db.insert(chatConversationParticipants).values({
+      conversationId,
+      userId
+    }).returning();
     
-    return component;
+    return participant.id > 0;
   }
   
-  // MODO operations
-  async getDeliverables(clientId?: number): Promise<Deliverable[]> {
-    try {
-      let query = db.select().from(deliverables);
-      
-      // Con la tabla que creamos manualmente, no tenemos el campo clientId
-      // Entonces por ahora ignoraremos ese filtro y devolveremos todos los entregables
-      // Cuando se haga la migración completa, se puede descomentar estas líneas
-      /*
-      if (clientId) {
-        query = query.where(eq(deliverables.clientId, clientId));
-      }
-      
-      return await query.orderBy(deliverables.deliveryMonth);
-      */
-      
-      // Por ahora simplemente devolvemos todos los datos
-      return await query;
-    } catch (error) {
-      console.error("Error in getDeliverables:", error);
-      return [];
-    }
+  async updateConversationLastActivity(conversationId: number): Promise<void> {
+    await db
+      .update(chatConversations)
+      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+      .where(eq(chatConversations.id, conversationId));
   }
   
-  async getDeliverable(id: number): Promise<any | undefined> {
-    try {
-      const result = await db.execute(
-        `SELECT * FROM deliverables WHERE id = ${id}`
-      );
-      
-      if (result.rows && result.rows.length > 0) {
-        return result.rows[0];
-      }
-      return undefined;
-    } catch (error) {
-      console.error("Error fetching deliverable:", error);
-      return undefined;
-    }
-  }
-  
-  async createDeliverable(deliverable: InsertDeliverable): Promise<Deliverable> {
-    const [newDeliverable] = await db.insert(deliverables).values(deliverable).returning();
-    return newDeliverable;
-  }
-  
-
-  
-  async deleteDeliverable(id: number): Promise<boolean> {
-    try {
-      const result = await db.delete(deliverables).where(eq(deliverables.id, id));
-      return result.rowCount > 0;
-    } catch (error) {
-      console.error("Error deleting deliverable:", error);
-      return false;
-    }
-  }
-  
-  async getClientModoComments(clientId: number): Promise<ClientModoComment[]> {
-    console.log(`Buscando comentarios MODO para cliente ID: ${clientId}`);
-    const comments = await db
-      .select()
-      .from(clientModoComments)
-      .where(eq(clientModoComments.client_id, clientId))
-      .orderBy(clientModoComments.year, "desc")
-      .orderBy(clientModoComments.quarter, "desc");
-    
-    console.log(`Encontrados ${comments.length} comentarios MODO`);
-    return comments;
-  }
-  
-  async getClientModoComment(id: number): Promise<ClientModoComment | undefined> {
-    const [comment] = await db.select().from(clientModoComments).where(eq(clientModoComments.id, id));
-    return comment;
-  }
-  
-  async getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<ClientModoComment | undefined> {
-    console.log(`Buscando comentario MODO para cliente ID: ${clientId}, Q${quarter} ${year}`);
-    const [comment] = await db
-      .select()
-      .from(clientModoComments)
+  async markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void> {
+    await db
+      .update(chatMessages)
+      .set({ seen: true })
       .where(
         and(
-          eq(clientModoComments.client_id, clientId),
-          eq(clientModoComments.quarter, quarter),
-          eq(clientModoComments.year, year)
+          eq(chatMessages.conversationId, conversationId),
+          sql`${chatMessages.senderId} <> ${userId}`
         )
       );
-    return comment;
   }
-  
 
-  
-  async updateClientModoComment(id: number, comment: Partial<InsertClientModoComment>): Promise<ClientModoComment | undefined> {
+  // Deliverable operations
+  async getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]> {
     try {
-      const existingComment = await this.getClientModoComment(id);
-      if (!existingComment) {
-        return undefined;
-      }
+      if (projectIds.length === 0) return [];
       
-      const [updatedComment] = await db
-        .update(clientModoComments)
-        .set({
-          ...comment,
-          updatedAt: new Date()
-        })
-        .where(eq(clientModoComments.id, id))
-        .returning();
+      console.log(`Obteniendo entregables para los proyectos: ${projectIds.join(", ")}`);
       
-      return updatedComment;
+      const deliverableList = await db.select().from(deliverables).where(inArray(deliverables.projectId, projectIds));
+      
+      console.log(`Encontrados ${deliverableList.length} entregables`);
+      return deliverableList;
     } catch (error) {
-      console.error("Error updating MODO comment:", error);
+      console.error("Error al obtener entregables:", error);
       throw error;
     }
   }
   
-  async deleteClientModoComment(id: number): Promise<boolean> {
+  async createDeliverable(deliverable: any): Promise<Deliverable> {
     try {
-      const result = await db.delete(clientModoComments).where(eq(clientModoComments.id, id));
-      return result.rowCount > 0;
+      console.log("Datos recibidos para crear entregable:", deliverable);
+      
+      const dataToInsert = {
+        projectId: deliverable.projectId || deliverable.project_id,
+        name: deliverable.name || deliverable.title,
+        deliveryDate: deliverable.deliveryDate || new Date(),
+        dueDate: deliverable.dueDate || deliverable.due_date || new Date(),
+        onTime: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
+        narrativeQuality: deliverable.narrativeQuality || deliverable.narrative_quality,
+        graphicsEffectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness,
+        formatDesign: deliverable.formatDesign || deliverable.format_design,
+        relevantInsights: deliverable.relevantInsights || deliverable.relevant_insights,
+        operationsFeedback: deliverable.operationsFeedback || deliverable.operations_feedback,
+        clientFeedback: deliverable.clientFeedback || deliverable.client_feedback,
+        briefCompliance: deliverable.briefCompliance || deliverable.brief_compliance,
+        notes: deliverable.notes || "",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      console.log("Datos a insertar:", dataToInsert);
+      
+      const [newDeliverable] = await db.insert(deliverables).values(dataToInsert).returning();
+      return newDeliverable;
     } catch (error) {
-      console.error("Error deleting MODO comment:", error);
-      return false;
+      console.error("Error al crear entregable:", error);
+      throw error;
     }
   }
   
-  async getClientModoSummary(clientId: number): Promise<{
+  async updateDeliverable(id: number, data: any): Promise<Deliverable | undefined> {
+    try {
+      console.log(`Actualizando entregable ID ${id} con datos:`, data);
+      
+      const updateData: any = { updatedAt: new Date() };
+      
+      // Mapear campos correctamente
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.title !== undefined) updateData.name = data.title;
+      if (data.projectId !== undefined) updateData.projectId = data.projectId;
+      if (data.project_id !== undefined) updateData.projectId = data.project_id;
+      if (data.deliveryDate !== undefined) updateData.deliveryDate = data.deliveryDate;
+      if (data.delivery_date !== undefined) updateData.deliveryDate = data.delivery_date;
+      if (data.dueDate !== undefined) updateData.dueDate = data.dueDate;
+      if (data.due_date !== undefined) updateData.dueDate = data.due_date;
+      if (data.onTime !== undefined) updateData.onTime = data.onTime;
+      if (data.deliveryOnTime !== undefined) updateData.onTime = data.deliveryOnTime;
+      if (data.on_time !== undefined) updateData.onTime = data.on_time;
+      
+      // Mapear campos de calidad (frontend "_score" -> backend sin sufijo)
+      if (data.narrative_quality_score !== undefined) updateData.narrativeQuality = data.narrative_quality_score;
+      if (data.narrative_quality !== undefined) updateData.narrativeQuality = data.narrative_quality;
+      if (data.graphics_effectiveness_score !== undefined) updateData.graphicsEffectiveness = data.graphics_effectiveness_score;
+      if (data.graphics_effectiveness !== undefined) updateData.graphicsEffectiveness = data.graphics_effectiveness;
+      if (data.format_design_score !== undefined) updateData.formatDesign = data.format_design_score;
+      if (data.format_design !== undefined) updateData.formatDesign = data.format_design;
+      if (data.relevant_insights_score !== undefined) updateData.relevantInsights = data.relevant_insights_score;
+      if (data.relevant_insights !== undefined) updateData.relevantInsights = data.relevant_insights;
+      if (data.operations_feedback_score !== undefined) updateData.operationsFeedback = data.operations_feedback_score;
+      if (data.operations_feedback !== undefined) updateData.operationsFeedback = data.operations_feedback;
+      if (data.client_feedback_score !== undefined) updateData.clientFeedback = data.client_feedback_score;
+      if (data.client_feedback !== undefined) updateData.clientFeedback = data.client_feedback;
+      if (data.brief_compliance_score !== undefined) updateData.briefCompliance = data.brief_compliance_score;
+      if (data.brief_compliance !== undefined) updateData.briefCompliance = data.brief_compliance;
+      if (data.notes !== undefined) updateData.notes = data.notes;
+      
+      console.log("Datos de actualización preparados:", updateData);
+      
+      const [updatedDeliverable] = await db
+        .update(deliverables)
+        .set(updateData)
+        .where(eq(deliverables.id, id))
+        .returning();
+      
+      if (!updatedDeliverable) {
+        console.log(`No se encontró el entregable con ID ${id}`);
+        return undefined;
+      }
+      
+      console.log(`Entregable ID ${id} actualizado correctamente`);
+      return updatedDeliverable;
+    } catch (error) {
+      console.error(`Error al actualizar entregable ID ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // Client MODO operations
+  async getClientStatistics(clientId: number): Promise<{
     totalDeliverables: number;
     onTimeDeliveries: number;
-    onTimePercentage: number;
-    averageScores: {
+    deliveryRate: number;
+    qualityScores: {
       narrativeQuality: number;
       graphicsEffectiveness: number;
       formatDesign: number;
@@ -2271,80 +946,43 @@ export class DatabaseStorage implements IStorage {
     latestComment?: ClientModoComment;
   }> {
     try {
-      console.log(`Obteniendo datos MODO para cliente ID: ${clientId}`);
+      console.log(`Obteniendo estadísticas para el cliente ID: ${clientId}`);
       
-      // Obtener todos los entregables - por ahora usamos todos los entregables
-      // independientemente del cliente porque nuestra tabla no tiene relación con clientes directamente
-      const clientDeliverables = await db
-        .select()
-        .from(deliverables);
-        
-      console.log(`Encontrados ${clientDeliverables.length} entregables en total`);
-      // En una implementación futura, filtraríamos por project_id donde el proyecto pertenezca al cliente
-      // Por ahora usamos todos los entregables para prueba
+      // Obtener proyectos del cliente
+      const clientProjects = await this.getActiveProjectsByClient(clientId);
+      const projectIds = clientProjects.map(p => p.id);
       
-    
-      // Calcular métricas
-      const totalDeliverables = clientDeliverables.length;
-      const onTimeDeliveries = clientDeliverables.filter(d => d.on_time).length;
-      const onTimePercentage = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
+      console.log(`Proyectos del cliente: [${projectIds.join(", ")}]`);
       
-      // Inicializar sumas para promedios
-      let sumNarrativeQuality = 0;
-      let sumGraphicsEffectiveness = 0;
-      let sumFormatDesign = 0;
-      let sumRelevantInsights = 0;
-      let sumOperationsFeedback = 0;
-      let sumClientFeedback = 0;
-      let sumBriefCompliance = 0;
+      // Obtener entregables
+      const deliverablesList = await this.getDeliverablesByProjects(projectIds);
       
-      let countNarrativeQuality = 0;
-      let countGraphicsEffectiveness = 0;
-      let countFormatDesign = 0;
-      let countRelevantInsights = 0;
-      let countOperationsFeedback = 0;
-      let countClientFeedback = 0;
-      let countBriefCompliance = 0;
+      console.log(`Entregables encontrados: ${deliverablesList.length}`);
       
-      // Sumar valores para cada categoría (ignorando null/undefined)
-      for (const deliverable of clientDeliverables) {
-        if (deliverable.narrative_quality !== null && deliverable.narrative_quality !== undefined) {
-          sumNarrativeQuality += Number(deliverable.narrative_quality);
-          countNarrativeQuality++;
-        }
-        
-        if (deliverable.graphics_effectiveness !== null && deliverable.graphics_effectiveness !== undefined) {
-          sumGraphicsEffectiveness += Number(deliverable.graphics_effectiveness);
-          countGraphicsEffectiveness++;
-        }
-        
-        if (deliverable.format_design !== null && deliverable.format_design !== undefined) {
-          sumFormatDesign += Number(deliverable.format_design);
-          countFormatDesign++;
-        }
-        
-        if (deliverable.relevant_insights !== null && deliverable.relevant_insights !== undefined) {
-          sumRelevantInsights += Number(deliverable.relevant_insights);
-          countRelevantInsights++;
-        }
-        
-        if (deliverable.operations_feedback !== null && deliverable.operations_feedback !== undefined) {
-          sumOperationsFeedback += Number(deliverable.operations_feedback);
-          countOperationsFeedback++;
-        }
-        
-        if (deliverable.client_feedback !== null && deliverable.client_feedback !== undefined) {
-          sumClientFeedback += Number(deliverable.client_feedback);
-          countClientFeedback++;
-        }
-        
-        if (deliverable.brief_compliance !== null && deliverable.brief_compliance !== undefined) {
-          sumBriefCompliance += Number(deliverable.brief_compliance);
-          countBriefCompliance++;
-        }
-      }
+      // Calcular estadísticas
+      const totalDeliverables = deliverablesList.length;
+      const onTimeDeliveries = deliverablesList.filter(d => d.onTime).length;
+      const deliveryRate = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
       
-      // Calcular promedios
+      // Calcular promedios de calidad
+      let sumNarrativeQuality = 0, countNarrativeQuality = 0;
+      let sumGraphicsEffectiveness = 0, countGraphicsEffectiveness = 0;
+      let sumFormatDesign = 0, countFormatDesign = 0;
+      let sumRelevantInsights = 0, countRelevantInsights = 0;
+      let sumOperationsFeedback = 0, countOperationsFeedback = 0;
+      let sumClientFeedback = 0, countClientFeedback = 0;
+      let sumBriefCompliance = 0, countBriefCompliance = 0;
+      
+      deliverablesList.forEach(d => {
+        if (d.narrativeQuality != null) { sumNarrativeQuality += d.narrativeQuality; countNarrativeQuality++; }
+        if (d.graphicsEffectiveness != null) { sumGraphicsEffectiveness += d.graphicsEffectiveness; countGraphicsEffectiveness++; }
+        if (d.formatDesign != null) { sumFormatDesign += d.formatDesign; countFormatDesign++; }
+        if (d.relevantInsights != null) { sumRelevantInsights += d.relevantInsights; countRelevantInsights++; }
+        if (d.operationsFeedback != null) { sumOperationsFeedback += d.operationsFeedback; countOperationsFeedback++; }
+        if (d.clientFeedback != null) { sumClientFeedback += d.clientFeedback; countClientFeedback++; }
+        if (d.briefCompliance != null) { sumBriefCompliance += d.briefCompliance; countBriefCompliance++; }
+      });
+      
       const averageNarrativeQuality = countNarrativeQuality > 0 ? sumNarrativeQuality / countNarrativeQuality : 0;
       const averageGraphicsEffectiveness = countGraphicsEffectiveness > 0 ? sumGraphicsEffectiveness / countGraphicsEffectiveness : 0;
       const averageFormatDesign = countFormatDesign > 0 ? sumFormatDesign / countFormatDesign : 0;
@@ -2357,7 +995,7 @@ export class DatabaseStorage implements IStorage {
       const comments = await db
         .select()
         .from(clientModoComments)
-        .where(eq(clientModoComments.client_id, clientId))
+        .where(eq(clientModoComments.clientId, clientId))
         .orderBy(desc(clientModoComments.year));
       
       console.log(`Encontrados ${comments.length} comentarios para el cliente ID: ${clientId}`);
@@ -2368,35 +1006,33 @@ export class DatabaseStorage implements IStorage {
       return {
         totalDeliverables,
         onTimeDeliveries,
-        onTimePercentage,
-        averageScores: {
-          narrativeQuality: averageNarrativeQuality,
-          graphicsEffectiveness: averageGraphicsEffectiveness,
-          formatDesign: averageFormatDesign,
-          relevantInsights: averageRelevantInsights,
-          operationsFeedback: averageOperationsFeedback,
-          clientFeedback: averageClientFeedback,
-          briefCompliance: averageBriefCompliance
+        deliveryRate: Number(deliveryRate.toFixed(2)),
+        qualityScores: {
+          narrativeQuality: Number(averageNarrativeQuality.toFixed(2)),
+          graphicsEffectiveness: Number(averageGraphicsEffectiveness.toFixed(2)),
+          formatDesign: Number(averageFormatDesign.toFixed(2)),
+          relevantInsights: Number(averageRelevantInsights.toFixed(2)),
+          operationsFeedback: Number(averageOperationsFeedback.toFixed(2)),
+          clientFeedback: Number(averageClientFeedback.toFixed(2)),
+          briefCompliance: Number(averageBriefCompliance.toFixed(2)),
         },
         totalComments,
         latestComment
       };
     } catch (error) {
-      console.error("Error al obtener resumen MODO del cliente:", error);
+      console.error("Error al obtener estadísticas del cliente:", error);
       throw error;
     }
   }
-  
+
   async getClientModoComments(clientId: number): Promise<ClientModoComment[]> {
     try {
-      console.log(`Obteniendo comentarios MODO para cliente ID: ${clientId}`);
       const comments = await db
         .select()
         .from(clientModoComments)
-        .where(eq(clientModoComments.client_id, clientId))
-        .orderBy(desc(clientModoComments.year), desc(clientModoComments.quarter));
+        .where(eq(clientModoComments.clientId, clientId))
+        .orderBy(desc(clientModoComments.year));
       
-      console.log(`Encontrados ${comments.length} comentarios MODO`);
       return comments;
     } catch (error) {
       console.error("Error al obtener comentarios MODO:", error);
@@ -2408,10 +1044,9 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log("Datos recibidos para crear comentario MODO:", comment);
       
-      // Adaptamos los datos al esquema real de la tabla
       const dataToInsert = {
-        client_id: comment.clientId || comment.client_id,
-        comment_text: comment.comments || comment.comment_text,
+        clientId: comment.clientId || comment.client_id,
+        comments: comment.comments || comment.comment_text,
         year: comment.year,
         quarter: comment.quarter,
         timestamp: new Date().toISOString()
@@ -2426,159 +1061,8 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  
-  async getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]> {
-    try {
-      if (projectIds.length === 0) return [];
-      
-      console.log(`Obteniendo entregables para los proyectos: ${projectIds.join(", ")}`);
-      
-      // Ejecutamos una consulta SQL directa para obtener los entregables
-      const { rows } = await db.execute(
-        `SELECT * FROM deliverables 
-         WHERE project_id IN (${projectIds.join(',')}) 
-         ORDER BY delivery_date DESC`
-      );
-      
-      console.log(`Encontrados ${rows.length} entregables`);
-      return rows;
-    } catch (error) {
-      console.error("Error al obtener entregables:", error);
-      throw error;
-    }
-  }
-  
-  async createDeliverable(deliverable: any): Promise<Deliverable> {
-    try {
-      console.log("Datos recibidos para crear entregable:", deliverable);
-      
-      // Adaptamos los datos al esquema real de la tabla
-      const dataToInsert = {
-        project_id: deliverable.projectId || deliverable.project_id,
-        title: deliverable.name || deliverable.title,
-        delivery_date: deliverable.deliveryDate || new Date().toISOString(),
-        due_date: deliverable.dueDate || deliverable.due_date || new Date().toISOString(),
-        on_time: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
-        narrative_quality: deliverable.narrativeQuality || deliverable.narrative_quality,
-        graphics_effectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness,
-        format_design: deliverable.formatDesign || deliverable.format_design,
-        relevant_insights: deliverable.relevantInsights || deliverable.relevant_insights,
-        operations_feedback: deliverable.operationsFeedback || deliverable.operations_feedback,
-        client_feedback: deliverable.clientFeedback || deliverable.client_feedback,
-        brief_compliance: deliverable.briefCompliance || deliverable.brief_compliance,
-        notes: deliverable.notes || "",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log("Datos a insertar:", dataToInsert);
-      
-      // Usamos SQL directo para evitar problemas de mapeo con Drizzle
-      const { rows } = await db.execute(
-        `INSERT INTO deliverables (
-          project_id, title, delivery_date, due_date, on_time, 
-          narrative_quality, graphics_effectiveness, format_design, 
-          relevant_insights, operations_feedback, client_feedback, 
-          brief_compliance, notes, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-        ) RETURNING *`,
-        [
-          dataToInsert.project_id,
-          dataToInsert.title,
-          dataToInsert.delivery_date,
-          dataToInsert.due_date,
-          dataToInsert.on_time,
-          dataToInsert.narrative_quality,
-          dataToInsert.graphics_effectiveness,
-          dataToInsert.format_design,
-          dataToInsert.relevant_insights,
-          dataToInsert.operations_feedback,
-          dataToInsert.client_feedback,
-          dataToInsert.brief_compliance,
-          dataToInsert.notes,
-          dataToInsert.created_at,
-          dataToInsert.updated_at
-        ]
-      );
-      
-      return rows[0];
-    } catch (error) {
-      console.error("Error al crear entregable:", error);
-      throw error;
-    }
-  }
-  
-  async updateDeliverable(id: number, data: any): Promise<Deliverable | undefined> {
-    try {
-      console.log(`Actualizando entregable ID ${id} con datos:`, data);
-      
-      // Preparamos los datos para actualizar según la estructura real de la tabla
-      const updateData: any = { updated_at: new Date().toISOString() };
-      
-      // Mapeamos los campos según corresponda en la estructura real
-      if (data.name !== undefined) updateData.title = data.name;
-      if (data.title !== undefined) updateData.title = data.title;
-      if (data.projectId !== undefined) updateData.project_id = data.projectId;
-      if (data.project_id !== undefined) updateData.project_id = data.project_id;
-      if (data.deliveryDate !== undefined) updateData.delivery_date = data.deliveryDate;
-      if (data.delivery_date !== undefined) updateData.delivery_date = data.delivery_date;
-      if (data.dueDate !== undefined) updateData.due_date = data.dueDate;
-      if (data.due_date !== undefined) updateData.due_date = data.due_date;
-      if (data.onTime !== undefined) updateData.on_time = data.onTime;
-      if (data.deliveryOnTime !== undefined) updateData.on_time = data.deliveryOnTime;
-      if (data.on_time !== undefined) updateData.on_time = data.on_time;
-      // Mapear campos con sufijo _score (del frontend) a campos sin sufijo (base de datos)
-      if (data.narrative_quality_score !== undefined) updateData.narrative_quality = data.narrative_quality_score;
-      if (data.narrative_quality !== undefined) updateData.narrative_quality = data.narrative_quality;
-      if (data.graphics_effectiveness_score !== undefined) updateData.graphics_effectiveness = data.graphics_effectiveness_score;
-      if (data.graphics_effectiveness !== undefined) updateData.graphics_effectiveness = data.graphics_effectiveness;
-      if (data.format_design_score !== undefined) updateData.format_design = data.format_design_score;
-      if (data.format_design !== undefined) updateData.format_design = data.format_design;
-      if (data.relevant_insights_score !== undefined) updateData.relevant_insights = data.relevant_insights_score;
-      if (data.relevant_insights !== undefined) updateData.relevant_insights = data.relevant_insights;
-      if (data.operations_feedback_score !== undefined) updateData.operations_feedback = data.operations_feedback_score;
-      if (data.operations_feedback !== undefined) updateData.operations_feedback = data.operations_feedback;
-      if (data.client_feedback_score !== undefined) updateData.client_feedback = data.client_feedback_score;
-      if (data.client_feedback !== undefined) updateData.client_feedback = data.client_feedback;
-      if (data.brief_compliance_score !== undefined) updateData.brief_compliance = data.brief_compliance_score;
-      if (data.brief_compliance !== undefined) updateData.brief_compliance = data.brief_compliance;
-      if (data.notes !== undefined) updateData.notes = data.notes;
-      
-      console.log("Datos de actualización preparados:", updateData);
-      
-      // Construimos una consulta SQL usando interpolación directa (más segura para este caso)
-      const setClauses = Object.keys(updateData).map(key => {
-        const value = updateData[key];
-        if (typeof value === 'string') {
-          return `${key} = '${value.replace(/'/g, "''")}'`;
-        } else if (typeof value === 'number') {
-          return `${key} = ${value}`;
-        } else if (value === null) {
-          return `${key} = NULL`;
-        }
-        return `${key} = '${String(value)}'`;
-      }).join(', ');
-      
-      // Ejecutamos la consulta SQL directa
-      const result = await db.execute(
-        `UPDATE deliverables SET ${setClauses} WHERE id = ${id} RETURNING *`
-      );
-      
-      if (!result.rows || result.rows.length === 0) {
-        console.log(`No se encontró el entregable con ID ${id}`);
-        return undefined;
-      }
-      
-      console.log(`Entregable ID ${id} actualizado correctamente`);
-      return result.rows[0];
-    } catch (error) {
-      console.error(`Error al actualizar entregable ID ${id}:`, error);
-      throw error;
-    }
-  }
 
-  // Implementación de métodos NPS Survey
+  // NPS Survey operations
   async getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]> {
     try {
       const surveys = await db.select().from(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.clientId, clientId));
@@ -2634,5 +1118,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Exportar la implementación de la base de datos en lugar de la memoria
+// Exportar solo la implementación de base de datos
 export const storage = new DatabaseStorage();
