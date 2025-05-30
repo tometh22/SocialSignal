@@ -1046,15 +1046,16 @@ export class DatabaseStorage implements IStorage {
       console.log("Datos recibidos para crear comentario MODO:", comment);
       
       const dataToInsert = {
-        clientId: comment.clientId || comment.client_id,
+        client_id: comment.clientId || comment.client_id,
         comments: comment.comments || comment.comment_text,
         year: comment.year,
         quarter: comment.quarter,
-        timestamp: new Date().toISOString()
+        created_at: new Date(),
+        updated_at: new Date()
       };
       
       console.log("Datos a insertar:", dataToInsert);
-      const [newComment] = await db.insert(clientModoComments).values(dataToInsert).returning();
+      const [newComment] = await db.insert(clientModoComments).values([dataToInsert]).returning();
       
       return newComment;
     } catch (error) {
@@ -1114,6 +1115,247 @@ export class DatabaseStorage implements IStorage {
       return true;
     } catch (error) {
       console.error(`Error al eliminar encuesta NPS ${id}:`, error);
+      return false;
+    }
+  }
+
+  // Métodos faltantes para corregir errores de TypeScript
+  async getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
+    try {
+      return await db.select().from(activeProjects).where(eq(activeProjects.quotationId, quotationId));
+    } catch (error) {
+      console.error("Error al obtener proyectos activos por cotización:", error);
+      throw error;
+    }
+  }
+
+  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
+    try {
+      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+    } catch (error) {
+      console.error("Error al eliminar miembros del equipo:", error);
+      throw error;
+    }
+  }
+
+  async getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
+    try {
+      return await db.select().from(activeProjects).where(eq(activeProjects.quotationId, quotationId));
+    } catch (error) {
+      console.error("Error al obtener proyectos por cotización:", error);
+      throw error;
+    }
+  }
+
+  async getClientCostSummary(clientId: number): Promise<any> {
+    try {
+      const projects = await db.select().from(activeProjects).where(eq(activeProjects.client_id, clientId));
+      const allTimeEntries = await db.select().from(timeEntries);
+      
+      let totalCost = 0;
+      let totalBudget = 0;
+      
+      for (const project of projects) {
+        totalBudget += parseFloat(project.costLimit || '0');
+        const projectTimeEntries = allTimeEntries.filter((te: any) => te.projectId === project.id);
+        for (const entry of projectTimeEntries) {
+          totalCost += parseFloat(entry.totalCost || '0');
+        }
+      }
+      
+      return {
+        totalCost,
+        totalBudget,
+        variance: totalBudget - totalCost,
+        percentageUsed: totalBudget > 0 ? (totalCost / totalBudget) * 100 : 0
+      };
+    } catch (error) {
+      console.error("Error al obtener resumen de costos del cliente:", error);
+      throw error;
+    }
+  }
+
+  async getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]> {
+    try {
+      return await db.select().from(activeProjects).where(eq(activeProjects.parentProjectId, parentId));
+    } catch (error) {
+      console.error("Error al obtener proyectos activos por padre:", error);
+      throw error;
+    }
+  }
+
+  async getProjectComponent(id: number): Promise<any> {
+    try {
+      const [component] = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
+      return component;
+    } catch (error) {
+      console.error("Error al obtener componente de proyecto:", error);
+      throw error;
+    }
+  }
+
+  async getDefaultProjectComponent(): Promise<any> {
+    try {
+      const [component] = await db.select().from(projectComponents).limit(1);
+      return component;
+    } catch (error) {
+      console.error("Error al obtener componente por defecto:", error);
+      throw error;
+    }
+  }
+
+  async getProgressReportsByProject(projectId: number): Promise<any[]> {
+    try {
+      return await db.select().from(progressReports).where(eq(progressReports.projectId, projectId));
+    } catch (error) {
+      console.error("Error al obtener reportes de progreso:", error);
+      throw error;
+    }
+  }
+
+  async getProgressReport(id: number): Promise<any> {
+    try {
+      const [report] = await db.select().from(progressReports).where(eq(progressReports.id, id));
+      return report;
+    } catch (error) {
+      console.error("Error al obtener reporte de progreso:", error);
+      throw error;
+    }
+  }
+
+  async getProjectCostSummary(projectId: number): Promise<any> {
+    try {
+      const project = await this.getActiveProject(projectId);
+      if (!project) return null;
+
+      const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
+      
+      let totalCost = 0;
+      for (const entry of entries) {
+        totalCost += parseFloat(entry.totalCost || '0');
+      }
+      
+      const budget = parseFloat(project.costLimit || '0');
+      
+      return {
+        projectId,
+        totalCost,
+        budget,
+        variance: budget - totalCost,
+        percentageUsed: budget ? (totalCost / budget) * 100 : 0
+      };
+    } catch (error) {
+      console.error("Error al obtener resumen de costos del proyecto:", error);
+      throw error;
+    }
+  }
+
+  async getDeliverables(projectIds: number[]): Promise<Deliverable[]> {
+    try {
+      if (projectIds.length === 0) return [];
+      return await db.select().from(deliverables).where(inArray(deliverables.project_id, projectIds));
+    } catch (error) {
+      console.error("Error al obtener entregables:", error);
+      throw error;
+    }
+  }
+
+  async getDeliverable(id: number): Promise<Deliverable | undefined> {
+    try {
+      const [deliverable] = await db.select().from(deliverables).where(eq(deliverables.id, id));
+      return deliverable;
+    } catch (error) {
+      console.error("Error al obtener entregable:", error);
+      throw error;
+    }
+  }
+
+  async deleteDeliverable(id: number): Promise<boolean> {
+    try {
+      await db.delete(deliverables).where(eq(deliverables.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar entregable:", error);
+      return false;
+    }
+  }
+
+  async getClientModoComment(clientId: number, quarter: number, year: number): Promise<any> {
+    try {
+      const [comment] = await db.select().from(clientModoComments)
+        .where(and(
+          eq(clientModoComments.client_id, clientId),
+          eq(clientModoComments.quarter, quarter),
+          eq(clientModoComments.year, year)
+        ));
+      return comment;
+    } catch (error) {
+      console.error("Error al obtener comentario MODO:", error);
+      throw error;
+    }
+  }
+
+  async getClientModoCommentByQuarter(clientId: number, quarter: number, year: number): Promise<any> {
+    try {
+      return await this.getClientModoComment(clientId, quarter, year);
+    } catch (error) {
+      console.error("Error al obtener comentario MODO por trimestre:", error);
+      throw error;
+    }
+  }
+
+  async updateClientModoComment(id: number, comment: any): Promise<any> {
+    try {
+      const [updatedComment] = await db.update(clientModoComments)
+        .set({
+          comments: comment.comments,
+          updated_at: new Date()
+        })
+        .where(eq(clientModoComments.id, id))
+        .returning();
+      return updatedComment;
+    } catch (error) {
+      console.error("Error al actualizar comentario MODO:", error);
+      throw error;
+    }
+  }
+
+  async deleteClientModoComment(id: number): Promise<boolean> {
+    try {
+      await db.delete(clientModoComments).where(eq(clientModoComments.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar comentario MODO:", error);
+      return false;
+    }
+  }
+
+  async getClientModoSummary(clientId: number): Promise<any> {
+    try {
+      const comments = await db.select().from(clientModoComments)
+        .where(eq(clientModoComments.client_id, clientId));
+      
+      const projects = await db.select().from(activeProjects)
+        .where(eq(activeProjects.clientId, clientId));
+      
+      return {
+        clientId,
+        totalComments: comments.length,
+        totalProjects: projects.length,
+        recentComments: comments.slice(-5)
+      };
+    } catch (error) {
+      console.error("Error al obtener resumen MODO del cliente:", error);
+      throw error;
+    }
+  }
+
+  async deleteQuotationTeamMemberById(id: number): Promise<boolean> {
+    try {
+      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar miembro del equipo por ID:", error);
       return false;
     }
   }
