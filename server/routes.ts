@@ -1278,7 +1278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(projectId)) return res.status(400).json({ message: "ID de proyecto inválido" });
     
     try {
-      const component = await storage.getDefaultProjectComponent(projectId);
+      const component = await storage.getDefaultProjectComponent();
       if (!component) {
         return res.status(404).json({ message: "No hay componente predeterminado para este proyecto" });
       }

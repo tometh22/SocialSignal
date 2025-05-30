@@ -962,7 +962,7 @@ export class DatabaseStorage implements IStorage {
       
       // Calcular estadísticas
       const totalDeliverables = deliverablesList.length;
-      const onTimeDeliveries = deliverablesList.filter(d => d.onTime).length;
+      const onTimeDeliveries = deliverablesList.filter(d => d.deliveryOnTime).length;
       const deliveryRate = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
       
       // Calcular promedios de calidad
@@ -975,13 +975,13 @@ export class DatabaseStorage implements IStorage {
       let sumBriefCompliance = 0, countBriefCompliance = 0;
       
       deliverablesList.forEach(d => {
-        if (d.narrativeQuality != null) { sumNarrativeQuality += d.narrativeQuality; countNarrativeQuality++; }
-        if (d.graphicsEffectiveness != null) { sumGraphicsEffectiveness += d.graphicsEffectiveness; countGraphicsEffectiveness++; }
-        if (d.formatDesign != null) { sumFormatDesign += d.formatDesign; countFormatDesign++; }
-        if (d.relevantInsights != null) { sumRelevantInsights += d.relevantInsights; countRelevantInsights++; }
-        if (d.operationsFeedback != null) { sumOperationsFeedback += d.operationsFeedback; countOperationsFeedback++; }
-        if (d.clientFeedback != null) { sumClientFeedback += d.clientFeedback; countClientFeedback++; }
-        if (d.briefCompliance != null) { sumBriefCompliance += d.briefCompliance; countBriefCompliance++; }
+        if (d.narrativeQuality != null) { sumNarrativeQuality += parseFloat(String(d.narrativeQuality)); countNarrativeQuality++; }
+        if (d.graphicsEffectiveness != null) { sumGraphicsEffectiveness += parseFloat(String(d.graphicsEffectiveness)); countGraphicsEffectiveness++; }
+        if (d.formatDesign != null) { sumFormatDesign += parseFloat(String(d.formatDesign)); countFormatDesign++; }
+        if (d.relevantInsights != null) { sumRelevantInsights += parseFloat(String(d.relevantInsights)); countRelevantInsights++; }
+        if (d.operationsFeedback != null) { sumOperationsFeedback += parseFloat(String(d.operationsFeedback)); countOperationsFeedback++; }
+        if (d.clientFeedback != null) { sumClientFeedback += parseFloat(String(d.clientFeedback)); countClientFeedback++; }
+        if (d.briefCompliance != null) { sumBriefCompliance += parseFloat(String(d.briefCompliance)); countBriefCompliance++; }
       });
       
       const averageNarrativeQuality = countNarrativeQuality > 0 ? sumNarrativeQuality / countNarrativeQuality : 0;
@@ -1046,12 +1046,13 @@ export class DatabaseStorage implements IStorage {
       console.log("Datos recibidos para crear comentario MODO:", comment);
       
       const dataToInsert = {
-        client_id: comment.clientId || comment.client_id,
+        clientId: comment.clientId || comment.client_id,
         comments: comment.comments || comment.comment_text,
         year: comment.year,
         quarter: comment.quarter,
-        created_at: new Date(),
-        updated_at: new Date()
+        totalScore: comment.totalScore || 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
       console.log("Datos a insertar:", dataToInsert);
@@ -1284,7 +1285,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const [comment] = await db.select().from(clientModoComments)
         .where(and(
-          eq(clientModoComments.client_id, clientId),
+          eq(clientModoComments.clientId, clientId),
           eq(clientModoComments.quarter, quarter),
           eq(clientModoComments.year, year)
         ));
@@ -1309,7 +1310,7 @@ export class DatabaseStorage implements IStorage {
       const [updatedComment] = await db.update(clientModoComments)
         .set({
           comments: comment.comments,
-          updated_at: new Date()
+          updatedAt: new Date()
         })
         .where(eq(clientModoComments.id, id))
         .returning();
@@ -1333,7 +1334,7 @@ export class DatabaseStorage implements IStorage {
   async getClientModoSummary(clientId: number): Promise<any> {
     try {
       const comments = await db.select().from(clientModoComments)
-        .where(eq(clientModoComments.client_id, clientId));
+        .where(eq(clientModoComments.clientId, clientId));
       
       const projects = await db.select().from(activeProjects)
         .where(eq(activeProjects.clientId, clientId));
