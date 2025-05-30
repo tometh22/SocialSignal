@@ -844,22 +844,22 @@ export class DatabaseStorage implements IStorage {
       console.log("Datos recibidos para crear entregable:", deliverable);
       
       const dataToInsert = {
-        project_id: deliverable.projectId || deliverable.project_id,
+        clientId: deliverable.clientId || deliverable.client_id,
         name: deliverable.name || deliverable.title,
-        client_id: deliverable.clientId || deliverable.client_id,
-        delivery_month: deliverable.deliveryMonth || new Date().toISOString().substring(0, 7),
+        deliveryMonth: deliverable.deliveryMonth || new Date().toISOString().substring(0, 7),
+        deliveryOnTime: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
+        narrativeQuality: deliverable.narrativeQuality || deliverable.narrative_quality || "0",
+        graphicsEffectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness || "0",
+        formatDesign: deliverable.formatDesign || deliverable.format_design || "0",
+        relevantInsights: deliverable.relevantInsights || deliverable.relevant_insights || "0",
+        operationsFeedback: deliverable.operationsFeedback || deliverable.operations_feedback || "0",
+        clientFeedback: deliverable.clientFeedback || deliverable.client_feedback || "0",
+        briefCompliance: deliverable.briefCompliance || deliverable.brief_compliance || "0",
+        project_id: deliverable.projectId || deliverable.project_id,
+        delivery_date: deliverable.deliveryDate || new Date(),
         due_date: deliverable.dueDate || deliverable.due_date || new Date(),
-        delivery_on_time: deliverable.onTime || deliverable.deliveryOnTime || deliverable.on_time || false,
-        narrative_quality: deliverable.narrativeQuality || deliverable.narrative_quality || 0,
-        graphics_effectiveness: deliverable.graphicsEffectiveness || deliverable.graphics_effectiveness || 0,
-        format_design: deliverable.formatDesign || deliverable.format_design || 0,
-        relevant_insights: deliverable.relevantInsights || deliverable.relevant_insights || 0,
-        operations_feedback: deliverable.operationsFeedback || deliverable.operations_feedback || 0,
-        client_feedback: deliverable.clientFeedback || deliverable.client_feedback || 0,
-        brief_compliance: deliverable.briefCompliance || deliverable.brief_compliance || 0,
-        notes: deliverable.notes || "",
-        created_at: new Date(),
-        updated_at: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
       console.log("Datos a insertar:", dataToInsert);
@@ -1156,10 +1156,10 @@ export class DatabaseStorage implements IStorage {
       let totalBudget = 0;
       
       for (const project of projects) {
-        totalBudget += parseFloat(project.deliverableBudget || '0');
+        totalBudget += parseFloat(String(project.deliverableBudget || 0));
         const projectTimeEntries = allTimeEntries.filter((te: any) => te.projectId === project.id);
         for (const entry of projectTimeEntries) {
-          totalCost += parseFloat(entry.totalCost || '0');
+          totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
         }
       }
       
@@ -1232,10 +1232,10 @@ export class DatabaseStorage implements IStorage {
       
       let totalCost = 0;
       for (const entry of entries) {
-        totalCost += parseFloat(entry.totalCost || '0');
+        totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
       }
       
-      const budget = parseFloat(project.costLimit || '0');
+      const budget = parseFloat(String(project.deliverableBudget || 0));
       
       return {
         projectId,
