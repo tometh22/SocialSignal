@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ export default function ProjectDetails() {
   const [match, params] = useRoute("/active-projects/:id");
   const projectId = params?.id;
   const [showTimeEntryForm, setShowTimeEntryForm] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["/api/active-projects", projectId],
@@ -173,7 +174,11 @@ export default function ProjectDetails() {
                 <Clock className="h-5 w-5 mr-2" />
                 Registrar Horas
               </Button>
-              <Button variant="outline" size="lg">
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => window.location.href = `/time-entries/project/${projectId}`}
+              >
                 <BarChart3 className="h-5 w-5 mr-2" />
                 Ver Análisis
               </Button>
@@ -370,26 +375,17 @@ export default function ProjectDetails() {
       </div>
 
       {/* Modal de Registro de Tiempo */}
-      {showTimeEntryForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Registrar Tiempo</h3>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowTimeEntryForm(false)}
-              >
-                ×
-              </Button>
-            </div>
-            <TimeEntryForm 
-              projectId={parseInt(projectId!)} 
-              onSuccess={() => setShowTimeEntryForm(false)}
-            />
-          </div>
-        </div>
-      )}
+      <TimeEntryForm 
+        projectId={projectId!} 
+        open={showTimeEntryForm}
+        onOpenChange={(open) => {
+          setShowTimeEntryForm(open);
+          if (!open) {
+            // Recargar datos cuando se cierre el modal
+            queryClient.invalidateQueries({ queryKey: ["/api/time-entries/project", projectId] });
+          }
+        }}
+      />
     </div>
   );
 }
