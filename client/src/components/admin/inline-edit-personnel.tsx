@@ -333,14 +333,24 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
             <Input 
               value={editName} 
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full h-9" // Altura fija
+              className="w-full h-9"
+              disabled={updatePersonnelMutation.isPending}
             />
-          ) : <span data-field="name">{updatedPerson.name}</span>}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`name-${updatedPerson.id}-${updatedPerson.name}`}>{updatedPerson.name}</span>
+            </div>
+          )}
         </TableCell>
         <TableCell>
           {isEditing ? (
-            <Select value={editRoleId.toString()} onValueChange={(value) => setEditRoleId(parseInt(value))}>
-              <SelectTrigger className="w-full h-9"> {/* Altura fija */}
+            <Select 
+              value={editRoleId.toString()} 
+              onValueChange={(value) => setEditRoleId(parseInt(value))}
+              disabled={updatePersonnelMutation.isPending}
+            >
+              <SelectTrigger className="w-full h-9">
                 <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
@@ -351,7 +361,12 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
                 ))}
               </SelectContent>
             </Select>
-          ) : <span data-field="role">{getRoleName(updatedPerson.roleId)}</span>}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`role-${updatedPerson.id}-${updatedPerson.roleId}`}>{getRoleName(updatedPerson.roleId)}</span>
+            </div>
+          )}
         </TableCell>
         <TableCell>
           {isEditing ? (
@@ -364,24 +379,28 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
                 const inputValue = e.target.value;
                 setEditRateText(inputValue);
                 
-                // Si está vacío, establecer a cero
                 if (inputValue === "") {
                   setEditRate(0);
                   return;
                 }
                 
-                // Reemplazar comas por puntos para parsing
                 const normalizedValue = inputValue.replace(',', '.');
-                
-                // Verificar si es un número
                 const numericValue = parseFloat(normalizedValue);
                 if (!isNaN(numericValue)) {
                   setEditRate(numericValue);
                 }
               }} 
-              className="w-full h-9" // Altura fija
+              className="w-full h-9"
+              disabled={updatePersonnelMutation.isPending}
             />
-          ) : <span data-field="rate">${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr</span>}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`rate-${updatedPerson.id}-${updatedPerson.hourlyRate}`} className="font-mono">
+                ${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr
+              </span>
+            </div>
+          )}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (

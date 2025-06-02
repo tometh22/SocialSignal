@@ -209,9 +209,15 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
             <Input 
               value={editName} 
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full h-9" // Altura fija
+              className="w-full h-9"
+              disabled={updateRoleMutation.isPending}
             />
-          ) : localRole.name}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`name-${localRole.id}-${localRole.name}`}>{localRole.name}</span>
+            </div>
+          )}
         </TableCell>
         <TableCell>
           {isEditing ? (
@@ -220,8 +226,14 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
               onChange={(e) => setEditDescription(e.target.value)}
               className="w-full h-10 resize-none min-h-0 py-2"
               style={{ overflow: 'auto', lineHeight: '1.2' }}
+              disabled={updateRoleMutation.isPending}
             />
-          ) : localRole.description || "-"}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`desc-${localRole.id}-${localRole.description}`}>{localRole.description || "-"}</span>
+            </div>
+          )}
         </TableCell>
         <TableCell>
           {isEditing ? (
@@ -234,9 +246,17 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
                 const value = parseDecimal(e.target.value);
                 setEditDefaultRate(isNaN(value) ? 0 : value);
               }} 
-              className="w-full h-9" // Altura fija
+              className="w-full h-9"
+              disabled={updateRoleMutation.isPending}
             />
-          ) : `$${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2).replace('.', ',')}/hr`}
+          ) : (
+            <div className="flex items-center gap-2">
+              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+              <span key={`rate-${localRole.id}-${localRole.defaultRate}`} className="font-mono">
+                ${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2).replace('.', ',')}/hr
+              </span>
+            </div>
+          )}
         </TableCell>
         <TableCell className="text-right">
           {isEditing ? (
