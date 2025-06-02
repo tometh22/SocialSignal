@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import TimeEntryForm from "@/components/time-entry-form";
 import { 
   ArrowLeft, 
@@ -20,7 +21,10 @@ import {
   MessageSquare,
   Plus,
   Timer,
-  Activity
+  Activity,
+  BarChart3,
+  Edit,
+  AlertCircle
 } from "lucide-react";
 
 export default function ProjectDetails() {
@@ -121,311 +125,271 @@ export default function ProjectDetails() {
     );
   };
 
+  // Calcular métricas
+  const totalHours = timeEntries.reduce((sum: number, entry: any) => sum + entry.hours, 0);
+  const estimatedHours = 8; // Valor estimado
+  const progress = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
+  const totalCost = timeEntries.reduce((sum: number, entry: any) => sum + (entry.hours * (entry.hourlyRate || 0)), 0);
+
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-background">
+      {/* Header Moderno con Acciones Principales */}
+      <div className="border-b bg-white sticky top-0 z-10 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               <Link href="/active-projects">
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Volver
                 </Button>
               </Link>
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">
+                <h1 className="text-3xl font-bold text-foreground">
                   {getProjectName(projectData?.id || parseInt(projectId!))}
                 </h1>
                 {isSubproject && parentProject && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    Parte del proyecto: {getProjectName(parentProject.id)}
+                  <p className="text-muted-foreground mt-1">
+                    Parte del proyecto: <span className="font-medium">{getProjectName(parentProject.id)}</span>
                   </p>
                 )}
+                <div className="flex items-center gap-4 mt-2">
+                  {getStatusBadge(projectData?.status || "active")}
+                  <Badge variant="outline" className="text-xs">
+                    <Building2 className="h-3 w-3 mr-1" />
+                    MODO
+                  </Badge>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {getStatusBadge(projectData?.status || "active")}
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Configurar
+            
+            {/* Botones de Acción Principales */}
+            <div className="flex items-center gap-3">
+              <Button 
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => setShowTimeEntryForm(true)}
+              >
+                <Clock className="h-5 w-5 mr-2" />
+                Registrar Horas
+              </Button>
+              <Button variant="outline" size="lg">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Ver Análisis
+              </Button>
+              <Button variant="ghost" size="sm">
+                <Settings className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Información del Cliente */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src="/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png" />
-                <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
-                  MO
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">MODO</h3>
-                <p className="text-sm text-gray-600">Cliente Always-On</p>
-              </div>
-              <div className="text-right">
-                {isSubproject ? (
-                  <div>
-                    <div className="text-lg font-semibold text-gray-700">Incluido</div>
-                    <p className="text-sm text-gray-600">En presupuesto principal</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">$4,200.00</div>
-                    <p className="text-sm text-gray-600">Presupuesto mensual</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Detalles del Proyecto */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Información General */}
+      <div className="max-w-6xl mx-auto p-6">
+        {/* Panel de Métricas Rápidas */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Información General
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-gray-500" />
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Fecha de inicio</p>
-                  <p className="text-sm text-gray-600">
-                    {projectData?.startDate ? new Date(projectData.startDate).toLocaleDateString('es-ES') : "01/01/2023"}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Horas Registradas</p>
+                  <p className="text-2xl font-bold">{totalHours}h</p>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium">Fecha estimada de fin</p>
-                  <p className="text-sm text-gray-600">
-                    {projectData?.expectedEndDate ? new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : "28/12/2023"}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Target className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium">Frecuencia</p>
-                  <p className="text-sm text-gray-600">{projectData?.trackingFrequency || "Mensual"}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium">Presupuesto</p>
-                  <p className="text-sm text-gray-600">
-                    {isSubproject ? "Incluido en presupuesto principal" : "$4,200.00 mensual"}
-                  </p>
-                </div>
+                <Clock className="h-8 w-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>
-
-          {/* Descripción y Notas */}
+          
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Descripción
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {projectData?.notes || 
-                 `Proyecto creado a partir del entregable "${getProjectName(projectData?.id || parseInt(projectId!))}" del Excel MODO. Este entregable forma parte del programa Always-On de MODO con seguimiento mensual y presupuesto consolidado.`}
-              </p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Horas Estimadas</p>
+                  <p className="text-2xl font-bold">{estimatedHours}h</p>
+                </div>
+                <Target className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Progreso</p>
+                  <p className="text-2xl font-bold">{Math.round(progress)}%</p>
+                </div>
+                <TrendingUp className={`h-8 w-8 ${progress > 100 ? 'text-red-500' : 'text-emerald-500'}`} />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Costo Actual</p>
+                  <p className="text-2xl font-bold">${totalCost.toFixed(0)}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-orange-500" />
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Seguimiento de Horas - Layout expandido */}
-        <div className="mt-6">
-          {/* Panel Principal de Seguimiento */}
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Timer className="h-5 w-5" />
-                  Control de Horas y Costos del Proyecto
-                </div>
-                <Button 
-                  size="sm" 
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setShowTimeEntryForm(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Registrar Horas
-                </Button>
+        {/* Barra de Progreso Visual */}
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold">Progreso del Entregable</h3>
+              <span className="text-sm text-muted-foreground">{totalHours}h de {estimatedHours}h</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className={`h-3 rounded-full transition-all duration-500 ${
+                  progress > 100 ? 'bg-red-500' : progress > 80 ? 'bg-orange-500' : 'bg-blue-500'
+                }`}
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              ></div>
+            </div>
+            {progress > 100 && (
+              <div className="flex items-center gap-2 mt-2 text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Proyecto excedido en {Math.round(progress - 100)}%</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Grid Principal */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Registros de Tiempo */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Registros de Tiempo
               </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowTimeEntryForm(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar
+              </Button>
             </CardHeader>
             <CardContent>
-              {/* Métricas principales */}
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <div className="text-3xl font-bold text-gray-900">
-                    {timeEntries.reduce((total: number, entry: any) => total + (entry.hours || 0), 0).toFixed(1)}h
-                  </div>
-                  <p className="text-sm text-gray-600">Total trabajadas</p>
-                </div>
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-3xl font-bold text-blue-600">
-                    ${timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0).toLocaleString()}
-                  </div>
-                  <p className="text-sm text-blue-600">Costo real</p>
-                </div>
-                <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                  <div className="text-3xl font-bold text-emerald-600">
-                    {isSubproject ? "Incluido" : "$4,200"}
-                  </div>
-                  <p className="text-sm text-emerald-600">Presupuesto</p>
-                </div>
-                <div className="text-center p-4 bg-amber-50 rounded-lg">
-                  <div className="text-3xl font-bold text-amber-600">
-                    {isSubproject ? "N/A" : 
-                     `${Math.round((timeEntries.reduce((total: number, entry: any) => total + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0) / 4200) * 100)}%`}
-                  </div>
-                  <p className="text-sm text-amber-600">Uso presupuesto</p>
-                </div>
-              </div>
-                
-              {/* Detalle de entradas por persona */}
               {timeEntries.length > 0 ? (
                 <div className="space-y-4">
-                  <h4 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                    Registro detallado de horas trabajadas
-                  </h4>
-                  <div className="grid gap-4">
-                    {timeEntries.map((entry: any) => (
-                      <div key={entry.id} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-white">
-                                {entry.personnelName ? entry.personnelName.charAt(0).toUpperCase() : "?"}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="text-base font-semibold text-gray-900">
-                                {entry.personnelName || "Personal no identificado"}
-                              </div>
-                              <div className="text-sm text-blue-600">
-                                {entry.roleName || "Rol no especificado"}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-gray-900">{entry.hours}h</div>
-                            <div className="text-sm font-medium text-green-600">
-                              ${((entry.hours || 0) * (entry.hourlyRate || 0)).toFixed(0)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              ${entry.hourlyRate || 0}/hora
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded mb-2">
-                          <strong>Trabajo realizado:</strong> {entry.description || "Sin descripción específica"}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          📅 {entry.date ? new Date(entry.date).toLocaleDateString('es-ES', { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          }) : "Fecha no registrada"}
+                  {timeEntries.map((entry: any) => (
+                    <div key={entry.id} className="flex items-start justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                            {entry.personnelName?.split(' ').map((n: string) => n[0]).join('') || 'TR'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{entry.personnelName}</p>
+                          <p className="text-xs text-muted-foreground">{entry.roleName}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                            {entry.hours}h
+                          </Badge>
+                          <span className="text-sm font-medium">${(entry.hours * entry.hourlyRate).toFixed(0)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(entry.date).toLocaleDateString('es-ES')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Timer className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium">No hay horas registradas aún</p>
-                  <p className="text-sm">Comienza registrando el tiempo trabajado del equipo</p>
+                <div className="text-center py-8">
+                  <Timer className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay registros de tiempo</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={() => setShowTimeEntryForm(true)}
+                  >
+                    Registrar primera entrada
+                  </Button>
                 </div>
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Acciones Rápidas */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Acciones del Proyecto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Button variant="outline" className="justify-start">
-                <Users className="h-4 w-4 mr-2" />
-                Gestionar Equipo
-              </Button>
-              <Button 
-                variant="outline" 
-                className="justify-start"
-                onClick={() => setShowTimeEntryForm(true)}
-              >
-                <Timer className="h-4 w-4 mr-2" />
-                Cargar Horas
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <Calendar className="h-4 w-4 mr-2" />
-                Ver Cronograma
-              </Button>
-              <Button variant="outline" className="justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                Generar Reporte
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Nota sobre Always-On */}
-        {isSubproject && (
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <Building2 className="h-5 w-5 text-blue-600 mt-0.5" />
+          {/* Información del Proyecto */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Información del Entregable
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Frecuencia:</span>
+                  <span className="text-sm font-medium">Mensual</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Tipo:</span>
+                  <span className="text-sm font-medium">Ejecutivo</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Fecha inicio:</span>
+                  <span className="text-sm font-medium">
+                    {project.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'No definida'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Estado:</span>
+                  {getStatusBadge(project.status || "active")}
+                </div>
+              </div>
+              
+              <Separator />
+              
               <div>
-                <h4 className="text-sm font-medium text-blue-900">Proyecto Always-On</h4>
-                <p className="text-sm text-blue-700 mt-1">
-                  Este entregable forma parte del programa Always-On de MODO. El presupuesto y la gestión se manejan 
-                  de forma consolidada con otros entregables del mismo programa.
+                <h4 className="text-sm font-medium mb-2">Descripción</h4>
+                <p className="text-sm text-muted-foreground">
+                  {project.notes || `Entregable "${getProjectName(projectData?.id || parseInt(projectId!))}" del programa Always-On MODO`}
                 </p>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Formulario de Registro de Horas */}
-        {projectId && (
-          <TimeEntryForm
-            projectId={projectId}
-            open={showTimeEntryForm}
-            onOpenChange={setShowTimeEntryForm}
-          />
-        )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Modal de Registro de Tiempo */}
+      {showTimeEntryForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Registrar Tiempo</h3>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowTimeEntryForm(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <TimeEntryForm 
+              projectId={parseInt(projectId!)} 
+              onSuccess={() => setShowTimeEntryForm(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
