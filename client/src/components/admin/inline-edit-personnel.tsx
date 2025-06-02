@@ -84,46 +84,32 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
-      console.log("PERSONAL ACTUALIZADO - Datos del servidor:", updatedData);
+      console.log("✅ PERSONAL ACTUALIZADO:", updatedData);
       
-      // Actualización instantánea del estado local PRIMERO
-      setUpdatedPerson(updatedData);
+      // FORZAR actualización inmediata del estado local
+      setUpdatedPerson({...updatedData});
       setEditName(updatedData.name);
       setEditRoleId(updatedData.roleId);
       setEditRate(updatedData.hourlyRate);
       setEditRateText(updatedData.hourlyRate.toString().replace('.', ','));
       
-      console.log("Estado local actualizado - nueva tarifa:", updatedData.hourlyRate);
+      // Forzar re-render completo del componente
+      setTimeout(() => {
+        setUpdatedPerson({...updatedData});
+      }, 100);
       
-      // Actualizar inmediatamente el caché con los nuevos datos
-      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
-        console.log("Actualizando caché de personal...");
-        if (!oldData) return [updatedData];
-        const newData = oldData.map(item => item.id === updatedData.id ? updatedData : item);
-        console.log("Nueva data en caché:", newData.find(p => p.id === updatedData.id));
-        return newData;
-      });
-      
-      // Invalidar TODO inmediatamente
+      // Invalidar caché y recargar datos
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
       
       // Notificar al componente padre
       if (onUpdate) {
-        console.log("Notificando al componente padre...");
         onUpdate(updatedData);
       }
       
-      // Forzar re-render del componente
-      setTimeout(() => {
-        console.log("Forzando segundo re-render...");
-        setUpdatedPerson({...updatedData});
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      }, 50);
-      
       toast({
-        title: "Éxito",
-        description: `${updatedData.name}: $${updatedData.hourlyRate}/hr actualizado`,
+        title: "✅ Guardado",
+        description: `${updatedData.name}: $${updatedData.hourlyRate}/hr`,
       });
       setIsEditing(false);
     },

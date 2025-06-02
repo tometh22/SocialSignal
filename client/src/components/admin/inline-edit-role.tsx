@@ -56,47 +56,31 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
       return updatedRole as Role;
     },
     onSuccess: (updatedData: Role) => {
-      console.log("ROL ACTUALIZADO - Datos recibidos del servidor:", updatedData);
+      console.log("✅ ROL ACTUALIZADO:", updatedData);
       
-      // Actualizar estado local inmediatamente - FORZAR ACTUALIZACIÓN
-      setLocalRole(updatedData);
+      // FORZAR actualización inmediata del estado local
+      setLocalRole({...updatedData});
       setEditName(updatedData.name);
       setEditDescription(updatedData.description || "");
       setEditDefaultRate(updatedData.defaultRate);
       
-      console.log("Estado local actualizado con:", {
-        name: updatedData.name,
-        defaultRate: updatedData.defaultRate
-      });
+      // Forzar re-render completo del componente
+      setTimeout(() => {
+        setLocalRole({...updatedData});
+      }, 100);
       
-      // Actualizar la caché de React Query inmediatamente
-      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-        console.log("Actualizando caché de roles...");
-        if (!oldData) return [updatedData];
-        const newData = oldData.map(item => item.id === updatedData.id ? updatedData : item);
-        console.log("Nueva data en caché:", newData.find(r => r.id === updatedData.id));
-        return newData;
-      });
-      
-      // Invalidar TODO inmediatamente
+      // Invalidar caché y recargar datos
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.refetchQueries({ queryKey: ["/api/roles"] });
       
-      // Notificar al componente padre si existe onUpdate
+      // Notificar al componente padre
       if (onUpdate) {
-        console.log("Notificando al componente padre...");
         onUpdate(updatedData);
       }
       
-      // Forzar re-render del componente
-      setTimeout(() => {
-        setLocalRole({...updatedData});
-        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      }, 50);
-      
       toast({
-        title: "Éxito",
-        description: `${updatedData.name}: $${updatedData.defaultRate}/hr actualizado`,
+        title: "✅ Guardado",
+        description: `${updatedData.name}: $${updatedData.defaultRate}/hr`,
       });
       setIsEditing(false);
     },
