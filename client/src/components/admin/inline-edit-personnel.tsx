@@ -97,19 +97,22 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         return oldData.map(item => item.id === updatedData.id ? updatedData : item);
       });
       
+      // Invalidar TODAS las consultas relacionadas con personnel inmediatamente
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+      
+      // Forzar actualización inmediata de todas las consultas de personnel
+      queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
+      
       // Notificar al componente padre DESPUÉS de actualizar el estado
       if (onUpdate) {
         onUpdate(updatedData);
       }
       
-      // Forzar un re-render completo invalidando las consultas
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      }, 50);
-      
       toast({
         title: "Éxito",
-        description: `Tarifa actualizada a $${updatedData.hourlyRate}/hr`,
+        description: `Tarifa actualizada a $${updatedData.hourlyRate}/hr - Los cambios se reflejarán inmediatamente`,
       });
       setIsEditing(false);
     },
