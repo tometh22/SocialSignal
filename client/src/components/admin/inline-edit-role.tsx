@@ -59,23 +59,42 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
       // Actualizar estado local inmediatamente
       setLocalRole(updatedData);
       
-      // Notificar al componente padre si existe onUpdate
-      if (onUpdate) {
-        onUpdate(updatedData);
-      }
-      
-      // Actualizar la caché de React Query
+      // Actualizar la caché de React Query inmediatamente
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
         if (!oldData) return [updatedData];
         return oldData.map(item => item.id === updatedData.id ? updatedData : item);
       });
       
-      // También invalidar la consulta para asegurar que los datos se actualicen
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      // Invalidar TODO el caché de la aplicación para garantizar actualización completa
+      const invalidateAll = () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      };
+      
+      invalidateAll();
+      
+      // Forzar recarga inmediata de datos críticos
+      queryClient.refetchQueries({ queryKey: ["/api/roles"] });
+      
+      // Forzar una segunda invalidación después de un momento para asegurar que todo se actualice
+      setTimeout(() => {
+        invalidateAll();
+        queryClient.refetchQueries({ queryKey: ["/api/roles"] });
+      }, 100);
+      
+      // Notificar al componente padre si existe onUpdate
+      if (onUpdate) {
+        onUpdate(updatedData);
+      }
       
       toast({
-        title: "Success",
-        description: "Role has been updated successfully.",
+        title: "Éxito",
+        description: `Rol actualizado: ${updatedData.name} - $${updatedData.defaultRate}/hr`,
       });
       setIsEditing(false);
     },

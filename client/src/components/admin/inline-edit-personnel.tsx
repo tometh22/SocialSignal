@@ -97,22 +97,36 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         return oldData.map(item => item.id === updatedData.id ? updatedData : item);
       });
       
-      // Invalidar TODAS las consultas relacionadas con personnel inmediatamente
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+      // Invalidar TODO el caché de la aplicación para garantizar actualización completa
+      const invalidateAll = () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      };
       
-      // Forzar actualización inmediata de todas las consultas de personnel
+      invalidateAll();
+      
+      // Forzar recarga inmediata de datos críticos
       queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
       
-      // Notificar al componente padre DESPUÉS de actualizar el estado
+      // Notificar al componente padre
       if (onUpdate) {
         onUpdate(updatedData);
       }
       
+      // Forzar una segunda invalidación después de un momento para asegurar que todo se actualice
+      setTimeout(() => {
+        invalidateAll();
+        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
+      }, 100);
+      
       toast({
         title: "Éxito",
-        description: `Tarifa actualizada a $${updatedData.hourlyRate}/hr - Los cambios se reflejarán inmediatamente`,
+        description: `${updatedData.name}: $${updatedData.hourlyRate}/hr actualizado`,
       });
       setIsEditing(false);
     },
