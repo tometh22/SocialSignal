@@ -300,18 +300,28 @@ export default function ActiveProjectsModern() {
                                   
                                   {/* Métricas Rápidas */}
                                   <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      <span>4h registradas</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Target className="h-3 w-3" />
-                                      <span>8h estimadas</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <TrendingUp className="h-3 w-3 text-emerald-600" />
-                                      <span className="text-emerald-600">En tiempo</span>
-                                    </div>
+                                    {(() => {
+                                      const registeredHours = getProjectHours(subproject.id);
+                                      const estimatedHours = 8; // Por ahora usar valor estimado fijo
+                                      const status = getProjectStatus(registeredHours, estimatedHours);
+                                      
+                                      return (
+                                        <>
+                                          <div className="flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            <span>{registeredHours}h registradas</span>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <Target className="h-3 w-3" />
+                                            <span>{estimatedHours}h estimadas</span>
+                                          </div>
+                                          <div className={`flex items-center gap-1 ${status.color}`}>
+                                            <TrendingUp className="h-3 w-3" />
+                                            <span>{status.text}</span>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               </div>

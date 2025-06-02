@@ -1370,6 +1370,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Obtener registros de horas agrupados por proyecto (para métricas rápidas)
+  app.get("/api/time-entries/all-projects", async (req, res) => {
+    try {
+      const entries = await db.select({
+        projectId: sql`time_entries.project_id`,
+        hours: sql`time_entries.hours`
+      })
+      .from(sql`time_entries`);
+      
+      // Agrupar por proyecto
+      const groupedByProject: Record<number, any[]> = {};
+      entries.forEach(entry => {
+        const projectId = entry.projectId as number;
+        if (!groupedByProject[projectId]) {
+          groupedByProject[projectId] = [];
+        }
+        groupedByProject[projectId].push(entry);
+      });
+      
+      res.json(groupedByProject);
+    } catch (error) {
+      console.error("Error fetching all projects time entries:", error);
+      res.status(500).json({ message: "Failed to fetch time entries data" });
+    }
+  });
+
   // Obtener registros de horas por proyecto con información del personal
   app.get("/api/time-entries/project/:projectId", async (req, res) => {
     const projectId = parseInt(req.params.projectId);
