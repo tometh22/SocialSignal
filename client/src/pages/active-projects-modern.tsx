@@ -179,16 +179,29 @@ export default function ActiveProjectsModern() {
 
                       {/* Información del Proyecto */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900 truncate">
-                            MODO Always-On - Presupuesto Global
-                          </h3>
-                          {getStatusBadge(project.status === "active" ? "active" : "en_progreso")}
-                          {subprojects.length > 0 && (
-                            <Badge variant="outline" className="text-xs text-gray-600 border-gray-300">
-                              {subprojects.length} subproyectos
-                            </Badge>
-                          )}
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">
+                              MODO Always-On - Presupuesto Global
+                            </h3>
+                            {getStatusBadge(project.status === "active" ? "active" : "en_progreso")}
+                            {subprojects.length > 0 && (
+                              <Badge variant="outline" className="text-xs text-gray-600 border-gray-300">
+                                {subprojects.length} subproyectos
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          {/* Botón Ver Resumen del Proyecto */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                            onClick={() => setLocation(`/client-summary/${project.clientId}`)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Resumen del Proyecto
+                          </Button>
                         </div>
                         
                         <div className="flex items-center gap-6 text-sm text-gray-600">
