@@ -13,7 +13,7 @@ import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
 import ActiveProjects from "@/pages/active-projects-modern";
-import ProjectDetailsOptimized from "@/pages/project-details-optimized";
+import ProjectDetails from "@/pages/project-details";
 import NewActiveProject from "@/pages/new-active-project";
 import TimeEntries from "@/pages/time-entries";
 // Dashboard moderno mantenido - todos los antiguos eliminados
@@ -117,7 +117,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
                   <ProtectedRoute path="/admin" component={Admin} />
                   {/* Rutas para gestión de proyectos activos */}
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsOptimized} />
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetails} />
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewActiveProject} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
