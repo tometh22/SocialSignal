@@ -56,45 +56,47 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
       return updatedRole as Role;
     },
     onSuccess: (updatedData: Role) => {
-      // Actualizar estado local inmediatamente
+      console.log("ROL ACTUALIZADO - Datos recibidos del servidor:", updatedData);
+      
+      // Actualizar estado local inmediatamente - FORZAR ACTUALIZACIÓN
       setLocalRole(updatedData);
+      setEditName(updatedData.name);
+      setEditDescription(updatedData.description || "");
+      setEditDefaultRate(updatedData.defaultRate);
+      
+      console.log("Estado local actualizado con:", {
+        name: updatedData.name,
+        defaultRate: updatedData.defaultRate
+      });
       
       // Actualizar la caché de React Query inmediatamente
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        console.log("Actualizando caché de roles...");
         if (!oldData) return [updatedData];
-        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+        const newData = oldData.map(item => item.id === updatedData.id ? updatedData : item);
+        console.log("Nueva data en caché:", newData.find(r => r.id === updatedData.id));
+        return newData;
       });
       
-      // Invalidar TODO el caché de la aplicación para garantizar actualización completa
-      const invalidateAll = () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      };
-      
-      invalidateAll();
-      
-      // Forzar recarga inmediata de datos críticos
+      // Invalidar TODO inmediatamente
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.refetchQueries({ queryKey: ["/api/roles"] });
-      
-      // Forzar una segunda invalidación después de un momento para asegurar que todo se actualice
-      setTimeout(() => {
-        invalidateAll();
-        queryClient.refetchQueries({ queryKey: ["/api/roles"] });
-      }, 100);
       
       // Notificar al componente padre si existe onUpdate
       if (onUpdate) {
+        console.log("Notificando al componente padre...");
         onUpdate(updatedData);
       }
       
+      // Forzar re-render del componente
+      setTimeout(() => {
+        setLocalRole({...updatedData});
+        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      }, 50);
+      
       toast({
         title: "Éxito",
-        description: `Rol actualizado: ${updatedData.name} - $${updatedData.defaultRate}/hr`,
+        description: `${updatedData.name}: $${updatedData.defaultRate}/hr actualizado`,
       });
       setIsEditing(false);
     },

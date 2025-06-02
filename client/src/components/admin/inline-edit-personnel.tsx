@@ -84,6 +84,8 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
+      console.log("PERSONAL ACTUALIZADO - Datos del servidor:", updatedData);
+      
       // Actualización instantánea del estado local PRIMERO
       setUpdatedPerson(updatedData);
       setEditName(updatedData.name);
@@ -91,38 +93,33 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       setEditRate(updatedData.hourlyRate);
       setEditRateText(updatedData.hourlyRate.toString().replace('.', ','));
       
+      console.log("Estado local actualizado - nueva tarifa:", updatedData.hourlyRate);
+      
       // Actualizar inmediatamente el caché con los nuevos datos
       queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+        console.log("Actualizando caché de personal...");
         if (!oldData) return [updatedData];
-        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+        const newData = oldData.map(item => item.id === updatedData.id ? updatedData : item);
+        console.log("Nueva data en caché:", newData.find(p => p.id === updatedData.id));
+        return newData;
       });
       
-      // Invalidar TODO el caché de la aplicación para garantizar actualización completa
-      const invalidateAll = () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/quotations"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      };
-      
-      invalidateAll();
-      
-      // Forzar recarga inmediata de datos críticos
+      // Invalidar TODO inmediatamente
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
       
       // Notificar al componente padre
       if (onUpdate) {
+        console.log("Notificando al componente padre...");
         onUpdate(updatedData);
       }
       
-      // Forzar una segunda invalidación después de un momento para asegurar que todo se actualice
+      // Forzar re-render del componente
       setTimeout(() => {
-        invalidateAll();
-        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 100);
+        console.log("Forzando segundo re-render...");
+        setUpdatedPerson({...updatedData});
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      }, 50);
       
       toast({
         title: "Éxito",
