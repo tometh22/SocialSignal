@@ -89,8 +89,15 @@ export default function AuthPage() {
     // Usar la mutación del hook de auth
     loginMutation.mutate(data, {
       onSuccess: (user) => {
-        console.log("Login exitoso, redirigiendo...", user);
-        navigate("/");
+        console.log("Login exitoso, actualizando caché y redirigiendo...", user);
+        // Actualizar el caché inmediatamente
+        queryClient.setQueryData(["/api/current-user"], user);
+        // Forzar invalidación para refrescar cualquier consulta dependiente
+        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+        // Redirección con pequeño delay para asegurar que el estado se actualice
+        setTimeout(() => {
+          navigate("/");
+        }, 100);
       },
       onError: (error) => {
         console.error("Error de login:", error);
