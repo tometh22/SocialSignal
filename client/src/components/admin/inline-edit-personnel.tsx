@@ -36,6 +36,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
   const [editRate, setEditRate] = useState(person.hourlyRate);
   const [editRateText, setEditRateText] = useState(person.hourlyRate.toString().replace('.', ','));
   const [updatedPerson, setUpdatedPerson] = useState<Personnel>(person);
+  const [renderKey, setRenderKey] = useState(0);
   const { toast } = useToast();
   const { updatePersonnelInCache, invalidatePersonnelData } = useGlobalCacheInvalidation();
 
@@ -86,29 +87,47 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
     onSuccess: (updatedData: Personnel) => {
       console.log("✅ PERSONAL ACTUALIZADO:", updatedData);
       
-      // FORZAR actualización inmediata del estado local
+      // SOLUCIÓN DEFINITIVA: Forzar actualización inmediata con múltiples estrategias
+      
+      // 1. Actualizar estado local inmediatamente
       setUpdatedPerson({...updatedData});
       setEditName(updatedData.name);
       setEditRoleId(updatedData.roleId);
       setEditRate(updatedData.hourlyRate);
       setEditRateText(updatedData.hourlyRate.toString().replace('.', ','));
       
-      // Forzar re-render completo del componente
-      setTimeout(() => {
-        setUpdatedPerson({...updatedData});
-      }, 100);
+      // 2. Forzar re-render con key única
+      setRenderKey(prev => prev + 1);
       
-      // Invalidar caché y recargar datos
+      // 3. Actualizar caché de React Query inmediatamente
+      queryClient.setQueryData(["/api/personnel"], (oldData: Personnel[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      
+      // 4. Invalidar y refrescar datos
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
       
-      // Notificar al componente padre
+      // 5. Notificar al componente padre con datos frescos
       if (onUpdate) {
         onUpdate(updatedData);
       }
       
+      // 6. Forzar segunda actualización con delay
+      setTimeout(() => {
+        setUpdatedPerson({...updatedData});
+        setRenderKey(prev => prev + 1);
+      }, 50);
+      
+      // 7. Tercera actualización para casos extremos
+      setTimeout(() => {
+        setUpdatedPerson({...updatedData});
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      }, 200);
+      
       toast({
-        title: "✅ Guardado",
+        title: "Guardado",
         description: `${updatedData.name}: $${updatedData.hourlyRate}/hr`,
       });
       setIsEditing(false);
@@ -313,7 +332,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
 
   return (
     <>
-      <TableRow data-personnel-id={person.id}>
+      <TableRow key={`personnel-${person.id}-${renderKey}`} data-personnel-id={person.id}>
         <TableCell className="font-medium">
           {isEditing ? (
             <Input 
@@ -325,7 +344,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           ) : (
             <div className="flex items-center gap-2">
               {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`name-${updatedPerson.id}-${updatedPerson.name}`}>{updatedPerson.name}</span>
+              <span key={`name-${updatedPerson.id}-${updatedPerson.name}-${renderKey}`}>{updatedPerson.name}</span>
             </div>
           )}
         </TableCell>

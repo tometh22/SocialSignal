@@ -35,6 +35,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   // Estado local para mostrar los cambios inmediatamente
   const [localRole, setLocalRole] = useState<Role>(role);
+  const [renderKey, setRenderKey] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -58,28 +59,46 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
     onSuccess: (updatedData: Role) => {
       console.log("✅ ROL ACTUALIZADO:", updatedData);
       
-      // FORZAR actualización inmediata del estado local
+      // SOLUCIÓN DEFINITIVA: Forzar actualización inmediata con múltiples estrategias
+      
+      // 1. Actualizar estado local inmediatamente
       setLocalRole({...updatedData});
       setEditName(updatedData.name);
       setEditDescription(updatedData.description || "");
       setEditDefaultRate(updatedData.defaultRate);
       
-      // Forzar re-render completo del componente
-      setTimeout(() => {
-        setLocalRole({...updatedData});
-      }, 100);
+      // 2. Forzar re-render con key única
+      setRenderKey(prev => prev + 1);
       
-      // Invalidar caché y recargar datos
+      // 3. Actualizar caché de React Query inmediatamente
+      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
+        if (!oldData) return [updatedData];
+        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+      });
+      
+      // 4. Invalidar y refrescar datos
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
       queryClient.refetchQueries({ queryKey: ["/api/roles"] });
       
-      // Notificar al componente padre
+      // 5. Notificar al componente padre con datos frescos
       if (onUpdate) {
         onUpdate(updatedData);
       }
       
+      // 6. Forzar segunda actualización con delay
+      setTimeout(() => {
+        setLocalRole({...updatedData});
+        setRenderKey(prev => prev + 1);
+      }, 50);
+      
+      // 7. Tercera actualización para casos extremos
+      setTimeout(() => {
+        setLocalRole({...updatedData});
+        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      }, 200);
+      
       toast({
-        title: "✅ Guardado",
+        title: "Guardado",
         description: `${updatedData.name}: $${updatedData.defaultRate}/hr`,
       });
       setIsEditing(false);
