@@ -369,7 +369,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           ) : (
             <div className="flex items-center gap-2">
               {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`role-${updatedPerson.id}-${updatedPerson.roleId}`}>{getRoleName(updatedPerson.roleId)}</span>
+              <span key={`role-${updatedPerson.id}-${updatedPerson.roleId}-${renderKey}`}>{getRoleName(updatedPerson.roleId)}</span>
             </div>
           )}
         </TableCell>
@@ -401,7 +401,7 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           ) : (
             <div className="flex items-center gap-2">
               {updatePersonnelMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`rate-${updatedPerson.id}-${updatedPerson.hourlyRate}`} className="font-mono">
+              <span key={`rate-${updatedPerson.id}-${updatedPerson.hourlyRate}-${renderKey}`} className="font-mono">
                 ${updatedPerson.hourlyRate.toFixed(2).replace('.', ',')}/hr
               </span>
             </div>

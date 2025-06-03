@@ -206,7 +206,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
 
   return (
     <>
-      <TableRow>
+      <TableRow key={`role-${role.id}-${renderKey}`}>
         <TableCell className="font-medium">
           {isEditing ? (
             <Input 
@@ -218,7 +218,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
           ) : (
             <div className="flex items-center gap-2">
               {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`name-${localRole.id}-${localRole.name}`}>{localRole.name}</span>
+              <span key={`name-${localRole.id}-${localRole.name}-${renderKey}`}>{localRole.name}</span>
             </div>
           )}
         </TableCell>
@@ -234,7 +234,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
           ) : (
             <div className="flex items-center gap-2">
               {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`desc-${localRole.id}-${localRole.description}`}>{localRole.description || "-"}</span>
+              <span key={`desc-${localRole.id}-${localRole.description}-${renderKey}`}>{localRole.description || "-"}</span>
             </div>
           )}
         </TableCell>
@@ -255,7 +255,7 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
           ) : (
             <div className="flex items-center gap-2">
               {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`rate-${localRole.id}-${localRole.defaultRate}`} className="font-mono">
+              <span key={`rate-${localRole.id}-${localRole.defaultRate}-${renderKey}`} className="font-mono">
                 ${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2).replace('.', ',')}/hr
               </span>
             </div>
