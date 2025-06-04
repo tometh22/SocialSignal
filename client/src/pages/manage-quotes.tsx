@@ -108,8 +108,11 @@ export default function ManageQuotes() {
   };
 
   const openStatusDialog = (quote: Quotation) => {
+    console.log('Opening status dialog for quote:', quote);
+    console.log('Current status:', quote.status);
     setSelectedQuote(quote);
     setNewStatus(quote.status);
+    console.log('Set new status to:', quote.status);
     // Small delay to ensure state is updated before opening dialog
     setTimeout(() => {
       setDialogOpen(true);
@@ -454,11 +457,10 @@ export default function ManageQuotes() {
             <div className="form-group">
               <h4 className="text-label mb-2">Nuevo Estado:</h4>
               <select 
-                value={newStatus} 
+                value={newStatus || selectedQuote?.status || ""} 
                 onChange={(e) => setNewStatus(e.target.value)}
                 className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
-                <option value="">Seleccionar nuevo estado</option>
                 <option value="draft">Borrador</option>
                 <option value="pending">Pendiente</option>
                 <option value="approved">Aprobada</option>
