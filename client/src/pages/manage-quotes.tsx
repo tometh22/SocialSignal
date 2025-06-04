@@ -108,11 +108,8 @@ export default function ManageQuotes() {
   };
 
   const openStatusDialog = (quote: Quotation) => {
-    console.log('Opening status dialog for quote:', quote);
-    console.log('Current status:', quote.status);
     setSelectedQuote(quote);
     setNewStatus(quote.status);
-    console.log('Set new status to:', quote.status);
     // Small delay to ensure state is updated before opening dialog
     setTimeout(() => {
       setDialogOpen(true);
@@ -422,35 +419,12 @@ export default function ManageQuotes() {
           <div className="py-4 form-layout">
             <div className="form-group">
               <h4 className="text-label mb-2">Estado Actual:</h4>
-              {selectedQuote && selectedQuote.status === 'approved' && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-success/10 text-success-dark">
-                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                  {translateStatus(selectedQuote.status)}
-                </span>
-              )}
-              {selectedQuote && selectedQuote.status === 'pending' && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-warning/10 text-warning-dark">
-                  <Clock className="h-3.5 w-3.5 mr-1.5" />
-                  {translateStatus(selectedQuote.status)}
-                </span>
-              )}
-              {selectedQuote && selectedQuote.status === 'rejected' && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-error/10 text-error-dark">
-                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
-                  {translateStatus(selectedQuote.status)}
-                </span>
-              )}
-              {selectedQuote && selectedQuote.status === 'in-negotiation' && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-primary/10 text-primary-dark">
-                  <Edit className="h-3.5 w-3.5 mr-1.5" />
-                  {translateStatus(selectedQuote.status)}
-                </span>
-              )}
-              {selectedQuote && selectedQuote.status === 'draft' && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-caption font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
-                  <FileText className="h-3.5 w-3.5 mr-1.5" />
-                  {translateStatus(selectedQuote.status)}
-                </span>
+              {selectedQuote && (
+                <div className="p-3 bg-gray-50 rounded-md border">
+                  <span className="text-sm font-medium text-gray-900">
+                    {translateStatus(selectedQuote.status)}
+                  </span>
+                </div>
               )}
             </div>
 
