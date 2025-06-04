@@ -57,11 +57,23 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
     queryKey: ["/api/roles"],
   });
 
-  // Calculate final values
+  // Calculate final values with all adjustments
+  const calculateFinalAmount = () => {
+    const baseWithComplexity = baseCost + complexityAdjustment;
+    const withMarkup = baseWithComplexity + markupAmount;
+    const withPlatform = withMarkup + platformCost;
+    const deviationAmount = withPlatform * (deviationPercentage / 100);
+    const withDeviation = withPlatform + deviationAmount;
+    const discountAmount = withDeviation * (discountPercentage / 100);
+    const finalAmount = withDeviation - discountAmount;
+    return finalAmount;
+  };
+
   useEffect(() => {
     calculateTotalCost();
-    setAdjustedAmount(totalAmount);
-  }, [calculateTotalCost, totalAmount]);
+    const finalAmount = calculateFinalAmount();
+    setAdjustedAmount(finalAmount);
+  }, [calculateTotalCost, totalAmount, platformCost, deviationPercentage, discountPercentage]);
 
   // Helper functions to get names
   const getClientName = (clientId: number) => {
@@ -378,12 +390,49 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
                     </span>
                   </div>
                 </div>
+
+                {platformCost > 0 && (
+                  <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-neutral-700">Costo de Plataforma</span>
+                      <span className="text-sm font-mono font-medium text-neutral-900">
+                        {formatCurrency(platformCost)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {deviationPercentage !== 0 && (
+                  <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-neutral-700">
+                        Desviación ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
+                      </span>
+                      <span className={`text-sm font-mono font-medium ${deviationPercentage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {deviationPercentage > 0 ? '+' : ''}{formatCurrency((baseCost + complexityAdjustment + markupAmount + platformCost) * (deviationPercentage / 100))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {discountPercentage > 0 && (
+                  <div className="bg-white p-3 rounded-lg border border-neutral-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-neutral-700">
+                        Descuento ({discountPercentage}%)
+                      </span>
+                      <span className="text-sm font-mono font-medium text-green-600">
+                        -{formatCurrency(((baseCost + complexityAdjustment + markupAmount + platformCost) * (1 + deviationPercentage / 100)) * (discountPercentage / 100))}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="bg-primary bg-opacity-10 p-3 rounded-lg border border-primary">
                   <div className="flex justify-between items-center">
                     <span className="text-base font-medium text-primary">Cotización Total</span>
                     <span className="text-base font-mono font-medium text-primary">
-                      {formatCurrency(adjustedAmount || totalAmount)}
+                      {formatCurrency(calculateFinalAmount())}
                     </span>
                   </div>
                 </div>
