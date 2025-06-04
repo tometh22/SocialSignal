@@ -19,10 +19,26 @@ const ReviewUltraCompact: React.FC = () => {
   const [adjustedAmount, setAdjustedAmount] = useState<number | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
+  const [platformCost, setPlatformCost] = useState(0);
+  const [deviationPercentage, setDeviationPercentage] = useState(0);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+
+  // Calculate final amount with all adjustments
+  const calculateFinalAmount = () => {
+    const baseWithComplexity = baseCost + complexityAdjustment;
+    const withMarkup = baseWithComplexity + markupAmount;
+    const withPlatform = withMarkup + platformCost;
+    const deviationAmount = withPlatform * (deviationPercentage / 100);
+    const withDeviation = withPlatform + deviationAmount;
+    const discountAmount = withDeviation * (discountPercentage / 100);
+    const finalAmount = withDeviation - discountAmount;
+    return finalAmount;
+  };
 
   useEffect(() => {
-    setAdjustedAmount(totalAmount);
-  }, [totalAmount]);
+    const finalAmount = calculateFinalAmount();
+    setAdjustedAmount(finalAmount);
+  }, [totalAmount, platformCost, deviationPercentage, discountPercentage, baseCost, complexityAdjustment, markupAmount]);
 
   const getClientName = () => quotationData.client?.name || "Cliente no seleccionado";
   const getTemplateName = () => quotationData.template?.name || "Sin plantilla";
@@ -164,12 +180,37 @@ const ReviewUltraCompact: React.FC = () => {
               <span className="text-green-700">Margen</span>
               <span className="font-mono font-medium">${markupAmount.toFixed(0)}</span>
             </div>
+
+            {platformCost > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-green-700">Plataforma</span>
+                <span className="font-mono font-medium">${platformCost.toFixed(0)}</span>
+              </div>
+            )}
+
+            {deviationPercentage !== 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-green-700">Desviación</span>
+                <span className={`font-mono font-medium ${deviationPercentage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {deviationPercentage > 0 ? '+' : ''}${((baseCost + complexityAdjustment + markupAmount + platformCost) * (deviationPercentage / 100)).toFixed(0)}
+                </span>
+              </div>
+            )}
+
+            {discountPercentage > 0 && (
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-green-700">Descuento</span>
+                <span className="font-mono font-medium text-green-600">
+                  -${(calculateFinalAmount() * (discountPercentage / 100)).toFixed(0)}
+                </span>
+              </div>
+            )}
             
             <div className="border-t border-green-200 pt-1 mt-1">
               <div className="flex justify-between items-center bg-green-100 px-2 py-1 rounded">
                 <span className="font-semibold text-green-800 text-xs">Total</span>
                 <span className="text-sm font-bold text-green-800 font-mono">
-                  ${(adjustedAmount || totalAmount).toFixed(0)}
+                  ${calculateFinalAmount().toFixed(0)}
                 </span>
               </div>
             </div>
@@ -178,6 +219,47 @@ const ReviewUltraCompact: React.FC = () => {
           {/* Ajustes */}
           <div className="bg-white border border-gray-200 rounded p-2 space-y-2">
             <div>
+              <label className="text-xs text-gray-500 block mb-1">Costo Plataforma ($)</label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={platformCost}
+                onChange={(e) => setPlatformCost(parseFloat(e.target.value) || 0)}
+                className="font-mono text-right text-xs h-6"
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Desviación (%)</label>
+              <Input
+                type="number"
+                min="-100"
+                max="100"
+                step="0.1"
+                value={deviationPercentage}
+                onChange={(e) => setDeviationPercentage(parseFloat(e.target.value) || 0)}
+                className="font-mono text-right text-xs h-6"
+                placeholder="0.0"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Descuento (%)</label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={discountPercentage}
+                onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                className="font-mono text-right text-xs h-6"
+                placeholder="0.0"
+              />
+            </div>
+
+            <div>
               <label className="text-xs text-gray-500 block mb-1">Monto Final</label>
               <div className="flex items-center">
                 <span className="text-gray-400 mr-1 text-xs">$</span>
@@ -185,13 +267,13 @@ const ReviewUltraCompact: React.FC = () => {
                   type="number"
                   min="0"
                   step="1"
-                  value={adjustedAmount || totalAmount}
+                  value={adjustedAmount || calculateFinalAmount()}
                   onChange={handleAdjustedAmountChange}
                   className="font-mono text-right text-xs h-6"
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Original: ${totalAmount.toFixed(0)}
+                Calculado: ${calculateFinalAmount().toFixed(0)}
               </p>
             </div>
             
