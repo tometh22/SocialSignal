@@ -453,18 +453,18 @@ export default function ManageQuotes() {
 
             <div className="form-group">
               <h4 className="text-label mb-2">Nuevo Estado:</h4>
-              <Select key={`status-select-${selectedQuote?.id}`} value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar nuevo estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Borrador</SelectItem>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="approved">Aprobada</SelectItem>
-                  <SelectItem value="rejected">Rechazada</SelectItem>
-                  <SelectItem value="in-negotiation">En Negociación</SelectItem>
-                </SelectContent>
-              </Select>
+              <select 
+                value={newStatus} 
+                onChange={(e) => setNewStatus(e.target.value)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">Seleccionar nuevo estado</option>
+                <option value="draft">Borrador</option>
+                <option value="pending">Pendiente</option>
+                <option value="approved">Aprobada</option>
+                <option value="rejected">Rechazada</option>
+                <option value="in-negotiation">En Negociación</option>
+              </select>
             </div>
           </div>
 
