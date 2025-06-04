@@ -434,18 +434,19 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
                     className="w-full"
                   />
                 </div>
-              
-              <div className="mb-3">
-                <Label className="block text-sm font-medium text-neutral-700 mb-1">Ajustar Cotización Final</Label>
-                <div className="flex items-center">
-                  <Input
-                    type="number"
-                    className="w-full"
-                    value={adjustedAmount?.toString() || ""}
-                    onChange={handleAdjustedAmountChange}
-                  />
+                
+                <div>
+                  <Label className="block text-sm font-medium text-neutral-700 mb-1">Ajustar Cotización Final</Label>
+                  <div className="flex items-center">
+                    <Input
+                      type="number"
+                      className="w-full"
+                      value={adjustedAmount?.toString() || ""}
+                      onChange={handleAdjustedAmountChange}
+                    />
                   <span className="ml-2 text-sm font-mono text-neutral-600">USD</span>
                 </div>
+              </div>
               </div>
               <div className="mb-3">
                 <Label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de Ajuste</Label>
