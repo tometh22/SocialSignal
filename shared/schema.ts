@@ -122,10 +122,13 @@ export const quotations = pgTable("quotations", {
   baseCost: doublePrecision("base_cost").notNull(),
   complexityAdjustment: doublePrecision("complexity_adjustment").notNull(),
   markupAmount: doublePrecision("markup_amount").notNull(),
+  platformCost: doublePrecision("platform_cost").default(0), // Costo de plataforma
+  deviationPercentage: doublePrecision("deviation_percentage").default(0), // Porcentaje de desviación
+  discountPercentage: doublePrecision("discount_percentage").default(0), // Porcentaje de descuento
   totalAmount: doublePrecision("total_amount").notNull(),
   adjustmentReason: text("adjustment_reason"),
   additionalNotes: text("additional_notes"),
-  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'rejected', 'in-negotiation'
+  status: text("status").notNull().default("draft"), // 'draft', 'pending', 'approved', 'rejected', 'in-negotiation'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),

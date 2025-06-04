@@ -20,6 +20,9 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
   const [additionalNotes, setAdditionalNotes] = useState("");
   const [adjustedAmount, setAdjustedAmount] = useState<number | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [platformCost, setPlatformCost] = useState(0);
+  const [deviationPercentage, setDeviationPercentage] = useState(0);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
   
   const {
     projectDetails,
@@ -151,6 +154,15 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
 
     const finalAmount = adjustedAmount || totalAmount;
     
+    // Calcular el total ajustado con plataforma, desviación y descuento
+    const platformCostAmount = platformCost;
+    const deviationAmount = (totalAmount * deviationPercentage) / 100;
+    const subtotalWithAdjustments = totalAmount + platformCostAmount + deviationAmount;
+    const discountAmount = (subtotalWithAdjustments * discountPercentage) / 100;
+    const finalCalculatedAmount = subtotalWithAdjustments - discountAmount;
+    
+    const actualFinalAmount = adjustedAmount || finalCalculatedAmount;
+    
     const quotationData: InsertQuotation = {
       clientId: projectDetails.clientId,
       projectName: projectDetails.projectName,
@@ -164,10 +176,13 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
       baseCost: baseCost,
       complexityAdjustment: complexityAdjustment,
       markupAmount: markupAmount,
-      totalAmount: finalAmount,
-      adjustmentReason: adjustmentReason || undefined,
+      platformCost: platformCostAmount,
+      deviationPercentage: deviationPercentage,
+      discountPercentage: discountPercentage,
+      totalAmount: actualFinalAmount,
+      adjustmentReason: adjustmentReason || `Plataforma: $${platformCostAmount}, Desviación: ${deviationPercentage}%, Descuento: ${discountPercentage}%`,
       additionalNotes: additionalNotes || undefined,
-      status: "pending"
+      status: "draft"
     };
 
     createQuotationMutation.mutate(quotationData);
@@ -377,6 +392,49 @@ export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) 
             
             <div className="lg:col-span-2">
               <h5 className="text-base font-medium text-neutral-800 mb-3">Ajustes de Cotización</h5>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label className="block text-sm font-medium text-neutral-700 mb-1">Costo de Plataforma ($)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={platformCost}
+                    onChange={(e) => setPlatformCost(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="block text-sm font-medium text-neutral-700 mb-1">Desviación (%)</Label>
+                  <Input
+                    type="number"
+                    min="-100"
+                    max="100"
+                    step="0.1"
+                    value={deviationPercentage}
+                    onChange={(e) => setDeviationPercentage(parseFloat(e.target.value) || 0)}
+                    placeholder="0.0"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="block text-sm font-medium text-neutral-700 mb-1">Descuento (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={discountPercentage}
+                    onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                    placeholder="0.0"
+                    className="w-full"
+                  />
+                </div>
+              
               <div className="mb-3">
                 <Label className="block text-sm font-medium text-neutral-700 mb-1">Ajustar Cotización Final</Label>
                 <div className="flex items-center">
