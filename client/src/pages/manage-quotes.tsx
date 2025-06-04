@@ -110,7 +110,10 @@ export default function ManageQuotes() {
   const openStatusDialog = (quote: Quotation) => {
     setSelectedQuote(quote);
     setNewStatus(quote.status);
-    setDialogOpen(true);
+    // Small delay to ensure state is updated before opening dialog
+    setTimeout(() => {
+      setDialogOpen(true);
+    }, 10);
   };
   
   const openDeleteDialog = (quote: Quotation) => {
@@ -450,7 +453,7 @@ export default function ManageQuotes() {
 
             <div className="form-group">
               <h4 className="text-label mb-2">Nuevo Estado:</h4>
-              <Select value={newStatus} onValueChange={setNewStatus}>
+              <Select key={`status-select-${selectedQuote?.id}`} value={newStatus} onValueChange={setNewStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar nuevo estado" />
                 </SelectTrigger>
