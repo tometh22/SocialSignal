@@ -380,33 +380,33 @@ export default function Admin() {
       return await apiRequest(`/api/templates/${id}`, "DELETE");
     },
     onMutate: async (id: number) => {
-      // Cancelar cualquier query en progreso
+      console.log("Eliminando plantilla optimista:", id);
+      
+      // Cancelar queries en progreso
       await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
       
-      // Snapshot del estado anterior
-      const previousTemplates = queryClient.getQueryData(["/api/templates"]);
+      // Obtener estado actual
+      const previousTemplates = queryClient.getQueryData(["/api/templates"]) as ReportTemplate[];
+      console.log("Templates antes:", previousTemplates);
       
-      // Actualización optimista: remover la plantilla inmediatamente
-      queryClient.setQueryData(["/api/templates"], (old: any) => {
-        if (!old) return old;
-        return old.filter((template: any) => template.id !== id);
-      });
+      // Actualizar inmediatamente removiendo la plantilla
+      const newTemplates = previousTemplates?.filter(template => template.id !== id) || [];
+      console.log("Templates después:", newTemplates);
       
-      // Retornar contexto con snapshot anterior para rollback
+      queryClient.setQueryData(["/api/templates"], newTemplates);
+      
       return { previousTemplates };
     },
-    onSuccess: async () => {
-      // Invalidar cache para sincronizar con servidor
-      await queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/report-templates"] });
-      
+    onSuccess: () => {
       toast({
         title: "Éxito",
         description: "Plantilla eliminada correctamente.",
       });
     },
     onError: (err, id, context) => {
-      // En caso de error, restaurar estado anterior
+      console.log("Error eliminando plantilla, restaurando:", context?.previousTemplates);
+      
+      // Restaurar estado anterior en caso de error
       if (context?.previousTemplates) {
         queryClient.setQueryData(["/api/templates"], context.previousTemplates);
       }
@@ -416,10 +416,6 @@ export default function Admin() {
         description: "No se pudo eliminar la plantilla.",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
-      // Siempre refrescar la query al final
-      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
     },
   });
 
