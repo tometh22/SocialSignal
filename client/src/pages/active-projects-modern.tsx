@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Eye
 } from "lucide-react";
+import { SubprojectManager } from "@/components/subproject-manager";
 
 export default function ActiveProjectsModern() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -83,6 +84,23 @@ export default function ActiveProjectsModern() {
     };
     
     const statusConfig = config[status as keyof typeof config] || config.active;
+    
+    return (
+      <Badge variant="secondary" className={`text-xs font-medium px-2 py-1 ${statusConfig.className}`}>
+        {statusConfig.label}
+      </Badge>
+    );
+  };
+
+  const getCompletionStatusBadge = (status: string) => {
+    const config = {
+      "pending": { className: "bg-gray-100 text-gray-700", label: "Pendiente" },
+      "in_progress": { className: "bg-blue-100 text-blue-700", label: "En Progreso" },
+      "completed": { className: "bg-green-100 text-green-700", label: "Completado" },
+      "cancelled": { className: "bg-red-100 text-red-700", label: "Cancelado" }
+    };
+    
+    const statusConfig = config[status as keyof typeof config] || config.pending;
     
     return (
       <Badge variant="secondary" className={`text-xs font-medium px-2 py-1 ${statusConfig.className}`}>
@@ -266,20 +284,9 @@ export default function ActiveProjectsModern() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <h4 className="font-medium text-gray-900 text-sm">
-                                      {subproject.id === 5 ? "Ejecutivo Sony One" :
-                                       subproject.id === 6 ? "Mensual Enero" :
-                                       subproject.id === 7 ? "Ejecutivo Telepase" :
-                                       subproject.id === 8 ? "Mensual Febrero" :
-                                       subproject.id === 9 ? "Ejecutivo NFC" :
-                                       subproject.id === 10 ? "Ejecutivo Sony One Febrero" :
-                                       subproject.id === 11 ? "Mensual Marzo" :
-                                       subproject.id === 12 ? "Ejecutivo 2" :
-                                       subproject.id === 13 ? "Ejecutivo Comercios" :
-                                       subproject.id === 14 ? "Mensual Abril" :
-                                       subproject.id === 15 ? "Ejecutivo 1" :
-                                       `Entregable ${subproject.id}`}
+                                      {subproject.subprojectName || `Entregable ${subproject.id}`}
                                     </h4>
-                                    {getStatusBadge("en_progreso")}
+                                    {getCompletionStatusBadge(subproject.completionStatus || 'pending')}
                                   </div>
                                   
                                   <p className="text-xs text-gray-600 mb-3 leading-relaxed">

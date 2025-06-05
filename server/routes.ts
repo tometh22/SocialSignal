@@ -1041,6 +1041,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Actualizar estado de subproyecto
+  app.patch("/api/active-projects/:id/status", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const { completionStatus, completedDate } = req.body;
+      
+      // Validar estado
+      const validStatuses = ["pending", "in_progress", "completed", "cancelled"];
+      if (!validStatuses.includes(completionStatus)) {
+        return res.status(400).json({ message: "Invalid completion status" });
+      }
+      
+      const updateData: any = { completionStatus };
+      
+      // Si el estado es completado y no hay fecha, usar la fecha actual
+      if (completionStatus === "completed") {
+        updateData.completedDate = completedDate ? new Date(completedDate) : new Date();
+      } else if (completionStatus !== "completed") {
+        // Si no está completado, limpiar la fecha de finalización
+        updateData.completedDate = null;
+      }
+      
+      const updatedProject = await storage.updateActiveProject(id, updateData);
+      
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating project status:", error);
+      res.status(500).json({ message: "Failed to update project status" });
+    }
+  });
+  
+  // Actualizar nombre de subproyecto
+  app.patch("/api/active-projects/:id/name", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const { subprojectName } = req.body;
+      
+      if (!subprojectName || subprojectName.trim().length === 0) {
+        return res.status(400).json({ message: "Subproject name is required" });
+      }
+      
+      const updatedProject = await storage.updateActiveProject(id, { 
+        subprojectName: subprojectName.trim() 
+      });
+      
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating subproject name:", error);
+      res.status(500).json({ message: "Failed to update subproject name" });
+    }
+  });
+  
   // Guardar asignaciones de presupuesto para subproyectos Always-On
   app.post("/api/projects/budget-allocations", async (req, res) => {
     try {
