@@ -198,6 +198,11 @@ export const activeProjects = pgTable("active_projects", {
   deliverableBudget: doublePrecision("deliverable_budget"), // presupuesto específico para este entregable
   additionalDeliverableCost: doublePrecision("additional_deliverable_cost"), // costo de entregables opcionales/adicionales
   deliverableDescription: text("deliverable_description"), // descripción detallada del entregable
+  
+  // Campos para subproyectos únicos
+  subprojectName: text("subproject_name"), // nombre único del subproyecto (ej: "Informe Mensual Enero")
+  completionStatus: text("completion_status").default("pending"), // pending, in_progress, completed, cancelled
+  completedDate: timestamp("completed_date"), // fecha de finalización real
 });
 
 // Esquema base generado por drizzle-zod
@@ -212,6 +217,7 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   expectedEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
   actualEndDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  completedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
   parentProjectId: z.number().optional(),
   isAlwaysOnMacro: z.boolean().optional(),
   macroMonthlyBudget: z.number().optional(),
@@ -222,6 +228,10 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   deliverableBudget: z.number().optional(), // presupuesto específico para este entregable
   additionalDeliverableCost: z.number().optional(), // costo adicional para entregables fuera de lo planeado
   deliverableDescription: z.string().optional(), // descripción detallada del entregable
+  
+  // Nuevos campos para subproyectos únicos
+  subprojectName: z.string().optional(), // nombre único del subproyecto
+  completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
 });
 
 // ==================== COMPONENTES DE PROYECTO ====================
