@@ -380,7 +380,11 @@ export default function Admin() {
       return await apiRequest(`/api/templates/${id}`, "DELETE");
     },
     onSuccess: async () => {
+      // Invalidar múltiples cachés relacionados
       await queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/report-templates"] });
+      // Forzar refetch inmediato
+      await queryClient.refetchQueries({ queryKey: ["/api/templates"] });
       toast({
         title: "Éxito",
         description: "Plantilla eliminada correctamente.",
