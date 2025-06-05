@@ -24,29 +24,35 @@ const ReviewUltraCompact: React.FC = () => {
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [markupMultiplier, setMarkupMultiplier] = useState(2);
 
-  // Calculate dynamic markup amount
-  const calculateDynamicMarkup = () => {
-    const baseWithComplexity = baseCost + complexityAdjustment;
-    return baseWithComplexity * (markupMultiplier - 1);
+  // Calculate step by step with correct order
+  const calculateSteps = () => {
+    const step1_base = baseCost + complexityAdjustment;
+    const step2_platform = step1_base + platformCost;
+    const step3_deviation = step2_platform + (step2_platform * (deviationPercentage / 100));
+    const step4_markup = step3_deviation * markupMultiplier;
+    const step5_discount = step4_markup - (step4_markup * (discountPercentage / 100));
+    
+    return {
+      step1_base,
+      step2_platform,
+      step3_deviation,
+      step4_markup,
+      step5_discount,
+      markupAmount: step4_markup - step3_deviation
+    };
   };
 
-  // Calculate final amount with all adjustments
+  // Calculate final amount with correct order
   const calculateFinalAmount = () => {
-    const baseWithComplexity = baseCost + complexityAdjustment;
-    const dynamicMarkup = calculateDynamicMarkup();
-    const withMarkup = baseWithComplexity + dynamicMarkup;
-    const withPlatform = withMarkup + platformCost;
-    const deviationAmount = withPlatform * (deviationPercentage / 100);
-    const withDeviation = withPlatform + deviationAmount;
-    const discountAmount = withDeviation * (discountPercentage / 100);
-    const finalAmount = withDeviation - discountAmount;
-    return finalAmount;
+    return calculateSteps().step5_discount;
   };
+
+  const getSteps = calculateSteps();
 
   useEffect(() => {
     const finalAmount = calculateFinalAmount();
     setAdjustedAmount(finalAmount);
-  }, [totalAmount, platformCost, deviationPercentage, discountPercentage, baseCost, complexityAdjustment, markupAmount, markupMultiplier]);
+  }, [totalAmount, platformCost, deviationPercentage, discountPercentage, baseCost, complexityAdjustment, markupMultiplier]);
 
   const getClientName = () => quotationData.client?.name || "Cliente no seleccionado";
   const getTemplateName = () => quotationData.template?.name || "Sin plantilla";
@@ -198,55 +204,63 @@ const ReviewUltraCompact: React.FC = () => {
                 <h3 className="text-base font-semibold text-gray-900">Desglose Financiero</h3>
               </div>
               
-              <div className="p-3 space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-700">Costo Base</span>
-                  <span className="font-mono font-semibold">${baseCost.toFixed(0)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-700">Complejidad</span>
-                  <span className="font-mono font-semibold">${complexityAdjustment.toFixed(0)}</span>
-                </div>
-                
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-700">Margen ({markupMultiplier}x)</span>
-                  <span className="font-mono font-semibold">${calculateDynamicMarkup().toFixed(0)}</span>
-                </div>
-
-                {platformCost > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-700">Plataforma</span>
-                    <span className="font-mono font-semibold text-blue-600">${platformCost.toFixed(0)}</span>
+              <div className="p-3">
+                <div className="space-y-3">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-xs font-medium text-gray-600 mb-2">PASO 1: Base + Complejidad</div>
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                    </div>
                   </div>
-                )}
 
-                {deviationPercentage !== 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-700">
-                      Desviación ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
-                    </span>
-                    <span className={`font-mono font-semibold ${deviationPercentage > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {deviationPercentage > 0 ? '+' : ''}${((baseCost + complexityAdjustment + calculateDynamicMarkup() + platformCost) * (deviationPercentage / 100)).toFixed(0)}
-                    </span>
-                  </div>
-                )}
+                  {platformCost > 0 && (
+                    <div className="bg-blue-50 rounded p-2">
+                      <div className="text-xs font-medium text-blue-600 mb-2">PASO 2: + Plataforma</div>
+                      <div className="flex justify-between text-sm">
+                        <span>Subtotal</span>
+                        <span className="font-mono">${getSteps.step2_platform.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  )}
 
-                {discountPercentage > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-700">
-                      Descuento ({discountPercentage}%)
-                    </span>
-                    <span className="font-mono font-semibold text-green-600">
-                      -${(calculateFinalAmount() * (discountPercentage / 100)).toFixed(0)}
-                    </span>
+                  {deviationPercentage !== 0 && (
+                    <div className="bg-orange-50 rounded p-2">
+                      <div className="text-xs font-medium text-orange-600 mb-2">PASO 3: + Desviación ({deviationPercentage}%)</div>
+                      <div className="flex justify-between text-sm">
+                        <span>Subtotal</span>
+                        <span className="font-mono">${getSteps.step3_deviation.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-green-50 rounded p-2">
+                    <div className="text-xs font-medium text-green-600 mb-2">PASO 4: × Markup ({markupMultiplier}x)</div>
+                    <div className="flex justify-between text-sm">
+                      <span>Ganancia</span>
+                      <span className="font-mono text-green-700">+${getSteps.markupAmount.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Subtotal</span>
+                      <span className="font-mono">${getSteps.step4_markup.toFixed(0)}</span>
+                    </div>
                   </div>
-                )}
-                
-                <div className="bg-blue-50 rounded-lg p-2 border border-blue-200 mt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-gray-900">Total Final</span>
-                    <span className="text-lg font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
+
+                  {discountPercentage > 0 && (
+                    <div className="bg-red-50 rounded p-2">
+                      <div className="text-xs font-medium text-red-600 mb-2">PASO 5: - Descuento ({discountPercentage}%)</div>
+                      <div className="flex justify-between text-sm">
+                        <span>Descuento</span>
+                        <span className="font-mono text-red-700">-${(getSteps.step4_markup * (discountPercentage / 100)).toFixed(0)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="bg-blue-100 rounded-lg p-3 border-2 border-blue-300">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-gray-900">TOTAL FINAL</span>
+                      <span className="text-lg font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
