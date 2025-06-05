@@ -380,11 +380,16 @@ export default function Admin() {
       return await apiRequest(`/api/templates/${id}`, "DELETE");
     },
     onSuccess: async () => {
-      // Invalidar múltiples cachés relacionados
-      await queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/report-templates"] });
-      // Forzar refetch inmediato
+      // Invalidar todas las consultas relacionadas con plantillas
+      await queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0] as string;
+        return key?.includes('templates') || key?.includes('report-templates');
+      }});
+      
+      // Forzar refetch inmediato de las consultas principales
       await queryClient.refetchQueries({ queryKey: ["/api/templates"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/report-templates"] });
+      
       toast({
         title: "Éxito",
         description: "Plantilla eliminada correctamente.",
