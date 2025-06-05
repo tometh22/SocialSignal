@@ -260,17 +260,25 @@ const ReviewUltraCompact: React.FC = () => {
               
               <div className="p-3 space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Multiplicador de Margen</label>
-                  <Input
-                    type="number"
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Multiplicador de Margen: {markupMultiplier}x</label>
+                  <input
+                    type="range"
                     min="1"
-                    max="10"
+                    max="5"
                     step="0.1"
                     value={markupMultiplier}
-                    onChange={(e) => setMarkupMultiplier(parseFloat(e.target.value) || 2)}
-                    className="h-8 text-xs font-mono text-center"
+                    onChange={(e) => setMarkupMultiplier(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb 100%)`
+                    }}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Define la ganancia (ej: 2x = 100% ganancia)</p>
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>1x</span>
+                    <span>2.5x</span>
+                    <span>5x</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Define la ganancia sobre costo base</p>
                 </div>
 
                 <div>
