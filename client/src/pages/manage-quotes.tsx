@@ -53,6 +53,8 @@ export default function ManageQuotes() {
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
+  const [approvedQuote, setApprovedQuote] = useState<Quotation | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const { toast } = useToast();
   
@@ -95,6 +97,12 @@ export default function ManageQuotes() {
         description: `El estado de la cotización ha sido actualizado a ${translateStatus(newStatus)}.`,
       });
       
+      // Si la cotización fue aprobada, mostrar modal para crear proyecto
+      if (newStatus === 'approved') {
+        setApprovedQuote(selectedQuote);
+        setCreateProjectDialogOpen(true);
+      }
+      
       refetch();
       setDialogOpen(false);
     } catch (error) {
@@ -121,6 +129,55 @@ export default function ManageQuotes() {
     setDeleteDialogOpen(true);
   };
   
+  const handleCreateProject = async () => {
+    if (!approvedQuote) return;
+    
+    try {
+      // Crear el proyecto basado en la cotización aprobada
+      const projectData = {
+        name: approvedQuote.projectName,
+        clientId: approvedQuote.clientId,
+        quotationId: approvedQuote.id,
+        description: `Proyecto basado en cotización aprobada: ${approvedQuote.projectName}`,
+        budget: approvedQuote.totalAmount,
+        status: 'active',
+        startDate: new Date().toISOString().split('T')[0],
+        estimatedHours: 0 // Se puede calcular basado en el equipo de la cotización
+      };
+
+      const createdProject = await apiRequest('/api/projects', 'POST', projectData);
+      
+      toast({
+        title: "Proyecto creado exitosamente",
+        description: `El proyecto "${approvedQuote.projectName}" ha sido creado y está listo para comenzar.`,
+      });
+      
+      setCreateProjectDialogOpen(false);
+      setApprovedQuote(null);
+      
+      // Navegar al nuevo proyecto
+      navigate(`/projects/${createdProject.id}`);
+      
+    } catch (error) {
+      console.error('Error al crear proyecto:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el proyecto. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSkipProjectCreation = () => {
+    setCreateProjectDialogOpen(false);
+    setApprovedQuote(null);
+    
+    toast({
+      title: "Cotización aprobada",
+      description: "La cotización ha sido aprobada. Puedes crear el proyecto más tarde desde la sección de proyectos.",
+    });
+  };
+
   const handleDeleteQuotation = async () => {
     if (!selectedQuote) return;
     
@@ -484,6 +541,53 @@ export default function ManageQuotes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal para crear proyecto tras aprobación */}
+      <Dialog open={createProjectDialogOpen} onOpenChange={setCreateProjectDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Cotización Aprobada
+            </DialogTitle>
+            <DialogDescription>
+              La cotización ha sido aprobada exitosamente. ¿Deseas crear un proyecto basado en esta cotización?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {approvedQuote && (
+            <div className="py-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-900 mb-2">Detalles del proyecto a crear:</h4>
+                <div className="space-y-2 text-sm text-green-800">
+                  <div className="flex justify-between">
+                    <span>Nombre:</span>
+                    <span className="font-medium">{approvedQuote.projectName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cliente:</span>
+                    <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Presupuesto:</span>
+                    <span className="font-medium">${approvedQuote.totalAmount?.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleSkipProjectCreation}>
+              Crear más tarde
+            </Button>
+            <Button onClick={handleCreateProject} className="bg-green-600 hover:bg-green-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Crear Proyecto Ahora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
