@@ -64,6 +64,11 @@ export default function ManageQuotes() {
     return client ? client.name : `Cliente ID: ${clientId}`;
   };
 
+  // Función auxiliar para obtener el cliente completo por ID
+  const getClient = (clientId: number) => {
+    return clients.find(c => c.id === clientId);
+  };
+
   // Filter quotations based on search term and status
   const filteredQuotations = quotations
     ? quotations.filter((quote) => {
@@ -567,9 +572,25 @@ export default function ManageQuotes() {
                   <div className="flex justify-between items-center">
                     <span>Cliente:</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                        {getClientName(approvedQuote.clientId).charAt(0)}
-                      </div>
+                      {(() => {
+                        const client = getClient(approvedQuote.clientId);
+                        return client?.logoUrl ? (
+                          <div className="w-6 h-6 rounded overflow-hidden flex-shrink-0">
+                            <img 
+                              src={client.logoUrl} 
+                              alt={`${client.name} logo`} 
+                              className="h-full w-full object-contain"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            {getClientName(approvedQuote.clientId).charAt(0)}
+                          </div>
+                        );
+                      })()}
                       <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
                     </div>
                   </div>
