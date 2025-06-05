@@ -36,6 +36,7 @@ interface Client {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  logoUrl?: string;
 }
 
 export default function ManageQuotes() {
@@ -595,20 +596,32 @@ export default function ManageQuotes() {
                     </div>
                   </div>
                   <div className="border-t border-green-200 pt-2 space-y-2">
-                    <div className="flex justify-between">
-                      <span>Costo estimado:</span>
-                      <span className="font-mono">${(approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Precio al cliente:</span>
-                      <span className="font-bold text-green-900 font-mono">${approvedQuote.totalAmount?.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Margen de ganancia:</span>
-                      <span className="font-medium">
-                        ${((approvedQuote.totalAmount || 0) - (approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0))).toLocaleString()}
-                      </span>
-                    </div>
+                    {(() => {
+                      const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
+                      const finalAmount = approvedQuote.totalAmount || 0;
+                      
+                      // Calcular margen simple: precio final menos costo base
+                      const marginAmount = finalAmount - baseCostTotal;
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between">
+                            <span>Costo estimado:</span>
+                            <span className="font-mono">${baseCostTotal.toFixed(0)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Precio al cliente:</span>
+                            <span className="font-bold text-green-900 font-mono">${finalAmount.toFixed(0)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>Margen de ganancia:</span>
+                            <span className="font-medium">
+                              ${marginAmount > 0 ? marginAmount.toFixed(0) : '0'}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
