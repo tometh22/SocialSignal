@@ -373,136 +373,177 @@ const ReviewUltraCompact: React.FC = () => {
 
         {activeTab === 'breakdown' && (
           <div className="bg-white rounded-lg shadow border border-gray-200">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Desglose Detallado de Costos</h2>
-              <p className="text-gray-600 text-sm mt-1">Análisis paso a paso del cálculo financiero</p>
+            <div className="p-3 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Desglose Detallado de Costos</h2>
             </div>
             
-            <div className="p-6">
-              <div className="space-y-6">
-                <div className="bg-gray-50 rounded-lg p-4 border">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-gray-900">PASO 1: Costo Base + Complejidad</h3>
-                    <span className="text-xl font-bold text-gray-900">${getSteps.step1_base.toFixed(0)}</span>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div className="flex justify-between">
-                      <span>Costo del equipo:</span>
-                      <span className="font-mono">${baseCost.toFixed(0)}</span>
+            <div className="p-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Columna Izquierda - Pasos del Cálculo */}
+                <div className="space-y-3">
+                  <div className="bg-gray-50 rounded p-3 border">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-sm font-semibold text-gray-900">PASO 1: Base + Complejidad</h3>
+                      <span className="text-lg font-bold text-gray-900">${getSteps.step1_base.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Ajuste por complejidad:</span>
-                      <span className="font-mono">${complexityAdjustment.toFixed(0)}</span>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Equipo:</span>
+                        <span className="font-mono">${baseCost.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Complejidad:</span>
+                        <span className="font-mono">${complexityAdjustment.toFixed(0)}</span>
+                      </div>
                     </div>
                   </div>
+
+                  {platformCost > 0 && (
+                    <div className="bg-blue-50 rounded p-3 border border-blue-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-semibold text-blue-900">PASO 2: + Plataforma</h3>
+                        <span className="text-lg font-bold text-blue-900">${getSteps.step2_platform.toFixed(0)}</span>
+                      </div>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Anterior:</span>
+                          <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Plataforma:</span>
+                          <span className="font-mono">+${platformCost.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {deviationPercentage !== 0 && (
+                    <div className="bg-orange-50 rounded p-3 border border-orange-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-semibold text-orange-900">PASO 3: Desviación ({deviationPercentage}%)</h3>
+                        <span className="text-lg font-bold text-orange-900">${getSteps.step3_deviation.toFixed(0)}</span>
+                      </div>
+                      <div className="text-xs text-orange-700 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Anterior:</span>
+                          <span className="font-mono">${getSteps.step2_platform.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Desviación:</span>
+                          <span className="font-mono">{deviationPercentage > 0 ? '+' : ''}${(getSteps.step2_platform * (deviationPercentage / 100)).toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-green-50 rounded p-3 border border-green-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-sm font-semibold text-green-900">PASO 4: × Markup ({markupMultiplier}x)</h3>
+                      <span className="text-lg font-bold text-green-900">${getSteps.step4_markup.toFixed(0)}</span>
+                    </div>
+                    <div className="text-xs text-green-700 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Base:</span>
+                        <span className="font-mono">${getSteps.step3_deviation.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Multiplicador:</span>
+                        <span className="font-mono">×{markupMultiplier}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Ganancia:</span>
+                        <span className="font-mono">+${getSteps.markupAmount.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {discountPercentage > 0 && (
+                    <div className="bg-red-50 rounded p-3 border border-red-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-sm font-semibold text-red-900">PASO 5: - Descuento ({discountPercentage}%)</h3>
+                        <span className="text-lg font-bold text-red-900">${getSteps.step5_discount.toFixed(0)}</span>
+                      </div>
+                      <div className="text-xs text-red-700 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Antes descuento:</span>
+                          <span className="font-mono">${getSteps.step4_markup.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Descuento:</span>
+                          <span className="font-mono">-${(getSteps.step4_markup * (discountPercentage / 100)).toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {platformCost > 0 && (
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                {/* Columna Derecha - Resumen y Análisis */}
+                <div className="space-y-3">
+                  <div className="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-4 border-2 border-blue-300">
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-semibold text-blue-900">PASO 2: + Costo de Plataforma</h3>
-                      <span className="text-xl font-bold text-blue-900">${getSteps.step2_platform.toFixed(0)}</span>
+                      <h3 className="text-lg font-bold text-gray-900">PRECIO FINAL</h3>
+                      <span className="text-2xl font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
                     </div>
-                    <div className="text-sm text-blue-700 space-y-1">
+                    <div className="grid grid-cols-1 gap-2 text-sm">
                       <div className="flex justify-between">
-                        <span>Subtotal anterior:</span>
+                        <span>Costo base:</span>
                         <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Costo de plataforma:</span>
-                        <span className="font-mono">+${platformCost.toFixed(0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {deviationPercentage !== 0 && (
-                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-semibold text-orange-900">PASO 3: + Desviación ({deviationPercentage}%)</h3>
-                      <span className="text-xl font-bold text-orange-900">${getSteps.step3_deviation.toFixed(0)}</span>
-                    </div>
-                    <div className="text-sm text-orange-700 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Subtotal anterior:</span>
-                        <span className="font-mono">${getSteps.step2_platform.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Desviación ({deviationPercentage}%):</span>
-                        <span className="font-mono">{deviationPercentage > 0 ? '+' : ''}${(getSteps.step2_platform * (deviationPercentage / 100)).toFixed(0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-green-900">PASO 4: × Multiplicador de Margen ({markupMultiplier}x)</h3>
-                    <span className="text-xl font-bold text-green-900">${getSteps.step4_markup.toFixed(0)}</span>
-                  </div>
-                  <div className="text-sm text-green-700 space-y-1">
-                    <div className="flex justify-between">
-                      <span>Base para markup:</span>
-                      <span className="font-mono">${getSteps.step3_deviation.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Multiplicador aplicado:</span>
-                      <span className="font-mono">×{markupMultiplier}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <span>Ganancia generada:</span>
-                      <span className="font-mono">+${getSteps.markupAmount.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>Margen de ganancia:</span>
-                      <span className="font-mono">{((getSteps.markupAmount / getSteps.step3_deviation) * 100).toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {discountPercentage > 0 && (
-                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-semibold text-red-900">PASO 5: - Descuento ({discountPercentage}%)</h3>
-                      <span className="text-xl font-bold text-red-900">${getSteps.step5_discount.toFixed(0)}</span>
-                    </div>
-                    <div className="text-sm text-red-700 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Subtotal antes de descuento:</span>
-                        <span className="font-mono">${getSteps.step4_markup.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Descuento ({discountPercentage}%):</span>
-                        <span className="font-mono">-${(getSteps.step4_markup * (discountPercentage / 100)).toFixed(0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-6 border-2 border-blue-300">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-900">PRECIO FINAL</h3>
-                    <span className="text-3xl font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span>Costo base total:</span>
-                        <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Ganancia obtenida:</span>
+                        <span>Ganancia:</span>
                         <span className="font-mono">${getSteps.markupAmount.toFixed(0)}</span>
                       </div>
-                    </div>
-                    <div className="space-y-1">
                       <div className="flex justify-between">
-                        <span>Margen de ganancia:</span>
+                        <span>Margen:</span>
                         <span className="font-mono">{((getSteps.markupAmount / getSteps.step3_deviation) * 100).toFixed(0)}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>ROI sobre costo base:</span>
+                        <span>ROI:</span>
                         <span className="font-mono">{((getSteps.markupAmount / getSteps.step1_base) * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desglose del Equipo */}
+                  <div className="bg-gray-50 rounded-lg p-3 border">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Desglose del Equipo</h4>
+                    <div className="space-y-1 text-xs">
+                      {quotationData.teamMembers && quotationData.teamMembers.map((member, index) => (
+                        <div key={member.id || index} className="flex justify-between">
+                          <span className="text-gray-600">
+                            {getRoleName(member.roleId)} ({member.hours}h)
+                          </span>
+                          <span className="font-mono">${((member.hours || 0) * (member.rate || 0)).toFixed(0)}</span>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-300 pt-1 mt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Equipo:</span>
+                          <span className="font-mono">${baseCost.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Flujo de Efectivo */}
+                  <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-200">
+                    <h4 className="text-sm font-semibold text-indigo-900 mb-2">Análisis de Rentabilidad</h4>
+                    <div className="space-y-1 text-xs text-indigo-700">
+                      <div className="flex justify-between">
+                        <span>Inversión inicial:</span>
+                        <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Ingresos brutos:</span>
+                        <span className="font-mono">${calculateFinalAmount().toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Beneficio neto:</span>
+                        <span className="font-mono">${(calculateFinalAmount() - getSteps.step1_base).toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Multiplicador real:</span>
+                        <span className="font-mono">{(calculateFinalAmount() / getSteps.step1_base).toFixed(1)}x</span>
                       </div>
                     </div>
                   </div>
