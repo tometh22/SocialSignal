@@ -558,19 +558,36 @@ export default function ManageQuotes() {
           {approvedQuote && (
             <div className="py-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-semibold text-green-900 mb-2">Detalles del proyecto a crear:</h4>
-                <div className="space-y-2 text-sm text-green-800">
+                <h4 className="font-semibold text-green-900 mb-3">Detalles del proyecto a crear:</h4>
+                <div className="space-y-3 text-sm text-green-800">
                   <div className="flex justify-between">
-                    <span>Nombre:</span>
+                    <span>Nombre del proyecto:</span>
                     <span className="font-medium">{approvedQuote.projectName}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Cliente:</span>
-                    <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {getClientName(approvedQuote.clientId).charAt(0)}
+                      </div>
+                      <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Presupuesto:</span>
-                    <span className="font-medium">${approvedQuote.totalAmount?.toLocaleString()}</span>
+                  <div className="border-t border-green-200 pt-2 space-y-2">
+                    <div className="flex justify-between">
+                      <span>Costo estimado:</span>
+                      <span className="font-mono">${(approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Precio al cliente:</span>
+                      <span className="font-bold text-green-900 font-mono">${approvedQuote.totalAmount?.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span>Margen de ganancia:</span>
+                      <span className="font-medium">
+                        ${((approvedQuote.totalAmount || 0) - (approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0))).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
