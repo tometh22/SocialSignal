@@ -141,6 +141,10 @@ export default function Admin() {
   const [newRoleId, setNewRoleId] = useState("");
   const [newRoleHours, setNewRoleHours] = useState(0);
   
+  // Estado para controlar animaciones de eliminación
+  const [deletingTemplates, setDeletingTemplates] = useState<Set<number>>(new Set());
+  const [hiddenTemplates, setHiddenTemplates] = useState<Set<number>>(new Set());
+  
   const { toast } = useToast();
   const { 
     updatePersonnelInCache, 
@@ -380,36 +384,47 @@ export default function Admin() {
       return await apiRequest(`/api/templates/${id}`, "DELETE");
     },
     onMutate: async (id: number) => {
-      console.log("Eliminando plantilla optimista:", id);
+      // Marcar como eliminando para animación
+      setDeletingTemplates(prev => {
+        const newSet = new Set(prev);
+        newSet.add(id);
+        return newSet;
+      });
       
-      // Cancelar queries en progreso
-      await queryClient.cancelQueries({ queryKey: ["/api/templates"] });
-      
-      // Obtener estado actual
-      const previousTemplates = queryClient.getQueryData(["/api/templates"]) as ReportTemplate[];
-      console.log("Templates antes:", previousTemplates);
-      
-      // Actualizar inmediatamente removiendo la plantilla
-      const newTemplates = previousTemplates?.filter(template => template.id !== id) || [];
-      console.log("Templates después:", newTemplates);
-      
-      queryClient.setQueryData(["/api/templates"], newTemplates);
-      
-      return { previousTemplates };
+      // Después de 300ms, ocultar completamente
+      setTimeout(() => {
+        setHiddenTemplates(prev => {
+          const newSet = new Set(prev);
+          newSet.add(id);
+          return newSet;
+        });
+        setDeletingTemplates(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }, 300);
     },
     onSuccess: () => {
+      // Invalidar cache para sincronizar con servidor
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
       toast({
         title: "Éxito",
         description: "Plantilla eliminada correctamente.",
       });
     },
-    onError: (err, id, context) => {
-      console.log("Error eliminando plantilla, restaurando:", context?.previousTemplates);
-      
-      // Restaurar estado anterior en caso de error
-      if (context?.previousTemplates) {
-        queryClient.setQueryData(["/api/templates"], context.previousTemplates);
-      }
+    onError: (err, id) => {
+      // En caso de error, mostrar nuevamente la plantilla
+      setHiddenTemplates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      setDeletingTemplates(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
       
       toast({
         title: "Error",
@@ -800,57 +815,78 @@ export default function Admin() {
                 </div>
               ) : templates && templates.length > 0 ? (
                 <div className="space-y-4">
-                  {templates.map((template) => (
-                    <Card key={template.id} className="border border-slate-200">
-                      <CardHeader className="pb-3">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-1">
-                            <CardTitle className="text-lg">{template.name}</CardTitle>
-                            <CardDescription>{template.description}</CardDescription>
-                            <div className="flex gap-2 flex-wrap">
-                              <Badge variant="outline">{template.complexity}</Badge>
-                              {template.pageRange && (
-                                <Badge variant="secondary">{template.pageRange} páginas</Badge>
-                              )}
-                              <Badge variant="secondary" className="font-mono">
-                                ${template.platformCost} costo base
-                              </Badge>
+                  {templates
+                    .filter(template => !hiddenTemplates.has(template.id))
+                    .map((template) => {
+                      const isDeleting = deletingTemplates.has(template.id);
+                      return (
+                        <Card 
+                          key={template.id} 
+                          className={`border border-slate-200 transition-all duration-300 ${
+                            isDeleting ? 'opacity-0 scale-95 transform -translate-y-2' : 'opacity-100 scale-100'
+                          }`}
+                          style={{ 
+                            transform: isDeleting ? 'translateY(-8px)' : 'translateY(0)',
+                            transition: 'all 0.3s ease-out'
+                          }}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1">
+                                <CardTitle className="text-lg">{template.name}</CardTitle>
+                                <CardDescription>{template.description}</CardDescription>
+                                <div className="flex gap-2 flex-wrap">
+                                  <Badge variant="outline">{template.complexity}</Badge>
+                                  {template.pageRange && (
+                                    <Badge variant="secondary">{template.pageRange} páginas</Badge>
+                                  )}
+                                  <Badge variant="secondary" className="font-mono">
+                                    ${template.platformCost} costo base
+                                  </Badge>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openAssignRolesDialog(template)}
+                                  disabled={isDeleting}
+                                >
+                                  <UserCog className="h-4 w-4 mr-1" />
+                                  Roles
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => openEditTemplateDialog(template)}
+                                  disabled={isDeleting}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => deleteTemplateMutation.mutate(template.id)}
+                                  disabled={deleteTemplateMutation.isPending || isDeleting}
+                                  className={isDeleting ? 'bg-red-100' : ''}
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openAssignRolesDialog(template)}
-                            >
-                              <UserCog className="h-4 w-4 mr-1" />
-                              Roles
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => openEditTemplateDialog(template)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => deleteTemplateMutation.mutate(template.id)}
-                              disabled={deleteTemplateMutation.isPending}
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      {template.features && (
-                        <CardContent className="pt-0">
-                          <p className="text-sm text-muted-foreground">{template.features}</p>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
+                          </CardHeader>
+                          {template.features && (
+                            <CardContent className="pt-0">
+                              <p className="text-sm text-muted-foreground">{template.features}</p>
+                            </CardContent>
+                          )}
+                        </Card>
+                      );
+                    })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
