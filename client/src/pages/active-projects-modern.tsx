@@ -267,105 +267,14 @@ export default function ActiveProjectsModern() {
                     </div>
                   </div>
 
-                  {/* Subproyectos Expandidos */}
-                  {isExpanded && subprojects.length > 0 && (
-                    <div className="border-t border-gray-100 bg-gray-50/50">
-                      <div className="px-6 py-4">
-                        <div className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wider">
-                          Entregables ({subprojects.length})
-                        </div>
-                        <div className="grid gap-3">
-                          {subprojects.map((subproject: any) => (
-                            <div 
-                              key={subproject.id} 
-                              className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-all"
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h4 className="font-medium text-gray-900 text-sm">
-                                      {subproject.subprojectName || `Entregable ${subproject.id}`}
-                                    </h4>
-                                    {getCompletionStatusBadge(subproject.completionStatus || 'pending')}
-                                  </div>
-                                  
-                                  <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-                                    {subproject.notes || 
-                                     (subproject.id === 5 ? 'Entregable "Ejecutivo Sony One" del programa Always-On MODO' :
-                                      subproject.id === 6 ? 'Entregable "Mensual Enero" del programa Always-On MODO' :
-                                      subproject.id === 7 ? 'Entregable "Ejecutivo Telepase" del programa Always-On MODO' :
-                                      subproject.id === 8 ? 'Entregable "Mensual Febrero" del programa Always-On MODO' :
-                                      subproject.id === 9 ? 'Entregable "Ejecutivo NFC" del programa Always-On MODO' :
-                                      subproject.id === 10 ? 'Entregable "Ejecutivo Sony One Febrero" del programa Always-On MODO' :
-                                      subproject.id === 11 ? 'Entregable "Mensual Marzo" del programa Always-On MODO' :
-                                      subproject.id === 12 ? 'Entregable "Ejecutivo 2" del programa Always-On MODO' :
-                                      subproject.id === 13 ? 'Entregable "Ejecutivo Comercios" del programa Always-On MODO' :
-                                      subproject.id === 14 ? 'Entregable "Mensual Abril" del programa Always-On MODO' :
-                                      subproject.id === 15 ? 'Entregable "Ejecutivo 1" del programa Always-On MODO' :
-                                      'Entregable del programa Always-On')}
-                                  </p>
-                                  
-                                  {/* Métricas Rápidas */}
-                                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                                    {(() => {
-                                      const registeredHours = getProjectHours(subproject.id);
-                                      const estimatedHours = 8; // Por ahora usar valor estimado fijo
-                                      const status = getProjectStatus(registeredHours, estimatedHours);
-                                      
-                                      return (
-                                        <>
-                                          <div className="flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            <span>{registeredHours}h registradas</span>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <Target className="h-3 w-3" />
-                                            <span>{estimatedHours}h estimadas</span>
-                                          </div>
-                                          <div className={`flex items-center gap-1 ${status.color}`}>
-                                            <TrendingUp className="h-3 w-3" />
-                                            <span>{status.text}</span>
-                                          </div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* Botones de Acción */}
-                              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLocation(`/time-entries/project/${subproject.id}`);
-                                  }}
-                                >
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Registrar Horas
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLocation(`/active-projects/${subproject.id}`);
-                                  }}
-                                >
-                                  <TrendingUp className="h-3 w-3 mr-1" />
-                                  Ver Métricas
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Gestión de Subproyectos */}
+                  <SubprojectManager
+                    subprojects={subprojects}
+                    parentProjectId={project.id}
+                    isExpanded={isExpanded}
+                    getProjectHours={getProjectHours}
+                    setLocation={setLocation}
+                  />
                 </CardContent>
               </Card>
             );
