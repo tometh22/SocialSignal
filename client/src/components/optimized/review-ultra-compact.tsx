@@ -23,6 +23,7 @@ const ReviewUltraCompact: React.FC = () => {
   const [deviationPercentage, setDeviationPercentage] = useState(0);
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [markupMultiplier, setMarkupMultiplier] = useState(2);
+  const [activeTab, setActiveTab] = useState<'overview' | 'team' | 'breakdown'>('overview');
 
   // Calculate step by step with correct order
   const calculateSteps = () => {
@@ -99,41 +100,211 @@ const ReviewUltraCompact: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Panel Principal - Equipo */}
-          <div className="lg:col-span-2">
+        {/* Navegación de Pestañas */}
+        <div className="bg-white rounded-lg shadow border border-gray-200 mb-4">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'overview'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Resumen y Controles
+            </button>
+            <button
+              onClick={() => setActiveTab('team')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'team'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Configuración de Equipo
+            </button>
+            <button
+              onClick={() => setActiveTab('breakdown')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'breakdown'
+                  ? 'border-blue-500 text-blue-600 bg-blue-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Desglose Detallado
+            </button>
+          </div>
+        </div>
+
+        {/* Contenido de las Pestañas */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Información del Proyecto */}
             <div className="bg-white rounded-lg shadow border border-gray-200">
               <div className="p-4 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-gray-900">Configuración del Equipo</h2>
+                <h3 className="text-lg font-semibold text-gray-900">Información del Proyecto</h3>
               </div>
-              
-              <div className="p-4">
-                {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
-                  <div className="space-y-3">
-                    {quotationData.teamMembers.map((member, index) => (
-                      <div key={member.id || index} className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
-                              <span className="text-white font-bold text-xs">
-                                {getRoleName(member.roleId).charAt(0)}
-                              </span>
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-gray-900 text-sm">{getRoleName(member.roleId)}</h3>
-                              <p className="text-gray-600 text-xs">{getPersonnelName(member.personnelId)}</p>
-                            </div>
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                    <div className="p-2 bg-gray-50 rounded border text-sm">{getClientName()}</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Plantilla</label>
+                    <div className="p-2 bg-gray-50 rounded border text-sm">{getTemplateName()}</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Costo Base del Equipo</label>
+                  <div className="p-3 bg-blue-50 rounded border text-lg font-bold text-blue-600">${baseCost.toFixed(0)}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Notas del Proyecto</label>
+                  <Textarea
+                    value={additionalNotes}
+                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                    placeholder="Agrega notas sobre el proyecto..."
+                    className="min-h-[80px]"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Controles Financieros */}
+            <div className="bg-white rounded-lg shadow border border-gray-200">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900">Controles Financieros</h3>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Multiplicador de Margen: {markupMultiplier}x</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    value={markupMultiplier}
+                    onChange={(e) => setMarkupMultiplier(parseFloat(e.target.value))}
+                    className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb 100%)`
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>1x (Sin ganancia)</span>
+                    <span>3x (200% ganancia)</span>
+                    <span>5x (400% ganancia)</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Costo Plataforma ($)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={platformCost}
+                      onChange={(e) => setPlatformCost(parseFloat(e.target.value) || 0)}
+                      className="font-mono text-right"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Desviación (%)</label>
+                    <Input
+                      type="number"
+                      min="-100"
+                      max="100"
+                      step="0.1"
+                      value={deviationPercentage}
+                      onChange={(e) => setDeviationPercentage(parseFloat(e.target.value) || 0)}
+                      className="font-mono text-right"
+                      placeholder="0.0"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descuento (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={discountPercentage}
+                      onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                      className="font-mono text-right"
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio Final ($)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={adjustedAmount || calculateFinalAmount()}
+                      onChange={handleAdjustedAmountChange}
+                      className="font-mono text-right font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-gray-900">TOTAL FINAL</span>
+                    <span className="text-2xl font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    Ganancia: ${getSteps.markupAmount.toFixed(0)} ({((getSteps.markupAmount / getSteps.step3_deviation) * 100).toFixed(0)}%)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'team' && (
+          <div className="bg-white rounded-lg shadow border border-gray-200">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Configuración del Equipo</h2>
+              <p className="text-gray-600 text-sm mt-1">Ajusta las tarifas y horas de cada miembro del equipo</p>
+            </div>
+            
+            <div className="p-4">
+              {quotationData.teamMembers && quotationData.teamMembers.length > 0 ? (
+                <div className="space-y-4">
+                  {quotationData.teamMembers.map((member, index) => (
+                    <div key={member.id || index} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                            <span className="text-white font-bold">
+                              {getRoleName(member.roleId).charAt(0)}
+                            </span>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-gray-900 text-sm">
-                              ${((member.hours || 0) * (member.rate || 0)).toFixed(0)}
-                            </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900 text-lg">{getRoleName(member.roleId)}</h3>
+                            <p className="text-gray-600">{getPersonnelName(member.personnelId)}</p>
                           </div>
                         </div>
-                        
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">$/h</label>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-gray-900">
+                            ${((member.hours || 0) * (member.rate || 0)).toFixed(0)}
+                          </div>
+                          <div className="text-sm text-gray-500">Subtotal</div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Tarifa por Hora</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                             <Input
                               type="number"
                               min="0"
@@ -147,226 +318,199 @@ const ReviewUltraCompact: React.FC = () => {
                                   cost: (member.hours || 0) * newRate
                                 });
                               }}
-                              className="h-8 text-xs font-mono text-right"
+                              className="pl-8 font-mono text-right bg-white"
                             />
                           </div>
-                          
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">hrs</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={member.hours || 0}
-                              onChange={(e) => {
-                                const newHours = parseInt(e.target.value) || 0;
-                                updateTeamMember(member.id, {
-                                  ...member,
-                                  hours: newHours,
-                                  cost: newHours * (member.rate || 0)
-                                });
-                              }}
-                              className="h-8 text-xs text-center"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">total</label>
-                            <div className="h-8 px-2 bg-gray-100 rounded border text-xs font-mono text-right flex items-center justify-end">
-                              ${((member.hours || 0) * (member.rate || 0)).toFixed(0)}
-                            </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Horas</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={member.hours || 0}
+                            onChange={(e) => {
+                              const newHours = parseInt(e.target.value) || 0;
+                              updateTeamMember(member.id, {
+                                ...member,
+                                hours: newHours,
+                                cost: newHours * (member.rate || 0)
+                              });
+                            }}
+                            className="text-center bg-white"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Costo Total</label>
+                          <div className="bg-gray-100 rounded-md px-3 py-2 font-mono font-semibold text-gray-900 text-right border">
+                            ${((member.hours || 0) * (member.rate || 0)).toFixed(0)}
                           </div>
                         </div>
                       </div>
-                    ))}
-                    
-                    <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-900">Costo Base Total</span>
-                        <span className="font-bold text-blue-600">${baseCost.toFixed(0)}</span>
-                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-300">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xl font-bold text-gray-900">Costo Base Total del Equipo</span>
+                      <span className="text-2xl font-bold text-blue-600">${baseCost.toFixed(0)}</span>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <p className="text-sm">No hay miembros del equipo configurados</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-gray-400 text-3xl">👥</span>
+                  </div>
+                  <p className="text-lg">No hay miembros del equipo configurados</p>
+                  <p className="text-sm mt-2">Ve a la configuración de equipo para agregar miembros</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'breakdown' && (
+          <div className="bg-white rounded-lg shadow border border-gray-200">
+            <div className="p-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Desglose Detallado de Costos</h2>
+              <p className="text-gray-600 text-sm mt-1">Análisis paso a paso del cálculo financiero</p>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4 border">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-gray-900">PASO 1: Costo Base + Complejidad</h3>
+                    <span className="text-xl font-bold text-gray-900">${getSteps.step1_base.toFixed(0)}</span>
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Costo del equipo:</span>
+                      <span className="font-mono">${baseCost.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Ajuste por complejidad:</span>
+                      <span className="font-mono">${complexityAdjustment.toFixed(0)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {platformCost > 0 && (
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-blue-900">PASO 2: + Costo de Plataforma</h3>
+                      <span className="text-xl font-bold text-blue-900">${getSteps.step2_platform.toFixed(0)}</span>
+                    </div>
+                    <div className="text-sm text-blue-700 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Subtotal anterior:</span>
+                        <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Costo de plataforma:</span>
+                        <span className="font-mono">+${platformCost.toFixed(0)}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
 
-          </div>
-
-          {/* Panel Lateral - Financiero */}
-          <div className="space-y-4">
-            {/* Desglose de Costos */}
-            <div className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="p-3 border-b border-gray-100">
-                <h3 className="text-base font-semibold text-gray-900">Desglose Financiero</h3>
-              </div>
-              
-              <div className="p-3">
-                <div className="space-y-3">
-                  <div className="bg-gray-50 rounded p-2">
-                    <div className="text-xs font-medium text-gray-600 mb-2">PASO 1: Base + Complejidad</div>
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal</span>
-                      <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                {deviationPercentage !== 0 && (
+                  <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-orange-900">PASO 3: + Desviación ({deviationPercentage}%)</h3>
+                      <span className="text-xl font-bold text-orange-900">${getSteps.step3_deviation.toFixed(0)}</span>
                     </div>
-                  </div>
-
-                  {platformCost > 0 && (
-                    <div className="bg-blue-50 rounded p-2">
-                      <div className="text-xs font-medium text-blue-600 mb-2">PASO 2: + Plataforma</div>
-                      <div className="flex justify-between text-sm">
-                        <span>Subtotal</span>
+                    <div className="text-sm text-orange-700 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Subtotal anterior:</span>
                         <span className="font-mono">${getSteps.step2_platform.toFixed(0)}</span>
                       </div>
-                    </div>
-                  )}
-
-                  {deviationPercentage !== 0 && (
-                    <div className="bg-orange-50 rounded p-2">
-                      <div className="text-xs font-medium text-orange-600 mb-2">PASO 3: + Desviación ({deviationPercentage}%)</div>
-                      <div className="flex justify-between text-sm">
-                        <span>Subtotal</span>
-                        <span className="font-mono">${getSteps.step3_deviation.toFixed(0)}</span>
+                      <div className="flex justify-between">
+                        <span>Desviación ({deviationPercentage}%):</span>
+                        <span className="font-mono">{deviationPercentage > 0 ? '+' : ''}${(getSteps.step2_platform * (deviationPercentage / 100)).toFixed(0)}</span>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  <div className="bg-green-50 rounded p-2">
-                    <div className="text-xs font-medium text-green-600 mb-2">PASO 4: × Markup ({markupMultiplier}x)</div>
-                    <div className="flex justify-between text-sm">
-                      <span>Ganancia</span>
-                      <span className="font-mono text-green-700">+${getSteps.markupAmount.toFixed(0)}</span>
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-green-900">PASO 4: × Multiplicador de Margen ({markupMultiplier}x)</h3>
+                    <span className="text-xl font-bold text-green-900">${getSteps.step4_markup.toFixed(0)}</span>
+                  </div>
+                  <div className="text-sm text-green-700 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Base para markup:</span>
+                      <span className="font-mono">${getSteps.step3_deviation.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-semibold">
-                      <span>Subtotal</span>
-                      <span className="font-mono">${getSteps.step4_markup.toFixed(0)}</span>
+                    <div className="flex justify-between">
+                      <span>Multiplicador aplicado:</span>
+                      <span className="font-mono">×{markupMultiplier}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Ganancia generada:</span>
+                      <span className="font-mono">+${getSteps.markupAmount.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span>Margen de ganancia:</span>
+                      <span className="font-mono">{((getSteps.markupAmount / getSteps.step3_deviation) * 100).toFixed(0)}%</span>
                     </div>
                   </div>
+                </div>
 
-                  {discountPercentage > 0 && (
-                    <div className="bg-red-50 rounded p-2">
-                      <div className="text-xs font-medium text-red-600 mb-2">PASO 5: - Descuento ({discountPercentage}%)</div>
-                      <div className="flex justify-between text-sm">
-                        <span>Descuento</span>
-                        <span className="font-mono text-red-700">-${(getSteps.step4_markup * (discountPercentage / 100)).toFixed(0)}</span>
+                {discountPercentage > 0 && (
+                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-red-900">PASO 5: - Descuento ({discountPercentage}%)</h3>
+                      <span className="text-xl font-bold text-red-900">${getSteps.step5_discount.toFixed(0)}</span>
+                    </div>
+                    <div className="text-sm text-red-700 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Subtotal antes de descuento:</span>
+                        <span className="font-mono">${getSteps.step4_markup.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Descuento ({discountPercentage}%):</span>
+                        <span className="font-mono">-${(getSteps.step4_markup * (discountPercentage / 100)).toFixed(0)}</span>
                       </div>
                     </div>
-                  )}
-                  
-                  <div className="bg-blue-100 rounded-lg p-3 border-2 border-blue-300">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-900">TOTAL FINAL</span>
-                      <span className="text-lg font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
+                  </div>
+                )}
+                
+                <div className="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-6 border-2 border-blue-300">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900">PRECIO FINAL</h3>
+                    <span className="text-3xl font-bold text-blue-600">${calculateFinalAmount().toFixed(0)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span>Costo base total:</span>
+                        <span className="font-mono">${getSteps.step1_base.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Ganancia obtenida:</span>
+                        <span className="font-mono">${getSteps.markupAmount.toFixed(0)}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span>Margen de ganancia:</span>
+                        <span className="font-mono">{((getSteps.markupAmount / getSteps.step3_deviation) * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>ROI sobre costo base:</span>
+                        <span className="font-mono">{((getSteps.markupAmount / getSteps.step1_base) * 100).toFixed(0)}%</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Panel de Ajustes */}
-            <div className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="p-3 border-b border-gray-100">
-                <h3 className="text-base font-semibold text-gray-900">Controles Financieros</h3>
-              </div>
-              
-              <div className="p-3 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Multiplicador de Margen: {markupMultiplier}x</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="5"
-                    step="0.1"
-                    value={markupMultiplier}
-                    onChange={(e) => setMarkupMultiplier(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    style={{
-                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb ${((markupMultiplier - 1) / 4) * 100}%, #e5e7eb 100%)`
-                    }}
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>1x</span>
-                    <span>2.5x</span>
-                    <span>5x</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Define la ganancia sobre costo base</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Costo Plataforma ($)</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={platformCost}
-                    onChange={(e) => setPlatformCost(parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs font-mono text-right"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Desviación (%)</label>
-                  <Input
-                    type="number"
-                    min="-100"
-                    max="100"
-                    step="0.1"
-                    value={deviationPercentage}
-                    onChange={(e) => setDeviationPercentage(parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs font-mono text-right"
-                    placeholder="0.0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Descuento (%)</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={discountPercentage}
-                    onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs font-mono text-right"
-                    placeholder="0.0"
-                  />
-                </div>
-
-                <div className="border-t border-gray-200 pt-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Ajuste Manual Final ($)</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={adjustedAmount || calculateFinalAmount()}
-                    onChange={handleAdjustedAmountChange}
-                    className="h-8 text-xs font-mono text-right"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Notas */}
-            <div className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="p-3 border-b border-gray-100">
-                <h3 className="text-base font-semibold text-gray-900">Notas</h3>
-              </div>
-              <div className="p-3">
-                <Textarea
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
-                  placeholder="Notas del proyecto..."
-                  className="min-h-[60px] text-xs"
-                  rows={3}
-                />
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
