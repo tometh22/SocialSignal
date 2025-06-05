@@ -463,6 +463,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteReportTemplate(id: number): Promise<boolean> {
+    // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
+    await db.delete(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, id));
+    
+    // Luego eliminar la plantilla
     await db.delete(reportTemplates).where(eq(reportTemplates.id, id));
     const template = await db.select().from(reportTemplates).where(eq(reportTemplates.id, id));
     return template.length === 0;
