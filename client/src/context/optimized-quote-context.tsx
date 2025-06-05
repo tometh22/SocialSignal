@@ -901,6 +901,63 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     }
   }, [quotationData.template]);
 
+  // Recalcular valores financieros cuando cambian los factores
+  useEffect(() => {
+    // Calcular el ajuste de complejidad
+    const totalComplexityFactor = complexityFactors.analysisTypeFactor + 
+                                 complexityFactors.mentionsVolumeFactor + 
+                                 complexityFactors.countriesFactor + 
+                                 complexityFactors.clientEngagementFactor + 
+                                 complexityFactors.templateFactor;
+    
+    const adjustment = baseCost * totalComplexityFactor;
+    setComplexityAdjustment(adjustment);
+
+    // Calcular el costo base total (base + complejidad)
+    const totalBaseCost = baseCost + adjustment;
+    
+    // Aplicar el multiplicador de margen desde financials
+    const marginMultiplier = quotationData.financials.marginFactor || 1.0;
+    const calculatedMarkup = totalBaseCost * (marginMultiplier - 1.0);
+    
+    // Calcular el total sin descuentos ni desviaciones
+    const subtotalWithMarkup = totalBaseCost + calculatedMarkup;
+    
+    // Aplicar costo de plataforma
+    const platformCost = quotationData.financials.platformCost || 0;
+    const subtotalWithPlatform = subtotalWithMarkup + platformCost;
+    
+    // Aplicar desviación
+    const deviationPercentage = quotationData.financials.deviationPercentage || 0;
+    const subtotalWithDeviation = subtotalWithPlatform + (subtotalWithPlatform * (deviationPercentage / 100));
+    
+    // Aplicar descuento
+    const discountPercentage = quotationData.financials.discount || 0;
+    const finalTotal = subtotalWithDeviation * (1 - (discountPercentage / 100));
+    
+    setMarkupAmount(calculatedMarkup);
+    setTotalAmount(finalTotal);
+    
+    console.log("Recálculo financiero:", {
+      baseCost,
+      adjustment,
+      totalBaseCost,
+      marginMultiplier,
+      calculatedMarkup,
+      platformCost,
+      deviationPercentage,
+      discountPercentage,
+      finalTotal
+    });
+  }, [
+    baseCost, 
+    complexityFactors, 
+    quotationData.financials.marginFactor,
+    quotationData.financials.platformCost,
+    quotationData.financials.deviationPercentage,
+    quotationData.financials.discount
+  ]);
+
   // Variable para rastrear si hay una operación de guardado en progreso
   const [isSavingInProgress, setIsSavingInProgress] = useState(false);
 
@@ -947,6 +1004,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         baseCost: number;
         complexityAdjustment: number;
         markupAmount: number;
+        platformCost: number;
+        deviationPercentage: number;
+        discountPercentage: number;
         totalAmount: number;
         adjustmentReason: string;
         additionalNotes: string;
@@ -966,6 +1026,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         baseCost: baseCost,
         complexityAdjustment: complexityAdjustment,
         markupAmount: markupAmount,
+        platformCost: quotationData.financials.platformCost || 0,
+        deviationPercentage: quotationData.financials.deviationPercentage || 0,
+        discountPercentage: quotationData.financials.discount || 0,
         totalAmount: totalAmount,
         adjustmentReason: `Descuento: ${quotationData.financials.discount}%, Desviación: ${quotationData.financials.deviationPercentage}%`,
         additionalNotes: quotationData.template === null 
@@ -1726,6 +1789,13 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     updateTeamMember,
     removeTeamMember,
     applyRecommendedTeam,
+    // Métodos Always-On (stubs para compatibilidad)
+    setIsAlwaysOnProject: () => {},
+    updateDeliverables: () => {},
+    addDeliverable: () => {},
+    updateDeliverable: () => {},
+    removeDeliverable: () => {},
+    updateAdditionalDeliverableCost: () => {},
     updateFinancials,
     saveQuotation,
     currentStep,
