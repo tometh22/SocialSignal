@@ -14,12 +14,13 @@ import {
   type Deliverable, type InsertDeliverable,
   type ClientModoComment, type InsertClientModoComment,
   type QuarterlyNpsSurvey, type InsertQuarterlyNpsSurvey,
+  type CostMultiplier, type InsertCostMultiplier,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
-  deliverables, clientModoComments
+  deliverables, clientModoComments, costMultipliers
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
@@ -165,6 +166,14 @@ export interface IStorage {
   createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey>;
   updateNpsSurvey(id: number, survey: Partial<InsertQuarterlyNpsSurvey>): Promise<QuarterlyNpsSurvey | undefined>;
   deleteNpsSurvey(id: number): Promise<boolean>;
+
+  // Cost Multiplier operations
+  getCostMultipliers(): Promise<CostMultiplier[]>;
+  getCostMultipliersByCategory(category: string): Promise<CostMultiplier[]>;
+  getCostMultiplier(id: number): Promise<CostMultiplier | undefined>;
+  updateCostMultiplier(id: number, multiplier: Partial<InsertCostMultiplier>): Promise<CostMultiplier | undefined>;
+  createCostMultiplier(multiplier: InsertCostMultiplier): Promise<CostMultiplier>;
+  deleteCostMultiplier(id: number): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -1361,6 +1370,57 @@ export class DatabaseStorage implements IStorage {
       return true;
     } catch (error) {
       console.error("Error al eliminar miembro del equipo por ID:", error);
+      return false;
+    }
+  }
+
+  // ==================== MULTIPLICADORES DE COSTOS ====================
+  
+  async getCostMultipliers(): Promise<CostMultiplier[]> {
+    return await db.select().from(costMultipliers).orderBy(costMultipliers.category, costMultipliers.subcategory);
+  }
+
+  async getCostMultipliersByCategory(category: string): Promise<CostMultiplier[]> {
+    return await db.select().from(costMultipliers)
+      .where(and(eq(costMultipliers.category, category), eq(costMultipliers.isActive, true)))
+      .orderBy(costMultipliers.subcategory);
+  }
+
+  async getCostMultiplier(id: number): Promise<CostMultiplier | undefined> {
+    const [multiplier] = await db.select().from(costMultipliers).where(eq(costMultipliers.id, id));
+    return multiplier || undefined;
+  }
+
+  async updateCostMultiplier(id: number, multiplier: Partial<InsertCostMultiplier>): Promise<CostMultiplier | undefined> {
+    try {
+      const updateData = {
+        ...multiplier,
+        updatedAt: new Date(),
+      };
+      
+      const [updated] = await db.update(costMultipliers)
+        .set(updateData)
+        .where(eq(costMultipliers.id, id))
+        .returning();
+        
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error al actualizar multiplicador de costo:", error);
+      return undefined;
+    }
+  }
+
+  async createCostMultiplier(multiplier: InsertCostMultiplier): Promise<CostMultiplier> {
+    const [created] = await db.insert(costMultipliers).values(multiplier).returning();
+    return created;
+  }
+
+  async deleteCostMultiplier(id: number): Promise<boolean> {
+    try {
+      await db.delete(costMultipliers).where(eq(costMultipliers.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar multiplicador de costo:", error);
       return false;
     }
   }

@@ -171,6 +171,30 @@ export const insertTemplateRoleAssignmentSchema = createInsertSchema(templateRol
   id: true,
 });
 
+// ==================== MULTIPLICADORES DE COSTOS ====================
+// Tabla para gestionar los multiplicadores de costos del sistema de cotización
+export const costMultipliers = pgTable("cost_multipliers", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(), // 'complexity', 'mentions_volume', 'countries', 'urgency', etc.
+  subcategory: text("subcategory").notNull(), // 'basic', 'standard', 'advanced', etc.
+  multiplier: doublePrecision("multiplier").notNull().default(1.0), // valor del multiplicador
+  label: text("label").notNull(), // etiqueta descriptiva para mostrar en UI
+  description: text("description"), // descripción opcional
+  isActive: boolean("is_active").notNull().default(true), // para desactivar sin eliminar
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+export const insertCostMultiplierSchema = createInsertSchema(costMultipliers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CostMultiplier = typeof costMultipliers.$inferSelect;
+export type InsertCostMultiplier = z.infer<typeof insertCostMultiplierSchema>;
+
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
 export const activeProjects = pgTable("active_projects", {
@@ -465,6 +489,11 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export const chatParticipantsRelations = relations(chatConversationParticipants, ({ one }) => ({
   conversation: one(chatConversations, { fields: [chatConversationParticipants.conversationId], references: [chatConversations.id] }),
   user: one(users, { fields: [chatConversationParticipants.userId], references: [users.id] }),
+}));
+
+// Relaciones de multiplicadores de costos
+export const costMultipliersRelations = relations(costMultipliers, ({ one }) => ({
+  updater: one(users, { fields: [costMultipliers.updatedBy], references: [users.id] }),
 }));
 
 // ==================== CONSTANTES Y OPCIONES ====================
