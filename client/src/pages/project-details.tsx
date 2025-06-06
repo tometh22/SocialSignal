@@ -72,6 +72,12 @@ export default function ProjectDetails() {
     enabled: !!projectId,
   });
 
+  const { data: personnel = [] } = useQuery({
+    queryKey: ["/api/personnel"],
+  });
+
+
+
   // Mutaciones para actualizar el proyecto
   const updateProjectMutation = useMutation({
     mutationFn: async (data: { name?: string; status?: string; description?: string }) => {
@@ -322,6 +328,19 @@ export default function ProjectDetails() {
             )}
           </CardContent>
         </Card>
+
+        {/* Sistema de Alertas de Eficiencia para Subproyectos */}
+        {isSubproject && timeEntries.length > 0 && (
+          <div className="mb-8">
+            <SubprojectAlerts
+              timeEntries={timeEntries}
+              personnel={personnel || []}
+              estimatedHours={estimatedHours}
+              projectStartDate={projectData?.startDate?.toString()}
+              clientSubprojects={[]}
+            />
+          </div>
+        )}
 
         {/* Grid Principal */}
         <div className="grid gap-6 lg:grid-cols-2">
