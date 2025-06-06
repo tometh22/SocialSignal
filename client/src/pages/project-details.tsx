@@ -1,12 +1,19 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TimeEntryForm from "@/components/time-entry-form";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
   Calendar,
@@ -24,14 +31,24 @@ import {
   Activity,
   BarChart3,
   Edit,
-  AlertCircle
+  AlertCircle,
+  Save,
+  X,
+  CheckCircle,
+  Pause,
+  Play
 } from "lucide-react";
 
 export default function ProjectDetails() {
   const [match, params] = useRoute("/active-projects/:id");
   const projectId = params?.id;
   const [showTimeEntryForm, setShowTimeEntryForm] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [editingName, setEditingName] = useState("");
+  const [editingStatus, setEditingStatus] = useState("");
+  const [editingDescription, setEditingDescription] = useState("");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: project, isLoading } = useQuery({
     queryKey: ["/api/active-projects", projectId],
@@ -53,6 +70,44 @@ export default function ProjectDetails() {
     queryFn: () => fetch(`/api/time-entries/project/${projectId}`).then(res => res.json()),
     enabled: !!projectId,
   });
+
+  // Mutaciones para actualizar el proyecto
+  const updateProjectMutation = useMutation({
+    mutationFn: async (data: { name?: string; status?: string; description?: string }) => {
+      return apiRequest(`/api/active-projects/${projectId}/update`, "PATCH", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+      setShowSettingsDialog(false);
+      toast({
+        title: "Éxito",
+        description: "Proyecto actualizado correctamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el proyecto.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenSettings = () => {
+    const projectData = allProjects.find((p: any) => p.id === parseInt(projectId!));
+    setEditingName(getProjectName(projectData?.id || parseInt(projectId!)));
+    setEditingStatus(projectData?.completionStatus || "pending");
+    setEditingDescription(projectData?.description || "");
+    setShowSettingsDialog(true);
+  };
+
+  const handleSaveSettings = () => {
+    updateProjectMutation.mutate({
+      name: editingName,
+      status: editingStatus,
+      description: editingDescription,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -182,7 +237,7 @@ export default function ProjectDetails() {
                 <BarChart3 className="h-5 w-5 mr-2" />
                 Ver Análisis
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={handleOpenSettings}>
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
@@ -386,6 +441,163 @@ export default function ProjectDetails() {
           }
         }}
       />
+
+      {/* Diálogo de Configuración del Proyecto */}
+      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configuración del Proyecto
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Información básica */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="project-name" className="text-sm font-medium">
+                  Nombre del Proyecto
+                </Label>
+                <Input
+                  id="project-name"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  className="mt-1"
+                  placeholder="Nombre del entregable"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="project-status" className="text-sm font-medium">
+                  Estado del Proyecto
+                </Label>
+                <Select value={editingStatus} onValueChange={setEditingStatus}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        Pendiente
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in_progress">
+                      <div className="flex items-center gap-2">
+                        <Play className="h-4 w-4 text-blue-500" />
+                        En Progreso
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="completed">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        Completado
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="paused">
+                      <div className="flex items-center gap-2">
+                        <Pause className="h-4 w-4 text-orange-500" />
+                        Pausado
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cancelled">
+                      <div className="flex items-center gap-2">
+                        <X className="h-4 w-4 text-red-500" />
+                        Cancelado
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="project-description" className="text-sm font-medium">
+                  Descripción
+                </Label>
+                <Textarea
+                  id="project-description"
+                  value={editingDescription}
+                  onChange={(e) => setEditingDescription(e.target.value)}
+                  className="mt-1"
+                  placeholder="Descripción del entregable y sus objetivos..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            {/* Información del proyecto padre */}
+            {isSubproject && parentProject && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">Proyecto Padre</span>
+                </div>
+                <p className="text-sm text-blue-700">
+                  Este entregable forma parte del proyecto: <strong>{getProjectName(parentProject.id)}</strong>
+                </p>
+              </div>
+            )}
+
+            {/* Acciones rápidas */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-900">Acciones Rápidas</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowSettingsDialog(false);
+                    setShowTimeEntryForm(true);
+                  }}
+                  className="justify-start"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Registrar Tiempo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowSettingsDialog(false);
+                    window.location.href = `/time-entries/project/${projectId}`;
+                  }}
+                  className="justify-start"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Ver Análisis
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-6 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSettingsDialog(false)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveSettings}
+              disabled={updateProjectMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {updateProjectMutation.isPending ? (
+                <>
+                  <Timer className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Cambios
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
