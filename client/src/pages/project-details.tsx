@@ -253,88 +253,100 @@ export default function ProjectDetails() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Panel de Métricas Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Horas Registradas</p>
-                  <p className="text-2xl font-bold">{totalHours}h</p>
+      <div className="max-w-7xl mx-auto p-6">
+        {/* SECCIÓN 1: ESTADO Y PROGRESO */}
+        <div className="grid gap-6 mb-8">
+          {/* Panel de Estado Principal */}
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Progreso Visual Prominente */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-bold text-gray-900">Progreso del Entregable</h3>
+                      <Badge variant={progress > 100 ? "destructive" : progress > 80 ? "secondary" : "default"}>
+                        {Math.round(progress)}%
+                      </Badge>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div 
+                        className={`h-4 rounded-full transition-all duration-500 ${
+                          progress > 100 ? 'bg-red-500' : progress > 80 ? 'bg-orange-500' : 'bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-600 mt-1">
+                      <span>{totalHours}h registradas</span>
+                      <span>{estimatedHours}h estimadas</span>
+                    </div>
+                    {progress > 100 && (
+                      <div className="flex items-center gap-2 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                        <span className="text-sm font-medium text-red-700">
+                          Subproyecto excedido en {Math.round(progress - 100)}% - Requiere atención
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <Clock className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Horas Estimadas</p>
-                  <p className="text-2xl font-bold">{estimatedHours}h</p>
+
+                {/* Métricas Clave */}
+                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+                  <div className="bg-white p-4 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Horas Totales</p>
+                        <p className="text-2xl font-bold text-blue-600">{totalHours}h</p>
+                      </div>
+                      <Clock className="h-8 w-8 text-blue-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Costo Actual</p>
+                        <p className="text-2xl font-bold text-green-600">${totalCost.toFixed(0)}</p>
+                      </div>
+                      <DollarSign className="h-8 w-8 text-green-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Límite PM</p>
+                        <p className="text-2xl font-bold text-orange-600">{estimatedHours}h</p>
+                      </div>
+                      <Target className="h-8 w-8 text-orange-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Eficiencia</p>
+                        <p className={`text-2xl font-bold ${progress <= 100 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {progress <= 100 ? 'Óptima' : 'Riesgo'}
+                        </p>
+                      </div>
+                      <TrendingUp className={`h-8 w-8 ${progress <= 100 ? 'text-emerald-500' : 'text-red-500'}`} />
+                    </div>
+                  </div>
                 </div>
-                <Target className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Progreso</p>
-                  <p className="text-2xl font-bold">{Math.round(progress)}%</p>
-                </div>
-                <TrendingUp className={`h-8 w-8 ${progress > 100 ? 'text-red-500' : 'text-emerald-500'}`} />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Costo Actual</p>
-                  <p className="text-2xl font-bold">${totalCost.toFixed(0)}</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-orange-500" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Barra de Progreso Visual */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold">Progreso del Entregable</h3>
-              <span className="text-sm text-muted-foreground">{totalHours}h de {estimatedHours}h</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className={`h-3 rounded-full transition-all duration-500 ${
-                  progress > 100 ? 'bg-red-500' : progress > 80 ? 'bg-orange-500' : 'bg-blue-500'
-                }`}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              ></div>
-            </div>
-            {progress > 100 && (
-              <div className="flex items-center gap-2 mt-2 text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">Proyecto excedido en {Math.round(progress - 100)}%</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Sistema de Alertas de Eficiencia para Subproyectos */}
-        {isSubproject && timeEntries.length > 0 && (
+        {/* SECCIÓN 2: ALERTAS DE EFICIENCIA (Solo para subproyectos) */}
+        {isSubproject && timeEntries.length > 0 && Array.isArray(personnel) && (
           <div className="mb-8">
             <SubprojectAlerts
               timeEntries={timeEntries}
-              personnel={personnel || []}
+              personnel={personnel}
               estimatedHours={estimatedHours}
               projectStartDate={projectData?.startDate?.toString()}
               clientSubprojects={[]}
@@ -342,11 +354,13 @@ export default function ProjectDetails() {
           </div>
         )}
 
-        {/* Grid Principal */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Registros de Tiempo */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+        {/* SECCIÓN 3: OPERACIONES Y DATOS */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* COLUMNA 1: Registros de Tiempo y Acciones */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Registros de Tiempo */}
+            <Card className="h-fit">
+              <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5" />
                 Registros de Tiempo
@@ -405,48 +419,123 @@ export default function ProjectDetails() {
                 </div>
               )}
             </CardContent>
-          </Card>
+            </Card>
+          </div>
 
-          {/* Información del Proyecto */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Información del Entregable
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Frecuencia:</span>
-                  <span className="text-sm font-medium">Mensual</span>
+          {/* COLUMNA 2: Información del Proyecto y Acciones */}
+          <div className="space-y-6">
+            {/* Información del Proyecto */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Información del Entregable
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Frecuencia:</span>
+                    <span className="text-sm font-medium">Mensual</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Tipo:</span>
+                    <span className="text-sm font-medium">Ejecutivo</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Fecha inicio:</span>
+                    <span className="text-sm font-medium">
+                      {projectData?.startDate ? new Date(projectData.startDate).toLocaleDateString('es-ES') : 'No definida'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Estado:</span>
+                    {getCompletionStatusBadge(projectData?.completionStatus || "in_progress")}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Tipo:</span>
-                  <span className="text-sm font-medium">Ejecutivo</span>
+                
+                <Separator />
+                
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Descripción</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {projectData?.notes || `Entregable "${getProjectName(projectData?.id || parseInt(projectId!))}" del programa Always-On MODO`}
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Fecha inicio:</span>
-                  <span className="text-sm font-medium">
-                    {project.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'No definida'}
-                  </span>
+              </CardContent>
+            </Card>
+
+            {/* Panel de Acciones Rápidas */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Acciones Rápidas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => setShowTimeEntryForm(true)}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Registrar Tiempo
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => window.location.href = `/time-entries/project/${projectId}`}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Ver Análisis Detallado
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={handleOpenSettings}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configurar Proyecto
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Resumen Ejecutivo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Resumen Ejecutivo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {timeEntries.length}
+                  </div>
+                  <div className="text-sm text-gray-600">Entradas de Tiempo</div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Estado:</span>
-                  {getCompletionStatusBadge(project.completionStatus || "in_progress")}
+                
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="text-lg font-bold text-blue-600">
+                      {Math.round((totalHours / estimatedHours) * 100)}%
+                    </div>
+                    <div className="text-xs text-blue-600">Completado</div>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <div className="text-lg font-bold text-green-600">
+                      ${(totalCost / totalHours || 0).toFixed(0)}
+                    </div>
+                    <div className="text-xs text-green-600">Costo/Hora</div>
+                  </div>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h4 className="text-sm font-medium mb-2">Descripción</h4>
-                <p className="text-sm text-muted-foreground">
-                  {project.notes || `Entregable "${getProjectName(projectData?.id || parseInt(projectId!))}" del programa Always-On MODO`}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
