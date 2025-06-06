@@ -164,15 +164,16 @@ export default function ProjectDetails() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getCompletionStatusBadge = (status: string) => {
     const config = {
-      "active": { className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100", label: "Activo" },
-      "en_progreso": { className: "bg-blue-100 text-blue-700 hover:bg-blue-100", label: "En Progreso" },
+      "pending": { className: "bg-gray-100 text-gray-700 hover:bg-gray-100", label: "Pendiente" },
+      "in_progress": { className: "bg-blue-100 text-blue-700 hover:bg-blue-100", label: "En Progreso" },
+      "completed": { className: "bg-green-100 text-green-700 hover:bg-green-100", label: "Completado" },
       "paused": { className: "bg-amber-100 text-amber-700 hover:bg-amber-100", label: "Pausado" },
-      "completed": { className: "bg-gray-100 text-gray-700 hover:bg-gray-100", label: "Completado" }
+      "cancelled": { className: "bg-red-100 text-red-700 hover:bg-red-100", label: "Cancelado" }
     };
     
-    const statusConfig = config[status as keyof typeof config] || config.active;
+    const statusConfig = config[status as keyof typeof config] || config.pending;
     
     return (
       <Badge variant="secondary" className={`text-sm font-medium px-3 py-1 ${statusConfig.className}`}>
@@ -210,7 +211,7 @@ export default function ProjectDetails() {
                   </p>
                 )}
                 <div className="flex items-center gap-4 mt-2">
-                  {getStatusBadge(projectData?.status || "active")}
+                  {getCompletionStatusBadge(projectData?.completionStatus || "in_progress")}
                   <Badge variant="outline" className="text-xs">
                     <Building2 className="h-3 w-3 mr-1" />
                     MODO
@@ -412,7 +413,7 @@ export default function ProjectDetails() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Estado:</span>
-                  {getStatusBadge(project.status || "active")}
+                  {getCompletionStatusBadge(project.completionStatus || "in_progress")}
                 </div>
               </div>
               
