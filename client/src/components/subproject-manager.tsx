@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp, Play, Pause } from "lucide-react";
+import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp, PlayCircle, PauseCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -312,7 +312,7 @@ export function SubprojectManager({
                 onClick={() => setNewStatus("in_progress")}
                 className="justify-start h-12"
               >
-                <Play className="h-4 w-4 mr-2 text-blue-500" />
+                <TrendingUp className="h-4 w-4 mr-2 text-blue-500" />
                 <div className="text-left">
                   <div className="font-medium">En Progreso</div>
                   <div className="text-xs text-gray-500">Trabajando</div>
@@ -336,7 +336,7 @@ export function SubprojectManager({
                 onClick={() => setNewStatus("paused")}
                 className="justify-start h-12"
               >
-                <Pause className="h-4 w-4 mr-2 text-orange-500" />
+                <Calendar className="h-4 w-4 mr-2 text-orange-500" />
                 <div className="text-left">
                   <div className="font-medium">Pausado</div>
                   <div className="text-xs text-gray-500">En espera</div>
