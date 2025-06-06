@@ -4,8 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
-import { Edit, Save, X, Check, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Edit, Save, X, Check, AlertTriangle, Plus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateCostMultipliersCache, loadCostMultipliers } from "@/lib/calculation";
@@ -22,16 +29,68 @@ interface CostMultiplier {
   updatedAt: string;
 }
 
+// Schema de validación para crear multiplicadores
+const createMultiplierSchema = z.object({
+  category: z.string().min(1, "La categoría es requerida"),
+  subcategory: z.string().min(1, "La subcategoría es requerida"),
+  multiplier: z.number().min(0.1, "El multiplicador debe ser mayor a 0.1").max(10, "El multiplicador no puede ser mayor a 10"),
+  label: z.string().min(1, "El nombre es requerido"),
+  description: z.string().optional()
+});
+
 export function CostMultipliersManager() {
   const [editingMultiplier, setEditingMultiplier] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [updatingMultipliers, setUpdatingMultipliers] = useState<Set<number>>(new Set());
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Form para crear multiplicadores
+  const createForm = useForm<z.infer<typeof createMultiplierSchema>>({
+    resolver: zodResolver(createMultiplierSchema),
+    defaultValues: {
+      category: "",
+      subcategory: "",
+      multiplier: 1,
+      label: "",
+      description: ""
+    }
+  });
+
   const { data: multipliers = [], isLoading } = useQuery<CostMultiplier[]>({
     queryKey: ["/api/cost-multipliers"],
+  });
+
+  // Mutación para crear multiplicadores
+  const createMultiplierMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof createMultiplierSchema>) => {
+      return apiRequest("/api/cost-multipliers", "POST", data);
+    },
+    onSuccess: () => {
+      // Invalidar caché de multiplicadores
+      invalidateCostMultipliersCache();
+      
+      // Refrescar datos
+      queryClient.invalidateQueries({ queryKey: ["/api/cost-multipliers"] });
+      
+      // Cerrar diálogo y limpiar form
+      setCreateDialogOpen(false);
+      createForm.reset();
+      
+      toast({
+        title: "Multiplicador creado",
+        description: "El nuevo multiplicador se ha agregado correctamente y está disponible en el cotizador.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo crear el multiplicador.",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateMultiplierMutation = useMutation({
@@ -125,6 +184,19 @@ export function CostMultipliersManager() {
     return colors[category] || "bg-gray-100 text-gray-800";
   };
 
+  const handleCreateSubmit = (data: z.infer<typeof createMultiplierSchema>) => {
+    createMultiplierMutation.mutate(data);
+  };
+
+  // Opciones de categorías disponibles
+  const categoryOptions = [
+    { value: "complexity", label: "Complejidad" },
+    { value: "mentions_volume", label: "Volumen de Menciones" },
+    { value: "countries", label: "Países Cubiertos" },
+    { value: "urgency", label: "Urgencia" },
+    { value: "project_type", label: "Tipo de Proyecto" },
+  ];
+
   const handleEditClick = (multiplier: CostMultiplier) => {
     setEditingMultiplier(multiplier.id);
     setEditingValue(multiplier.multiplier.toString());
@@ -172,6 +244,145 @@ export function CostMultipliersManager() {
 
   return (
     <div className="space-y-6">
+      {/* Botón para agregar nuevo multiplicador */}
+      <div className="flex justify-end">
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Añadir Multiplicador
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Multiplicador</DialogTitle>
+              <DialogDescription>
+                Agrega un nuevo multiplicador que estará disponible en el sistema de cotización.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...createForm}>
+              <form onSubmit={createForm.handleSubmit(handleCreateSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoría</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona una categoría" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categoryOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="subcategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subcategoría (Clave)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="ej. premium, custom, etc." 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createForm.control}
+                    name="label"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre (Etiqueta)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="ej. Análisis Premium" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="multiplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Multiplicador</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.1"
+                            max="10"
+                            placeholder="1.25"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={createForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripción (Opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe cuándo se usa este multiplicador..." 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setCreateDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createMultiplierMutation.isPending}
+                  >
+                    {createMultiplierMutation.isPending ? "Creando..." : "Crear Multiplicador"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
       {Object.entries(groupedMultipliers).map(([category, categoryMultipliers]) => (
         <div key={category} className="space-y-4">
           <div className="flex items-center gap-3">

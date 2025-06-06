@@ -920,10 +920,6 @@ export default function Admin() {
                   <CardTitle className="heading-card">Multiplicadores de Costos</CardTitle>
                   <CardDescription>Gestiona los multiplicadores que se usan en el sistema de cotización</CardDescription>
                 </div>
-                <Button>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Añadir Multiplicador
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="card-content">
