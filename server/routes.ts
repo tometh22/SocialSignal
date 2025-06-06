@@ -1175,6 +1175,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Actualizar proyecto completo (nombre, estado, descripción)
+  app.patch("/api/active-projects/:id/update", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      const { name, status, description } = req.body;
+      const updateData: any = {};
+      
+      if (name && name.trim().length > 0) {
+        updateData.subprojectName = name.trim();
+      }
+      
+      if (status) {
+        const validStatuses = ["pending", "in_progress", "completed", "paused", "cancelled"];
+        if (!validStatuses.includes(status)) {
+          return res.status(400).json({ message: "Invalid status" });
+        }
+        updateData.completionStatus = status;
+        
+        if (status === "completed") {
+          updateData.completedDate = new Date();
+        } else if (status !== "completed") {
+          updateData.completedDate = null;
+        }
+      }
+      
+      if (description !== undefined) {
+        updateData.description = description;
+      }
+      
+      const updatedProject = await storage.updateActiveProject(id, updateData);
+      
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error updating project:", error);
+      res.status(500).json({ message: "Failed to update project" });
+    }
+  });
+
   // Actualizar nombre de subproyecto
   app.patch("/api/active-projects/:id/name", async (req, res) => {
     const id = parseInt(req.params.id);
