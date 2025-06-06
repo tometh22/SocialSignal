@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Edit, Save, X, Check, AlertTriangle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateCostMultipliersCache, loadCostMultipliers } from "@/lib/calculation";
 
 interface CostMultiplier {
   id: number;

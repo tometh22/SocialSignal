@@ -9,7 +9,8 @@ import {
   getMentionsVolumeFactor, 
   getCountriesFactor, 
   getClientEngagementFactor,
-  getTemplateFactor
+  getTemplateFactor,
+  loadCostMultipliers
 } from '@/lib/calculation';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -900,6 +901,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       console.log("Modo personalizado: estableciendo costo base predeterminado de 1000");
     }
   }, [quotationData.template]);
+
+  // Cargar multiplicadores de costos al inicializar el contexto
+  useEffect(() => {
+    loadCostMultipliers();
+  }, []);
 
   // Recalcular valores financieros cuando cambian los factores
   useEffect(() => {

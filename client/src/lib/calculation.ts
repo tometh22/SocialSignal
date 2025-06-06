@@ -6,75 +6,108 @@ export interface ComplexityFactors {
   templateFactor: number;
 }
 
-export const getAnalysisTypeFactor = (analysisType: string): number => {
-  switch (analysisType) {
-    case "basic":
-      return 0;
-    case "standard":
-      return 0.1; // +10% - Metodología estándar requiere más recursos técnicos
-    case "deep":
-      return 0.15; // +15% - Metodología avanzada requiere herramientas y técnicas especializadas
-    default:
-      return 0;
+// Cache para multiplicadores - se actualiza cada vez que se cargan
+let multiplierCache: Record<string, Record<string, number>> = {};
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+// Función para cargar multiplicadores desde la API
+export const loadCostMultipliers = async (forceReload = false): Promise<void> => {
+  const now = Date.now();
+  
+  // Si el caché es reciente y no se fuerza la recarga, usar caché
+  if (!forceReload && (now - cacheTimestamp) < CACHE_DURATION && Object.keys(multiplierCache).length > 0) {
+    console.log('Usando multiplicadores del caché');
+    return;
   }
+  
+  try {
+    const response = await fetch('/api/cost-multipliers');
+    if (!response.ok) {
+      throw new Error('Failed to fetch cost multipliers');
+    }
+    
+    const multipliers = await response.json();
+    
+    // Organizar multiplicadores por categoría y subcategoría
+    multiplierCache = {};
+    multipliers.forEach((m: any) => {
+      if (!multiplierCache[m.category]) {
+        multiplierCache[m.category] = {};
+      }
+      if (m.isActive) {
+        multiplierCache[m.category][m.subcategory] = m.multiplier;
+      }
+    });
+    
+    cacheTimestamp = now;
+    console.log('Multiplicadores cargados desde API:', multiplierCache);
+  } catch (error) {
+    console.error('Error loading cost multipliers:', error);
+    // Usar valores por defecto si falla la carga
+    setDefaultMultipliers();
+  }
+};
+
+// Función para invalidar el caché y forzar recarga
+export const invalidateCostMultipliersCache = (): void => {
+  cacheTimestamp = 0;
+  console.log('Cache de multiplicadores invalidado');
+};
+
+// Función para establecer multiplicadores por defecto si falla la carga de la API
+const setDefaultMultipliers = (): void => {
+  multiplierCache = {
+    complexity: {
+      basic: 0,
+      standard: 0.1,
+      deep: 0.15
+    },
+    mentions_volume: {
+      small: 0,
+      medium: 0.1,
+      large: 0.2,
+      xlarge: 0.3
+    },
+    countries: {
+      "1": 0,
+      "2-5": 0.05,
+      "6-10": 0.15,
+      "10+": 0.25
+    },
+    urgency: {
+      low: 0,
+      medium: 0.05,
+      high: 0.15
+    },
+    project_type: {
+      low: 0,
+      medium: 0.1,
+      high: 0.2,
+      variable: 0.15
+    }
+  };
+};
+
+// Funciones de factor de cálculo - ahora usan la base de datos
+export const getAnalysisTypeFactor = (analysisType: string): number => {
+  return multiplierCache.complexity?.[analysisType] ?? 0;
 };
 
 export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
-  switch (mentionsVolume) {
-    case "small":
-      return 0;
-    case "medium":
-      return 0.1; // +10%
-    case "large":
-      return 0.2; // +20%
-    case "xlarge":
-      return 0.3; // +30%
-    default:
-      return 0;
-  }
+  return multiplierCache.mentions_volume?.[mentionsVolume] ?? 0;
 };
 
 export const getCountriesFactor = (countriesCovered: string): number => {
-  switch (countriesCovered) {
-    case "1":
-      return 0;
-    case "2-5":
-      return 0.05; // +5%
-    case "6-10":
-      return 0.15; // +15%
-    case "10+":
-      return 0.25; // +25%
-    default:
-      return 0;
-  }
+  return multiplierCache.countries?.[countriesCovered] ?? 0;
 };
 
 export const getClientEngagementFactor = (clientEngagement: string): number => {
-  switch (clientEngagement) {
-    case "low":
-      return 0;
-    case "medium":
-      return 0.05; // +5%
-    case "high":
-      return 0.15; // +15%
-    default:
-      return 0;
-  }
+  return multiplierCache.urgency?.[clientEngagement] ?? 0;
 };
 
 export const getTemplateFactor = (templateComplexity: string): number => {
-  switch (templateComplexity) {
-    case "low":
-      return 0;
-    case "medium":
-      return 0.1; // +10%
-    case "high":
-      return 0.2; // +20%
-    case "variable":
-      return 0.15; // +15%
-    default:
-      return 0;
-  }
+  return multiplierCache.project_type?.[templateComplexity] ?? 0;
 };
 
 export const calculateComplexityAdjustment = (
