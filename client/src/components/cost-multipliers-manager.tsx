@@ -9,25 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Edit, Save, X, Check, AlertTriangle, Plus } from "lucide-react";
+import { Edit, Save, X, Check, AlertTriangle, Plus, Settings, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateCostMultipliersCache, loadCostMultipliers } from "@/lib/calculation";
-
-interface CostMultiplier {
-  id: number;
-  category: string;
-  subcategory: string;
-  multiplier: number;
-  label: string;
-  description?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { CostMultiplier } from "@shared/schema";
 
 // Schema de validación para crear multiplicadores
 const createMultiplierSchema = z.object({
@@ -43,12 +32,26 @@ export function CostMultipliersManager() {
   const [editingValue, setEditingValue] = useState("");
   const [updatingMultipliers, setUpdatingMultipliers] = useState<Set<number>>(new Set());
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingMultiplierData, setEditingMultiplierData] = useState<CostMultiplier | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Form para crear multiplicadores
   const createForm = useForm<z.infer<typeof createMultiplierSchema>>({
+    resolver: zodResolver(createMultiplierSchema),
+    defaultValues: {
+      category: "",
+      subcategory: "",
+      multiplier: 1,
+      label: "",
+      description: ""
+    }
+  });
+
+  // Form para editar multiplicadores
+  const editForm = useForm<z.infer<typeof createMultiplierSchema>>({
     resolver: zodResolver(createMultiplierSchema),
     defaultValues: {
       category: "",
@@ -93,11 +96,12 @@ export function CostMultipliersManager() {
     },
   });
 
+  // Mutación para actualizar multiplicador completo
   const updateMultiplierMutation = useMutation({
-    mutationFn: async ({ id, multiplier }: { id: number; multiplier: number }) => {
-      return apiRequest(`/api/cost-multipliers/${id}`, "PATCH", { multiplier });
+    mutationFn: async ({ id, data }: { id: number; data: Partial<CostMultiplier> }) => {
+      return apiRequest(`/api/cost-multipliers/${id}`, "PATCH", data);
     },
-    onMutate: async ({ id, multiplier }) => {
+    onMutate: async ({ id, data }) => {
       // Marcar como actualizando
       setUpdatingMultipliers(prev => {
         const newSet = new Set(prev);
@@ -113,7 +117,7 @@ export function CostMultipliersManager() {
       
       // Actualización optimista
       const newMultipliers = previousMultipliers.map(m => 
-        m.id === id ? { ...m, multiplier, updatedAt: new Date().toISOString() } : m
+        m.id === id ? { ...m, ...data, updatedAt: new Date().toISOString() } : m
       );
       
       queryClient.setQueryData(["/api/cost-multipliers"], newMultipliers);
@@ -135,10 +139,12 @@ export function CostMultipliersManager() {
       
       setEditingMultiplier(null);
       setEditingValue("");
+      setEditDialogOpen(false);
+      setEditingMultiplierData(null);
       
       toast({
         title: "Actualizado",
-        description: "Multiplicador actualizado. Las cotizaciones usarán el nuevo valor.",
+        description: "Multiplicador actualizado correctamente.",
       });
     },
     onError: (err, { id }, context) => {
@@ -188,6 +194,38 @@ export function CostMultipliersManager() {
     createMultiplierMutation.mutate(data);
   };
 
+  const handleEditSubmit = (data: z.infer<typeof createMultiplierSchema>) => {
+    if (editingMultiplierData) {
+      updateMultiplierMutation.mutate({ 
+        id: editingMultiplierData.id, 
+        data: {
+          multiplier: data.multiplier,
+          label: data.label,
+          description: data.description
+        }
+      });
+    }
+  };
+
+  const handleOpenEditDialog = (multiplier: CostMultiplier) => {
+    setEditingMultiplierData(multiplier);
+    editForm.reset({
+      category: multiplier.category,
+      subcategory: multiplier.subcategory,
+      multiplier: multiplier.multiplier,
+      label: multiplier.label,
+      description: multiplier.description || ""
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleToggleActive = (multiplier: CostMultiplier) => {
+    updateMultiplierMutation.mutate({
+      id: multiplier.id,
+      data: { isActive: !multiplier.isActive }
+    });
+  };
+
   // Opciones de categorías disponibles
   const categoryOptions = [
     { value: "complexity", label: "Complejidad" },
@@ -216,7 +254,7 @@ export function CostMultipliersManager() {
       
       updateMultiplierMutation.mutate({ 
         id: editingMultiplier, 
-        multiplier: numericValue 
+        data: { multiplier: numericValue }
       });
     }
   };
