@@ -292,13 +292,16 @@ export function CostMultipliersManager() {
                     name="subcategory"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Subcategoría (Clave)</FormLabel>
+                        <FormLabel>Código Interno</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="ej. premium, custom, etc." 
+                            placeholder="ej. mega, premium, rush, etc." 
                             {...field} 
                           />
                         </FormControl>
+                        <div className="text-xs text-muted-foreground">
+                          Código único que identifica esta opción (sin espacios, solo letras y números)
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
