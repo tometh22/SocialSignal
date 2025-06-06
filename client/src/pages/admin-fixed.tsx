@@ -74,6 +74,7 @@ import { InlineEditRole } from "@/components/admin/inline-edit-role";
 import { InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
+import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 
 import { 
   InsertPersonnel, 
@@ -603,7 +604,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -615,6 +616,10 @@ export default function Admin() {
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Plantillas
+          </TabsTrigger>
+          <TabsTrigger value="multipliers" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Multiplicadores
           </TabsTrigger>
         </TabsList>
 
@@ -904,6 +909,26 @@ export default function Admin() {
                 </div>
               </div>
             )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="multipliers">
+          <Card className="standard-card mt-6">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="heading-card">Multiplicadores de Costos</CardTitle>
+                  <CardDescription>Gestiona los multiplicadores que se usan en el sistema de cotización</CardDescription>
+                </div>
+                <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Añadir Multiplicador
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="card-content">
+              <CostMultipliersManager />
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

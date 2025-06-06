@@ -415,6 +415,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---------- RUTAS PARA MULTIPLICADORES DE COSTOS ----------
+  
+  // Obtener todos los multiplicadores de costos
+  app.get("/api/cost-multipliers", async (req, res) => {
+    try {
+      const multipliers = await storage.getCostMultipliers();
+      res.json(multipliers);
+    } catch (error) {
+      console.error("Error fetching cost multipliers:", error);
+      res.status(500).json({ message: "Failed to fetch cost multipliers" });
+    }
+  });
+
+  // Obtener multiplicadores por categoría
+  app.get("/api/cost-multipliers/category/:category", async (req, res) => {
+    const category = req.params.category;
+    
+    try {
+      const multipliers = await storage.getCostMultipliersByCategory(category);
+      res.json(multipliers);
+    } catch (error) {
+      console.error("Error fetching cost multipliers by category:", error);
+      res.status(500).json({ message: "Failed to fetch cost multipliers by category" });
+    }
+  });
+
+  // Actualizar multiplicador de costo
+  app.patch("/api/cost-multipliers/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
+
+    try {
+      const { multiplier, label, description, isActive } = req.body;
+      
+      const updateData: any = {};
+      if (multiplier !== undefined) updateData.multiplier = parseFloat(multiplier);
+      if (label !== undefined) updateData.label = label;
+      if (description !== undefined) updateData.description = description;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      const updated = await storage.updateCostMultiplier(id, updateData);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Cost multiplier not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating cost multiplier:", error);
+      res.status(500).json({ message: "Failed to update cost multiplier" });
+    }
+  });
+
+  // Crear nuevo multiplicador de costo
+  app.post("/api/cost-multipliers", async (req, res) => {
+    try {
+      const { category, subcategory, multiplier, label, description } = req.body;
+      
+      if (!category || !subcategory || !label || multiplier === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      const newMultiplier = await storage.createCostMultiplier({
+        category,
+        subcategory,
+        multiplier: parseFloat(multiplier),
+        label,
+        description,
+        isActive: true
+      });
+      
+      res.status(201).json(newMultiplier);
+    } catch (error) {
+      console.error("Error creating cost multiplier:", error);
+      res.status(500).json({ message: "Failed to create cost multiplier" });
+    }
+  });
+
+  // Eliminar multiplicador de costo
+  app.delete("/api/cost-multipliers/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
+
+    try {
+      const deleted = await storage.deleteCostMultiplier(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Cost multiplier not found" });
+      }
+      
+      res.json({ message: "Cost multiplier deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting cost multiplier:", error);
+      res.status(500).json({ message: "Failed to delete cost multiplier" });
+    }
+  });
+
   // Quotations routes
   app.get("/api/quotations", async (_, res) => {
     const quotations = await storage.getQuotations();
