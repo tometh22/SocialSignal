@@ -525,14 +525,39 @@ export function CostMultipliersManager() {
                       </TableCell>
                       <TableCell className="text-center">
                         {!isEditing && !isUpdating && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditClick(multiplier)}
-                            className="h-7 w-7 p-0"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditClick(multiplier)}
+                              className="h-7 w-7 p-0"
+                              title="Edición rápida del multiplicador"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleOpenEditDialog(multiplier)}
+                              className="h-7 w-7 p-0"
+                              title="Editar multiplicador completo"
+                            >
+                              <Settings className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleToggleActive(multiplier)}
+                              className="h-7 w-7 p-0"
+                              title={multiplier.isActive ? "Desactivar" : "Activar"}
+                            >
+                              {multiplier.isActive ? (
+                                <Eye className="h-3 w-3" />
+                              ) : (
+                                <EyeOff className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -551,6 +576,139 @@ export function CostMultipliersManager() {
           <p className="text-gray-600">Los multiplicadores de costos son necesarios para el sistema de cotización.</p>
         </div>
       )}
+
+      {/* Diálogo para editar multiplicador completo */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Editar Multiplicador</DialogTitle>
+            <DialogDescription>
+              Modifica todos los campos del multiplicador seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+          {editingMultiplierData && (
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Categoría</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm text-gray-600">
+                      {getCategoryDisplayName(editingMultiplierData.category)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      La categoría no se puede modificar
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código Interno</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 font-mono">
+                      {editingMultiplierData.subcategory}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      El código interno no se puede modificar
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="label"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre (Etiqueta)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="ej. Análisis Premium" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="multiplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Multiplicador</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.1"
+                            max="10"
+                            placeholder="1.25"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 1)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={editForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripción</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe cuándo se usa este multiplicador..." 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded">
+                  <div className="flex items-center gap-2">
+                    {editingMultiplierData.isActive ? (
+                      <Eye className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="text-sm font-medium">
+                      Estado: {editingMultiplierData.isActive ? "Activo" : "Inactivo"}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleActive(editingMultiplierData)}
+                    disabled={updateMultiplierMutation.isPending}
+                  >
+                    {editingMultiplierData.isActive ? "Desactivar" : "Activar"}
+                  </Button>
+                </div>
+                
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setEditDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={updateMultiplierMutation.isPending}
+                  >
+                    {updateMultiplierMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
