@@ -62,6 +62,9 @@ export function CostMultipliersManager() {
       return { previousMultipliers };
     },
     onSuccess: (data, { id }) => {
+      // Invalidar caché de multiplicadores para que el cotizador use los nuevos valores
+      invalidateCostMultipliersCache();
+      
       // Remover de actualizando después de 500ms para mostrar animación
       setTimeout(() => {
         setUpdatingMultipliers(prev => {
@@ -76,7 +79,7 @@ export function CostMultipliersManager() {
       
       toast({
         title: "Actualizado",
-        description: "Multiplicador actualizado correctamente.",
+        description: "Multiplicador actualizado. Las cotizaciones usarán el nuevo valor.",
       });
     },
     onError: (err, { id }, context) => {
@@ -248,6 +251,11 @@ export function CostMultipliersManager() {
                               isUpdating ? 'bg-green-100 text-green-800' : 'bg-gray-100'
                             }`}>
                               {multiplier.multiplier}x
+                              {multiplier.multiplier !== 1 && (
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({multiplier.multiplier > 1 ? '+' : ''}{((multiplier.multiplier - 1) * 100).toFixed(0)}%)
+                                </span>
+                              )}
                             </span>
                             {isUpdating && (
                               <Check className="h-4 w-4 text-green-600 animate-pulse" />

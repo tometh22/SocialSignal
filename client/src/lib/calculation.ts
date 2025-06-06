@@ -90,24 +90,30 @@ const setDefaultMultipliers = (): void => {
 };
 
 // Funciones de factor de cálculo - ahora usan la base de datos
+// Los multiplicadores vienen como valores absolutos (1.0, 1.25, etc.), los convertimos a factores (0, 0.25, etc.)
 export const getAnalysisTypeFactor = (analysisType: string): number => {
-  return multiplierCache.complexity?.[analysisType] ?? 0;
+  const multiplier = multiplierCache.complexity?.[analysisType] ?? 1;
+  return multiplier - 1; // Convertir de multiplicador absoluto a factor aditivo
 };
 
 export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
-  return multiplierCache.mentions_volume?.[mentionsVolume] ?? 0;
+  const multiplier = multiplierCache.mentions_volume?.[mentionsVolume] ?? 1;
+  return multiplier - 1;
 };
 
 export const getCountriesFactor = (countriesCovered: string): number => {
-  return multiplierCache.countries?.[countriesCovered] ?? 0;
+  const multiplier = multiplierCache.countries?.[countriesCovered] ?? 1;
+  return multiplier - 1;
 };
 
 export const getClientEngagementFactor = (clientEngagement: string): number => {
-  return multiplierCache.urgency?.[clientEngagement] ?? 0;
+  const multiplier = multiplierCache.urgency?.[clientEngagement] ?? 1;
+  return multiplier - 1;
 };
 
 export const getTemplateFactor = (templateComplexity: string): number => {
-  return multiplierCache.project_type?.[templateComplexity] ?? 0;
+  const multiplier = multiplierCache.project_type?.[templateComplexity] ?? 1;
+  return multiplier - 1;
 };
 
 export const calculateComplexityAdjustment = (
