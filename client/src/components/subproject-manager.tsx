@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp } from "lucide-react";
+import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp, Play, Pause } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -31,6 +31,7 @@ export function SubprojectManager({
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedSubproject, setSelectedSubproject] = useState<any>(null);
   const [newStatus, setNewStatus] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -78,25 +79,28 @@ export function SubprojectManager({
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      setUpdatingStatus(id);
       return apiRequest(`/api/active-projects/${id}/status`, "PATCH", { 
         completionStatus: status,
         completedDate: status === "completed" ? new Date().toISOString() : null
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
       setStatusDialogOpen(false);
       setSelectedSubproject(null);
       setNewStatus("");
+      setUpdatingStatus(null);
       toast({
-        title: "Éxito",
-        description: "Estado del subproyecto actualizado correctamente.",
+        title: "Estado actualizado",
+        description: "El estado del entregable se ha actualizado correctamente.",
       });
     },
-    onError: () => {
+    onError: (_, variables) => {
+      setUpdatingStatus(null);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado del subproyecto.",
+        description: "No se pudo actualizar el estado del entregable.",
         variant: "destructive",
       });
     },
@@ -128,6 +132,10 @@ export function SubprojectManager({
     if (selectedSubproject && newStatus) {
       updateStatusMutation.mutate({ id: selectedSubproject.id, status: newStatus });
     }
+  };
+
+  const handleQuickStatusUpdate = (subproject: any, newStatus: string) => {
+    updateStatusMutation.mutate({ id: subproject.id, status: newStatus });
   };
 
   if (!isExpanded || subprojects.length === 0) return null;
@@ -189,12 +197,22 @@ export function SubprojectManager({
                         </div>
                         
                         <div className="flex items-center gap-2 mb-2">
-                          <button
-                            onClick={() => handleStatusChange(subproject)}
-                            className="transition-all hover:scale-105"
-                          >
-                            {getCompletionStatusBadge(subproject.completionStatus || 'pending')}
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => handleStatusChange(subproject)}
+                              className={`transition-all hover:scale-105 ${
+                                updatingStatus === subproject.id ? 'animate-pulse opacity-50' : ''
+                              }`}
+                              disabled={updatingStatus === subproject.id}
+                            >
+                              {getCompletionStatusBadge(subproject.completionStatus || 'pending')}
+                            </button>
+                            {updatingStatus === subproject.id && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                              </div>
+                            )}
+                          </div>
                           
                           {subproject.completedDate && (
                             <Badge variant="outline" className="text-xs">
@@ -240,7 +258,7 @@ export function SubprojectManager({
                             }}
                           >
                             <TrendingUp className="h-3 w-3 mr-1" />
-                            Ver Métricas
+                            Ver Resumen de Sub-proyecto
                           </Button>
                         </div>
                       </div>
@@ -255,51 +273,106 @@ export function SubprojectManager({
 
       {/* Dialog para cambiar estado */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Cambiar Estado del Subproyecto</DialogTitle>
+            <DialogTitle>Actualizar Estado del Entregable</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Subproyecto: {selectedSubproject?.subprojectName || `Entregable ${selectedSubproject?.id}`}
-              </label>
+          <div className="space-y-6">
+            <div className="text-center">
+              <h3 className="text-lg font-medium text-gray-900 mb-1">
+                {selectedSubproject?.subprojectName || `Entregable ${selectedSubproject?.id}`}
+              </h3>
+              <p className="text-sm text-gray-600">
+                Estado actual: <span className="font-medium">{
+                  selectedSubproject?.completionStatus === 'pending' ? 'Pendiente' :
+                  selectedSubproject?.completionStatus === 'in_progress' ? 'En Progreso' :
+                  selectedSubproject?.completionStatus === 'completed' ? 'Completado' :
+                  selectedSubproject?.completionStatus === 'paused' ? 'Pausado' :
+                  selectedSubproject?.completionStatus === 'cancelled' ? 'Cancelado' : 'Sin definir'
+                }</span>
+              </p>
             </div>
             
-            <div>
-              <label className="text-sm font-medium mb-2 block">Nuevo Estado</label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="in_progress">En Progreso</SelectItem>
-                  <SelectItem value="completed">Completado</SelectItem>
-                  <SelectItem value="cancelled">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={newStatus === "pending" ? "default" : "outline"}
+                onClick={() => setNewStatus("pending")}
+                className="justify-start h-12"
+              >
+                <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                <div className="text-left">
+                  <div className="font-medium">Pendiente</div>
+                  <div className="text-xs text-gray-500">Por iniciar</div>
+                </div>
+              </Button>
+              
+              <Button
+                variant={newStatus === "in_progress" ? "default" : "outline"}
+                onClick={() => setNewStatus("in_progress")}
+                className="justify-start h-12"
+              >
+                <Play className="h-4 w-4 mr-2 text-blue-500" />
+                <div className="text-left">
+                  <div className="font-medium">En Progreso</div>
+                  <div className="text-xs text-gray-500">Trabajando</div>
+                </div>
+              </Button>
+              
+              <Button
+                variant={newStatus === "completed" ? "default" : "outline"}
+                onClick={() => setNewStatus("completed")}
+                className="justify-start h-12"
+              >
+                <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                <div className="text-left">
+                  <div className="font-medium">Completado</div>
+                  <div className="text-xs text-gray-500">Finalizado</div>
+                </div>
+              </Button>
+              
+              <Button
+                variant={newStatus === "paused" ? "default" : "outline"}
+                onClick={() => setNewStatus("paused")}
+                className="justify-start h-12"
+              >
+                <Pause className="h-4 w-4 mr-2 text-orange-500" />
+                <div className="text-left">
+                  <div className="font-medium">Pausado</div>
+                  <div className="text-xs text-gray-500">En espera</div>
+                </div>
+              </Button>
             </div>
             
             {newStatus === "completed" && (
-              <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+              <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                <CheckCircle className="h-4 w-4 inline mr-2 text-green-600" />
                 Al marcar como completado, se registrará automáticamente la fecha de finalización.
               </div>
             )}
             
-            <div className="flex gap-2 pt-4">
+            <div className="flex gap-3 pt-4 border-t">
               <Button 
                 onClick={handleSaveStatus} 
-                disabled={updateStatusMutation.isPending}
-                className="flex-1"
+                disabled={updateStatusMutation.isPending || !newStatus}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                {updateStatusMutation.isPending ? "Guardando..." : "Guardar"}
+                {updateStatusMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Actualizando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Actualizar Estado
+                  </>
+                )}
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setStatusDialogOpen(false)}
-                className="flex-1"
+                disabled={updateStatusMutation.isPending}
               >
                 Cancelar
               </Button>
