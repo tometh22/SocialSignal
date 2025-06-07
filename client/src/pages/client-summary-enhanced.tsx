@@ -88,6 +88,11 @@ export default function ClientSummaryEnhanced() {
     queryKey: ["/api/personnel"],
   });
 
+  const { data: npsHistory = [] } = useQuery({
+    queryKey: [`/api/clients/${clientId}/nps-history`],
+    enabled: !!clientId,
+  });
+
   if (!clientData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -638,6 +643,117 @@ export default function ClientSummaryEnhanced() {
                       <p className="text-xs text-muted-foreground">
                         "Gráficos claros, narrativa podría mejorarse"
                       </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* NPS HISTORY SECTION */}
+            <div className="grid gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Historial de Encuestas NPS
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 lg:grid-cols-3">
+                    {/* NPS Metrics Summary */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold">Métricas Acumuladas</h4>
+                      <div className="space-y-3">
+                        <div className="p-3 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {npsHistory && npsHistory.length > 0 
+                              ? Math.round(npsHistory.reduce((sum: number, survey: any) => sum + (survey.nps_score || 0), 0) / npsHistory.length)
+                              : '+47'
+                            }
+                          </div>
+                          <div className="text-sm text-blue-700">NPS Promedio</div>
+                        </div>
+                        <div className="p-3 bg-green-50 rounded-lg">
+                          <div className="text-lg font-bold text-green-600">
+                            {npsHistory ? npsHistory.length : 2}
+                          </div>
+                          <div className="text-sm text-green-700">Encuestas Realizadas</div>
+                        </div>
+                        <div className="p-3 bg-purple-50 rounded-lg">
+                          <div className="text-sm font-bold text-purple-600">
+                            {npsHistory && npsHistory.length > 0 
+                              ? npsHistory[npsHistory.length - 1]?.nps_category || 'Promotor'
+                              : 'Promotor'
+                            }
+                          </div>
+                          <div className="text-xs text-purple-700">Categoría Actual</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quarterly Results */}
+                    <div className="lg:col-span-2">
+                      <h4 className="font-semibold mb-4">Resultados por Trimestre</h4>
+                      <div className="space-y-3">
+                        {npsHistory && npsHistory.length > 0 ? (
+                          npsHistory.map((survey: any, index: number) => (
+                            <div key={survey.id || index} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <div className="font-medium">Q{survey.quarter} {survey.year}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {new Date(survey.created_at).toLocaleDateString('es-ES', { 
+                                      month: 'long', 
+                                      year: 'numeric' 
+                                    })}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-blue-600">
+                                    {survey.nps_score || 'N/A'}
+                                  </div>
+                                  <Badge 
+                                    variant={survey.nps_category === 'Promotor' ? 'default' : 
+                                            survey.nps_category === 'Pasivo' ? 'secondary' : 'destructive'}
+                                    className="text-xs"
+                                  >
+                                    {survey.nps_category || 'Sin categoría'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              {/* Survey Details */}
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                {survey.report_quality && (
+                                  <div>
+                                    <span className="text-muted-foreground">Calidad Reporte:</span>
+                                    <span className="ml-2 font-medium">{survey.report_quality}/5</span>
+                                  </div>
+                                )}
+                                {survey.report_presentation && (
+                                  <div>
+                                    <span className="text-muted-foreground">Presentación:</span>
+                                    <span className="ml-2 font-medium">{survey.report_presentation}/5</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {survey.improvement_suggestions && (
+                                <div className="mt-3 p-3 bg-gray-50 rounded text-sm">
+                                  <div className="font-medium text-gray-700 mb-1">Sugerencias:</div>
+                                  <div className="text-gray-600">{survey.improvement_suggestions}</div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 border rounded-lg text-center text-muted-foreground">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>No hay encuestas NPS registradas</p>
+                            <p className="text-sm">Las encuestas aparecerán aquí una vez completadas</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
