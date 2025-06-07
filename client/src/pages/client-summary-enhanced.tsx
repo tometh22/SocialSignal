@@ -39,22 +39,27 @@ export default function ClientSummaryEnhanced() {
 
   // Navigation handlers for strategic actions
   const handleNewDeliverable = () => {
+    console.log("Navigating to projects page");
     setLocation(`/projects`);
   };
 
   const handleNPSSurvey = () => {
+    console.log("Navigating to conversations page");
     setLocation(`/conversations`);
   };
 
   const handleGenerateReport = () => {
+    console.log("Navigating to dashboard page");
     setLocation(`/dashboard`);
   };
 
   const handleUpdateQuality = () => {
+    console.log("Switching to quality tab");
     setActiveTab("quality");
   };
 
   const handleClientConfiguration = () => {
+    console.log("Staying on overview tab");
     setActiveTab("overview");
   };
 
