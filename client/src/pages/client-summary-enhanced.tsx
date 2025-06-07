@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,28 @@ export default function ClientSummaryEnhanced() {
   const [, params] = useRoute("/client-summary/:id");
   const clientId = parseInt(params?.id || "0");
   const [activeTab, setActiveTab] = useState("overview");
+  const [, setLocation] = useLocation();
+
+  // Navigation handlers for strategic actions
+  const handleNewDeliverable = () => {
+    setLocation(`/projects`);
+  };
+
+  const handleNPSSurvey = () => {
+    setLocation(`/conversations`);
+  };
+
+  const handleGenerateReport = () => {
+    setLocation(`/dashboard`);
+  };
+
+  const handleUpdateQuality = () => {
+    setActiveTab("quality");
+  };
+
+  const handleClientConfiguration = () => {
+    setActiveTab("overview");
+  };
 
   // Queries for comprehensive client data
   const { data: clientData } = useQuery({
@@ -334,23 +356,23 @@ export default function ClientSummaryEnhanced() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button className="w-full justify-start" variant="outline" onClick={handleNewDeliverable}>
                     <FileText className="h-4 w-4 mr-2" />
                     Nuevo Entregable
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button className="w-full justify-start" variant="outline" onClick={handleNPSSurvey}>
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Encuesta NPS Trimestral
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button className="w-full justify-start" variant="outline" onClick={handleGenerateReport}>
                     <BarChart3 className="h-4 w-4 mr-2" />
                     Generar Reporte
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button className="w-full justify-start" variant="outline" onClick={handleUpdateQuality}>
                     <Star className="h-4 w-4 mr-2" />
                     Actualizar Calidad
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button className="w-full justify-start" variant="outline" onClick={handleClientConfiguration}>
                     <Settings className="h-4 w-4 mr-2" />
                     Configuración Cliente
                   </Button>
