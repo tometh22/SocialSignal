@@ -38,7 +38,7 @@ export default function ClientSummaryEnhanced() {
   const [, setLocation] = useLocation();
 
   // Navigation handlers for strategic actions
-  const handleNewDeliverable = () => {
+  const handleManageProjects = () => {
     console.log("Navigating to active projects page");
     setLocation(`/active-projects`);
   };
@@ -48,19 +48,14 @@ export default function ClientSummaryEnhanced() {
     setLocation(`/quarterly-nps/${clientId}`);
   };
 
-  const handleGenerateReport = () => {
-    console.log("Navigating to main dashboard");
-    setLocation(`/`);
+  const handleQualityScores = () => {
+    console.log("Navigating to quality scores page");
+    setLocation(`/quality-scores/${clientId}`);
   };
 
-  const handleUpdateQuality = () => {
-    console.log("Switching to quality tab");
-    setActiveTab("quality");
-  };
-
-  const handleClientConfiguration = () => {
-    console.log("Navigating to clients page");
-    setLocation(`/clients`);
+  const handleViewFinancials = () => {
+    console.log("Switching to financials tab");
+    setActiveTab("financials");
   };
 
   // Queries for comprehensive client data
@@ -364,7 +359,7 @@ export default function ClientSummaryEnhanced() {
                   <Button 
                     className="w-full justify-start" 
                     variant="outline" 
-                    onClick={handleNewDeliverable}
+                    onClick={handleManageProjects}
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Gestionar Proyectos
@@ -380,26 +375,18 @@ export default function ClientSummaryEnhanced() {
                   <Button 
                     className="w-full justify-start" 
                     variant="outline" 
-                    onClick={handleGenerateReport}
-                  >
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Dashboard Principal
-                  </Button>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={handleUpdateQuality}
+                    onClick={handleQualityScores}
                   >
                     <Star className="h-4 w-4 mr-2" />
-                    Ver Calidad
+                    Análisis de Calidad
                   </Button>
                   <Button 
                     className="w-full justify-start" 
                     variant="outline" 
-                    onClick={handleClientConfiguration}
+                    onClick={handleViewFinancials}
                   >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Gestionar Clientes
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Ver Financieros
                   </Button>
                 </CardContent>
               </Card>
