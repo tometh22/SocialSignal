@@ -361,66 +361,61 @@ export default function ClientSummaryEnhanced() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  <button 
+                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      console.log("TEST: Nuevo Entregable clicked!");
+                      alert("Test: Navegando a Proyectos");
                       handleNewDeliverable();
                     }}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4" />
                     Nuevo Entregable
-                  </Button>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  </button>
+                  <button 
+                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      console.log("TEST: Encuesta NPS clicked!");
+                      alert("Test: Navegando a Conversaciones");
                       handleNPSSurvey();
                     }}
                   >
-                    <MessageSquare className="h-4 w-4 mr-2" />
+                    <MessageSquare className="h-4 w-4" />
                     Encuesta NPS Trimestral
-                  </Button>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  </button>
+                  <button 
+                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      console.log("TEST: Generar Reporte clicked!");
+                      alert("Test: Navegando a Dashboard");
                       handleGenerateReport();
                     }}
                   >
-                    <BarChart3 className="h-4 w-4 mr-2" />
+                    <BarChart3 className="h-4 w-4" />
                     Generar Reporte
-                  </Button>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  </button>
+                  <button 
+                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      console.log("TEST: Actualizar Calidad clicked!");
+                      alert("Test: Cambiando a pestaña Calidad");
                       handleUpdateQuality();
                     }}
                   >
-                    <Star className="h-4 w-4 mr-2" />
+                    <Star className="h-4 w-4" />
                     Actualizar Calidad
-                  </Button>
-                  <Button 
-                    className="w-full justify-start" 
-                    variant="outline" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  </button>
+                  <button 
+                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      console.log("TEST: Configuración Cliente clicked!");
+                      alert("Test: Configuración del cliente");
                       handleClientConfiguration();
                     }}
                   >
-                    <Settings className="h-4 w-4 mr-2" />
+                    <Settings className="h-4 w-4" />
                     Configuración Cliente
-                  </Button>
+                  </button>
                 </CardContent>
               </Card>
 
