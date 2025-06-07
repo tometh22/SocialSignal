@@ -177,7 +177,7 @@ export default function ClientSummaryEnhanced() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-700">Entregables Totales</p>
-                  <p className="text-3xl font-bold text-blue-900">{deliverables.length}</p>
+                  <p className="text-3xl font-bold text-blue-900">{deliverablesArray.length}</p>
                   <p className="text-xs text-blue-600 mt-1">+2 este mes</p>
                 </div>
                 <FileText className="h-12 w-12 text-blue-500" />
@@ -328,7 +328,7 @@ export default function ClientSummaryEnhanced() {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span className="text-sm font-medium">A Tiempo</span>
-                        <span className="text-sm text-muted-foreground">{onTimeDeliveries}/{deliverables.length}</span>
+                        <span className="text-sm text-muted-foreground">{onTimeDeliveries}/{deliverablesArray.length}</span>
                       </div>
                       <Progress value={onTimePercentage} className="h-3" />
                     </div>
@@ -381,7 +381,7 @@ export default function ClientSummaryEnhanced() {
           {/* PROJECTS TAB */}
           <TabsContent value="projects" className="space-y-6">
             <div className="grid gap-4">
-              {projects.map((project: any) => (
+              {projectsArray.map((project: any) => (
                 <Card key={project.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
