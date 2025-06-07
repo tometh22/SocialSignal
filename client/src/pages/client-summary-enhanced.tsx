@@ -302,125 +302,130 @@ export default function ClientSummaryEnhanced() {
 
           {/* OVERVIEW TAB */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Performance Chart - Full Width */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Tendencias de Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="deliverables" stroke="#0088FE" strokeWidth={3} name="Entregables" />
+                    <Line type="monotone" dataKey="satisfaction" stroke="#00C49F" strokeWidth={3} name="Satisfacción" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Bottom Section - Three Columns */}
             <div className="grid gap-6 lg:grid-cols-3">
-              {/* Performance Summary */}
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Tendencias de Performance
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={monthlyData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="deliverables" stroke="#0088FE" strokeWidth={3} name="Entregables" />
-                        <Line type="monotone" dataKey="satisfaction" stroke="#00C49F" strokeWidth={3} name="Satisfacción" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    Acciones Estratégicas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="w-full justify-start" variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Nuevo Entregable
+                  </Button>
+                  <Button className="w-full justify-start" variant="outline">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Encuesta NPS Trimestral
+                  </Button>
+                  <Button className="w-full justify-start" variant="outline">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Generar Reporte
+                  </Button>
+                  <Button className="w-full justify-start" variant="outline">
+                    <Star className="h-4 w-4 mr-2" />
+                    Actualizar Calidad
+                  </Button>
+                  <Button className="w-full justify-start" variant="outline">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configuración Cliente
+                  </Button>
+                </CardContent>
+              </Card>
 
-              {/* Enhanced Quick Actions & Project Status */}
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5" />
-                      Acciones Estratégicas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button className="w-full justify-start" variant="outline">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Nuevo Entregable
-                    </Button>
-                    <Button className="w-full justify-start" variant="outline">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Encuesta NPS Trimestral
-                    </Button>
-                    <Button className="w-full justify-start" variant="outline">
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Generar Reporte
-                    </Button>
-                    <Button className="w-full justify-start" variant="outline">
-                      <Star className="h-4 w-4 mr-2" />
-                      Actualizar Calidad
-                    </Button>
-                    <Button className="w-full justify-start" variant="outline">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Configuración Cliente
-                    </Button>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-blue-500" />
+                    Estado del Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Relación</span>
+                    <Badge variant="default" className="bg-green-100 text-green-700">Always-On</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Satisfacción</span>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                      <span className="text-sm font-medium">4.6/5.0</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Próxima Entrega</span>
+                    <span className="text-sm font-medium">2 días</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Facturación</span>
+                    <span className="text-sm font-medium text-green-600">Al día</span>
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Award className="h-5 w-5 text-blue-500" />
-                      Estado del Cliente
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Relación</span>
-                      <Badge variant="default" className="bg-green-100 text-green-700">Always-On</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Satisfacción</span>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                        <span className="text-sm font-medium">4.6/5.0</span>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-purple-500" />
+                    Equipo Asignado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">AM</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-medium">Account Manager</div>
+                        <div className="text-xs text-gray-500">Belén López</div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Próxima Entrega</span>
-                      <span className="text-sm font-medium">2 días</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Facturación</span>
-                      <span className="text-sm font-medium text-green-600">Al día</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-purple-500" />
-                      Equipo Asignado
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">AM</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">Account Manager</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="bg-green-100 text-green-700 text-xs">AN</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">Analista Senior</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">DS</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">Diseñador</span>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-green-100 text-green-700 text-xs">AN</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-medium">Analista Senior</div>
+                        <div className="text-xs text-gray-500">Aylen Magali</div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">DS</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-medium">Diseñador</div>
+                        <div className="text-xs text-gray-500">Marina Silva</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
