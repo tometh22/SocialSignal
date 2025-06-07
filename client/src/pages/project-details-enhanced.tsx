@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,9 +80,9 @@ export default function ProjectDetailsEnhanced() {
   });
 
   // Inicializar filteredTimeEntries cuando timeEntries cambie
-  useState(() => {
+  useEffect(() => {
     setFilteredTimeEntries(timeEntries);
-  });
+  }, [timeEntries]);
 
   // Mutaciones
   const updateProjectMutation = useMutation({
@@ -109,7 +109,7 @@ export default function ProjectDetailsEnhanced() {
   // Lógica de cálculos
   const isSubproject = projectData?.parentProjectId;
   const parentProject = isSubproject ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
-  const clientData = clients.find((c: any) => c.id === projectData?.clientId);
+  const clientData = Array.isArray(clients) ? clients.find((c: any) => c.id === projectData?.clientId) : null;
   
   // Obtener subproyectos hermanos
   const siblingProjects = isSubproject 
@@ -380,7 +380,7 @@ export default function ProjectDetailsEnhanced() {
           <div className="mb-8">
             <SubprojectAlerts
               timeEntries={timeEntries}
-              personnel={personnel}
+              personnel={personnel as any}
               estimatedHours={estimatedHours}
               projectStartDate={projectData?.startDate?.toString()}
               clientSubprojects={[]}
@@ -421,7 +421,7 @@ export default function ProjectDetailsEnhanced() {
                 {timeEntries.length > 3 && (
                   <TimeEntriesFilter
                     timeEntries={timeEntries}
-                    personnel={personnel}
+                    personnel={personnel as any}
                     onFilteredEntriesChange={setFilteredTimeEntries}
                   />
                 )}
