@@ -39,18 +39,18 @@ export default function ClientSummaryEnhanced() {
 
   // Navigation handlers for strategic actions
   const handleNewDeliverable = () => {
-    console.log("Navigating to projects page");
-    setLocation(`/projects`);
+    console.log("Navigating to active projects page");
+    setLocation(`/active-projects`);
   };
 
   const handleNPSSurvey = () => {
-    console.log("Navigating to conversations page");
-    setLocation(`/conversations`);
+    console.log("Navigating to quarterly NPS survey");
+    setLocation(`/quarterly-nps/${clientId}`);
   };
 
   const handleGenerateReport = () => {
-    console.log("Navigating to dashboard page");
-    setLocation(`/dashboard`);
+    console.log("Navigating to main dashboard");
+    setLocation(`/`);
   };
 
   const handleUpdateQuality = () => {
@@ -59,8 +59,8 @@ export default function ClientSummaryEnhanced() {
   };
 
   const handleClientConfiguration = () => {
-    console.log("Staying on overview tab");
-    setActiveTab("overview");
+    console.log("Navigating to clients page");
+    setLocation(`/clients`);
   };
 
   // Queries for comprehensive client data
@@ -361,61 +361,46 @@ export default function ClientSummaryEnhanced() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <button 
-                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      console.log("TEST: Nuevo Entregable clicked!");
-                      alert("Test: Navegando a Proyectos");
-                      handleNewDeliverable();
-                    }}
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={handleNewDeliverable}
                   >
-                    <FileText className="h-4 w-4" />
-                    Nuevo Entregable
-                  </button>
-                  <button 
-                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      console.log("TEST: Encuesta NPS clicked!");
-                      alert("Test: Navegando a Conversaciones");
-                      handleNPSSurvey();
-                    }}
+                    <FileText className="h-4 w-4 mr-2" />
+                    Gestionar Proyectos
+                  </Button>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={handleNPSSurvey}
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <MessageSquare className="h-4 w-4 mr-2" />
                     Encuesta NPS Trimestral
-                  </button>
-                  <button 
-                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      console.log("TEST: Generar Reporte clicked!");
-                      alert("Test: Navegando a Dashboard");
-                      handleGenerateReport();
-                    }}
+                  </Button>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={handleGenerateReport}
                   >
-                    <BarChart3 className="h-4 w-4" />
-                    Generar Reporte
-                  </button>
-                  <button 
-                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      console.log("TEST: Actualizar Calidad clicked!");
-                      alert("Test: Cambiando a pestaña Calidad");
-                      handleUpdateQuality();
-                    }}
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Dashboard Principal
+                  </Button>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={handleUpdateQuality}
                   >
-                    <Star className="h-4 w-4" />
-                    Actualizar Calidad
-                  </button>
-                  <button 
-                    className="w-full flex items-center justify-start gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={() => {
-                      console.log("TEST: Configuración Cliente clicked!");
-                      alert("Test: Configuración del cliente");
-                      handleClientConfiguration();
-                    }}
+                    <Star className="h-4 w-4 mr-2" />
+                    Ver Calidad
+                  </Button>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={handleClientConfiguration}
                   >
-                    <Settings className="h-4 w-4" />
-                    Configuración Cliente
-                  </button>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Gestionar Clientes
+                  </Button>
                 </CardContent>
               </Card>
 
