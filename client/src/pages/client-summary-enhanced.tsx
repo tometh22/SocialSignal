@@ -361,23 +361,63 @@ export default function ClientSummaryEnhanced() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline" onClick={handleNewDeliverable}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNewDeliverable();
+                    }}
+                  >
                     <FileText className="h-4 w-4 mr-2" />
                     Nuevo Entregable
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" onClick={handleNPSSurvey}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNPSSurvey();
+                    }}
+                  >
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Encuesta NPS Trimestral
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" onClick={handleGenerateReport}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleGenerateReport();
+                    }}
+                  >
                     <BarChart3 className="h-4 w-4 mr-2" />
                     Generar Reporte
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" onClick={handleUpdateQuality}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpdateQuality();
+                    }}
+                  >
                     <Star className="h-4 w-4 mr-2" />
                     Actualizar Calidad
                   </Button>
-                  <Button className="w-full justify-start" variant="outline" onClick={handleClientConfiguration}>
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleClientConfiguration();
+                    }}
+                  >
                     <Settings className="h-4 w-4 mr-2" />
                     Configuración Cliente
                   </Button>
