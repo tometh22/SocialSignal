@@ -170,61 +170,124 @@ export default function ClientSummaryEnhanced() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* KPI DASHBOARD */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Entregables Totales</p>
-                  <p className="text-3xl font-bold text-blue-900">{deliverablesArray.length}</p>
-                  <p className="text-xs text-blue-600 mt-1">+2 este mes</p>
+        {/* KPI DASHBOARD WITH INTEGRATED ALERTS */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+          {/* Main KPI Cards */}
+          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Entregables Totales</p>
+                    <p className="text-3xl font-bold text-blue-900">{deliverablesArray.length}</p>
+                    <p className="text-xs text-blue-600 mt-1">+2 este mes</p>
+                  </div>
+                  <FileText className="h-12 w-12 text-blue-500" />
                 </div>
-                <FileText className="h-12 w-12 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">Entregas a Tiempo</p>
-                  <p className="text-3xl font-bold text-green-900">{Math.round(onTimePercentage)}%</p>
-                  <p className="text-xs text-green-600 mt-1">
-                    {onTimePercentage >= 80 ? 'Excelente' : 'Mejorable'}
-                  </p>
+            <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Entregas a Tiempo</p>
+                    <p className="text-3xl font-bold text-green-900">{Math.round(onTimePercentage)}%</p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {onTimePercentage >= 80 ? 'Excelente' : 'Mejorable'}
+                    </p>
+                  </div>
+                  <CheckCircle className="h-12 w-12 text-green-500" />
                 </div>
-                <CheckCircle className="h-12 w-12 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-700">Puntuación NPS</p>
-                  <p className="text-3xl font-bold text-purple-900">+47</p>
-                  <p className="text-xs text-purple-600 mt-1">Promotor fuerte</p>
+            <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Puntuación NPS</p>
+                    <p className="text-3xl font-bold text-purple-900">+47</p>
+                    <p className="text-xs text-purple-600 mt-1">Promotor fuerte</p>
+                  </div>
+                  <Star className="h-12 w-12 text-purple-500" />
                 </div>
-                <Star className="h-12 w-12 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-700">Horas Totales</p>
-                  <p className="text-3xl font-bold text-orange-900">{totalHours}h</p>
-                  <p className="text-xs text-orange-600 mt-1">${(totalCost / totalHours || 0).toFixed(0)}/hora</p>
+            <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700">Horas Totales</p>
+                    <p className="text-3xl font-bold text-orange-900">{totalHours}h</p>
+                    <p className="text-xs text-orange-600 mt-1">${(totalCost / totalHours || 0).toFixed(0)}/hora</p>
+                  </div>
+                  <Clock className="h-12 w-12 text-orange-500" />
                 </div>
-                <Clock className="h-12 w-12 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Strategic Alerts Panel */}
+          <div className="lg:col-span-4">
+            <Card className="h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  Centro de Alertas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Entregable Crítico</p>
+                      <p className="text-xs text-amber-600">Informe Mayo vence en 2 días</p>
+                      <div className="mt-2">
+                        <Button size="sm" variant="outline" className="text-xs h-7">
+                          Ver Detalles
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Encuesta NPS</p>
+                      <p className="text-xs text-blue-600">Q2 2024 programada próxima semana</p>
+                      <div className="mt-2">
+                        <Button size="sm" variant="outline" className="text-xs h-7">
+                          Preparar Envío
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Rendimiento Óptimo</p>
+                      <p className="text-xs text-green-600">Todas las métricas en rango objetivo</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <Button className="w-full justify-start text-sm" variant="ghost" size="sm">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Ver todas las alertas
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* COMPREHENSIVE TABS INTERFACE */}
@@ -265,13 +328,13 @@ export default function ClientSummaryEnhanced() {
                 </Card>
               </div>
 
-              {/* Quick Actions & Alerts */}
+              {/* Enhanced Quick Actions & Project Status */}
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Zap className="h-5 w-5" />
-                      Acciones Rápidas
+                      Acciones Estratégicas
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -281,15 +344,19 @@ export default function ClientSummaryEnhanced() {
                     </Button>
                     <Button className="w-full justify-start" variant="outline">
                       <MessageSquare className="h-4 w-4 mr-2" />
-                      Encuesta Trimestral
+                      Encuesta NPS Trimestral
                     </Button>
                     <Button className="w-full justify-start" variant="outline">
                       <BarChart3 className="h-4 w-4 mr-2" />
-                      Reporte Mensual
+                      Generar Reporte
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Star className="h-4 w-4 mr-2" />
+                      Actualizar Calidad
                     </Button>
                     <Button className="w-full justify-start" variant="outline">
                       <Settings className="h-4 w-4 mr-2" />
-                      Configurar Proyecto
+                      Configuración Cliente
                     </Button>
                   </CardContent>
                 </Card>
@@ -297,18 +364,60 @@ export default function ClientSummaryEnhanced() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-amber-500" />
-                      Alertas Importantes
+                      <Award className="h-5 w-5 text-blue-500" />
+                      Estado del Cliente
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-sm font-medium text-amber-800">Entregable pendiente</p>
-                      <p className="text-xs text-amber-600">Informe Mensual Mayo vence en 2 días</p>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Relación</span>
+                      <Badge variant="default" className="bg-green-100 text-green-700">Always-On</Badge>
                     </div>
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm font-medium text-blue-800">Encuesta NPS programada</p>
-                      <p className="text-xs text-blue-600">Trimestre Q2 2024 - Enviar próxima semana</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Satisfacción</span>
+                      <div className="flex items-center gap-1">
+                        <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                        <span className="text-sm font-medium">4.6/5.0</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Próxima Entrega</span>
+                      <span className="text-sm font-medium">2 días</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Facturación</span>
+                      <span className="text-sm font-medium text-green-600">Al día</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-purple-500" />
+                      Equipo Asignado
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">AM</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">Account Manager</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="bg-green-100 text-green-700 text-xs">AN</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">Analista Senior</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">DS</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">Diseñador</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
