@@ -96,6 +96,26 @@ export default function ExecutiveDashboard() {
     }
   };
 
+  const getAlertActionUrl = (alert: ClientAlert) => {
+    // Find client ID based on client name
+    const clientsArray = (clients as any[]) || [];
+    const client = clientsArray.find((c: any) => c.name === alert.clientName);
+    const clientId = client?.id;
+
+    switch (alert.type) {
+      case 'quality_issue':
+        return clientId ? `/quality-scores/${clientId}` : '/clients';
+      case 'deadline_risk':
+        return '/active-projects';
+      case 'budget_overrun':
+        return '/active-projects';
+      case 'nps_low':
+        return clientId ? `/quarterly-nps/${clientId}` : '/clients';
+      default:
+        return clientId ? `/client-summary/${clientId}` : '/clients';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Ejecutivo - Más compacto */}
@@ -230,9 +250,11 @@ export default function ExecutiveDashboard() {
                           </div>
                         </div>
                         {alert.actionRequired && (
-                          <Button size="sm" variant="outline" className="text-xs">
-                            Revisar
-                          </Button>
+                          <Link href={getAlertActionUrl(alert)}>
+                            <Button size="sm" variant="outline" className="text-xs">
+                              Revisar
+                            </Button>
+                          </Link>
                         )}
                       </div>
                     </div>
