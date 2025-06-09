@@ -240,13 +240,13 @@ export default function RecurringTemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => setLocation('/projects')}>
+          <Button variant="ghost" onClick={() => setLocation(`/active-projects/${projectId}`)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Proyectos
+            Volver al Proyecto
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Automatización Always-On</h1>
-            <p className="text-muted-foreground">Configuración de proyectos recurrentes y ciclos automáticos</p>
+            <h1 className="text-3xl font-bold">Automatización del Proyecto</h1>
+            <p className="text-muted-foreground">Configurar recurrencia y automatización para este proyecto específico</p>
           </div>
         </div>
 

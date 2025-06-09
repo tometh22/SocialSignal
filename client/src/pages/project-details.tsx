@@ -28,6 +28,7 @@ import {
   Users,
   MessageSquare,
   Plus,
+  Repeat,
   Timer,
   Activity,
   BarChart3,
@@ -244,6 +245,15 @@ export default function ProjectDetails() {
               >
                 <BarChart3 className="h-5 w-5 mr-2" />
                 Ver Análisis
+              </Button>
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => window.location.href = `/projects/${projectId}/recurring-templates`}
+                className="border-orange-200 text-orange-700 hover:bg-orange-50"
+              >
+                <Repeat className="h-5 w-5 mr-2" />
+                Automatizar
               </Button>
               <Button variant="ghost" size="sm" onClick={handleOpenSettings}>
                 <Settings className="h-4 w-4" />
