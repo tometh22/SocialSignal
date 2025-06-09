@@ -294,7 +294,7 @@ export default function RecurringTemplatesPage() {
                 Nueva Plantilla
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Crear Plantilla Recurrente</DialogTitle>
               </DialogHeader>
@@ -383,37 +383,37 @@ export default function RecurringTemplatesPage() {
                   </div>
                   
                   {showTeamSection && (
-                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50">
-                      <div className="grid gap-3">
+                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-80 overflow-y-auto">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {personnel.map((person: any) => (
-                          <div key={person.id} className="flex items-center justify-between p-3 border rounded bg-white">
-                            <div className="flex items-center space-x-3">
+                          <div key={person.id} className="flex items-center justify-between p-2 border rounded bg-white text-sm">
+                            <div className="flex items-center space-x-2 flex-1">
                               <input
                                 type="checkbox"
-                                className="rounded"
+                                className="rounded w-4 h-4"
                                 checked={selectedTeamMembers[person.id] !== undefined}
                                 onChange={(e) => handleTeamMemberToggle(person.id, e.target.checked)}
                               />
-                              <div>
-                                <p className="font-medium">{person.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  ${person.hourlyRate || 50}/hora
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{person.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  ${person.hourlyRate || 50}/h
                                 </p>
                               </div>
                             </div>
                             
                             {selectedTeamMembers[person.id] && (
-                              <div className="flex items-center space-x-2">
-                                <Label className="text-xs">Horas:</Label>
+                              <div className="flex items-center space-x-1 ml-2">
                                 <Input
                                   type="number"
-                                  className="w-20"
+                                  className="w-16 h-8 text-xs"
                                   min="0"
                                   step="0.5"
-                                  value={selectedTeamMembers[person.id]?.hours || 0}
+                                  placeholder="hrs"
+                                  value={selectedTeamMembers[person.id]?.hours || ''}
                                   onChange={(e) => handleHoursChange(person.id, parseFloat(e.target.value) || 0)}
                                 />
-                                <span className="text-sm font-medium">
+                                <span className="text-xs font-medium min-w-0 text-right">
                                   ${((selectedTeamMembers[person.id]?.hours || 0) * (person.hourlyRate || 50)).toFixed(0)}
                                 </span>
                               </div>
@@ -423,12 +423,12 @@ export default function RecurringTemplatesPage() {
                       </div>
                       
                       {Object.keys(selectedTeamMembers).length > 0 && (
-                        <div className="border-t pt-3 mt-4">
-                          <div className="flex justify-between items-center font-semibold">
+                        <div className="border-t pt-3 mt-4 bg-white rounded p-3">
+                          <div className="flex justify-between items-center font-semibold text-sm">
                             <span>Costo Total Estimado:</span>
-                            <span className="text-lg text-blue-600">${calculateTotalCost().toFixed(0)}</span>
+                            <span className="text-base text-blue-600">${calculateTotalCost().toFixed(0)}</span>
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mt-1">
                             Total de horas: {Object.values(selectedTeamMembers).reduce((sum, member) => sum + member.hours, 0)}h
                           </div>
                         </div>
