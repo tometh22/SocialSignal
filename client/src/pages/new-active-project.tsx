@@ -767,7 +767,7 @@ const NewActiveProject: React.FC = () => {
                                   <h4 className="text-sm font-medium text-muted-foreground">Período</h4>
                                   <p>
                                     {form.watch("startDate") && format(form.watch("startDate"), "dd MMM yyyy", { locale: es })}
-                                    {form.watch("expectedEndDate") && ` - ${format(form.watch("expectedEndDate"), "dd MMM yyyy", { locale: es })}`}
+                                    {form.watch("expectedEndDate") && form.watch("expectedEndDate") && ` - ${format(form.watch("expectedEndDate")!, "dd MMM yyyy", { locale: es })}`}
                                   </p>
                                 </div>
                                 <div>
