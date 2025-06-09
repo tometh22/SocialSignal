@@ -46,6 +46,10 @@ export default function ExecutiveDashboard() {
   const { data: activeProjects = [] } = useQuery({ queryKey: ['/api/active-projects'] });
   const { data: quotations = [] } = useQuery({ queryKey: ['/api/quotations'] });
   const { data: personnel = [] } = useQuery({ queryKey: ['/api/personnel'] });
+  
+  // Obtener datos adicionales para alertas reales
+  const { data: allTimeEntries = [] } = useQuery({ queryKey: ['/api/time-entries'] });
+  const { data: allDeliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
 
   // Cálculos de métricas ejecutivas usando datos reales
   const totalActiveProjects = Array.isArray(activeProjects) ? activeProjects.length : 0;
@@ -57,73 +61,129 @@ export default function ExecutiveDashboard() {
   const highPriorityClients = Array.isArray(clients) ? 
     clients.filter((c: any) => c.name === 'MODO' || c.name === 'Warner' || c.name === 'Huggies').slice(0, 3) : [];
 
-  // Detección automática de alertas basada en datos reales
+  // Detección automática de alertas basada en datos reales del sistema
   const generateCriticalAlerts = (): ClientAlert[] => {
     const alerts: ClientAlert[] = [];
     const clientsArray = (clients as any[]) || [];
     const projectsArray = (activeProjects as any[]) || [];
+    const timeEntriesArray = (allTimeEntries as any[]) || [];
+    const deliverablesArray = (allDeliverables as any[]) || [];
     
-    // Análisis de proyectos para detectar riesgos de deadline
-    projectsArray.forEach((project: any, index: number) => {
+    // Análisis real de proyectos para detectar riesgos de deadline y presupuesto
+    projectsArray.forEach((project: any) => {
       const client = clientsArray.find((c: any) => c.id === project.clientId);
       const clientName = client?.name || `Cliente ${project.clientId}`;
       
-      // Simular análisis de horas consumidas vs tiempo restante
       if (project.status === 'active') {
-        const hoursUsed = Math.random() * 100; // En producción, esto vendría de time entries
+        // Calcular horas reales consumidas por proyecto
+        const projectTimeEntries = timeEntriesArray.filter((entry: any) => entry.projectId === project.id);
+        const totalHoursUsed = projectTimeEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
+        const totalCost = projectTimeEntries.reduce((sum: number, entry: any) => 
+          sum + ((entry.hours || 0) * (entry.hourlyRate || 50)), 0);
         
-        if (hoursUsed > 85) {
-          alerts.push({
-            id: alerts.length + 1,
-            clientName,
-            type: 'deadline_risk',
-            severity: 'high',
-            message: `Proyecto #${project.id} tiene ${Math.round(hoursUsed)}% de horas consumidas`,
-            actionRequired: true
-          });
-        } else if (hoursUsed > 70) {
+        // Para subproyectos Always-On, usar límite específico
+        const budgetLimit = project.subprojectCostLimit || project.budget || 1000;
+        const usagePercentage = budgetLimit > 0 ? (totalCost / budgetLimit) * 100 : 0;
+        
+        // Alertas de presupuesto basadas en datos reales
+        if (usagePercentage > 90) {
           alerts.push({
             id: alerts.length + 1,
             clientName,
             type: 'budget_overrun',
-            severity: 'medium',
-            message: `Proyecto #${project.id} está usando ${Math.round(hoursUsed)}% del presupuesto`,
+            severity: 'high',
+            message: `Proyecto #${project.id} ha superado el 90% del presupuesto (${usagePercentage.toFixed(1)}%)`,
             actionRequired: true
           });
+        } else if (usagePercentage > 75) {
+          alerts.push({
+            id: alerts.length + 1,
+            clientName,
+            type: 'deadline_risk',
+            severity: 'medium',
+            message: `Proyecto #${project.id} usando ${usagePercentage.toFixed(1)}% del presupuesto`,
+            actionRequired: true
+          });
+        }
+
+        // Análisis de horas semanales para detectar sobrecarga
+        if (totalHoursUsed > 0) {
+          const recentEntries = projectTimeEntries.filter((entry: any) => {
+            const entryDate = new Date(entry.date);
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return entryDate >= weekAgo;
+          });
+          
+          const weeklyHours = recentEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
+          if (weeklyHours > 40) {
+            alerts.push({
+              id: alerts.length + 1,
+              clientName,
+              type: 'deadline_risk',
+              severity: 'medium',
+              message: `Proyecto #${project.id} registra ${weeklyHours}h esta semana - posible sobrecarga`,
+              actionRequired: true
+            });
+          }
         }
       }
     });
 
-    // Análisis de clientes para detectar problemas de calidad o NPS
+    // Análisis real de puntuaciones de calidad por cliente
     clientsArray.forEach((client: any) => {
-      // Simular análisis de puntuaciones de calidad
-      const qualityScore = Math.random() * 5;
-      if (qualityScore < 3.5) {
-        alerts.push({
-          id: alerts.length + 1,
-          clientName: client.name,
-          type: 'quality_issue',
-          severity: qualityScore < 2.5 ? 'high' : 'medium',
-          message: `Puntuación de calidad ha bajado a ${qualityScore.toFixed(1)}/5`,
-          actionRequired: true
-        });
-      }
+      const clientDeliverables = deliverablesArray.filter((d: any) => {
+        const project = projectsArray.find((p: any) => p.id === d.projectId);
+        return project && project.clientId === client.id;
+      });
 
-      // Simular análisis de NPS
-      const npsScore = Math.random() * 10;
-      if (npsScore < 6) {
-        alerts.push({
-          id: alerts.length + 1,
-          clientName: client.name,
-          type: 'nps_low',
-          severity: npsScore < 4 ? 'high' : 'medium',
-          message: `NPS ha bajado a ${npsScore.toFixed(1)}/10 - Riesgo de churn`,
-          actionRequired: true
-        });
+      if (clientDeliverables.length > 0) {
+        // Calcular promedio real de calidad narrativa
+        const narrativeScores = clientDeliverables
+          .filter((d: any) => d.narrative_quality !== null && d.narrative_quality !== undefined)
+          .map((d: any) => d.narrative_quality);
+        
+        if (narrativeScores.length > 0) {
+          const avgNarrative = narrativeScores.reduce((sum: number, score: number) => sum + score, 0) / narrativeScores.length;
+          
+          if (avgNarrative < 3.5) {
+            alerts.push({
+              id: alerts.length + 1,
+              clientName: client.name,
+              type: 'quality_issue',
+              severity: avgNarrative < 2.5 ? 'high' : 'medium',
+              message: `Calidad narrativa promedio bajó a ${avgNarrative.toFixed(1)}/5 en últimos entregables`,
+              actionRequired: true
+            });
+          }
+        }
+
+        // Análisis de cumplimiento de brief
+        const briefScores = clientDeliverables
+          .filter((d: any) => d.brief_compliance !== null && d.brief_compliance !== undefined)
+          .map((d: any) => d.brief_compliance);
+        
+        if (briefScores.length > 0) {
+          const avgBrief = briefScores.reduce((sum: number, score: number) => sum + score, 0) / briefScores.length;
+          
+          if (avgBrief < 3.0) {
+            alerts.push({
+              id: alerts.length + 1,
+              clientName: client.name,
+              type: 'quality_issue',
+              severity: 'high',
+              message: `Cumplimiento de brief bajo: ${avgBrief.toFixed(1)}/5 - revisar requerimientos`,
+              actionRequired: true
+            });
+          }
+        }
       }
     });
 
-    return alerts.slice(0, 5); // Limitar a 5 alertas más críticas
+    return alerts.slice(0, 5).sort((a, b) => {
+      const severityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+      return severityOrder[b.severity as keyof typeof severityOrder] - severityOrder[a.severity as keyof typeof severityOrder];
+    });
   };
 
   const criticalAlerts = generateCriticalAlerts();
