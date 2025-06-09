@@ -17,8 +17,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { 
   Clock, Calendar, Users, DollarSign, Play, Pause, Settings, 
   Plus, Edit, Trash2, RotateCcw, CheckCircle, AlertCircle,
-  ArrowLeft, CalendarDays, Target, TrendingUp
+  ArrowLeft, CalendarDays, Target, TrendingUp, HelpCircle, FileText, Repeat
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RecurringTemplate {
   id: number;
@@ -301,93 +302,253 @@ export default function RecurringTemplatesPage() {
                 Nueva Plantilla
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Crear Plantilla Recurrente</DialogTitle>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="pb-6">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <Repeat className="h-6 w-6 text-blue-600" />
+                  Crear Plantilla Recurrente
+                </DialogTitle>
+                <p className="text-muted-foreground">
+                  Configura una plantilla para automatizar la creación de proyectos recurrentes
+                </p>
               </DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                handleCreateTemplate(new FormData(e.currentTarget));
-              }} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="templateName">Nombre de Plantilla</Label>
-                    <Input id="templateName" name="templateName" required />
-                  </div>
-                  <div>
-                    <Label htmlFor="deliverableType">Tipo de Entregable</Label>
-                    <Select name="deliverableType" required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {deliverableTypes.map(type => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="frequency">Frecuencia</Label>
-                    <Select name="frequency" required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar frecuencia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {frequencyOptions.map(freq => (
-                          <SelectItem key={freq.value} value={freq.value}>
-                            {freq.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="estimatedHours">Horas Estimadas</Label>
-                    <Input id="estimatedHours" name="estimatedHours" type="number" step="0.5" />
-                  </div>
-                  <div>
-                    <Label htmlFor="baseBudget">Presupuesto Base</Label>
-                    <Input id="baseBudget" name="baseBudget" type="number" step="0.01" />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea id="description" name="description" />
-                </div>
-
-                <div>
-                  <Label htmlFor="autoCreateDaysInAdvance">Días de Anticipación</Label>
-                  <Input 
-                    id="autoCreateDaysInAdvance" 
-                    name="autoCreateDaysInAdvance" 
-                    type="number" 
-                    defaultValue="7"
-                    min="1"
-                    max="30"
-                  />
-                </div>
-
-                <Separator />
-
-                {/* Team Assignment Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-semibold">Asignación de Equipo</Label>
-                      <p className="text-sm text-muted-foreground">Selecciona el equipo y las horas estimadas para calcular el costo del proyecto</p>
+              
+              <TooltipProvider>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCreateTemplate(new FormData(e.currentTarget));
+                }} className="space-y-6">
+                  
+                  {/* Basic Information Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold">Información Básica</h3>
                     </div>
-                    <Switch 
-                      checked={showTeamSection} 
-                      onCheckedChange={setShowTeamSection}
-                    />
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="templateName" className="text-sm font-medium">Nombre de Plantilla</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Nombre identificativo para esta plantilla. Ejemplo: "Reporte Mensual de Redes Sociales"</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input 
+                          id="templateName" 
+                          name="templateName" 
+                          placeholder="Ej: Reporte Mensual de Análisis"
+                          className="h-11"
+                          required 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="deliverableType" className="text-sm font-medium">Tipo de Entregable</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Categoría del producto o servicio que se entregará al cliente</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Select name="deliverableType" required>
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Seleccionar tipo de entregable" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {deliverableTypes.map(type => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Timing & Budget Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Calendar className="h-5 w-5 text-green-600" />
+                      <h3 className="text-lg font-semibold">Configuración de Tiempo y Presupuesto</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="frequency" className="text-sm font-medium">Frecuencia</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Con qué frecuencia se debe generar automáticamente este proyecto</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Select name="frequency" required>
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Seleccionar frecuencia" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {frequencyOptions.map(freq => (
+                              <SelectItem key={freq.value} value={freq.value}>
+                                <div className="flex items-center gap-2">
+                                  <Repeat className="h-4 w-4" />
+                                  {freq.label}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="estimatedHours" className="text-sm font-medium">Horas Estimadas</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Tiempo estimado para completar este proyecto (se calcula automáticamente si asignas equipo)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="relative">
+                          <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="estimatedHours" 
+                            name="estimatedHours" 
+                            type="number" 
+                            step="0.5"
+                            placeholder="Ej: 40"
+                            className="h-11 pl-10"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="baseBudget" className="text-sm font-medium">Presupuesto Base</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Presupuesto estimado para este proyecto (se calcula automáticamente si asignas equipo)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="baseBudget" 
+                            name="baseBudget" 
+                            type="number" 
+                            step="0.01"
+                            placeholder="Ej: 5000"
+                            className="h-11 pl-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Advanced Configuration */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Settings className="h-5 w-5 text-purple-600" />
+                      <h3 className="text-lg font-semibold">Configuración Avanzada</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="description" className="text-sm font-medium">Descripción</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Descripción detallada de lo que incluye este proyecto recurrente</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Textarea 
+                          id="description" 
+                          name="description" 
+                          placeholder="Describe el alcance y objetivos del proyecto..."
+                          className="min-h-[100px] resize-none"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="autoCreateDaysInAdvance" className="text-sm font-medium">Días de Anticipación</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Cuántos días antes de la fecha objetivo se debe crear automáticamente el proyecto</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="relative">
+                          <Target className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="autoCreateDaysInAdvance" 
+                            name="autoCreateDaysInAdvance" 
+                            type="number" 
+                            defaultValue="7"
+                            min="1"
+                            max="30"
+                            className="h-11 pl-10"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Recomendado: 7 días</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Team Assignment Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Users className="h-5 w-5 text-orange-600" />
+                      <h3 className="text-lg font-semibold">Asignación de Equipo</h3>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-orange-50 to-yellow-50">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-base font-medium">Activar Asignación de Equipo</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Asigna miembros del equipo con horas específicas para calcular automáticamente el costo real del proyecto</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Selecciona el equipo y las horas estimadas para calcular el costo del proyecto</p>
+                      </div>
+                      <Switch 
+                        checked={showTeamSection} 
+                        onCheckedChange={setShowTeamSection}
+                      />
+                    </div>
                   
                   {showTeamSection && (
                     <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-80 overflow-y-auto">
@@ -444,19 +605,30 @@ export default function RecurringTemplatesPage() {
                   )}
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => {
-                    setIsCreateDialogOpen(false);
-                    setSelectedTeamMembers({});
-                    setShowTeamSection(false);
-                  }}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={createTemplateMutation.isPending}>
-                    {createTemplateMutation.isPending ? 'Creando...' : 'Crear Plantilla'}
-                  </Button>
-                </div>
-              </form>
+                  <div className="flex justify-end gap-3 pt-6 border-t">
+                    <Button type="button" variant="outline" size="lg" onClick={() => {
+                      setIsCreateDialogOpen(false);
+                      setSelectedTeamMembers({});
+                      setShowTeamSection(false);
+                    }}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" size="lg" disabled={createTemplateMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+                      {createTemplateMutation.isPending ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Creando...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          Crear Plantilla
+                        </div>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </TooltipProvider>
             </DialogContent>
           </Dialog>
         </div>
