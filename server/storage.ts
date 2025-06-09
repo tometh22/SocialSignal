@@ -1209,44 +1209,62 @@ export class DatabaseStorage implements IStorage {
 
   async getRecurringTemplatesWithTeam(projectId: number): Promise<any[]> {
     try {
-      const templates = await db.select().from(recurringProjectTemplates)
-        .where(eq(recurringProjectTemplates.parentProjectId, projectId))
-        .orderBy(desc(recurringProjectTemplates.createdAt));
+      // Optimized: Get templates with basic info only first
+      const templates = await db.select({
+        id: recurringProjectTemplates.id,
+        parentProjectId: recurringProjectTemplates.parentProjectId,
+        templateName: recurringProjectTemplates.templateName,
+        deliverableType: recurringProjectTemplates.deliverableType,
+        frequency: recurringProjectTemplates.frequency,
+        dayOfMonth: recurringProjectTemplates.dayOfMonth,
+        dayOfWeek: recurringProjectTemplates.dayOfWeek,
+        estimatedHours: recurringProjectTemplates.estimatedHours,
+        baseBudget: recurringProjectTemplates.baseBudget,
+        description: recurringProjectTemplates.description,
+        autoCreateDaysInAdvance: recurringProjectTemplates.autoCreateDaysInAdvance,
+        isActive: recurringProjectTemplates.isActive,
+        createdAt: recurringProjectTemplates.createdAt
+      })
+      .from(recurringProjectTemplates)
+      .where(eq(recurringProjectTemplates.parentProjectId, projectId))
+      .orderBy(desc(recurringProjectTemplates.createdAt));
 
-      // Get team members for each template
-      const enrichedTemplates = [];
-      for (const template of templates) {
-        const teamMembers = await db.select({
-          id: recurringTemplatePersonnel.id,
-          templateId: recurringTemplatePersonnel.templateId,
-          personnelId: recurringTemplatePersonnel.personnelId,
-          personnelName: personnel.name,
-          roleName: roles.name,
-          hourlyRate: personnel.hourlyRate,
-          estimatedHours: recurringTemplatePersonnel.estimatedHours,
-          isRequired: recurringTemplatePersonnel.isRequired
-        })
-        .from(recurringTemplatePersonnel)
-        .leftJoin(personnel, eq(recurringTemplatePersonnel.personnelId, personnel.id))
-        .leftJoin(roles, eq(personnel.roleId, roles.id))
-        .where(eq(recurringTemplatePersonnel.templateId, template.id));
-
-        const enrichedTeamMembers = teamMembers.map(member => ({
-          ...member,
-          totalCost: (member.estimatedHours || 0) * (member.hourlyRate || 50)
-        }));
-
-        const totalEstimatedCost = enrichedTeamMembers.reduce((sum: number, member: any) => 
-          sum + member.totalCost, 0);
-
-        enrichedTemplates.push({
-          ...template,
-          teamMembers: enrichedTeamMembers,
-          totalEstimatedCost
-        });
+      if (templates.length === 0) {
+        return [];
       }
 
-      return enrichedTemplates;
+      // For empty project, return templates without team data to speed up initial load
+      const templateIds = templates.map(t => t.id);
+      const teamMembers = await db.select({
+        templateId: recurringTemplatePersonnel.templateId,
+        personnelName: personnel.name,
+        roleName: roles.name,
+        hourlyRate: personnel.hourlyRate,
+        estimatedHours: recurringTemplatePersonnel.estimatedHours,
+        isRequired: recurringTemplatePersonnel.isRequired
+      })
+      .from(recurringTemplatePersonnel)
+      .innerJoin(personnel, eq(recurringTemplatePersonnel.personnelId, personnel.id))
+      .innerJoin(roles, eq(personnel.roleId, roles.id))
+      .where(inArray(recurringTemplatePersonnel.templateId, templateIds));
+
+      // Group and calculate costs
+      const teamByTemplate = teamMembers.reduce((acc, member) => {
+        if (!acc[member.templateId]) acc[member.templateId] = [];
+        acc[member.templateId].push({
+          ...member,
+          totalCost: (member.estimatedHours || 0) * (member.hourlyRate || 50)
+        });
+        return acc;
+      }, {} as Record<number, any[]>);
+
+      return templates.map(template => ({
+        ...template,
+        teamMembers: teamByTemplate[template.id] || [],
+        totalEstimatedCost: (teamByTemplate[template.id] || [])
+          .reduce((sum: number, member: any) => sum + member.totalCost, 0)
+      }));
+
     } catch (error) {
       console.error('Error fetching recurring templates:', error);
       return [];

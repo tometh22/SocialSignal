@@ -108,17 +108,24 @@ export default function RecurringTemplatesPage() {
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<{[key: number]: {hours: number, required: boolean}}>({});
   const [showTeamSection, setShowTeamSection] = useState(false);
 
-  // Queries
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+  // Queries with proper error handling and faster loading
+  const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useQuery({
     queryKey: ['/api/projects', projectId, 'recurring-templates'],
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1
   });
 
   const { data: cycles = [], isLoading: cyclesLoading } = useQuery({
     queryKey: ['/api/projects', projectId, 'cycles'],
+    enabled: !!projectId,
+    staleTime: 5 * 60 * 1000
   });
 
   const { data: personnel = [] } = useQuery({
     queryKey: ['/api/personnel'],
+    staleTime: 10 * 60 * 1000, // Cache personnel for 10 minutes
+    retry: 1
   });
 
   // Mutations
