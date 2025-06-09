@@ -7,19 +7,28 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
+import { Badge } from "@/components/ui/badge";
 
 import {
   ChevronRight,
   Activity,
   LayoutDashboard,
-  PlusCircle,
+  FileText,
   ListChecks,
   Briefcase,
   Users,
-  PieChart,
-  Cog,
+  BarChart3,
+  Settings,
   ChevronDown,
   LogOut,
+  Star,
+  Zap,
+  Building2,
+  Target,
+  TrendingUp,
+  Calendar,
+  Plus,
+  Layers,
 } from "lucide-react";
 
 // Tipo para elementos de navegación
@@ -29,6 +38,7 @@ type NavItem = {
   icon: any;
   badge?: string;
   status?: 'new';
+  description?: string;
 };
 
 export default function Sidebar() {
@@ -49,28 +59,29 @@ export default function Sidebar() {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  // Categorías de navegación
+  // Categorías de navegación modernizadas
   const navCategories = {
-    general: [
-      { href: "/", title: "Dashboard", icon: LayoutDashboard },
+    principal: [
+      { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Vista general del negocio" },
     ],
-    cotizaciones: [
-      { href: "/optimized-quote", title: "Nueva Cotización", icon: PlusCircle, status: 'new' as const },
-      { href: "/manage-quotes", title: "Gestionar Cotizaciones", icon: ListChecks },
+    operaciones: [
+      { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear propuesta comercial" },
+      { href: "/manage-quotes", title: "Gestionar Cotizaciones", icon: FileText, description: "Revisar propuestas" },
+      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: "12", description: "Proyectos en curso" },
     ],
-    proyectos: [
-      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, status: 'new' as const },
+    clientes: [
+      { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" },
+      { href: "/statistics", title: "Análisis", icon: BarChart3, description: "Métricas y reportes" },
     ],
-    datos: [
-      { href: "/clients", title: "Clientes", icon: Users },
-      { href: "/statistics", title: "Estadísticas y Análisis", icon: PieChart },
+    automatizacion: [
+      { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const, description: "Servicios recurrentes" },
     ],
     sistema: [
-      { href: "/admin", title: "Panel Admin", icon: Cog },
+      { href: "/admin", title: "Configuración", icon: Settings, description: "Panel administrativo" },
     ],
   };
 
-  // Renderizar enlace de navegación
+  // Renderizar enlace de navegación modernizado
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const isActive = currentPath === item.href;
@@ -80,30 +91,46 @@ export default function Sidebar() {
         key={item.href}
         href={item.href}
         className={cn(
-          "flex items-center px-3 py-2.5 rounded-md text-sm transition-colors relative group",
+          "flex items-center px-3 py-3 rounded-lg text-sm transition-all duration-200 relative group",
           isActive
-            ? "bg-sidebar-active-bg text-sidebar-active-fg font-medium border-l-2 border-l-primary"
-            : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-border/20 border-l-2 border-transparent",
-          isCollapsed && "justify-center py-2.5"
+            ? "bg-blue-50 text-blue-700 font-medium shadow-sm border border-blue-200"
+            : "text-gray-700 hover:text-gray-900 hover:bg-gray-100 border border-transparent",
+          isCollapsed && "justify-center py-3"
         )}
       >
-        <Icon className={cn(
-          "h-4 w-4 flex-shrink-0", 
-          isCollapsed ? "m-0" : "mr-3"
-        )} />
+        <div className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
+          isActive ? "bg-blue-100" : "bg-gray-100 group-hover:bg-gray-200",
+          isCollapsed ? "mr-0" : "mr-3"
+        )}>
+          <Icon className="h-4 w-4" />
+        </div>
         
         {!isCollapsed && (
-          <span className="truncate">{item.title}</span>
-        )}
-        
-        {!isCollapsed && item.status === 'new' && (
-          <span className="ml-auto rounded-full text-[10px] bg-sidebar-accent/10 text-sidebar-accent px-1.5 py-0.5">
-            Nuevo
-          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="truncate font-medium">{item.title}</span>
+              <div className="flex items-center gap-2">
+                {item.badge && (
+                  <Badge variant="secondary" className="text-xs">
+                    {item.badge}
+                  </Badge>
+                )}
+                {item.status === 'new' && (
+                  <Badge variant="default" className="text-xs bg-blue-600">
+                    Nuevo
+                  </Badge>
+                )}
+              </div>
+            </div>
+            {item.description && (
+              <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>
+            )}
+          </div>
         )}
         
         {isCollapsed && item.status === 'new' && (
-          <span className="absolute right-0.5 top-0.5 w-1.5 h-1.5 rounded-full bg-sidebar-accent"></span>
+          <span className="absolute right-0.5 top-0.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
         )}
       </Link>
     );
@@ -117,33 +144,35 @@ export default function Sidebar() {
            onClick={() => setIsOpen(false)} />
       )}
     
-      {/* Barra lateral */}
+      {/* Barra lateral modernizada */}
       <motion.div
         className={cn(
-          "sidebar fixed top-0 bottom-0 left-0 z-50 h-screen flex-col flex-shrink-0 bg-sidebar-background border-r border-sidebar-border shadow-lg md:shadow-none md:relative md:z-0 md:flex",
-          isCollapsed ? "w-[72px]" : "w-[260px]",
+          "sidebar fixed top-0 bottom-0 left-0 z-50 h-screen flex-col flex-shrink-0 bg-white border-r border-gray-200 shadow-xl md:shadow-lg md:relative md:z-0 md:flex",
+          isCollapsed ? "w-[72px]" : "w-[280px]",
           isOpen ? "flex" : "hidden md:flex"
         )}
         initial={false}
         animate={{ 
-          width: isCollapsed ? 72 : 260,
+          width: isCollapsed ? 72 : 280,
           transition: { duration: 0.2 }
         }}
       >
         <div className="flex flex-col h-full overflow-hidden">
-          {/* Header con logo */}
+          {/* Header modernizado con logo */}
           <div className={cn(
-            "flex items-center justify-between py-4 border-b border-sidebar-border/30",
-            isCollapsed ? "px-3 justify-center" : "px-5"
+            "flex items-center justify-between py-5 px-4 border-b border-gray-200",
+            isCollapsed && "justify-center"
           )}>
-            <Link href="/" className="flex items-center gap-2.5">
-              <Logo size="sm" />
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                <span className="text-white font-bold text-lg">M</span>
+              </div>
               {!isCollapsed && (
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-sidebar-foreground tracking-wide">
+                  <span className="text-lg font-bold text-gray-900 tracking-tight">
                     Mind
                   </span>
-                  <span className="text-[11px] text-sidebar-foreground/60">
+                  <span className="text-xs text-gray-500 font-medium">
                     Epical Digital
                   </span>
                 </div>
@@ -182,30 +211,30 @@ export default function Sidebar() {
                 )}
               </div>
               <nav className="space-y-1">
-                {navCategories.general.map((item) => renderNavLink(item))}
+                {navCategories.principal.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            {/* Cotizaciones */}
+            {/* Operaciones */}
             <div className="px-3">
               <div 
                 className={cn(
                   "flex items-center justify-between mb-2 px-2 group cursor-pointer",
                   isCollapsed && "justify-center"
                 )}
-                onClick={() => !isCollapsed && toggleSection('cotizaciones')}
+                onClick={() => !isCollapsed && toggleSection('operaciones')}
               >
                 <h3 className={cn(
                   "text-xs font-semibold text-sidebar-foreground/70 tracking-wider",
                   isCollapsed ? "sr-only" : "uppercase"
                 )}>
-                  Cotizaciones
+                  Operaciones
                 </h3>
                 {!isCollapsed && (
                   <ChevronDown 
                     className={cn(
                       "h-3.5 w-3.5 text-sidebar-foreground/40 transition-transform group-hover:text-sidebar-foreground/70",
-                      expandedSection === 'cotizaciones' ? "transform rotate-180" : ""
+                      expandedSection === 'operaciones' ? "transform rotate-180" : ""
                     )}
                   />
                 )}
@@ -214,30 +243,30 @@ export default function Sidebar() {
                 )}
               </div>
               <nav className="space-y-1">
-                {navCategories.cotizaciones.map((item) => renderNavLink(item))}
+                {navCategories.operaciones.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
-            {/* Proyectos */}
+            {/* Clientes */}
             <div className="px-3">
               <div 
                 className={cn(
                   "flex items-center justify-between mb-2 px-2 group cursor-pointer",
                   isCollapsed && "justify-center"
                 )}
-                onClick={() => !isCollapsed && toggleSection('proyectos')}
+                onClick={() => !isCollapsed && toggleSection('clientes')}
               >
                 <h3 className={cn(
                   "text-xs font-semibold text-sidebar-foreground/70 tracking-wider",
                   isCollapsed ? "sr-only" : "uppercase"
                 )}>
-                  Proyectos
+                  Clientes & Análisis
                 </h3>
                 {!isCollapsed && (
                   <ChevronDown 
                     className={cn(
                       "h-3.5 w-3.5 text-sidebar-foreground/40 transition-transform group-hover:text-sidebar-foreground/70",
-                      expandedSection === 'proyectos' ? "transform rotate-180" : ""
+                      expandedSection === 'clientes' ? "transform rotate-180" : ""
                     )}
                   />
                 )}
@@ -246,39 +275,28 @@ export default function Sidebar() {
                 )}
               </div>
               <nav className="space-y-1">
-                {navCategories.proyectos.map((item) => renderNavLink(item))}
+                {navCategories.clientes.map((item) => renderNavLink(item))}
               </nav>
             </div>
-            
-            {/* Datos */}
+
+            {/* Automatización */}
             <div className="px-3">
-              <div 
-                className={cn(
-                  "flex items-center justify-between mb-2 px-2 group cursor-pointer",
-                  isCollapsed && "justify-center"
-                )}
-                onClick={() => !isCollapsed && toggleSection('datos')}
-              >
+              <div className={cn(
+                "flex items-center mb-2 px-2",
+                isCollapsed && "justify-center"
+              )}>
                 <h3 className={cn(
                   "text-xs font-semibold text-sidebar-foreground/70 tracking-wider",
                   isCollapsed ? "sr-only" : "uppercase"
                 )}>
-                  Datos e Informes
+                  Automatización
                 </h3>
-                {!isCollapsed && (
-                  <ChevronDown 
-                    className={cn(
-                      "h-3.5 w-3.5 text-sidebar-foreground/40 transition-transform group-hover:text-sidebar-foreground/70",
-                      expandedSection === 'datos' ? "transform rotate-180" : ""
-                    )}
-                  />
-                )}
                 {isCollapsed && (
                   <div className="h-0.5 w-5 rounded-full bg-sidebar-foreground/20"></div>
                 )}
               </div>
               <nav className="space-y-1">
-                {navCategories.datos.map((item) => renderNavLink(item))}
+                {navCategories.automatizacion.map((item) => renderNavLink(item))}
               </nav>
             </div>
             
