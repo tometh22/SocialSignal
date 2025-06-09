@@ -50,6 +50,16 @@ export default function ExecutiveDashboard() {
   // Obtener datos adicionales para alertas reales
   const { data: allTimeEntries = [] } = useQuery({ queryKey: ['/api/time-entries'] });
   const { data: allDeliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
+  
+  // Obtener todas las encuestas NPS para análisis de tendencias
+  const { data: allNpsSurveys = [] } = useQuery({ 
+    queryKey: ['/api/nps-surveys'],
+    queryFn: async () => {
+      const response = await fetch('/api/nps-surveys');
+      if (!response.ok) return [];
+      return response.json();
+    }
+  });
 
   // Cálculos de métricas ejecutivas usando datos reales
   const totalActiveProjects = Array.isArray(activeProjects) ? activeProjects.length : 0;
@@ -68,6 +78,7 @@ export default function ExecutiveDashboard() {
     const projectsArray = (activeProjects as any[]) || [];
     const timeEntriesArray = (allTimeEntries as any[]) || [];
     const deliverablesArray = (allDeliverables as any[]) || [];
+    const npsSurveysArray = (allNpsSurveys as any[]) || [];
     
     // Análisis real de proyectos para detectar riesgos de deadline y presupuesto
     projectsArray.forEach((project: any) => {
@@ -176,6 +187,72 @@ export default function ExecutiveDashboard() {
               actionRequired: true
             });
           }
+        }
+      }
+    });
+
+    // Análisis real de tendencias NPS para detectar riesgo de churn
+    clientsArray.forEach((client: any) => {
+      const clientNpsSurveys = npsSurveysArray.filter((survey: any) => survey.clientId === client.id);
+      
+      if (clientNpsSurveys.length >= 2) {
+        // Ordenar por fecha para análisis de tendencia
+        const sortedSurveys = clientNpsSurveys.sort((a: any, b: any) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        
+        const latestSurvey = sortedSurveys[0];
+        const previousSurvey = sortedSurveys[1];
+        
+        // Detectar caída significativa en NPS
+        if (latestSurvey.npsScore !== null && previousSurvey.npsScore !== null) {
+          const npsDropp = previousSurvey.npsScore - latestSurvey.npsScore;
+          
+          if (npsDropp >= 3) {
+            alerts.push({
+              id: alerts.length + 1,
+              clientName: client.name,
+              type: 'nps_low',
+              severity: npsDropp >= 5 ? 'high' : 'medium',
+              message: `NPS cayó ${npsDropp} puntos: ${latestSurvey.npsScore}/10 - riesgo de churn`,
+              actionRequired: true
+            });
+          }
+        }
+        
+        // Detectar NPS bajo absoluto
+        if (latestSurvey.npsScore !== null && latestSurvey.npsScore <= 6) {
+          alerts.push({
+            id: alerts.length + 1,
+            clientName: client.name,
+            type: 'nps_low',
+            severity: latestSurvey.npsScore <= 4 ? 'high' : 'medium',
+            message: `NPS crítico: ${latestSurvey.npsScore}/10 en último trimestre`,
+            actionRequired: true
+          });
+        }
+        
+        // Análisis de otras métricas de la encuesta NPS
+        if (latestSurvey.reportQuality !== null && latestSurvey.reportQuality <= 5) {
+          alerts.push({
+            id: alerts.length + 1,
+            clientName: client.name,
+            type: 'quality_issue',
+            severity: 'medium',
+            message: `Calidad de reportes evaluada como ${latestSurvey.reportQuality}/10 en encuesta NPS`,
+            actionRequired: true
+          });
+        }
+        
+        if (latestSurvey.briefObjectives !== null && latestSurvey.briefObjectives <= 5) {
+          alerts.push({
+            id: alerts.length + 1,
+            clientName: client.name,
+            type: 'quality_issue',
+            severity: 'medium',
+            message: `Cumplimiento de objetivos de brief: ${latestSurvey.briefObjectives}/10 según NPS`,
+            actionRequired: true
+          });
         }
       }
     });

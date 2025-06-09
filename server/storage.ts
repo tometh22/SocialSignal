@@ -1100,6 +1100,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // NPS Survey operations
+  async getAllNpsSurveys(): Promise<QuarterlyNpsSurvey[]> {
+    try {
+      const surveys = await db.select().from(quarterlyNpsSurveys).orderBy(desc(quarterlyNpsSurveys.createdAt));
+      return surveys;
+    } catch (error) {
+      console.error('Error al obtener todas las encuestas NPS:', error);
+      return [];
+    }
+  }
+
   async getNpsSurveysByClient(clientId: number): Promise<QuarterlyNpsSurvey[]> {
     try {
       const surveys = await db.select().from(quarterlyNpsSurveys).where(eq(quarterlyNpsSurveys.clientId, clientId));

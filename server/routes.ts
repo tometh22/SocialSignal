@@ -2160,6 +2160,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // =========== RUTAS PARA ENCUESTAS NPS ===========
   
+  // Obtener todas las encuestas NPS
+  app.get("/api/nps-surveys", async (req, res) => {
+    try {
+      const surveys = await storage.getAllNpsSurveys();
+      res.json(surveys);
+    } catch (error) {
+      console.error("Error fetching all NPS surveys:", error);
+      res.status(500).json({ message: "Failed to fetch NPS surveys" });
+    }
+  });
+  
   // Crear nueva encuesta NPS
   app.post("/api/nps-surveys", async (req, res) => {
     try {
