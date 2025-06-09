@@ -309,6 +309,13 @@ export default function ExecutiveDashboard() {
                       <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
+                            {client.logoUrl ? (
+                              <AvatarImage 
+                                src={client.logoUrl} 
+                                alt={`${client.name} logo`}
+                                className="object-contain"
+                              />
+                            ) : null}
                             <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
                               {client.name?.charAt(0) || 'C'}
                             </AvatarFallback>
