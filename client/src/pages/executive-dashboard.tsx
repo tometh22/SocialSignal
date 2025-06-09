@@ -98,23 +98,23 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Ejecutivo */}
+      {/* Header Ejecutivo - Más compacto */}
       <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Panel Ejecutivo</h1>
-              <p className="text-gray-600 mt-1">Visión estratégica del negocio de Social Listening</p>
+              <h1 className="text-2xl font-bold text-gray-900">Panel Ejecutivo</h1>
+              <p className="text-gray-600 text-sm">Visión estratégica del negocio de Social Listening</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Link href="/optimized-quote">
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Cotización
                 </Button>
               </Link>
               <Link href="/active-projects">
-                <Button variant="outline">
+                <Button variant="outline" size="sm">
                   <Briefcase className="h-4 w-4 mr-2" />
                   Ver Proyectos
                 </Button>
@@ -124,113 +124,113 @@ export default function ExecutiveDashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* KPIs Principales */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="max-w-7xl mx-auto p-4 space-y-4">
+        {/* KPIs Principales - Más compactos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Proyectos Activos</p>
-                  <p className="text-3xl font-bold text-gray-900">{totalActiveProjects}</p>
-                  <p className="text-sm text-green-600 mt-1">
+                  <p className="text-xs font-medium text-gray-600">Proyectos Activos</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalActiveProjects}</p>
+                  <p className="text-xs text-green-600 mt-1">
                     <TrendingUp className="h-3 w-3 inline mr-1" />
                     +12% vs mes anterior
                   </p>
                 </div>
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <Briefcase className="h-6 w-6 text-blue-600" />
+                <div className="bg-blue-100 p-2 rounded-full">
+                  <Briefcase className="h-4 w-4 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Clientes Always-On</p>
-                  <p className="text-3xl font-bold text-gray-900">{alwaysOnProjects}</p>
-                  <p className="text-sm text-green-600 mt-1">
+                  <p className="text-xs font-medium text-gray-600">Clientes Always-On</p>
+                  <p className="text-2xl font-bold text-gray-900">{alwaysOnProjects}</p>
+                  <p className="text-xs text-green-600 mt-1">
                     <Zap className="h-3 w-3 inline mr-1" />
                     Ingresos recurrentes
                   </p>
                 </div>
-                <div className="bg-green-100 p-3 rounded-full">
-                  <Zap className="h-6 w-6 text-green-600" />
+                <div className="bg-green-100 p-2 rounded-full">
+                  <Zap className="h-4 w-4 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Clientes Activos</p>
-                  <p className="text-3xl font-bold text-gray-900">{totalClients}</p>
-                  <p className="text-sm text-blue-600 mt-1">
+                  <p className="text-xs font-medium text-gray-600">Clientes Activos</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalClients}</p>
+                  <p className="text-xs text-blue-600 mt-1">
                     <Building2 className="h-3 w-3 inline mr-1" />
                     Portfolio diversificado
                   </p>
                 </div>
-                <div className="bg-purple-100 p-3 rounded-full">
-                  <Building2 className="h-6 w-6 text-purple-600" />
+                <div className="bg-purple-100 p-2 rounded-full">
+                  <Building2 className="h-4 w-4 text-purple-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Equipo</p>
-                  <p className="text-3xl font-bold text-gray-900">{totalPersonnel}</p>
-                  <p className="text-sm text-orange-600 mt-1">
+                  <p className="text-xs font-medium text-gray-600">Equipo</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalPersonnel}</p>
+                  <p className="text-xs text-orange-600 mt-1">
                     <Users className="h-3 w-3 inline mr-1" />
                     92% utilización
                   </p>
                 </div>
-                <div className="bg-orange-100 p-3 rounded-full">
-                  <Users className="h-6 w-6 text-orange-600" />
+                <div className="bg-orange-100 p-2 rounded-full">
+                  <Users className="h-4 w-4 text-orange-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Layout de dos columnas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Layout de dos columnas - Más compacto */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Columna principal */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Alertas Críticas */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Alertas Críticas - Más compactas */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
                   Alertas Críticas
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="pt-0">
+                <div className="space-y-2">
                   {criticalAlerts.map((alert) => (
-                    <div key={alert.id} className={`p-4 border rounded-lg ${getAlertColor(alert.severity)}`}>
+                    <div key={alert.id} className={`p-3 border rounded-lg ${getAlertColor(alert.severity)}`}>
                       <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-2">
                           {getAlertIcon(alert.type)}
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-medium">{alert.clientName}</span>
+                              <span className="font-medium text-sm">{alert.clientName}</span>
                               <Badge variant={alert.severity === 'high' ? 'destructive' : 'secondary'} className="text-xs">
                                 {alert.severity === 'high' ? 'Crítico' : alert.severity === 'medium' ? 'Medio' : 'Bajo'}
                               </Badge>
                             </div>
-                            <p className="text-sm mt-1">{alert.message}</p>
+                            <p className="text-xs mt-1 text-gray-600">{alert.message}</p>
                           </div>
                         </div>
                         {alert.actionRequired && (
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" className="text-xs">
                             Revisar
                           </Button>
                         )}
@@ -241,32 +241,32 @@ export default function ExecutiveDashboard() {
               </CardContent>
             </Card>
 
-            {/* Proyectos Recientes */}
+            {/* Proyectos Recientes - Más compacto */}
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Proyectos Activos Recientes</CardTitle>
+                  <CardTitle className="text-lg">Proyectos Activos Recientes</CardTitle>
                   <Link href="/active-projects">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="text-xs">
                       Ver Todos
-                      <ArrowRight className="h-4 w-4 ml-1" />
+                      <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </Link>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentProjects.map((project: any, index) => (
-                    <div key={project.id || index} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <Avatar>
-                          <AvatarFallback className="bg-blue-100 text-blue-600">
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  {recentProjects.map((project: any, index: number) => (
+                    <div key={project.id || index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
                             {project.status === 'active' ? 'A' : 'P'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">Proyecto #{project.id}</h4>
+                            <h4 className="font-medium text-sm">Proyecto #{project.id}</h4>
                             {project.isAlwaysOnMacro && (
                               <Badge variant="secondary" className="text-xs">
                                 <Zap className="h-3 w-3 mr-1" />
@@ -274,14 +274,14 @@ export default function ExecutiveDashboard() {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600">Cliente ID: {project.clientId}</p>
+                          <p className="text-xs text-gray-600">Cliente ID: {project.clientId}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge variant={project.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                           {project.status === 'active' ? 'Activo' : 'En Planificación'}
                         </Badge>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           {new Date(project.startDate).toLocaleDateString()}
                         </p>
                       </div>
@@ -292,33 +292,33 @@ export default function ExecutiveDashboard() {
             </Card>
           </div>
 
-          {/* Sidebar derecho */}
-          <div className="space-y-6">
+          {/* Sidebar derecho - Más compacto */}
+          <div className="space-y-4">
             {/* Clientes Prioritarios */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-yellow-500" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Star className="h-4 w-4 text-yellow-500" />
                   Clientes Estratégicos
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {highPriorityClients.map((client: any, index) => (
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  {highPriorityClients.map((client: any, index: number) => (
                     <Link key={client.id || index} href={`/client-summary/${client.id}`}>
                       <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                         <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback className="bg-purple-100 text-purple-600">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-purple-100 text-purple-600 text-xs">
                               {client.name?.charAt(0) || 'C'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h4 className="font-medium">{client.name}</h4>
-                            <p className="text-sm text-gray-600">{client.contactName}</p>
+                            <h4 className="font-medium text-sm">{client.name}</h4>
+                            <p className="text-xs text-gray-600">{client.contactName}</p>
                           </div>
                         </div>
-                        <ArrowRight className="h-4 w-4 text-gray-400" />
+                        <ArrowRight className="h-3 w-3 text-gray-400" />
                       </div>
                     </Link>
                   ))}
@@ -328,32 +328,32 @@ export default function ExecutiveDashboard() {
 
             {/* Acciones Rápidas */}
             <Card>
-              <CardHeader>
-                <CardTitle>Acciones Rápidas</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="pt-0">
+                <div className="space-y-2">
                   <Link href="/optimized-quote">
-                    <Button className="w-full justify-start" variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button className="w-full justify-start text-xs" variant="outline" size="sm">
+                      <Plus className="h-3 w-3 mr-2" />
                       Nueva Cotización
                     </Button>
                   </Link>
                   <Link href="/active-projects/new">
-                    <Button className="w-full justify-start" variant="outline">
-                      <Briefcase className="h-4 w-4 mr-2" />
+                    <Button className="w-full justify-start text-xs" variant="outline" size="sm">
+                      <Briefcase className="h-3 w-3 mr-2" />
                       Nuevo Proyecto
                     </Button>
                   </Link>
                   <Link href="/clients">
-                    <Button className="w-full justify-start" variant="outline">
-                      <Building2 className="h-4 w-4 mr-2" />
+                    <Button className="w-full justify-start text-xs" variant="outline" size="sm">
+                      <Building2 className="h-3 w-3 mr-2" />
                       Gestionar Clientes
                     </Button>
                   </Link>
                   <Link href="/statistics">
-                    <Button className="w-full justify-start" variant="outline">
-                      <BarChart3 className="h-4 w-4 mr-2" />
+                    <Button className="w-full justify-start text-xs" variant="outline" size="sm">
+                      <BarChart3 className="h-3 w-3 mr-2" />
                       Analíticas
                     </Button>
                   </Link>
@@ -363,34 +363,34 @@ export default function ExecutiveDashboard() {
 
             {/* Métricas de Calidad */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-green-500" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-4 w-4 text-green-500" />
                   Métricas de Calidad
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="pt-0">
+                <div className="space-y-3">
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">NPS Promedio</span>
-                      <span className="text-sm font-bold text-green-600">+47</span>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-medium">NPS Promedio</span>
+                      <span className="text-xs font-bold text-green-600">+47</span>
                     </div>
-                    <Progress value={75} className="h-2" />
+                    <Progress value={75} className="h-1.5" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">Entrega a Tiempo</span>
-                      <span className="text-sm font-bold text-blue-600">89%</span>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-medium">Entrega a Tiempo</span>
+                      <span className="text-xs font-bold text-blue-600">89%</span>
                     </div>
-                    <Progress value={89} className="h-2" />
+                    <Progress value={89} className="h-1.5" />
                   </div>
                   <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium">Satisfacción Cliente</span>
-                      <span className="text-sm font-bold text-purple-600">4.2/5</span>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs font-medium">Satisfacción Cliente</span>
+                      <span className="text-xs font-bold text-purple-600">4.2/5</span>
                     </div>
-                    <Progress value={84} className="h-2" />
+                    <Progress value={84} className="h-1.5" />
                   </div>
                 </div>
               </CardContent>
