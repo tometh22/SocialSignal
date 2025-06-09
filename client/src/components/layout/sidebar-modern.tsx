@@ -43,7 +43,7 @@ export default function ModernSidebar() {
   const { user, logoutMutation } = useAuth();
   const [currentPath] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<string[]>(['principal']);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['Principal', 'Operaciones', 'Clientes & Análisis', 'Automatización']);
 
   const toggleSection = (sectionTitle: string) => {
     setExpandedSections(prev =>
@@ -105,7 +105,7 @@ export default function ModernSidebar() {
         key={item.href}
         href={item.href}
         className={cn(
-          "flex items-center px-3 py-3 rounded-lg text-sm transition-all duration-200 relative group",
+          "flex items-center px-3 py-2.5 rounded-lg text-sm transition-all duration-200 relative group",
           isActive
             ? "bg-blue-50 text-blue-700 font-medium shadow-sm border border-blue-200"
             : "text-gray-700 hover:text-gray-900 hover:bg-gray-100 border border-transparent",
@@ -113,11 +113,11 @@ export default function ModernSidebar() {
         )}
       >
         <div className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
+          "flex items-center justify-center w-7 h-7 rounded-md transition-colors",
           isActive ? "bg-blue-100" : "bg-gray-100 group-hover:bg-gray-200",
-          isCollapsed ? "mr-0" : "mr-3"
+          isCollapsed ? "mr-0" : "mr-2.5"
         )}>
-          <Icon className="h-4 w-4" />
+          <Icon className="h-3.5 w-3.5" />
         </div>
         
         {!isCollapsed && (
@@ -150,11 +150,11 @@ export default function ModernSidebar() {
     const isExpanded = expandedSections.includes(section.title);
     
     return (
-      <div key={section.title} className="px-4">
+      <div key={section.title} className="px-3">
         {section.collapsible ? (
           <div
             className={cn(
-              "flex items-center justify-between mb-3 px-2 cursor-pointer group",
+              "flex items-center justify-between mb-2 px-2 cursor-pointer group",
               isCollapsed && "justify-center"
             )}
             onClick={() => !isCollapsed && toggleSection(section.title)}
@@ -168,18 +168,18 @@ export default function ModernSidebar() {
             {!isCollapsed && (
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 text-gray-400 transition-transform group-hover:text-gray-600",
+                  "h-3 w-3 text-gray-400 transition-transform group-hover:text-gray-600",
                   isExpanded ? "transform rotate-180" : ""
                 )}
               />
             )}
             {isCollapsed && (
-              <div className="h-0.5 w-5 rounded-full bg-gray-300"></div>
+              <div className="h-0.5 w-4 rounded-full bg-gray-300"></div>
             )}
           </div>
         ) : (
           <div className={cn(
-            "flex items-center mb-3 px-2",
+            "flex items-center mb-2 px-2",
             isCollapsed && "justify-center"
           )}>
             <h3 className={cn(
@@ -189,13 +189,13 @@ export default function ModernSidebar() {
               {section.title}
             </h3>
             {isCollapsed && (
-              <div className="h-0.5 w-5 rounded-full bg-gray-300"></div>
+              <div className="h-0.5 w-4 rounded-full bg-gray-300"></div>
             )}
           </div>
         )}
         
         {(!section.collapsible || isExpanded || isCollapsed) && (
-          <nav className="space-y-2">
+          <nav className="space-y-1.5">
             {section.items.map((item) => renderNavLink(item))}
           </nav>
         )}
@@ -207,26 +207,26 @@ export default function ModernSidebar() {
     <motion.div
       className={cn(
         "fixed top-0 bottom-0 left-0 z-50 h-screen flex flex-col bg-white border-r border-gray-200 shadow-xl md:shadow-lg md:relative md:z-0",
-        isCollapsed ? "w-[72px]" : "w-[280px]"
+        isCollapsed ? "w-[72px]" : "w-[260px]"
       )}
       initial={false}
       animate={{
-        width: isCollapsed ? 72 : 280,
+        width: isCollapsed ? 72 : 260,
         transition: { duration: 0.2 }
       }}
     >
       {/* Header */}
       <div className={cn(
-        "flex items-center justify-between py-5 px-4 border-b border-gray-200 bg-white",
+        "flex items-center justify-between py-4 px-3 border-b border-gray-200 bg-white",
         isCollapsed && "justify-center"
       )}>
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-            <span className="text-white font-bold text-lg">M</span>
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
+            <span className="text-white font-bold text-sm">M</span>
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="text-lg font-bold text-gray-900 tracking-tight">
+              <span className="text-base font-bold text-gray-900 tracking-tight">
                 Mind
               </span>
               <span className="text-xs text-gray-500 font-medium">
@@ -241,15 +241,15 @@ export default function ModernSidebar() {
             variant="ghost"
             size="sm"
             onClick={() => setIsCollapsed(true)}
-            className="h-8 w-8 text-gray-400 hover:text-gray-600 transition-colors"
+            className="h-7 w-7 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-4 bg-gray-50/30">
+      <div className="flex-1 overflow-y-auto py-3 space-y-3 bg-gray-50/30">
         {navSections.map(renderSection)}
       </div>
 
