@@ -302,13 +302,13 @@ export default function RecurringTemplatesPage() {
                 Nueva Plantilla
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader className="pb-6">
-                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                  <Repeat className="h-6 w-6 text-blue-600" />
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader className="pb-4 border-b">
+                <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                  <Repeat className="h-5 w-5 text-blue-600" />
                   Crear Plantilla Recurrente
                 </DialogTitle>
-                <p className="text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-1">
                   Configura una plantilla para automatizar la creación de proyectos recurrentes
                 </p>
               </DialogHeader>
@@ -317,25 +317,25 @@ export default function RecurringTemplatesPage() {
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   handleCreateTemplate(new FormData(e.currentTarget));
-                }} className="space-y-6">
+                }} className="space-y-6 pt-4">
                   
                   {/* Basic Information Section */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      <h3 className="text-lg font-semibold">Información Básica</h3>
+                    <div className="flex items-center gap-2 pb-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <h3 className="text-base font-medium text-gray-900">Información Básica</h3>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="templateName" className="text-sm font-medium">Nombre de Plantilla</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Nombre identificativo para esta plantilla. Ejemplo: "Reporte Mensual de Redes Sociales"</p>
+                              <p className="max-w-xs text-xs">Nombre identificativo para esta plantilla. Ejemplo: "Reporte Mensual de Redes Sociales"</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -343,25 +343,25 @@ export default function RecurringTemplatesPage() {
                           id="templateName" 
                           name="templateName" 
                           placeholder="Ej: Reporte Mensual de Análisis"
-                          className="h-11"
+                          className="h-10"
                           required 
                         />
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="deliverableType" className="text-sm font-medium">Tipo de Entregable</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Categoría del producto o servicio que se entregará al cliente</p>
+                              <p className="max-w-xs text-xs">Categoría del producto o servicio que se entregará al cliente</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <Select name="deliverableType" required>
-                          <SelectTrigger className="h-11">
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Seleccionar tipo de entregable" />
                           </SelectTrigger>
                           <SelectContent>
@@ -378,35 +378,32 @@ export default function RecurringTemplatesPage() {
 
                   {/* Timing & Budget Section */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Calendar className="h-5 w-5 text-green-600" />
-                      <h3 className="text-lg font-semibold">Configuración de Tiempo y Presupuesto</h3>
+                    <div className="flex items-center gap-2 pb-2">
+                      <Calendar className="h-4 w-4 text-green-600" />
+                      <h3 className="text-base font-medium text-gray-900">Configuración de Tiempo y Presupuesto</h3>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="frequency" className="text-sm font-medium">Frecuencia</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Con qué frecuencia se debe generar automáticamente este proyecto</p>
+                              <p className="max-w-xs text-xs">Con qué frecuencia se debe generar automáticamente este proyecto</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <Select name="frequency" required>
-                          <SelectTrigger className="h-11">
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Seleccionar frecuencia" />
                           </SelectTrigger>
                           <SelectContent>
                             {frequencyOptions.map(freq => (
                               <SelectItem key={freq.value} value={freq.value}>
-                                <div className="flex items-center gap-2">
-                                  <Repeat className="h-4 w-4" />
-                                  {freq.label}
-                                </div>
+                                {freq.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -414,51 +411,51 @@ export default function RecurringTemplatesPage() {
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="estimatedHours" className="text-sm font-medium">Horas Estimadas</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Tiempo estimado para completar este proyecto (se calcula automáticamente si asignas equipo)</p>
+                              <p className="max-w-xs text-xs">Tiempo estimado para completar este proyecto (se calcula automáticamente si asignas equipo)</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="relative">
-                          <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                           <Input 
                             id="estimatedHours" 
                             name="estimatedHours" 
                             type="number" 
                             step="0.5"
                             placeholder="Ej: 40"
-                            className="h-11 pl-10"
+                            className="h-10 pl-9"
                           />
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="baseBudget" className="text-sm font-medium">Presupuesto Base</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Presupuesto estimado para este proyecto (se calcula automáticamente si asignas equipo)</p>
+                              <p className="max-w-xs text-xs">Presupuesto estimado para este proyecto (se calcula automáticamente si asignas equipo)</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                           <Input 
                             id="baseBudget" 
                             name="baseBudget" 
                             type="number" 
                             step="0.01"
                             placeholder="Ej: 5000"
-                            className="h-11 pl-10"
+                            className="h-10 pl-9"
                           />
                         </div>
                       </div>
@@ -467,21 +464,21 @@ export default function RecurringTemplatesPage() {
 
                   {/* Advanced Configuration */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Settings className="h-5 w-5 text-purple-600" />
-                      <h3 className="text-lg font-semibold">Configuración Avanzada</h3>
+                    <div className="flex items-center gap-2 pb-2">
+                      <Settings className="h-4 w-4 text-purple-600" />
+                      <h3 className="text-base font-medium text-gray-900">Configuración Avanzada</h3>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="description" className="text-sm font-medium">Descripción</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Descripción detallada de lo que incluye este proyecto recurrente</p>
+                              <p className="max-w-xs text-xs">Descripción detallada de lo que incluye este proyecto recurrente</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -489,24 +486,24 @@ export default function RecurringTemplatesPage() {
                           id="description" 
                           name="description" 
                           placeholder="Describe el alcance y objetivos del proyecto..."
-                          className="min-h-[100px] resize-none"
+                          className="min-h-[80px] resize-none"
                         />
                       </div>
                       
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Label htmlFor="autoCreateDaysInAdvance" className="text-sm font-medium">Días de Anticipación</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Cuántos días antes de la fecha objetivo se debe crear automáticamente el proyecto</p>
+                              <p className="max-w-xs text-xs">Cuántos días antes de la fecha objetivo se debe crear automáticamente el proyecto</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="relative">
-                          <Target className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Target className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                           <Input 
                             id="autoCreateDaysInAdvance" 
                             name="autoCreateDaysInAdvance" 
@@ -514,35 +511,35 @@ export default function RecurringTemplatesPage() {
                             defaultValue="7"
                             min="1"
                             max="30"
-                            className="h-11 pl-10"
+                            className="h-10 pl-9"
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">Recomendado: 7 días</p>
+                        <p className="text-xs text-gray-500">Recomendado: 7 días</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Team Assignment Section */}
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Users className="h-5 w-5 text-orange-600" />
-                      <h3 className="text-lg font-semibold">Asignación de Equipo</h3>
+                    <div className="flex items-center gap-2 pb-2">
+                      <Users className="h-4 w-4 text-orange-600" />
+                      <h3 className="text-base font-medium text-gray-900">Asignación de Equipo</h3>
                     </div>
                     
-                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-orange-50 to-yellow-50">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-base font-medium">Activar Asignación de Equipo</Label>
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-gradient-to-r from-orange-50 to-yellow-50">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Label className="text-sm font-medium">Activar Asignación de Equipo</Label>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">Asigna miembros del equipo con horas específicas para calcular automáticamente el costo real del proyecto</p>
+                              <p className="max-w-xs text-xs">Asigna miembros del equipo con horas específicas para calcular automáticamente el costo real del proyecto</p>
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <p className="text-sm text-muted-foreground">Selecciona el equipo y las horas estimadas para calcular el costo del proyecto</p>
+                        <p className="text-xs text-gray-600">Selecciona el equipo y las horas estimadas para calcular el costo del proyecto</p>
                       </div>
                       <Switch 
                         checked={showTeamSection} 
@@ -551,37 +548,37 @@ export default function RecurringTemplatesPage() {
                     </div>
                   
                   {showTeamSection && (
-                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50 max-h-80 overflow-y-auto">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-3 border rounded-lg p-3 bg-gray-50 max-h-80 overflow-y-auto">
+                      <div className="grid grid-cols-1 gap-2">
                         {personnel.map((person: any) => (
-                          <div key={person.id} className="flex items-center justify-between p-2 border rounded bg-white text-sm">
-                            <div className="flex items-center space-x-2 flex-1">
+                          <div key={person.id} className="flex items-center justify-between p-3 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center space-x-3 flex-1">
                               <input
                                 type="checkbox"
-                                className="rounded w-4 h-4"
+                                className="rounded w-4 h-4 text-blue-600"
                                 checked={selectedTeamMembers[person.id] !== undefined}
                                 onChange={(e) => handleTeamMemberToggle(person.id, e.target.checked)}
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{person.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  ${person.hourlyRate || 50}/h
+                                <p className="font-medium text-sm truncate">{person.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  ${person.hourlyRate || 50}/hora
                                 </p>
                               </div>
                             </div>
                             
                             {selectedTeamMembers[person.id] && (
-                              <div className="flex items-center space-x-1 ml-2">
+                              <div className="flex items-center space-x-2">
                                 <Input
                                   type="number"
-                                  className="w-16 h-8 text-xs"
+                                  className="w-20 h-8 text-xs"
                                   min="0"
                                   step="0.5"
                                   placeholder="hrs"
                                   value={selectedTeamMembers[person.id]?.hours || ''}
                                   onChange={(e) => handleHoursChange(person.id, parseFloat(e.target.value) || 0)}
                                 />
-                                <span className="text-xs font-medium min-w-0 text-right">
+                                <span className="text-xs font-semibold text-blue-600 min-w-0">
                                   ${((selectedTeamMembers[person.id]?.hours || 0) * (person.hourlyRate || 50)).toFixed(0)}
                                 </span>
                               </div>
