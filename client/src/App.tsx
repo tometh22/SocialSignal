@@ -2,6 +2,7 @@ import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard-fixed-corrected";
+import ExecutiveDashboard from "@/pages/executive-dashboard";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
@@ -104,7 +105,7 @@ function AppRoutes() {
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
-                  <ProtectedRoute path="/" component={Dashboard} />
+                  <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
