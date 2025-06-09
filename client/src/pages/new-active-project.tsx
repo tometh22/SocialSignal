@@ -151,17 +151,41 @@ const NewActiveProject: React.FC = () => {
   const [stepsCompleted, setStepsCompleted] = useState<number[]>([]);
   const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
   
-  // Queries para obtener datos
-  const { data: quotations, isLoading: isLoadingQuotations } = useQuery({
+  // Queries para obtener datos con timeout y manejo de errores
+  const { data: quotations = [], isLoading: isLoadingQuotations, error: quotationsError } = useQuery({
     queryKey: ["/api/quotations"],
+    queryFn: async () => {
+      const response = await fetch("/api/quotations");
+      if (!response.ok) throw new Error("Error al cargar cotizaciones");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 500,
   });
 
-  const { data: statusOptions, isLoading: isLoadingStatusOptions } = useQuery({
+  const { data: statusOptions = [], isLoading: isLoadingStatusOptions, error: statusError } = useQuery({
     queryKey: ["/api/options/project-status"],
+    queryFn: async () => {
+      const response = await fetch("/api/options/project-status");
+      if (!response.ok) throw new Error("Error al cargar estados");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 500,
   });
 
-  const { data: trackingOptions, isLoading: isLoadingTrackingOptions } = useQuery({
+  const { data: trackingOptions = [], isLoading: isLoadingTrackingOptions, error: trackingError } = useQuery({
     queryKey: ["/api/options/tracking-frequency"],
+    queryFn: async () => {
+      const response = await fetch("/api/options/tracking-frequency");
+      if (!response.ok) throw new Error("Error al cargar opciones de seguimiento");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 500,
   });
 
   // Filtrar cotizaciones aprobadas
@@ -266,6 +290,52 @@ const NewActiveProject: React.FC = () => {
   // Estado de carga
   const isLoading = isLoadingQuotations || isLoadingStatusOptions || isLoadingTrackingOptions;
   const isSubmitting = createProjectMutation.isPending;
+
+  console.log("Estados de carga:", {
+    isLoadingQuotations,
+    isLoadingStatusOptions, 
+    isLoadingTrackingOptions,
+    isLoading,
+    quotationsLength: quotations?.length,
+    approvedLength: approvedQuotations.length,
+    errors: { quotationsError, statusError, trackingError }
+  });
+
+  // Mostrar errores si los hay
+  if (quotationsError || statusError || trackingError) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </Button>
+          <h1 className="text-3xl font-bold ml-4">Nuevo Proyecto</h1>
+        </div>
+        
+        <Card className="mx-auto max-w-3xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl text-red-600">Error al cargar datos</CardTitle>
+            <CardDescription className="max-w-md mx-auto">
+              No se pudieron cargar los datos necesarios para crear un proyecto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-gray-600">
+              {quotationsError && <p>Error cargando cotizaciones: {quotationsError.message}</p>}
+              {statusError && <p>Error cargando estados: {statusError.message}</p>}
+              {trackingError && <p>Error cargando opciones de seguimiento: {trackingError.message}</p>}
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   // Renderizar mensaje si no hay cotizaciones aprobadas
   if (!isLoading && approvedQuotations.length === 0) {
