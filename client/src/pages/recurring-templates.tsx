@@ -245,8 +245,8 @@ export default function RecurringTemplatesPage() {
             Volver a Proyectos
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Gestión de Recurrencia</h1>
-            <p className="text-muted-foreground">Plantillas y automatización para proyectos Always-On</p>
+            <h1 className="text-3xl font-bold">Automatización Always-On</h1>
+            <p className="text-muted-foreground">Configuración de proyectos recurrentes y ciclos automáticos</p>
           </div>
         </div>
 
@@ -254,7 +254,7 @@ export default function RecurringTemplatesPage() {
           {!showWizard && (
             <Button onClick={() => setShowWizard(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Nueva Plantilla
+              Nueva Configuración Recurrente
             </Button>
           )}
         </div>
@@ -265,7 +265,7 @@ export default function RecurringTemplatesPage() {
         <div className="bg-white border rounded-lg shadow-sm mb-6">
           <div className="p-6 border-b">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Crear Nueva Plantilla Recurrente</h2>
+              <h2 className="text-xl font-semibold">Configurar Automatización Recurrente</h2>
               <Button variant="outline" size="sm" onClick={resetWizard}>
                 <X className="h-4 w-4" />
               </Button>
@@ -523,11 +523,11 @@ export default function RecurringTemplatesPage() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="templates">
                 <Settings className="h-4 w-4 mr-2" />
-                Plantillas ({templates.length})
+                Configuraciones Recurrentes ({templates.length})
               </TabsTrigger>
               <TabsTrigger value="cycles">
                 <Calendar className="h-4 w-4 mr-2" />
-                Ciclos Generados ({cycles.length})
+                Ciclos Automáticos ({cycles.length})
               </TabsTrigger>
             </TabsList>
 
@@ -539,7 +539,7 @@ export default function RecurringTemplatesPage() {
                   </div>
                 ) : templates.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No hay plantillas configuradas
+                    No hay configuraciones recurrentes establecidas
                   </div>
                 ) : (
                   templates.map((template: RecurringTemplate) => (
@@ -615,7 +615,7 @@ export default function RecurringTemplatesPage() {
                   </div>
                 ) : cycles.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No hay ciclos generados
+                    No hay ciclos automáticos generados
                   </div>
                 ) : (
                   cycles.map((cycle: ProjectCycle) => (
