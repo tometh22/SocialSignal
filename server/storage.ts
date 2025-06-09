@@ -1445,6 +1445,341 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
   }
+
+  // =============== PLANTILLAS RECURRENTES ===============
+
+  async getRecurringTemplatesByProject(parentProjectId: number): Promise<RecurringProjectTemplate[]> {
+    return await db.select()
+      .from(recurringProjectTemplates)
+      .where(eq(recurringProjectTemplates.parentProjectId, parentProjectId))
+      .orderBy(recurringProjectTemplates.templateName);
+  }
+
+  async getRecurringTemplate(id: number): Promise<RecurringProjectTemplate | undefined> {
+    const [template] = await db.select().from(recurringProjectTemplates)
+      .where(eq(recurringProjectTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createRecurringTemplate(template: InsertRecurringProjectTemplate): Promise<RecurringProjectTemplate> {
+    const [created] = await db.insert(recurringProjectTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateRecurringTemplate(id: number, template: Partial<InsertRecurringProjectTemplate>): Promise<RecurringProjectTemplate | undefined> {
+    try {
+      const [updated] = await db.update(recurringProjectTemplates)
+        .set(template)
+        .where(eq(recurringProjectTemplates.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating recurring template:", error);
+      return undefined;
+    }
+  }
+
+  async deleteRecurringTemplate(id: number): Promise<boolean> {
+    try {
+      await db.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting recurring template:", error);
+      return false;
+    }
+  }
+
+  // =============== CICLOS DE PROYECTO ===============
+
+  async getProjectCycles(parentProjectId: number): Promise<ProjectCycle[]> {
+    return await db.select()
+      .from(projectCycles)
+      .where(eq(projectCycles.parentProjectId, parentProjectId))
+      .orderBy(desc(projectCycles.startDate));
+  }
+
+  async getProjectCycle(id: number): Promise<ProjectCycle | undefined> {
+    const [cycle] = await db.select().from(projectCycles)
+      .where(eq(projectCycles.id, id));
+    return cycle || undefined;
+  }
+
+  async createProjectCycle(cycle: InsertProjectCycle): Promise<ProjectCycle> {
+    const [created] = await db.insert(projectCycles).values(cycle).returning();
+    return created;
+  }
+
+  async updateProjectCycle(id: number, cycle: Partial<InsertProjectCycle>): Promise<ProjectCycle | undefined> {
+    try {
+      const [updated] = await db.update(projectCycles)
+        .set(cycle)
+        .where(eq(projectCycles.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating project cycle:", error);
+      return undefined;
+    }
+  }
+
+  async completeProjectCycle(id: number): Promise<ProjectCycle | undefined> {
+    try {
+      // Obtener el ciclo actual
+      const cycle = await this.getProjectCycle(id);
+      if (!cycle) return undefined;
+
+      // Calcular el costo real basado en horas registradas si hay subproyecto
+      let actualCost = 0;
+      let budgetVariance = 0;
+
+      if (cycle.subprojectId) {
+        const costSummary = await this.getProjectCostSummary(cycle.subprojectId);
+        actualCost = costSummary.totalCost;
+        
+        // Obtener template para comparar con presupuesto base
+        if (cycle.templateId) {
+          const template = await this.getRecurringTemplate(cycle.templateId);
+          if (template && template.baseBudget) {
+            budgetVariance = actualCost - template.baseBudget;
+          }
+        }
+      }
+
+      // Actualizar ciclo como completado
+      const [updated] = await db.update(projectCycles)
+        .set({
+          status: 'completed',
+          actualCost,
+          budgetVariance,
+          completedAt: new Date()
+        })
+        .where(eq(projectCycles.id, id))
+        .returning();
+
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error completing project cycle:", error);
+      return undefined;
+    }
+  }
+
+  // =============== AUTOMATIZACIÓN ===============
+
+  async autoGenerateSubprojects(
+    parentProjectId: number, 
+    templateId: number, 
+    periodStart: Date, 
+    periodEnd: Date
+  ): Promise<ActiveProject[]> {
+    try {
+      const template = await this.getRecurringTemplate(templateId);
+      if (!template) throw new Error("Template not found");
+
+      const parentProject = await this.getActiveProject(parentProjectId);
+      if (!parentProject) throw new Error("Parent project not found");
+
+      const generatedProjects: ActiveProject[] = [];
+      
+      // Generar subproyectos basados en la frecuencia
+      let currentDate = new Date(periodStart);
+      const endDate = new Date(periodEnd);
+
+      while (currentDate <= endDate) {
+        const cycleName = this.generateCycleName(template.frequency, currentDate);
+        const cycleEnd = this.calculateCycleEnd(template.frequency, currentDate);
+
+        // Crear ciclo de proyecto
+        const cycle = await this.createProjectCycle({
+          parentProjectId,
+          templateId,
+          cycleName,
+          cycleType: template.frequency,
+          startDate: new Date(currentDate),
+          endDate: cycleEnd,
+          status: 'upcoming'
+        });
+
+        // Crear subproyecto basado en la plantilla
+        const subprojectData: InsertActiveProject = {
+          quotationId: parentProject.quotationId,
+          clientId: parentProject.clientId,
+          parentProjectId,
+          startDate: new Date(currentDate),
+          expectedEndDate: cycleEnd,
+          status: 'active',
+          trackingFrequency: 'weekly',
+          subprojectName: cycleName,
+          deliverableType: template.deliverableType,
+          deliverableFrequency: template.frequency,
+          deliverableBudget: template.baseBudget,
+          deliverableDescription: template.description,
+          completionStatus: 'pending'
+        };
+
+        const subproject = await this.createActiveProject(subprojectData);
+        generatedProjects.push(subproject);
+
+        // Actualizar ciclo con referencia al subproyecto
+        await this.updateProjectCycle(cycle.id, { subprojectId: subproject.id });
+
+        // Avanzar a la siguiente fecha según frecuencia
+        currentDate = this.getNextCycleDate(template.frequency, currentDate);
+      }
+
+      return generatedProjects;
+    } catch (error) {
+      console.error("Error auto-generating subprojects:", error);
+      throw error;
+    }
+  }
+
+  async checkAndCreatePendingCycles(): Promise<ProjectCycle[]> {
+    try {
+      // Obtener todas las plantillas activas
+      const templates = await db.select()
+        .from(recurringProjectTemplates)
+        .where(eq(recurringProjectTemplates.isActive, true));
+
+      const createdCycles: ProjectCycle[] = [];
+      const today = new Date();
+
+      for (const template of templates) {
+        // Verificar si necesita crear próximo ciclo
+        const shouldCreate = await this.shouldCreateNextCycle(template, today);
+        
+        if (shouldCreate) {
+          const nextCycleStart = this.calculateNextCycleStart(template);
+          const nextCycleEnd = this.calculateCycleEnd(template.frequency, nextCycleStart);
+          const cycleName = this.generateCycleName(template.frequency, nextCycleStart);
+
+          const cycle = await this.createProjectCycle({
+            parentProjectId: template.parentProjectId,
+            templateId: template.id,
+            cycleName,
+            cycleType: template.frequency,
+            startDate: nextCycleStart,
+            endDate: nextCycleEnd,
+            status: 'upcoming'
+          });
+
+          createdCycles.push(cycle);
+        }
+      }
+
+      return createdCycles;
+    } catch (error) {
+      console.error("Error checking pending cycles:", error);
+      throw error;
+    }
+  }
+
+  // =============== MÉTODOS AUXILIARES PARA AUTOMATIZACIÓN ===============
+
+  private generateCycleName(frequency: string, date: Date): string {
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    
+    switch (frequency) {
+      case 'monthly':
+        return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+      case 'weekly':
+        const weekNum = Math.ceil(date.getDate() / 7);
+        return `Semana ${weekNum} - ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+      case 'biweekly':
+        const biweekNum = Math.ceil(date.getDate() / 14);
+        return `Quincena ${biweekNum} - ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+      default:
+        return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+    }
+  }
+
+  private calculateCycleEnd(frequency: string, startDate: Date): Date {
+    const endDate = new Date(startDate);
+    
+    switch (frequency) {
+      case 'weekly':
+        endDate.setDate(endDate.getDate() + 6);
+        break;
+      case 'biweekly':
+        endDate.setDate(endDate.getDate() + 13);
+        break;
+      case 'monthly':
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(endDate.getDate() - 1);
+        break;
+      default:
+        endDate.setMonth(endDate.getMonth() + 1);
+        break;
+    }
+    
+    return endDate;
+  }
+
+  private getNextCycleDate(frequency: string, currentDate: Date): Date {
+    const nextDate = new Date(currentDate);
+    
+    switch (frequency) {
+      case 'weekly':
+        nextDate.setDate(nextDate.getDate() + 7);
+        break;
+      case 'biweekly':
+        nextDate.setDate(nextDate.getDate() + 14);
+        break;
+      case 'monthly':
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        break;
+    }
+    
+    return nextDate;
+  }
+
+  private async shouldCreateNextCycle(template: RecurringProjectTemplate, today: Date): Promise<boolean> {
+    // Obtener el último ciclo para esta plantilla
+    const [lastCycle] = await db.select()
+      .from(projectCycles)
+      .where(eq(projectCycles.templateId, template.id))
+      .orderBy(desc(projectCycles.endDate))
+      .limit(1);
+
+    if (!lastCycle) return true; // No hay ciclos, crear el primero
+
+    // Verificar si debe crear basado en días de anticipación
+    const nextCycleStart = this.calculateNextCycleStart(template);
+    const daysUntilNext = Math.ceil((nextCycleStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysUntilNext <= (template.autoCreateDaysInAdvance || 7);
+  }
+
+  private calculateNextCycleStart(template: RecurringProjectTemplate): Date {
+    const today = new Date();
+    const nextStart = new Date(today);
+    
+    switch (template.frequency) {
+      case 'monthly':
+        if (template.dayOfMonth) {
+          nextStart.setDate(template.dayOfMonth);
+          if (nextStart <= today) {
+            nextStart.setMonth(nextStart.getMonth() + 1);
+          }
+        } else {
+          nextStart.setMonth(nextStart.getMonth() + 1);
+          nextStart.setDate(1);
+        }
+        break;
+      case 'weekly':
+        if (template.dayOfWeek !== null && template.dayOfWeek !== undefined) {
+          const daysUntilNext = (template.dayOfWeek - today.getDay() + 7) % 7;
+          nextStart.setDate(today.getDate() + (daysUntilNext === 0 ? 7 : daysUntilNext));
+        } else {
+          nextStart.setDate(today.getDate() + 7);
+        }
+        break;
+      default:
+        nextStart.setDate(today.getDate() + 7);
+    }
+    
+    return nextStart;
+  }
 }
 
 // Exportar solo la implementación de base de datos
