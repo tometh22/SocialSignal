@@ -1164,6 +1164,122 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // ==================== RECURRING TEMPLATES OPERATIONS ====================
+  
+  async createRecurringTemplate(template: any): Promise<any> {
+    try {
+      const [newTemplate] = await db.insert(recurringProjectTemplates).values({
+        parentProjectId: template.parentProjectId,
+        templateName: template.templateName,
+        deliverableType: template.deliverableType,
+        frequency: template.frequency,
+        dayOfMonth: template.dayOfMonth,
+        dayOfWeek: template.dayOfWeek,
+        estimatedHours: template.estimatedHours,
+        baseBudget: template.baseBudget,
+        description: template.description,
+        autoCreateDaysInAdvance: template.autoCreateDaysInAdvance,
+        createdBy: template.createdBy
+      }).returning();
+
+      // If team members are provided, create the assignments
+      if (template.teamMembers && template.teamMembers.length > 0) {
+        const teamAssignments = template.teamMembers.map((member: any) => ({
+          templateId: newTemplate.id,
+          personnelId: member.personnelId,
+          estimatedHours: member.estimatedHours,
+          isRequired: member.isRequired
+        }));
+
+        await db.insert(recurringTemplatePersonnel).values(teamAssignments);
+      }
+
+      return newTemplate;
+    } catch (error) {
+      console.error('Error creating recurring template:', error);
+      throw error;
+    }
+  }
+
+  async getRecurringTemplatesByProject(projectId: number): Promise<any[]> {
+    try {
+      const templates = await db.select().from(recurringProjectTemplates)
+        .where(eq(recurringProjectTemplates.parentProjectId, projectId))
+        .orderBy(desc(recurringProjectTemplates.createdAt));
+
+      // Get team members for each template
+      for (const template of templates) {
+        const teamMembers = await db.select({
+          id: recurringTemplatePersonnel.id,
+          templateId: recurringTemplatePersonnel.templateId,
+          personnelId: recurringTemplatePersonnel.personnelId,
+          personnelName: personnel.name,
+          roleName: roles.name,
+          hourlyRate: personnel.hourlyRate,
+          estimatedHours: recurringTemplatePersonnel.estimatedHours,
+          isRequired: recurringTemplatePersonnel.isRequired
+        })
+        .from(recurringTemplatePersonnel)
+        .leftJoin(personnel, eq(recurringTemplatePersonnel.personnelId, personnel.id))
+        .leftJoin(roles, eq(personnel.roleId, roles.id))
+        .where(eq(recurringTemplatePersonnel.templateId, template.id));
+
+        template.teamMembers = teamMembers.map(member => ({
+          ...member,
+          totalCost: member.estimatedHours * (member.hourlyRate || 50)
+        }));
+
+        template.totalEstimatedCost = template.teamMembers.reduce((sum: number, member: any) => 
+          sum + member.totalCost, 0);
+      }
+
+      return templates;
+    } catch (error) {
+      console.error('Error fetching recurring templates:', error);
+      return [];
+    }
+  }
+
+  async updateRecurringTemplate(id: number, template: any): Promise<any> {
+    try {
+      const [updated] = await db.update(recurringProjectTemplates)
+        .set({
+          templateName: template.templateName,
+          deliverableType: template.deliverableType,
+          frequency: template.frequency,
+          dayOfMonth: template.dayOfMonth,
+          dayOfWeek: template.dayOfWeek,
+          estimatedHours: template.estimatedHours,
+          baseBudget: template.baseBudget,
+          description: template.description,
+          autoCreateDaysInAdvance: template.autoCreateDaysInAdvance,
+          isActive: template.isActive
+        })
+        .where(eq(recurringProjectTemplates.id, id))
+        .returning();
+
+      return updated;
+    } catch (error) {
+      console.error('Error updating recurring template:', error);
+      throw error;
+    }
+  }
+
+  async deleteRecurringTemplate(id: number): Promise<boolean> {
+    try {
+      // First delete team assignments
+      await db.delete(recurringTemplatePersonnel).where(eq(recurringTemplatePersonnel.templateId, id));
+      
+      // Then delete the template
+      await db.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.id, id));
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting recurring template:', error);
+      return false;
+    }
+  }
+
   // Métodos faltantes para corregir errores de TypeScript
   async getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
     try {
