@@ -1,297 +1,413 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
+
 import {
-  PlusCircle,
-  List,
+  LayoutDashboard,
+  FileText,
+  Briefcase,
   Users,
-  History,
+  BarChart3,
   Settings,
+  LogOut,
+  Plus,
+  Zap,
+  Building2,
+  Clock,
+  Search,
+  Bell,
   Menu,
   X,
-  Home,
-  BarChart,
   ChevronRight,
+  Sparkles,
+  TrendingUp,
+  Calendar,
+  FolderOpen,
+  Star,
   Activity,
-  PieChart,
-  LineChart,
-  ClipboardList,
-  LogOut
+  Database,
 } from "lucide-react";
 
-export default function Sidebar() {
-  const [location] = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [time, setTime] = useState(new Date());
-  
-  // Actualizar tiempo cada minuto
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTime(new Date());
-    }, 60000);
-    
-    return () => {
-      clearInterval(timer);
-    };
-  }, []);
+type NavItem = {
+  href: string;
+  title: string;
+  icon: any;
+  badge?: string | number;
+  status?: 'new' | 'updated' | 'hot';
+  description?: string;
+  shortcut?: string;
+  color?: string;
+};
 
-  // Elementos de navegación organizados por categorías
-  const navCategories = {
-    general: [
-      { href: "/", label: "Dashboard", icon: BarChart }
-    ],
-    cotizaciones: [
-      { href: "/optimized-quote", label: "Nueva Cotización", icon: PlusCircle, highlight: false },
-      { href: "/manage-quotes", label: "Gestionar Cotizaciones", icon: List }
-    ],
-    proyectos: [
-      { href: "/active-projects", label: "Proyectos Activos", icon: ClipboardList, highlight: true }
-    ],
-    datos: [
-      { href: "/clients", label: "Clientes", icon: Users },
-      { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart }
-    ],
-    sistema: [
-      { href: "/admin", label: "Panel Admin", icon: Settings }
-    ]
-  };
-  
-  // Toggle mobile menu
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+type NavSection = {
+  id: string;
+  title: string;
+  items: NavItem[];
+  canPin?: boolean;
+};
+
+export default function SidebarImproved() {
+  const { user, logoutMutation } = useAuth();
+  const [currentPath] = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [pinnedItems, setPinnedItems] = useState<string[]>([]);
+
+  const getUserInitials = () => {
+    if (!user) return "M";
+    return `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`;
   };
 
-  // Close mobile menu when a link is clicked
-  const handleNavigation = () => {
-    if (mobileMenuOpen) {
-      setMobileMenuOpen(false);
+  const getUserName = () => {
+    if (!user) return "Mind";
+    return `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Usuario";
+  };
+
+  // Navegación estructurada similar a la imagen
+  const navSections: NavSection[] = [
+    {
+      id: "principal",
+      title: "PRINCIPAL",
+      items: [
+        { 
+          href: "/", 
+          title: "Dashboard", 
+          icon: LayoutDashboard, 
+          description: "Vista general",
+          color: "blue"
+        },
+      ]
+    },
+    {
+      id: "flujo-trabajo",
+      title: "FLUJO DE TRABAJO",
+      items: [
+        { 
+          href: "/optimized-quote", 
+          title: "Nueva Cotización", 
+          icon: Plus, 
+          status: 'hot' as const, 
+          description: "Crear propuesta",
+          color: "red"
+        },
+        { 
+          href: "/active-projects", 
+          title: "Proyectos", 
+          icon: FolderOpen, 
+          badge: 12, 
+          description: "En curso",
+          color: "purple"
+        },
+        { 
+          href: "/manage-quotes", 
+          title: "Cotizaciones", 
+          icon: FileText, 
+          description: "Gestionar propuestas",
+          color: "orange"
+        },
+      ]
+    },
+    {
+      id: "clientes",
+      title: "CLIENTES",
+      items: [
+        { 
+          href: "/clients", 
+          title: "Base de Clientes", 
+          icon: Building2, 
+          description: "Gestión de clientes",
+          color: "cyan"
+        },
+        { 
+          href: "/statistics", 
+          title: "Análisis", 
+          icon: TrendingUp, 
+          description: "Métricas y KPIs",
+          color: "pink"
+        },
+      ]
+    },
+    {
+      id: "automatizacion",
+      title: "AUTOMATIZACIÓN",
+      items: [
+        { 
+          href: "/recurring-templates", 
+          title: "Always-On", 
+          icon: Zap, 
+          status: 'new' as const, 
+          description: "Servicios recurrentes",
+          color: "yellow"
+        },
+      ]
     }
-  };
+  ];
 
-  const renderNavLink = (item: any, mobile = false) => {
-    const Icon = item.icon;
-    const isActive = location === item.href;
+  const renderNavItem = (item: NavItem) => {
+    const isActive = currentPath === item.href;
     
+    const statusColors = {
+      hot: "bg-red-500 text-white text-xs px-2 py-1 rounded-md font-medium",
+      new: "bg-green-500 text-white text-xs px-2 py-1 rounded-md font-medium", 
+      updated: "bg-blue-500 text-white text-xs px-2 py-1 rounded-md font-medium"
+    };
+
     return (
-      <Link 
-        key={item.href} 
-        href={item.href}
-        onClick={mobile ? handleNavigation : undefined}
-        className={cn(
-          "group flex items-center px-4 py-3 my-1 text-sm font-medium rounded-lg transition-all duration-300",
-          isActive 
-            ? "bg-gradient-to-r from-blue-900/70 to-slate-800 text-blue-300 shadow-md" 
-            : "text-slate-300 hover:bg-slate-800/70 hover:text-white",
-          item.highlight && !isActive && "bg-gradient-to-r from-blue-900/20 to-slate-800/20"
-        )}
+      <motion.div
+        key={item.href}
+        whileHover={{ x: 1 }}
+        whileTap={{ scale: 0.98 }}
       >
-        <div className={cn(
-          "flex items-center justify-center w-9 h-9 rounded-lg mr-3 transition-all duration-300",
-          isActive 
-            ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30 scale-110" 
-            : "bg-slate-800 text-slate-400 group-hover:text-blue-300 group-hover:bg-slate-700 transform group-hover:scale-110"
-        )}>
-          <Icon className={cn(
-            "h-5 w-5 transition-transform duration-300",
-            !isActive && "group-hover:rotate-3"
-          )} />
-        </div>
-        <span>{item.label}</span>
-        {item.highlight && !isActive && (
-          <Badge variant="outline" className="ml-auto border-blue-500 text-blue-400 text-xs px-2 py-0 animate-pulse">
-            Nuevo
-          </Badge>
-        )}
-        {isActive && (
-          <ChevronRight className="ml-auto h-4 w-4 text-blue-400 animate-pulse" />
-        )}
-      </Link>
+        <Link href={item.href}>
+          <div className={cn(
+            "group flex items-center gap-3 px-4 py-3 mx-3 rounded-xl transition-all duration-200 relative",
+            "hover:bg-gray-50 cursor-pointer border-l-4 border-transparent",
+            isActive 
+              ? "bg-blue-50 border-l-blue-500 text-blue-900 shadow-sm" 
+              : "text-gray-700 hover:text-gray-900 hover:border-l-gray-300"
+          )}>
+            <div className={cn(
+              "flex items-center justify-center w-5 h-5 transition-colors",
+              isActive ? "text-blue-600" : "text-gray-500"
+            )}>
+              <item.icon className="w-5 h-5" />
+            </div>
+            
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 min-w-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <span className={cn(
+                        "font-medium text-sm block",
+                        isActive ? "text-blue-900" : "text-gray-800"
+                      )}>
+                        {item.title}
+                      </span>
+                      {item.description && (
+                        <span className="text-xs text-gray-500 block mt-0.5">
+                          {item.description}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 ml-2">
+                      {item.status && (
+                        <span className={statusColors[item.status]}>
+                          {item.status === 'hot' ? 'Hot' : item.status === 'new' ? 'New' : 'Updated'}
+                        </span>
+                      )}
+                      
+                      {item.badge && (
+                        <span className="text-xs px-2 py-1 rounded-md bg-gray-200 text-gray-700 font-medium">
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Link>
+      </motion.div>
     );
   };
 
-  // Formateador de tiempo
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('es-ES', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false
-    });
+  const renderNavSection = (section: NavSection) => {
+    return (
+      <motion.div
+        key={section.id}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-2"
+      >
+        {!isCollapsed && (
+          <div className="flex items-center justify-between px-5 py-2 mt-6 first:mt-0">
+            <h3 className="text-xs font-bold tracking-wider text-gray-600 uppercase">
+              {section.title}
+            </h3>
+            {section.id === "principal" && (
+              <Sparkles className="h-3 w-3 text-yellow-500" />
+            )}
+          </div>
+        )}
+        
+        <div className="space-y-1">
+          {section.items.map((item) => renderNavItem(item))}
+        </div>
+      </motion.div>
+    );
   };
 
   return (
-    <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 z-20 m-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleMobileMenu}
-          className="rounded-full shadow-sm"
-        >
-          {mobileMenuOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </Button>
-      </div>
-
-      {/* Mobile sidebar overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-10 lg:hidden"
-          onClick={toggleMobileMenu}
-        />
+    <motion.div
+      className={cn(
+        "fixed top-0 bottom-0 left-0 z-50 h-screen flex flex-col",
+        "bg-white border-r border-gray-200 shadow-lg",
+        "md:relative md:z-0",
+        isCollapsed ? "w-[72px]" : "w-[280px]"
       )}
-
-      {/* Sidebar for mobile & desktop (unified for consistency) */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-10 w-80 bg-gradient-to-b from-slate-900 to-slate-950 text-white transform transition-transform duration-500 ease-in-out shadow-xl",
-          "lg:shadow-blue-900/10 lg:translate-x-0 lg:static lg:block",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        )}
-      >
-        <div className="flex flex-col h-full">
-          {/* Header with logo and title */}
-          <div className="flex items-center h-24 px-6 border-b border-blue-900/20 bg-gradient-to-r from-slate-900 to-slate-900/90">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-lg border border-blue-500/30 text-white font-bold text-xl">
-                ED
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
-                  Sistema de Cotización
-                </h1>
-                <p className="text-xs text-slate-400">Epical Digital</p>
-              </div>
+      initial={false}
+      animate={{
+        width: isCollapsed ? 72 : 280,
+        transition: { duration: 0.3, ease: "easeInOut" }
+      }}
+    >
+      {/* Header */}
+      <div className={cn(
+        "flex items-center justify-between p-4 border-b border-gray-200",
+        isCollapsed && "justify-center"
+      )}>
+        <Link href="/" className="flex items-center gap-3 group">
+          <motion.div 
+            className="relative w-9 h-9 rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600" />
+            <div className="relative w-full h-full flex items-center justify-center">
+              <span className="text-white font-bold text-lg">M</span>
             </div>
-          </div>
-
-          {/* Main navigation */}
-          <div className="flex flex-col flex-grow overflow-y-auto px-4 py-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-            {/* Fecha y hora actual */}
-            <div className="mb-6 px-2">
-              <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                <div className="text-xs text-slate-400">
-                  {time.toLocaleDateString('es-ES', { 
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long' 
-                  })}
-                </div>
-                <div className="text-sm font-mono text-blue-400">
-                  {formatTime(time)}
-                </div>
-              </div>
-            </div>
-            
-            {/* General */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Principal
-                </h3>
-              </div>
-              <nav className="space-y-1">
-                {navCategories.general.map((item) => renderNavLink(item))}
-              </nav>
-            </div>
-            
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
-            
-            {/* Cotizaciones */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Cotizaciones
-                </h3>
-              </div>
-              <nav className="space-y-1">
-                {navCategories.cotizaciones.map((item) => renderNavLink(item))}
-              </nav>
-            </div>
-            
-            {/* Proyectos */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Proyectos
-                </h3>
-              </div>
-              <nav className="space-y-1">
-                {navCategories.proyectos.map((item) => renderNavLink(item))}
-              </nav>
-            </div>
-            
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
-            
-            {/* Datos */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Datos e Informes
-                </h3>
-              </div>
-              <nav className="space-y-1">
-                {navCategories.datos.map((item) => renderNavLink(item))}
-              </nav>
-            </div>
-            
-            <div className="h-px bg-gradient-to-r from-blue-900/30 via-slate-700/20 to-blue-900/30 my-4 mx-1"></div>
-            
-            {/* Sistema */}
-            <div className="mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Sistema
-                </h3>
-              </div>
-              <nav className="space-y-1">
-                {navCategories.sistema.map((item) => renderNavLink(item))}
-              </nav>
-            </div>
-            
-            {/* Actividad Reciente */}
-            <div className="mt-auto mb-4">
-              <div className="px-3 mb-2">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Actividad Reciente
-                </h3>
-              </div>
-              <div className="bg-slate-800/70 rounded-lg p-3 border border-slate-700/50 shadow-inner">
-                <div className="flex items-center text-sm text-slate-300 mb-2">
-                  <Activity className="h-4 w-4 mr-2 text-blue-400" />
-                  <span>2 cotizaciones pendientes</span>
-                </div>
-                <div className="text-xs text-slate-400">
-                  Última actualización: hace 20 min
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* User profile section */}
-          <div className="flex-shrink-0 p-4 border-t border-blue-900/20 bg-gradient-to-b from-slate-900/50 to-slate-900">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm shadow-lg ring-2 ring-blue-600/20">
-                  JS
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-slate-200">Jane Smith</p>
-                <p className="text-xs text-slate-400">Administrador</p>
-              </div>
-              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full">
-                <LogOut className="h-4 w-4" />
+          </motion.div>
+          
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col"
+              >
+                <span className="text-lg font-bold text-gray-900">
+                  Mind
+                </span>
+                <span className="text-xs text-gray-500 font-medium">
+                  Epical Digital
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Link>
+        
+        <AnimatePresence>
+          {!isCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCollapsed(true)}
+                className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              >
+                <ChevronRight className="h-4 w-4" />
               </Button>
-            </div>
-          </div>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </>
+
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto py-2 space-y-2">
+        {navSections.map(renderNavSection)}
+      </div>
+
+      {/* User Footer */}
+      <div className={cn(
+        "border-t border-gray-200 p-4",
+        isCollapsed && "px-2"
+      )}>
+        {user && (
+          <div className={cn(
+            "flex items-center gap-3 transition-all duration-200",
+            isCollapsed && "justify-center"
+          )}>
+            <Avatar className="h-9 w-9 ring-2 ring-gray-200">
+              <AvatarFallback className="bg-gradient-to-br from-purple-500 to-blue-600 text-white text-sm font-medium">
+                {getUserInitials()}
+              </AvatarFallback>
+            </Avatar>
+            
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 min-w-0"
+                >
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {getUserName()}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Administrador</span>
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => logoutMutation.mutate()}
+                    className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        
+        {/* Expand button when collapsed */}
+        <AnimatePresence>
+          {isCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2, delay: 0.1 }}
+              className="mt-3 flex justify-center"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCollapsed(false)}
+                className="h-8 w-8 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 }

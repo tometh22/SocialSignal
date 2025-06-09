@@ -498,3 +498,5 @@ export default function Sidebar2025() {
     </motion.div>
   );
 }
+
+export default Sidebar2025;
