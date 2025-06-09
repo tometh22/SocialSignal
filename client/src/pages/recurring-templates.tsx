@@ -546,6 +546,37 @@ export default function RecurringTemplatesPage() {
                         <span>{template.autoCreateDaysInAdvance} días anticipación</span>
                       </div>
                     </div>
+
+                    {/* Team Assignment Display */}
+                    {template.teamMembers && template.teamMembers.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium text-muted-foreground">Equipo Asignado</p>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Costo Total: </span>
+                            <span className="font-semibold text-blue-600">
+                              ${template.totalEstimatedCost?.toFixed(0) || '0'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          {template.teamMembers.map((member: any) => (
+                            <div key={member.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="font-medium">{member.personnelName}</span>
+                                <span className="text-muted-foreground">({member.roleName})</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">{member.estimatedHours}h</div>
+                                <div className="text-xs text-muted-foreground">${member.totalCost}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {template.description && (
                       <p className="text-sm text-muted-foreground mt-3 pt-3 border-t">
                         {template.description}
