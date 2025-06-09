@@ -33,7 +33,7 @@ import EditAlwaysOnProject from "@/pages/edit-always-on-project";
 import AlwaysOnDeliverablesDemo from "@/pages/always-on-deliverables-demo";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import RecurringTemplatesPage from "@/pages/recurring-templates";
-import Sidebar from "@/components/layout/sidebar-new";
+import ModernSidebar from "@/components/layout/sidebar-modern";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
@@ -99,7 +99,7 @@ function AppRoutes() {
       
       <Route path="*">
         <div className="flex h-screen overflow-hidden bg-background">
-          <Sidebar />
+          <ModernSidebar />
           <div className="flex flex-col flex-1 overflow-hidden">
             <Topbar />
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
