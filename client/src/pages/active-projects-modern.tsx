@@ -135,7 +135,10 @@ export default function ActiveProjectsModern() {
           <div>
             <h1 className="heading-page">Proyectos Activos</h1>
           </div>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+          <Button 
+            onClick={() => setLocation("/active-projects/new")}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Proyecto
           </Button>
