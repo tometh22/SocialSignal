@@ -1200,6 +1200,9 @@ export class DatabaseStorage implements IStorage {
         await db.insert(recurringTemplatePersonnel).values(teamAssignments);
       }
 
+      // Invalidate cache for this project
+      this.templateCache.delete(template.parentProjectId);
+
       return newTemplate;
     } catch (error) {
       console.error('Error creating recurring template:', error);
@@ -1207,35 +1210,33 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Simple cache for recurring templates
+  private templateCache = new Map<number, { data: any[], timestamp: number }>();
+  private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   async getRecurringTemplatesWithTeam(projectId: number): Promise<any[]> {
     try {
-      // Optimized: Get templates with basic info only first
-      const templates = await db.select({
-        id: recurringProjectTemplates.id,
-        parentProjectId: recurringProjectTemplates.parentProjectId,
-        templateName: recurringProjectTemplates.templateName,
-        deliverableType: recurringProjectTemplates.deliverableType,
-        frequency: recurringProjectTemplates.frequency,
-        dayOfMonth: recurringProjectTemplates.dayOfMonth,
-        dayOfWeek: recurringProjectTemplates.dayOfWeek,
-        estimatedHours: recurringProjectTemplates.estimatedHours,
-        baseBudget: recurringProjectTemplates.baseBudget,
-        description: recurringProjectTemplates.description,
-        autoCreateDaysInAdvance: recurringProjectTemplates.autoCreateDaysInAdvance,
-        isActive: recurringProjectTemplates.isActive,
-        createdAt: recurringProjectTemplates.createdAt
-      })
-      .from(recurringProjectTemplates)
-      .where(eq(recurringProjectTemplates.parentProjectId, projectId))
-      .orderBy(desc(recurringProjectTemplates.createdAt));
+      // Check cache first
+      const cached = this.templateCache.get(projectId);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+
+      // Fast query - just get basic templates without joins
+      const templates = await db.select()
+        .from(recurringProjectTemplates)
+        .where(eq(recurringProjectTemplates.parentProjectId, projectId))
+        .orderBy(desc(recurringProjectTemplates.createdAt));
 
       if (templates.length === 0) {
+        this.templateCache.set(projectId, { data: [], timestamp: Date.now() });
         return [];
       }
 
-      // For empty project, return templates without team data to speed up initial load
+      // Only fetch team data if templates exist
       const templateIds = templates.map(t => t.id);
       const teamMembers = await db.select({
+        id: recurringTemplatePersonnel.id,
         templateId: recurringTemplatePersonnel.templateId,
         personnelName: personnel.name,
         roleName: roles.name,
@@ -1248,23 +1249,32 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(roles, eq(personnel.roleId, roles.id))
       .where(inArray(recurringTemplatePersonnel.templateId, templateIds));
 
-      // Group and calculate costs
-      const teamByTemplate = teamMembers.reduce((acc, member) => {
-        if (!acc[member.templateId]) acc[member.templateId] = [];
-        acc[member.templateId].push({
+      // Group team members by template
+      const teamByTemplate: Record<number, any[]> = {};
+      teamMembers.forEach(member => {
+        if (!teamByTemplate[member.templateId]) {
+          teamByTemplate[member.templateId] = [];
+        }
+        teamByTemplate[member.templateId].push({
           ...member,
           totalCost: (member.estimatedHours || 0) * (member.hourlyRate || 50)
         });
-        return acc;
-      }, {} as Record<number, any[]>);
+      });
 
-      return templates.map(template => ({
-        ...template,
-        teamMembers: teamByTemplate[template.id] || [],
-        totalEstimatedCost: (teamByTemplate[template.id] || [])
-          .reduce((sum: number, member: any) => sum + member.totalCost, 0)
-      }));
+      const result = templates.map(template => {
+        const teamMembersForTemplate = teamByTemplate[template.id] || [];
+        return {
+          ...template,
+          teamMembers: teamMembersForTemplate,
+          totalEstimatedCost: teamMembersForTemplate.reduce((sum: number, member: any) => 
+            sum + member.totalCost, 0)
+        };
+      });
 
+      // Cache the result
+      this.templateCache.set(projectId, { data: result, timestamp: Date.now() });
+      
+      return result;
     } catch (error) {
       console.error('Error fetching recurring templates:', error);
       return [];
@@ -1289,6 +1299,11 @@ export class DatabaseStorage implements IStorage {
         .where(eq(recurringProjectTemplates.id, id))
         .returning();
 
+      // Invalidate cache for this project
+      if (updated) {
+        this.templateCache.delete(updated.parentProjectId);
+      }
+
       return updated;
     } catch (error) {
       console.error('Error updating recurring template:', error);
@@ -1298,11 +1313,21 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRecurringTemplateWithTeam(id: number): Promise<boolean> {
     try {
+      // Get the template first to know which project to invalidate cache for
+      const [templateToDelete] = await db.select({ parentProjectId: recurringProjectTemplates.parentProjectId })
+        .from(recurringProjectTemplates)
+        .where(eq(recurringProjectTemplates.id, id));
+
       // First delete team assignments
       await db.delete(recurringTemplatePersonnel).where(eq(recurringTemplatePersonnel.templateId, id));
       
       // Then delete the template
       await db.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.id, id));
+      
+      // Invalidate cache for this project
+      if (templateToDelete) {
+        this.templateCache.delete(templateToDelete.parentProjectId);
+      }
       
       return true;
     } catch (error) {
