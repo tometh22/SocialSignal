@@ -36,7 +36,8 @@ import {
   Activity,
   AlertCircle,
   BarChart3,
-  Save
+  Save,
+  RotateCcw
 } from "lucide-react";
 
 export default function ProjectDetailsEnhanced() {
@@ -245,6 +246,15 @@ export default function ProjectDetailsEnhanced() {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Botón para plantillas recurrentes si es proyecto padre */}
+              {!isSubproject && (
+                <Link href={`/recurring-templates/${projectId}`}>
+                  <Button variant="outline" size="sm">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Plantillas Recurrentes
+                  </Button>
+                </Link>
+              )}
               <Button 
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700"
