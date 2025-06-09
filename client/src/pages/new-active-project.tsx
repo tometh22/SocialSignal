@@ -120,6 +120,7 @@ const StepIndicator: React.FC<{
         <div className={currentStep === 1 ? "font-medium text-primary" : ""}>Cotización</div>
         <div className={currentStep === 2 ? "font-medium text-primary" : ""}>Programación</div>
         <div className={currentStep === 3 ? "font-medium text-primary" : ""}>Seguimiento</div>
+        <div className={currentStep === 4 ? "font-medium text-primary" : ""}>Automatización</div>
       </div>
     </div>
   );
@@ -212,7 +213,7 @@ const NewActiveProject: React.FC = () => {
       newCompleted.push(currentStep);
       setStepsCompleted(newCompleted);
     }
-    setCurrentStep((prev) => Math.min(prev + 1, 3));
+    setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
 
   // Volver al paso anterior
@@ -325,7 +326,7 @@ const NewActiveProject: React.FC = () => {
               <CardContent className="pb-2">
                 <StepIndicator 
                   currentStep={currentStep} 
-                  totalSteps={3} 
+                  totalSteps={4} 
                   onStepChange={setCurrentStep}
                   stepsCompleted={stepsCompleted} 
                 />
@@ -711,6 +712,91 @@ const NewActiveProject: React.FC = () => {
                             )}
                           </div>
                         </ScrollArea>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Paso 4: Automatización (Opcional) */}
+                {currentStep === 4 && (
+                  <div className="space-y-6">
+                    <div className="text-center mb-6">
+                      <h2 className="text-xl font-semibold mb-2">Automatización del Proyecto</h2>
+                      <p className="text-muted-foreground">
+                        Configura automatización recurrente para este proyecto (opcional)
+                      </p>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div>
+                          <h3 className="font-medium text-blue-900 mb-1">¿Qué es la automatización?</h3>
+                          <p className="text-sm text-blue-800">
+                            Puedes configurar este proyecto para generar automáticamente tareas recurrentes, 
+                            reportes periódicos y seguimientos regulares. Esto es útil para proyectos Always-On 
+                            que requieren entregables continuos.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <h3 className="font-medium">Opciones Rápidas</h3>
+                        
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="w-full justify-start h-auto p-4"
+                          onClick={() => window.location.href = `/projects/${selectedQuotation?.id}/recurring-templates`}
+                          disabled={!selectedQuotation}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-blue-600" />
+                            <div className="text-left">
+                              <div className="font-medium">Configurar Ahora</div>
+                              <div className="text-sm text-muted-foreground">
+                                Ir al asistente completo de automatización
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          className="w-full justify-start h-auto p-4"
+                          onClick={goToNextStep}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Clock className="h-5 w-5 text-gray-600" />
+                            <div className="text-left">
+                              <div className="font-medium">Configurar Más Tarde</div>
+                              <div className="text-sm text-muted-foreground">
+                                Crear el proyecto sin automatización
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="font-medium">Ejemplos de Automatización</h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 p-3 border rounded-lg">
+                            <FileText className="h-4 w-4 text-green-600" />
+                            <span className="text-sm">Reportes mensuales automáticos</span>
+                          </div>
+                          <div className="flex items-center gap-3 p-3 border rounded-lg">
+                            <BarChart3 className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm">Dashboards actualizados semanalmente</span>
+                          </div>
+                          <div className="flex items-center gap-3 p-3 border rounded-lg">
+                            <Users className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm">Asignación automática de equipo</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -131,20 +131,7 @@ export default function SidebarImproved() {
         },
       ]
     },
-    {
-      id: "automatizacion",
-      title: "AUTOMATIZACIÓN",
-      items: [
-        { 
-          href: "/recurring-templates", 
-          title: "Always-On", 
-          icon: Zap, 
-          status: 'new' as const, 
-          description: "Servicios recurrentes",
-          color: "yellow"
-        },
-      ]
-    }
+
   ];
 
   const renderNavItem = (item: NavItem) => {
