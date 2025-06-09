@@ -438,7 +438,11 @@ export default function RecurringTemplatesPage() {
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setSelectedTeamMembers({});
+                    setShowTeamSection(false);
+                  }}>
                     Cancelar
                   </Button>
                   <Button type="submit" disabled={createTemplateMutation.isPending}>

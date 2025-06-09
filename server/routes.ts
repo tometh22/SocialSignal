@@ -2261,6 +2261,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== RUTAS PARA RECURRING TEMPLATES ===========
+  
+  // Get recurring templates for a project
+  app.get("/api/projects/:projectId/recurring-templates", async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+      
+      const templates = await storage.getRecurringTemplatesWithTeam(projectId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching recurring templates:", error);
+      res.status(500).json({ message: "Failed to fetch recurring templates" });
+    }
+  });
+
+  // Create new recurring template
+  app.post("/api/recurring-templates", async (req, res) => {
+    try {
+      const templateData = {
+        ...req.body,
+        createdBy: 1 // Default user ID for now
+      };
+      
+      const newTemplate = await storage.createRecurringTemplateWithTeam(templateData);
+      res.status(201).json(newTemplate);
+    } catch (error) {
+      console.error("Error creating recurring template:", error);
+      res.status(500).json({ message: "Failed to create recurring template" });
+    }
+  });
+
+  // Update recurring template
+  app.put("/api/recurring-templates/:id", async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      if (isNaN(templateId)) {
+        return res.status(400).json({ message: "Invalid template ID" });
+      }
+      
+      const updatedTemplate = await storage.updateRecurringTemplateWithTeam(templateId, req.body);
+      if (!updatedTemplate) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      res.json(updatedTemplate);
+    } catch (error) {
+      console.error("Error updating recurring template:", error);
+      res.status(500).json({ message: "Failed to update recurring template" });
+    }
+  });
+
+  // Delete recurring template
+  app.delete("/api/recurring-templates/:id", async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      if (isNaN(templateId)) {
+        return res.status(400).json({ message: "Invalid template ID" });
+      }
+      
+      const deleted = await storage.deleteRecurringTemplateWithTeam(templateId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting recurring template:", error);
+      res.status(500).json({ message: "Failed to delete recurring template" });
+    }
+  });
+
   // =========== RUTAS PARA MODO (SEGUIMIENTO OPERACIONES) ===========
   
   // Obtener todos los entregables (opcionalmente filtrados por cliente)

@@ -185,6 +185,12 @@ export interface IStorage {
   updateRecurringTemplate(id: number, template: Partial<InsertRecurringProjectTemplate>): Promise<RecurringProjectTemplate | undefined>;
   deleteRecurringTemplate(id: number): Promise<boolean>;
 
+  // Enhanced Recurring Template operations with team assignment
+  getRecurringTemplatesWithTeam(projectId: number): Promise<any[]>;
+  createRecurringTemplateWithTeam(template: any): Promise<any>;
+  updateRecurringTemplateWithTeam(id: number, template: any): Promise<any>;
+  deleteRecurringTemplateWithTeam(id: number): Promise<boolean>;
+
   // Project Cycle operations
   getProjectCycles(parentProjectId: number): Promise<ProjectCycle[]>;
   getProjectCycle(id: number): Promise<ProjectCycle | undefined>;
@@ -1164,20 +1170,20 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // ==================== RECURRING TEMPLATES OPERATIONS ====================
+  // ==================== RECURRING TEMPLATES WITH TEAM ASSIGNMENT ====================
   
-  async createRecurringTemplate(template: any): Promise<any> {
+  async createRecurringTemplateWithTeam(template: any): Promise<any> {
     try {
       const [newTemplate] = await db.insert(recurringProjectTemplates).values({
         parentProjectId: template.parentProjectId,
         templateName: template.templateName,
         deliverableType: template.deliverableType,
         frequency: template.frequency,
-        dayOfMonth: template.dayOfMonth,
-        dayOfWeek: template.dayOfWeek,
-        estimatedHours: template.estimatedHours,
-        baseBudget: template.baseBudget,
-        description: template.description,
+        dayOfMonth: template.dayOfMonth || undefined,
+        dayOfWeek: template.dayOfWeek || undefined,
+        estimatedHours: template.estimatedHours || undefined,
+        baseBudget: template.baseBudget || undefined,
+        description: template.description || undefined,
         autoCreateDaysInAdvance: template.autoCreateDaysInAdvance,
         createdBy: template.createdBy
       }).returning();
@@ -1201,13 +1207,14 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getRecurringTemplatesByProject(projectId: number): Promise<any[]> {
+  async getRecurringTemplatesWithTeam(projectId: number): Promise<any[]> {
     try {
       const templates = await db.select().from(recurringProjectTemplates)
         .where(eq(recurringProjectTemplates.parentProjectId, projectId))
         .orderBy(desc(recurringProjectTemplates.createdAt));
 
       // Get team members for each template
+      const enrichedTemplates = [];
       for (const template of templates) {
         const teamMembers = await db.select({
           id: recurringTemplatePersonnel.id,
@@ -1224,34 +1231,40 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(roles, eq(personnel.roleId, roles.id))
         .where(eq(recurringTemplatePersonnel.templateId, template.id));
 
-        template.teamMembers = teamMembers.map(member => ({
+        const enrichedTeamMembers = teamMembers.map(member => ({
           ...member,
-          totalCost: member.estimatedHours * (member.hourlyRate || 50)
+          totalCost: (member.estimatedHours || 0) * (member.hourlyRate || 50)
         }));
 
-        template.totalEstimatedCost = template.teamMembers.reduce((sum: number, member: any) => 
+        const totalEstimatedCost = enrichedTeamMembers.reduce((sum: number, member: any) => 
           sum + member.totalCost, 0);
+
+        enrichedTemplates.push({
+          ...template,
+          teamMembers: enrichedTeamMembers,
+          totalEstimatedCost
+        });
       }
 
-      return templates;
+      return enrichedTemplates;
     } catch (error) {
       console.error('Error fetching recurring templates:', error);
       return [];
     }
   }
 
-  async updateRecurringTemplate(id: number, template: any): Promise<any> {
+  async updateRecurringTemplateWithTeam(id: number, template: any): Promise<any> {
     try {
       const [updated] = await db.update(recurringProjectTemplates)
         .set({
           templateName: template.templateName,
           deliverableType: template.deliverableType,
           frequency: template.frequency,
-          dayOfMonth: template.dayOfMonth,
-          dayOfWeek: template.dayOfWeek,
-          estimatedHours: template.estimatedHours,
-          baseBudget: template.baseBudget,
-          description: template.description,
+          dayOfMonth: template.dayOfMonth || undefined,
+          dayOfWeek: template.dayOfWeek || undefined,
+          estimatedHours: template.estimatedHours || undefined,
+          baseBudget: template.baseBudget || undefined,
+          description: template.description || undefined,
           autoCreateDaysInAdvance: template.autoCreateDaysInAdvance,
           isActive: template.isActive
         })
@@ -1265,7 +1278,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteRecurringTemplate(id: number): Promise<boolean> {
+  async deleteRecurringTemplateWithTeam(id: number): Promise<boolean> {
     try {
       // First delete team assignments
       await db.delete(recurringTemplatePersonnel).where(eq(recurringTemplatePersonnel.templateId, id));
@@ -1572,7 +1585,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // =============== PLANTILLAS RECURRENTES ===============
+  // =============== PLANTILLAS RECURRENTES (LEGACY INTERFACE COMPLIANCE) ===============
 
   async getRecurringTemplatesByProject(parentProjectId: number): Promise<RecurringProjectTemplate[]> {
     return await db.select()
