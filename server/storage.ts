@@ -15,12 +15,15 @@ import {
   type ClientModoComment, type InsertClientModoComment,
   type QuarterlyNpsSurvey, type InsertQuarterlyNpsSurvey,
   type CostMultiplier, type InsertCostMultiplier,
+  type RecurringProjectTemplate, type InsertRecurringProjectTemplate,
+  type RecurringTemplatePersonnel, type InsertRecurringTemplatePersonnel,
+  type ProjectCycle, type InsertProjectCycle,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
-  deliverables, clientModoComments, costMultipliers
+  deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
@@ -174,6 +177,24 @@ export interface IStorage {
   updateCostMultiplier(id: number, multiplier: Partial<InsertCostMultiplier>): Promise<CostMultiplier | undefined>;
   createCostMultiplier(multiplier: InsertCostMultiplier): Promise<CostMultiplier>;
   deleteCostMultiplier(id: number): Promise<boolean>;
+
+  // Recurring Template operations
+  getRecurringTemplatesByProject(parentProjectId: number): Promise<RecurringProjectTemplate[]>;
+  getRecurringTemplate(id: number): Promise<RecurringProjectTemplate | undefined>;
+  createRecurringTemplate(template: InsertRecurringProjectTemplate): Promise<RecurringProjectTemplate>;
+  updateRecurringTemplate(id: number, template: Partial<InsertRecurringProjectTemplate>): Promise<RecurringProjectTemplate | undefined>;
+  deleteRecurringTemplate(id: number): Promise<boolean>;
+
+  // Project Cycle operations
+  getProjectCycles(parentProjectId: number): Promise<ProjectCycle[]>;
+  getProjectCycle(id: number): Promise<ProjectCycle | undefined>;
+  createProjectCycle(cycle: InsertProjectCycle): Promise<ProjectCycle>;
+  updateProjectCycle(id: number, cycle: Partial<InsertProjectCycle>): Promise<ProjectCycle | undefined>;
+  completeProjectCycle(id: number): Promise<ProjectCycle | undefined>;
+
+  // Automation operations
+  autoGenerateSubprojects(parentProjectId: number, templateId: number, periodStart: Date, periodEnd: Date): Promise<ActiveProject[]>;
+  checkAndCreatePendingCycles(): Promise<ProjectCycle[]>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS

@@ -17,6 +17,9 @@ import {
   insertProjectComponentSchema,
   insertDeliverableSchema,
   insertClientModoCommentSchema,
+  insertRecurringProjectTemplateSchema,
+  insertRecurringTemplatePersonnelSchema,
+  insertProjectCycleSchema,
   projectStatusOptions,
   trackingFrequencyOptions,
   deliverables,
@@ -24,7 +27,10 @@ import {
   activeProjects,
   quotations,
   timeEntries,
-  personnel
+  personnel,
+  recurringProjectTemplates,
+  recurringTemplatePersonnel,
+  projectCycles
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -2885,6 +2891,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   /* MODO Routes END */
+
+  // =========== RUTAS PARA PLANTILLAS RECURRENTES ===========
+  
+  // Crear plantilla recurrente
+  app.post("/api/recurring-templates", async (req, res) => {
+    try {
+      const validatedData = insertRecurringProjectTemplateSchema.parse(req.body);
+      const template = await storage.createRecurringTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid template data", errors: error.errors });
+      }
+      console.error("Error creating recurring template:", error);
+      res.status(500).json({ message: "Failed to create recurring template" });
+    }
+  });
+
+  // Obtener plantillas recurrentes por proyecto padre
+  app.get("/api/projects/:parentProjectId/recurring-templates", async (req, res) => {
+    try {
+      const parentProjectId = parseInt(req.params.parentProjectId);
+      if (isNaN(parentProjectId)) {
+        return res.status(400).json({ message: "Invalid parent project ID" });
+      }
+      
+      const templates = await storage.getRecurringTemplatesByProject(parentProjectId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching recurring templates:", error);
+      res.status(500).json({ message: "Failed to fetch recurring templates" });
+    }
+  });
+
+  // Actualizar plantilla recurrente
+  app.put("/api/recurring-templates/:id", async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      if (isNaN(templateId)) {
+        return res.status(400).json({ message: "Invalid template ID" });
+      }
+      
+      const updatedTemplate = await storage.updateRecurringTemplate(templateId, req.body);
+      if (!updatedTemplate) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      res.json(updatedTemplate);
+    } catch (error) {
+      console.error("Error updating recurring template:", error);
+      res.status(500).json({ message: "Failed to update recurring template" });
+    }
+  });
+
+  // Eliminar plantilla recurrente
+  app.delete("/api/recurring-templates/:id", async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      if (isNaN(templateId)) {
+        return res.status(400).json({ message: "Invalid template ID" });
+      }
+      
+      const deleted = await storage.deleteRecurringTemplate(templateId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting recurring template:", error);
+      res.status(500).json({ message: "Failed to delete recurring template" });
+    }
+  });
+
+  // =========== RUTAS PARA CICLOS DE PROYECTO ===========
+  
+  // Obtener ciclos por proyecto padre
+  app.get("/api/projects/:parentProjectId/cycles", async (req, res) => {
+    try {
+      const parentProjectId = parseInt(req.params.parentProjectId);
+      if (isNaN(parentProjectId)) {
+        return res.status(400).json({ message: "Invalid parent project ID" });
+      }
+      
+      const cycles = await storage.getProjectCycles(parentProjectId);
+      res.json(cycles);
+    } catch (error) {
+      console.error("Error fetching project cycles:", error);
+      res.status(500).json({ message: "Failed to fetch project cycles" });
+    }
+  });
+
+  // Crear ciclo de proyecto
+  app.post("/api/project-cycles", async (req, res) => {
+    try {
+      const validatedData = insertProjectCycleSchema.parse(req.body);
+      const cycle = await storage.createProjectCycle(validatedData);
+      res.status(201).json(cycle);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid cycle data", errors: error.errors });
+      }
+      console.error("Error creating project cycle:", error);
+      res.status(500).json({ message: "Failed to create project cycle" });
+    }
+  });
+
+  // Completar ciclo (marca como completado y calcula varianza)
+  app.patch("/api/project-cycles/:id/complete", async (req, res) => {
+    try {
+      const cycleId = parseInt(req.params.id);
+      if (isNaN(cycleId)) {
+        return res.status(400).json({ message: "Invalid cycle ID" });
+      }
+      
+      const completedCycle = await storage.completeProjectCycle(cycleId);
+      if (!completedCycle) {
+        return res.status(404).json({ message: "Cycle not found" });
+      }
+      
+      res.json(completedCycle);
+    } catch (error) {
+      console.error("Error completing project cycle:", error);
+      res.status(500).json({ message: "Failed to complete project cycle" });
+    }
+  });
+
+  // =========== AUTOMATIZACIÓN DE PROYECTOS RECURRENTES ===========
+  
+  // Endpoint para generar automáticamente subproyectos desde plantillas
+  app.post("/api/projects/:parentProjectId/auto-generate", async (req, res) => {
+    try {
+      const parentProjectId = parseInt(req.params.parentProjectId);
+      if (isNaN(parentProjectId)) {
+        return res.status(400).json({ message: "Invalid parent project ID" });
+      }
+      
+      const { templateId, periodStart, periodEnd } = req.body;
+      
+      const generatedProjects = await storage.autoGenerateSubprojects(
+        parentProjectId, 
+        templateId, 
+        new Date(periodStart), 
+        new Date(periodEnd)
+      );
+      
+      res.json(generatedProjects);
+    } catch (error) {
+      console.error("Error auto-generating subprojects:", error);
+      res.status(500).json({ message: "Failed to auto-generate subprojects" });
+    }
+  });
+
+  // Endpoint para verificar y crear próximos ciclos pendientes
+  app.post("/api/automation/check-pending-cycles", async (req, res) => {
+    try {
+      const pendingCycles = await storage.checkAndCreatePendingCycles();
+      res.json({ 
+        message: "Pending cycles checked", 
+        created: pendingCycles.length,
+        cycles: pendingCycles 
+      });
+    } catch (error) {
+      console.error("Error checking pending cycles:", error);
+      res.status(500).json({ message: "Failed to check pending cycles" });
+    }
+  });
 
   return httpServer;
 }

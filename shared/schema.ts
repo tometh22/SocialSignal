@@ -258,6 +258,66 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
 });
 
+// ==================== PLANTILLAS DE RECURRENCIA ====================
+// Plantillas para generar automáticamente subproyectos recurrentes
+export const recurringProjectTemplates = pgTable("recurring_project_templates", {
+  id: serial("id").primaryKey(),
+  parentProjectId: integer("parent_project_id").notNull().references(() => activeProjects.id),
+  templateName: text("template_name").notNull(), // "Informe Mensual", "Reporte Semanal"
+  deliverableType: text("deliverable_type").notNull(), // informe_mensual, reporte_semanal
+  frequency: text("frequency").notNull(), // monthly, weekly, biweekly
+  dayOfMonth: integer("day_of_month"), // Para frecuencia mensual (ej: día 15)
+  dayOfWeek: integer("day_of_week"), // Para frecuencia semanal (0=domingo, 1=lunes, etc.)
+  estimatedHours: doublePrecision("estimated_hours"),
+  baseBudget: doublePrecision("base_budget"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  autoCreateDaysInAdvance: integer("auto_create_days_in_advance").default(7), // Crear X días antes
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const insertRecurringProjectTemplateSchema = createInsertSchema(recurringProjectTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Asignación de personal a plantillas recurrentes
+export const recurringTemplatePersonnel = pgTable("recurring_template_personnel", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull().references(() => recurringProjectTemplates.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  estimatedHours: doublePrecision("estimated_hours"),
+  isRequired: boolean("is_required").default(true),
+});
+
+export const insertRecurringTemplatePersonnelSchema = createInsertSchema(recurringTemplatePersonnel).omit({
+  id: true,
+});
+
+// ==================== CICLOS DE PROYECTO ====================
+// Seguimiento de ciclos mensuales/semanales para proyectos always-on
+export const projectCycles = pgTable("project_cycles", {
+  id: serial("id").primaryKey(),
+  parentProjectId: integer("parent_project_id").notNull().references(() => activeProjects.id),
+  templateId: integer("template_id").references(() => recurringProjectTemplates.id),
+  cycleName: text("cycle_name").notNull(), // "Enero 2025", "Semana 1 Enero", etc.
+  cycleType: text("cycle_type").notNull(), // monthly, weekly, quarterly
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  status: text("status").notNull().default("upcoming"), // upcoming, active, completed, cancelled
+  subprojectId: integer("subproject_id").references(() => activeProjects.id), // Referencia al subproyecto generado
+  actualCost: doublePrecision("actual_cost"),
+  budgetVariance: doublePrecision("budget_variance"), // Diferencia entre presupuestado y real
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectCycleSchema = createInsertSchema(projectCycles).omit({
+  id: true,
+  createdAt: true,
+});
+
 // ==================== COMPONENTES DE PROYECTO ====================
 // Tabla para los componentes de un proyecto (por ej. informes semanales, mensuales, SOV, newsletter)
 export const projectComponents = pgTable("project_components", {
@@ -731,6 +791,26 @@ export const quarterlyNpsSurveys = pgTable("quarterly_nps_surveys", {
   createdBy: integer("created_by").references(() => users.id),
 });
 
+// Relaciones de plantillas recurrentes
+export const recurringProjectTemplatesRelations = relations(recurringProjectTemplates, ({ one, many }) => ({
+  parentProject: one(activeProjects, { fields: [recurringProjectTemplates.parentProjectId], references: [activeProjects.id] }),
+  creator: one(users, { fields: [recurringProjectTemplates.createdBy], references: [users.id] }),
+  personnel: many(recurringTemplatePersonnel),
+  cycles: many(projectCycles),
+}));
+
+export const recurringTemplatePersonnelRelations = relations(recurringTemplatePersonnel, ({ one }) => ({
+  template: one(recurringProjectTemplates, { fields: [recurringTemplatePersonnel.templateId], references: [recurringProjectTemplates.id] }),
+  personnel: one(personnel, { fields: [recurringTemplatePersonnel.personnelId], references: [personnel.id] }),
+}));
+
+// Relaciones de ciclos de proyecto
+export const projectCyclesRelations = relations(projectCycles, ({ one }) => ({
+  parentProject: one(activeProjects, { fields: [projectCycles.parentProjectId], references: [activeProjects.id] }),
+  template: one(recurringProjectTemplates, { fields: [projectCycles.templateId], references: [recurringProjectTemplates.id] }),
+  subproject: one(activeProjects, { fields: [projectCycles.subprojectId], references: [activeProjects.id] }),
+}));
+
 // Relaciones de encuestas NPS
 export const quarterlyNpsSurveysRelations = relations(quarterlyNpsSurveys, ({ one }) => ({
   client: one(clients, { fields: [quarterlyNpsSurveys.clientId], references: [clients.id] }),
@@ -747,3 +827,13 @@ export const insertQuarterlyNpsSurveySchema = createInsertSchema(quarterlyNpsSur
 
 export type QuarterlyNpsSurvey = typeof quarterlyNpsSurveys.$inferSelect;
 export type InsertQuarterlyNpsSurvey = z.infer<typeof insertQuarterlyNpsSurveySchema>;
+
+// Tipos para las nuevas tablas de recurrencia
+export type RecurringProjectTemplate = typeof recurringProjectTemplates.$inferSelect;
+export type InsertRecurringProjectTemplate = z.infer<typeof insertRecurringProjectTemplateSchema>;
+
+export type RecurringTemplatePersonnel = typeof recurringTemplatePersonnel.$inferSelect;
+export type InsertRecurringTemplatePersonnel = z.infer<typeof insertRecurringTemplatePersonnelSchema>;
+
+export type ProjectCycle = typeof projectCycles.$inferSelect;
+export type InsertProjectCycle = z.infer<typeof insertProjectCycleSchema>;
