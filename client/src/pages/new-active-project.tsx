@@ -41,12 +41,15 @@ import {
   ArrowRight, 
   CheckCircle, 
   Clock, 
-  Calendar as CalendarSquare,
+  Calendar as CalendarIcon2,
   Clipboard, 
   Info,
   RotateCcw,
   UserCircle2,
-  Building2
+  Building2,
+  FileText,
+  BarChart3,
+  Users
 } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -372,7 +375,7 @@ const NewActiveProject: React.FC = () => {
                                     <span>Cliente: {q.clientId}</span>
                                   </div>
                                   <div className="flex items-center">
-                                    <CalendarSquare className="h-4 w-4 mr-2 text-muted-foreground" />
+                                    <CalendarIcon2 className="h-4 w-4 mr-2 text-muted-foreground" />
                                     <span>Tipo: {q.projectType}</span>
                                   </div>
                                   <div className="flex items-center">
@@ -753,7 +756,7 @@ const NewActiveProject: React.FC = () => {
                           disabled={!selectedQuotation}
                         >
                           <div className="flex items-center gap-3">
-                            <Calendar className="h-5 w-5 text-blue-600" />
+                            <CalendarIcon2 className="h-5 w-5 text-blue-600" />
                             <div className="text-left">
                               <div className="font-medium">Configurar Ahora</div>
                               <div className="text-sm text-muted-foreground">
@@ -815,7 +818,7 @@ const NewActiveProject: React.FC = () => {
                   </Button>
                 )}
 
-                {currentStep < 3 ? (
+                {currentStep < 4 ? (
                   <Button 
                     type="button" 
                     onClick={goToNextStep}
@@ -824,7 +827,7 @@ const NewActiveProject: React.FC = () => {
                       (currentStep === 2 && (!form.getValues("startDate") || !form.getValues("status") || !form.getValues("trackingFrequency")))
                     }
                   >
-                    Siguiente
+                    {currentStep === 3 ? "Configurar Automatización (Opcional)" : "Siguiente"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
