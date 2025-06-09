@@ -166,7 +166,11 @@ const NewActiveProject: React.FC = () => {
 
   // Filtrar cotizaciones aprobadas
   const approvedQuotations = React.useMemo(() => {
-    return quotations?.filter((q: any) => q.status === "approved") || [];
+    if (!quotations) return [];
+    console.log("Todas las cotizaciones:", quotations);
+    const approved = quotations.filter((q: any) => q.status === "approved");
+    console.log("Cotizaciones aprobadas:", approved);
+    return approved;
   }, [quotations]);
 
   // Configurar formulario con valores predeterminados inteligentes
