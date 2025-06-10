@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2 } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -543,7 +543,7 @@ export default function ManageQuotes() {
             <AlertDialogDescription>
               {checkingProjects ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Clock className="h-4 w-4 animate-spin" />
                   <span>Verificando proyectos asociados...</span>
                 </div>
               ) : associatedProjects.length > 0 ? (

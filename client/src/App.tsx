@@ -111,6 +111,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   <ProtectedRoute path="/huggies" component={HuggiesPage} />
                   <ProtectedRoute path="/new-quote" component={() => <Redirect to="/optimized-quote" />} />
+                  <ProtectedRoute path="/quotations" component={ManageQuotes} />
                   <ProtectedRoute path="/manage-quotes" component={ManageQuotes} />
                   <ProtectedRoute path="/quote/:id" component={QuoteDetails} />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
