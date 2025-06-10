@@ -112,13 +112,13 @@ export default function ProjectDetailsEnhanced() {
     },
   });
 
-  // Lógica de cálculos
-  const isSubproject = projectData?.parentProjectId;
-  const parentProject = isSubproject ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
-  const clientData = Array.isArray(clients) ? clients.find((c: any) => c.id === projectData?.clientId) : null;
+  // Lógica de cálculos - solo si projectData existe
+  const isSubproject = projectData?.parentProjectId !== null && projectData?.parentProjectId !== undefined;
+  const parentProject = isSubproject && projectData ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
+  const clientData = Array.isArray(clients) && projectData ? clients.find((c: any) => c.id === projectData.clientId) : null;
   
-  // Obtener subproyectos hermanos
-  const siblingProjects = isSubproject 
+  // Obtener subproyectos hermanos - solo si projectData existe
+  const siblingProjects = isSubproject && projectData
     ? allProjects.filter((p: any) => 
         p.parentProjectId === projectData.parentProjectId && 
         p.id !== projectData.id
@@ -133,7 +133,7 @@ export default function ProjectDetailsEnhanced() {
     : [];
 
   // Obtener todos los subproyectos del mismo cliente (incluyendo el actual)
-  const allClientSubprojects = isSubproject 
+  const allClientSubprojects = isSubproject && projectData
     ? allProjects.filter((p: any) => 
         p.parentProjectId === projectData.parentProjectId
       ).map((p: any) => ({
