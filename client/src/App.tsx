@@ -1,5 +1,6 @@
 import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
+import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard-fixed-corrected";
 import ExecutiveDashboard from "@/pages/executive-dashboard";
@@ -155,12 +156,16 @@ function AppRoutes() {
 function App() {
   // App ya está envuelto en QueryClientProvider en main.tsx
   return (
-    <AuthProvider>
-      <ChatProvider>
-        <AppRoutes />
-        <Toaster />
-      </ChatProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ChatProvider>
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
+          <Toaster />
+        </ChatProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

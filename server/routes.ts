@@ -1360,7 +1360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear un nuevo proyecto activo desde una cotización
-  app.post("/api/active-projects", async (req, res) => {
+  app.post("/api/active-projects", requireAuth, async (req, res) => {
     try {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
@@ -1436,13 +1436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[API] Eliminando entregables para proyecto ID ${id}`);
         await tx.delete(deliverables).where(eq(deliverables.project_id, id));
         
-        // 5. Eliminar informes de progreso
-        await tx.delete(progressReports).where(eq(progressReports.projectId, id));
-        
-        // 6. Eliminar componentes del proyecto
-        await tx.delete(projectComponents).where(eq(projectComponents.projectId, id));
-        
-        // 7. Eliminar el proyecto principal
+        // 5. Eliminar el proyecto principal
         console.log(`[API] Eliminando proyecto principal ID ${id}`);
         await tx.delete(activeProjects).where(eq(activeProjects.id, id));
       });
@@ -1463,7 +1457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar un proyecto activo
-  app.patch("/api/active-projects/:id", async (req, res) => {
+  app.patch("/api/active-projects/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
