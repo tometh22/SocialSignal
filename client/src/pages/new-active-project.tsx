@@ -164,29 +164,20 @@ const NewActiveProject: React.FC = () => {
     retryDelay: 500,
   });
 
-  const { data: statusOptions = [], isLoading: isLoadingStatusOptions, error: statusError } = useQuery({
-    queryKey: ["/api/options/project-status"],
-    queryFn: async () => {
-      const response = await fetch("/api/options/project-status");
-      if (!response.ok) throw new Error("Error al cargar estados");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-    retryDelay: 500,
-  });
+  // Opciones hardcodeadas para evitar queries innecesarias
+  const statusOptions = [
+    { value: "active", label: "Activo" },
+    { value: "completed", label: "Completado" },
+    { value: "cancelled", label: "Cancelado" },
+    { value: "on-hold", label: "En Pausa" }
+  ];
 
-  const { data: trackingOptions = [], isLoading: isLoadingTrackingOptions, error: trackingError } = useQuery({
-    queryKey: ["/api/options/tracking-frequency"],
-    queryFn: async () => {
-      const response = await fetch("/api/options/tracking-frequency");
-      if (!response.ok) throw new Error("Error al cargar opciones de seguimiento");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-    retryDelay: 500,
-  });
+  const trackingOptions = [
+    { value: "daily", label: "Diario" },
+    { value: "weekly", label: "Semanal" },
+    { value: "biweekly", label: "Quincenal" },
+    { value: "monthly", label: "Mensual" }
+  ];
 
   // Filtrar cotizaciones aprobadas
   const approvedQuotations = React.useMemo(() => {
@@ -288,21 +279,19 @@ const NewActiveProject: React.FC = () => {
   };
 
   // Estado de carga
-  const isLoading = isLoadingQuotations || isLoadingStatusOptions || isLoadingTrackingOptions;
+  const isLoading = isLoadingQuotations;
   const isSubmitting = createProjectMutation.isPending;
 
   console.log("Estados de carga:", {
     isLoadingQuotations,
-    isLoadingStatusOptions, 
-    isLoadingTrackingOptions,
     isLoading,
     quotationsLength: quotations?.length,
     approvedLength: approvedQuotations.length,
-    errors: { quotationsError, statusError, trackingError }
+    errors: { quotationsError }
   });
 
   // Mostrar errores si los hay
-  if (quotationsError || statusError || trackingError) {
+  if (quotationsError) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex items-center mb-6">
@@ -323,8 +312,6 @@ const NewActiveProject: React.FC = () => {
           <CardContent>
             <div className="text-sm text-gray-600">
               {quotationsError && <p>Error cargando cotizaciones: {quotationsError.message}</p>}
-              {statusError && <p>Error cargando estados: {statusError.message}</p>}
-              {trackingError && <p>Error cargando opciones de seguimiento: {trackingError.message}</p>}
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
