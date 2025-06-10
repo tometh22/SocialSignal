@@ -33,8 +33,10 @@ import {
   ArrowLeft, 
   Loader2, 
   Plus,
-  Clock
+  Clock,
+  Building2
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -78,12 +80,29 @@ export default function NewProjectFixed() {
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
   const clients = Array.isArray(clientsData) ? clientsData : [];
   
+  // Función para obtener logo del cliente
+  const getClientLogo = (clientName: string) => {
+    const logoMap: Record<string, string> = {
+      'Warner Bros.': '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
+      'MODO': '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
+      'Diamond Films': '/uploads/diamond-films-logo.png',
+      'Pedidos Ya': '/uploads/pedidos-ya-logo.png',
+      'Uber': '/uploads/uber-logo.png',
+      'Coca Cola': '/uploads/coca-cola-logo.png',
+      'Arcos Dorados': '/uploads/mcdonalds-logo.png'
+    };
+    return logoMap[clientName] || null;
+  };
+
   // Combinar cotizaciones con información de clientes
   const quotationsWithClients = quotations.map((q: any) => {
     const client = clients.find((c: any) => c.id === q.clientId);
+    const clientName = client?.name || 'Cliente no encontrado';
     return {
       ...q,
-      clientName: client?.name || 'Cliente no encontrado'
+      clientName,
+      clientLogo: getClientLogo(clientName),
+      clientInitials: clientName.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
     };
   });
   
@@ -247,10 +266,21 @@ export default function NewProjectFixed() {
                       <SelectContent>
                         {approvedQuotations.map((q: any) => (
                           <SelectItem key={q.id} value={q.id.toString()}>
-                            <div className="flex flex-col">
-                              <div className="font-medium">{q.clientName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {q.projectName} - ${q.totalAmount?.toFixed(2)}
+                            <div className="flex items-center gap-3 py-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage 
+                                  src={q.clientLogo} 
+                                  alt={q.clientName}
+                                />
+                                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                                  {q.clientInitials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-sm">{q.clientName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {q.projectName} - ${q.totalAmount?.toFixed(2)}
+                                </div>
                               </div>
                             </div>
                           </SelectItem>
