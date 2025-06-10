@@ -791,6 +791,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedEntry;
   }
+
+  async deleteTimeEntriesByProject(projectId: number): Promise<void> {
+    console.log(`Eliminando entradas de tiempo para proyecto ID ${projectId}`);
+    await db.delete(timeEntries).where(eq(timeEntries.projectId, projectId));
+  }
   
   // Progress report operations
   async getProgressReports(projectId: number): Promise<ProgressReport[]> {
@@ -969,6 +974,11 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error al actualizar entregable ID ${id}:`, error);
       throw error;
     }
+  }
+
+  async deleteDeliverablesByProject(projectId: number): Promise<void> {
+    console.log(`Eliminando entregables para proyecto ID ${projectId}`);
+    await db.delete(deliverables).where(eq(deliverables.project_id, projectId));
   }
 
   // Client MODO operations
