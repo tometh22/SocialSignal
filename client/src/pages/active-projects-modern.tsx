@@ -27,7 +27,7 @@ export default function ActiveProjectsModern() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterClient, setFilterClient] = useState("all");
-  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set([16])); // MODO expandido por defecto
+  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set()); // Todos los proyectos cerrados por defecto
   const [, setLocation] = useLocation();
 
   const { data: projects = [], isLoading } = useQuery({
