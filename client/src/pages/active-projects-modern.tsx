@@ -195,25 +195,35 @@ export default function ActiveProjectsModern() {
             const clientName = client?.name || "Cliente desconocido";
             const totalAmount = project.quotation?.totalAmount || 0;
             
+            // Determinar si es un proyecto Always-On (tiene subproyectos) o proyecto único
+            const isAlwaysOnProject = subprojects.length > 0;
+            const hasExpandableContent = isAlwaysOnProject;
+            
             return (
               <Card key={project.id} className="border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-0">
                   {/* Proyecto Principal */}
                   <div className="p-6">
                     <div className="flex items-center gap-4">
-                      {/* Botón de expansión */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 hover:bg-gray-100"
-                        onClick={() => toggleProjectExpansion(project.id)}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-gray-600" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-gray-600" />
-                        )}
-                      </Button>
+                      {/* Botón de expansión - solo para proyectos con subproyectos */}
+                      {hasExpandableContent ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-100"
+                          onClick={() => toggleProjectExpansion(project.id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-gray-600" />
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="h-8 w-8 flex items-center justify-center">
+                          <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                        </div>
+                      )}
 
                       {/* Avatar del Cliente */}
                       <Avatar className="h-10 w-10">
@@ -238,16 +248,28 @@ export default function ActiveProjectsModern() {
                             )}
                           </div>
                           
-                          {/* Botón Ver Resumen del Cliente */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-                            onClick={() => setLocation(`/client-summary/${project.clientId}`)}
-                          >
-                            <Building2 className="h-4 w-4 mr-2" />
-                            Ver Resumen del Cliente
-                          </Button>
+                          {/* Botón contextual según tipo de proyecto */}
+                          {isAlwaysOnProject ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                              onClick={() => setLocation(`/client-summary/${project.clientId}`)}
+                            >
+                              <Building2 className="h-4 w-4 mr-2" />
+                              Ver Resumen del Cliente
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                              onClick={() => setLocation(`/project-details/${project.id}`)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver Detalles del Proyecto
+                            </Button>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-6 text-sm text-gray-600">
@@ -275,14 +297,16 @@ export default function ActiveProjectsModern() {
                     </div>
                   </div>
 
-                  {/* Gestión de Subproyectos */}
-                  <SubprojectManager
-                    subprojects={subprojects}
-                    parentProjectId={project.id}
-                    isExpanded={isExpanded}
-                    getProjectHours={getProjectHours}
-                    setLocation={setLocation}
-                  />
+                  {/* Gestión de Subproyectos - solo para proyectos Always-On */}
+                  {isAlwaysOnProject && (
+                    <SubprojectManager
+                      subprojects={subprojects}
+                      parentProjectId={project.id}
+                      isExpanded={isExpanded}
+                      getProjectHours={getProjectHours}
+                      setLocation={setLocation}
+                    />
+                  )}
                 </CardContent>
               </Card>
             );
