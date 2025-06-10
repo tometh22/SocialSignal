@@ -57,6 +57,8 @@ export default function ManageQuotes() {
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [approvedQuote, setApprovedQuote] = useState<Quotation | null>(null);
   const [newStatus, setNewStatus] = useState("");
+  const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
+  const [checkingProjects, setCheckingProjects] = useState(false);
   const { toast } = useToast();
   
   // Función auxiliar para obtener el nombre del cliente por ID
@@ -130,9 +132,22 @@ export default function ManageQuotes() {
     }, 10);
   };
   
-  const openDeleteDialog = (quote: Quotation) => {
+  const openDeleteDialog = async (quote: Quotation) => {
     setSelectedQuote(quote);
-    setDeleteDialogOpen(true);
+    setCheckingProjects(true);
+    
+    try {
+      // Check if quotation has associated projects
+      const response = await fetch(`/api/active-projects/quotation/${quote.id}`);
+      const projects = await response.json();
+      setAssociatedProjects(projects || []);
+    } catch (error) {
+      console.error("Error checking associated projects:", error);
+      setAssociatedProjects([]);
+    } finally {
+      setCheckingProjects(false);
+      setDeleteDialogOpen(true);
+    }
   };
   
   const handleCreateProject = async () => {
@@ -520,30 +535,63 @@ export default function ManageQuotes() {
 
       {/* Diálogo de confirmación para eliminar cotización */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {associatedProjects.length > 0 ? "No se puede eliminar" : "¿Confirmar eliminación?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La cotización será eliminada permanentemente.
-              {selectedQuote && (
-                <div className="mt-2 p-3 bg-muted rounded-md">
-                  <p className="font-medium text-sm">Detalles de la cotización:</p>
-                  <p className="text-sm mt-1">Proyecto: <span className="font-semibold">{selectedQuote.projectName}</span></p>
-                  <p className="text-sm mt-1">ID: <span className="font-semibold">{selectedQuote.id}</span></p>
-                  <p className="text-sm mt-1">Estado: <span className="font-semibold">{translateStatus(selectedQuote.status)}</span></p>
+              {checkingProjects ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verificando proyectos asociados...</span>
+                </div>
+              ) : associatedProjects.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm">
+                    Esta cotización no puede ser eliminada porque tiene {associatedProjects.length} proyecto(s) activo(s) asociado(s):
+                  </p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                    {associatedProjects.map((project, index) => (
+                      <div key={project.id} className="flex items-center gap-2 text-sm">
+                        <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                        <span className="font-medium">Proyecto ID {project.id}</span>
+                        <span className="text-muted-foreground">({project.status})</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Para eliminar esta cotización, primero debe completar o eliminar los proyectos asociados.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p>Esta acción no se puede deshacer. La cotización será eliminada permanentemente.</p>
+                  {selectedQuote && (
+                    <div className="mt-3 p-3 bg-muted rounded-md">
+                      <p className="font-medium text-sm">Detalles de la cotización:</p>
+                      <p className="text-sm mt-1">Proyecto: <span className="font-semibold">{selectedQuote.projectName}</span></p>
+                      <p className="text-sm mt-1">ID: <span className="font-semibold">{selectedQuote.id}</span></p>
+                      <p className="text-sm mt-1">Estado: <span className="font-semibold">{translateStatus(selectedQuote.status)}</span></p>
+                    </div>
+                  )}
                 </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteQuotation}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Eliminar
-            </AlertDialogAction>
+            <AlertDialogCancel>
+              {associatedProjects.length > 0 ? "Entendido" : "Cancelar"}
+            </AlertDialogCancel>
+            {associatedProjects.length === 0 && !checkingProjects && (
+              <AlertDialogAction
+                onClick={handleDeleteQuotation}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
