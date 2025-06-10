@@ -717,7 +717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Asignar cliente a un proyecto específico
-  app.patch("/api/active-projects/:id/assign-client", async (req, res) => {
+  app.patch("/api/active-projects/:id/assign-client", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.id);
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
@@ -1049,7 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener proyectos activos por cliente
-  app.get("/api/active-projects/client/:clientId", async (req, res) => {
+  app.get("/api/active-projects/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
     
@@ -1062,7 +1062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/active-projects/quotation/:quotationId", async (req, res) => {
+  app.get("/api/active-projects/quotation/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "ID de cotización inválido" });
 
@@ -1135,7 +1135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener subproyectos por ID de proyecto padre
-  app.get("/api/active-projects/parent/:parentId", async (req, res) => {
+  app.get("/api/active-projects/parent/:parentId", requireAuth, async (req, res) => {
     const parentId = parseInt(req.params.parentId);
     if (isNaN(parentId)) return res.status(400).json({ message: "ID de proyecto padre inválido" });
     
@@ -1149,7 +1149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Actualizar estado de subproyecto
-  app.patch("/api/active-projects/:id/status", async (req, res) => {
+  app.patch("/api/active-projects/:id/status", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
@@ -1186,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Actualizar proyecto completo (nombre, estado, descripción)
-  app.patch("/api/active-projects/:id/update", async (req, res) => {
+  app.patch("/api/active-projects/:id/update", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
@@ -1230,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar nombre de subproyecto
-  app.patch("/api/active-projects/:id/name", async (req, res) => {
+  app.patch("/api/active-projects/:id/name", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
@@ -1479,37 +1479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Eliminar proyecto activo
-  app.delete("/api/active-projects/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
-    
-    try {
-      // Verificar que el proyecto exista
-      const project = await storage.getActiveProject(id);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
-      
-      // Eliminar el proyecto y sus datos relacionados
-      const deleted = await storage.deleteActiveProject(id);
-      
-      if (!deleted) {
-        return res.status(500).json({ message: "Failed to delete project" });
-      }
-      
-      console.log(`Proyecto ID ${id} eliminado correctamente`);
-      
-      res.status(200).json({ 
-        success: true, 
-        message: "Project deleted successfully", 
-        id 
-      });
-    } catch (error) {
-      console.error("Error deleting active project:", error);
-      res.status(500).json({ message: "Failed to delete project", error: String(error) });
-    }
-  });
+
   
   // ---------- RUTAS PARA COMPONENTES DE PROYECTO ----------
   
