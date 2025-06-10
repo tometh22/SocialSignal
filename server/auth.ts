@@ -102,10 +102,6 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
-    // Temporary bypass for testing enhanced features
-    req.user = { id: 3, firstName: 'Test', lastName: 'User', email: 'test@test.com', isAdmin: true };
-    return next();
-    
     const userId = req.session.userId;
     
     if (!userId) {
