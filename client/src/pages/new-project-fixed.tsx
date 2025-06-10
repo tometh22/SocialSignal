@@ -59,7 +59,7 @@ export default function NewProjectFixed() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Query simple con manejo robusto
+  // Queries para cotizaciones y clientes
   const { data: quotationsData, isLoading: quotationsLoading, error: quotationsError } = useQuery({
     queryKey: ["/api/quotations"],
     enabled: true,
@@ -67,9 +67,27 @@ export default function NewProjectFixed() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+    queryKey: ["/api/clients"],
+    enabled: true,
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Procesamiento seguro de datos
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
-  const approvedQuotations = quotations.filter((q: any) => q?.status === "approved");
+  const clients = Array.isArray(clientsData) ? clientsData : [];
+  
+  // Combinar cotizaciones con información de clientes
+  const quotationsWithClients = quotations.map((q: any) => {
+    const client = clients.find((c: any) => c.id === q.clientId);
+    return {
+      ...q,
+      clientName: client?.name || 'Cliente no encontrado'
+    };
+  });
+  
+  const approvedQuotations = quotationsWithClients.filter((q: any) => q?.status === "approved");
 
   // Opciones estáticas
   const statusOptions = [
@@ -149,7 +167,7 @@ export default function NewProjectFixed() {
     );
   }
 
-  if (quotationsLoading) {
+  if (quotationsLoading || clientsLoading) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -229,7 +247,12 @@ export default function NewProjectFixed() {
                       <SelectContent>
                         {approvedQuotations.map((q: any) => (
                           <SelectItem key={q.id} value={q.id.toString()}>
-                            {q.projectName} - ${q.totalAmount?.toFixed(2)}
+                            <div className="flex flex-col">
+                              <div className="font-medium">{q.clientName}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {q.projectName} - ${q.totalAmount?.toFixed(2)}
+                              </div>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
