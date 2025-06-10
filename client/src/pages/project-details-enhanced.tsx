@@ -774,6 +774,66 @@ export default function ProjectDetailsEnhanced() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de Eliminación Segura */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={resetDeleteDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">
+              ⚠️ Eliminar Proyecto
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-4">
+                <p className="text-sm font-medium">
+                  Esta acción es <strong>irreversible</strong> y eliminará permanentemente:
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <ul className="text-sm space-y-1 text-red-800">
+                    <li>• Todas las horas registradas ({totalHours.toFixed(1)}h)</li>
+                    <li>• Entregables y documentos asociados</li>
+                    <li>• Historial de progreso</li>
+                    <li>• Datos de análisis y métricas</li>
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deleteConfirm" className="text-sm font-medium">
+                    Para confirmar, escribe <code className="bg-gray-100 px-1 rounded">DELETE</code> en mayúsculas:
+                  </Label>
+                  <Input
+                    id="deleteConfirm"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="Escribe DELETE para confirmar"
+                    className="border-red-300 focus:border-red-500"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={resetDeleteDialog}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              disabled={deleteConfirmText !== "DELETE" || isDeleting}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+            >
+              {isDeleting ? (
+                <>
+                  <Timer className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar Proyecto
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

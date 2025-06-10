@@ -112,6 +112,7 @@ export interface IStorage {
   createTimeEntry(entry: InsertTimeEntry): Promise<TimeEntry>;
   updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
   deleteTimeEntry(id: number): Promise<boolean>;
+  deleteTimeEntriesByProject(projectId: number): Promise<void>;
   approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined>;
 
   // Progress report operations
@@ -142,6 +143,7 @@ export interface IStorage {
   getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]>;
   createDeliverable(deliverable: any): Promise<Deliverable>;
   updateDeliverable(id: number, data: any): Promise<Deliverable | undefined>;
+  deleteDeliverablesByProject(projectId: number): Promise<void>;
 
   // Client MODO operations
   getClientModoComments(clientId: number): Promise<ClientModoComment[]>;

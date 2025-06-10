@@ -1395,6 +1395,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Eliminar un proyecto activo
+  app.delete("/api/active-projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    
+    try {
+      console.log(`[API] Procesando solicitud para eliminar proyecto ID ${id}`);
+      
+      // 1. Verificar que el proyecto existe
+      const project = await storage.getActiveProject(id);
+      if (!project) {
+        console.log(`[API] El proyecto ID ${id} no existe`);
+        return res.status(404).json({ 
+          success: false, 
+          message: "El proyecto no existe" 
+        });
+      }
+      
+      // 2. Eliminar entradas de tiempo asociadas
+      console.log(`[API] Eliminando entradas de tiempo para proyecto ID ${id}`);
+      await storage.deleteTimeEntriesByProject(id);
+      
+      // 3. Eliminar entregables asociados
+      console.log(`[API] Eliminando entregables para proyecto ID ${id}`);
+      await storage.deleteDeliverablesByProject(id);
+      
+      // 4. Si es un proyecto padre (Always-On), eliminar subproyectos
+      if (project.isAlwaysOnMacro) {
+        console.log(`[API] Eliminando subproyectos del proyecto macro ID ${id}`);
+        const subprojects = await storage.getActiveProjectsByParentId(id);
+        
+        for (const subproject of subprojects) {
+          // Eliminar entradas de tiempo y entregables de cada subproyecto
+          await storage.deleteTimeEntriesByProject(subproject.id);
+          await storage.deleteDeliverablesByProject(subproject.id);
+          await storage.deleteActiveProject(subproject.id);
+        }
+      }
+      
+      // 5. Eliminar el proyecto principal
+      console.log(`[API] Eliminando proyecto principal ID ${id}`);
+      const success = await storage.deleteActiveProject(id);
+      
+      if (!success) {
+        console.log(`[API] Error al eliminar el proyecto ID ${id}`);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Ocurrió un error al intentar eliminar el proyecto" 
+        });
+      }
+      
+      console.log(`[API] Proyecto ID ${id} eliminado exitosamente`);
+      res.json({ 
+        success: true, 
+        message: "Proyecto eliminado exitosamente",
+        id
+      });
+    } catch (error) {
+      console.error("[API] Error eliminando proyecto:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error al eliminar el proyecto" 
+      });
+    }
+  });
+
   // Actualizar un proyecto activo
   app.patch("/api/active-projects/:id", async (req, res) => {
     const id = parseInt(req.params.id);
