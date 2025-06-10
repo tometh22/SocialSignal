@@ -120,9 +120,9 @@ function AppRoutes() {
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
                   <ProtectedRoute path="/admin" component={Admin} />
                   {/* Rutas para gestión de proyectos activos */}
+                  <ProtectedRoute path="/active-projects/new" component={NewProjectFixed} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsEnhanced} />
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
-                  <ProtectedRoute path="/active-projects/new" component={NewProjectFixed} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
                   {/* Ruta moderna para proyecto analytics */}
