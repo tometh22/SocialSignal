@@ -41,6 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const formSchema = z.object({
   quotationId: z.number(),
+  clientId: z.number(),
   status: z.string().min(1, "El estado es requerido"),
   trackingFrequency: z.string().min(1, "La frecuencia es requerida"),
   startDate: z.date(),
@@ -155,6 +156,7 @@ export default function NewProjectWithTooltips() {
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("Datos del formulario:", data);
     createProjectMutation.mutate(data);
   };
 
@@ -237,7 +239,14 @@ export default function NewProjectWithTooltips() {
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select onValueChange={(value) => field.onChange(parseInt(value))}>
+                      <Select onValueChange={(value) => {
+                        const quotationId = parseInt(value);
+                        const selectedQuotation = approvedQuotations.find(q => q.id === quotationId);
+                        field.onChange(quotationId);
+                        if (selectedQuotation) {
+                          form.setValue('clientId', selectedQuotation.clientId);
+                        }
+                      }}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecciona una cotización" />
@@ -246,26 +255,15 @@ export default function NewProjectWithTooltips() {
                         <SelectContent>
                           {approvedQuotations.map((q: any) => (
                             <SelectItem key={q.id} value={q.id.toString()}>
-                              <div className="flex items-center gap-3 py-2">
-                                <Avatar className="h-8 w-8">
-                                  {q.clientLogo ? (
-                                    <AvatarImage 
-                                      src={q.clientLogo} 
-                                      alt={q.clientName}
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                    />
-                                  ) : null}
-                                  <AvatarFallback className={`${q.clientBgColor} ${q.clientTextColor} text-xs font-medium`}>
-                                    {q.clientInitials}
-                                  </AvatarFallback>
-                                </Avatar>
+                              <div className="flex items-center gap-2 py-1">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${q.clientBgColor} ${q.clientTextColor}`}>
+                                  {q.clientInitials}
+                                </div>
                                 <div className="flex flex-col">
-                                  <div className="font-medium text-sm">{q.clientName}</div>
-                                  <div className="text-xs text-muted-foreground">
+                                  <span className="font-medium text-sm">{q.clientName}</span>
+                                  <span className="text-xs text-muted-foreground">
                                     {q.projectName} - ${q.totalAmount?.toFixed(2)}
-                                  </div>
+                                  </span>
                                 </div>
                               </div>
                             </SelectItem>
