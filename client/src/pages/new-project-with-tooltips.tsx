@@ -246,10 +246,27 @@ export default function NewProjectWithTooltips() {
                         if (selectedQuotation) {
                           form.setValue('clientId', selectedQuotation.clientId);
                         }
-                      }}>
+                      }} value={field.value?.toString()}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona una cotización" />
+                          <SelectTrigger className="h-auto min-h-[40px]">
+                            <SelectValue placeholder="Selecciona una cotización">
+                              {field.value && (() => {
+                                const selected = approvedQuotations.find(q => q.id === field.value);
+                                return selected ? (
+                                  <div className="flex items-center gap-2 py-1">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${selected.clientBgColor} ${selected.clientTextColor}`}>
+                                      {selected.clientInitials}
+                                    </div>
+                                    <div className="flex flex-col items-start">
+                                      <span className="font-medium text-sm">{selected.clientName}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {selected.projectName}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : null;
+                              })()}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
