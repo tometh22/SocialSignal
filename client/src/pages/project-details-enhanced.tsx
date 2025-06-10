@@ -43,8 +43,12 @@ import {
 } from "lucide-react";
 
 export default function ProjectDetailsEnhanced() {
-  const [, params] = useRoute("/project/:id");
-  const projectId = params?.id;
+  // Try multiple route patterns to match different URL structures
+  const [matchProjectDetails, paramsProjectDetails] = useRoute("/project-details/:id");
+  const [matchActiveProjects, paramsActiveProjects] = useRoute("/active-projects/:id");
+  const [matchProject, paramsProject] = useRoute("/project/:id");
+  
+  const projectId = paramsProjectDetails?.id || paramsActiveProjects?.id || paramsProject?.id;
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -60,15 +64,24 @@ export default function ProjectDetailsEnhanced() {
   const [filteredTimeEntries, setFilteredTimeEntries] = useState<any[]>([]);
 
   // Queries
-  const { data: projectData } = useQuery({
+  const { data: projectData, isLoading, error } = useQuery({
     queryKey: ["/api/active-projects", projectId],
-    queryFn: () => fetch(`/api/active-projects/${projectId}`).then(res => res.json()),
+    queryFn: () => fetch(`/api/active-projects/${projectId}`, {
+      credentials: 'include'
+    }).then(res => {
+      if (!res.ok) {
+        throw new Error(`Failed to fetch project: ${res.status} ${res.statusText}`);
+      }
+      return res.json();
+    }),
     enabled: !!projectId,
   });
 
   const { data: allProjects = [] } = useQuery({
     queryKey: ["/api/active-projects", true],
-    queryFn: () => fetch("/api/active-projects?showSubprojects=true").then(res => res.json()),
+    queryFn: () => fetch("/api/active-projects?showSubprojects=true", {
+      credentials: 'include'
+    }).then(res => res.json()),
   });
 
   const { data: clients = [] } = useQuery({
@@ -243,12 +256,32 @@ export default function ProjectDetailsEnhanced() {
     setIsDeleting(false);
   };
 
-  if (!projectData) {
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-500" />
+          <p className="text-red-600 font-semibold">Error al cargar el proyecto</p>
+          <p className="text-muted-foreground mt-2">{error.message}</p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            className="mt-4"
+            variant="outline"
+          >
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading || !projectData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Timer className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">Cargando proyecto...</p>
+          <p className="text-xs text-muted-foreground mt-2">ID: {projectId}</p>
         </div>
       </div>
     );
