@@ -37,6 +37,7 @@ import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
 import { upload, deleteOldFile } from "./upload";
+import { sanitizeInput } from "./input-sanitization";
 import path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -44,7 +45,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
   // Setup authentication with storage
-  setupAuth(app, storage);
+  const { requireAuth } = setupAuth(app, storage);
+  
+  // Apply input sanitization to all routes
+  app.use(sanitizeInput);
   
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
@@ -1001,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA PROYECTOS ACTIVOS ----------
   
   // Obtener todos los proyectos activos
-  app.get("/api/active-projects", async (req, res) => {
+  app.get("/api/active-projects", requireAuth, async (req, res) => {
     try {
       // Obtener parámetro de consulta para filtrar subproyectos
       const showSubprojects = req.query.showSubprojects === 'true';
@@ -1395,55 +1399,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Eliminar un proyecto activo
-  app.delete("/api/active-projects/:id", async (req, res) => {
+  app.delete("/api/active-projects/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
     try {
       console.log(`[API] Procesando solicitud para eliminar proyecto ID ${id}`);
       
-      // 1. Verificar que el proyecto existe
-      const project = await storage.getActiveProject(id);
-      if (!project) {
-        console.log(`[API] El proyecto ID ${id} no existe`);
-        return res.status(404).json({ 
-          success: false, 
-          message: "El proyecto no existe" 
-        });
-      }
-      
-      // 2. Eliminar entradas de tiempo asociadas
-      console.log(`[API] Eliminando entradas de tiempo para proyecto ID ${id}`);
-      await storage.deleteTimeEntriesByProject(id);
-      
-      // 3. Eliminar entregables asociados
-      console.log(`[API] Eliminando entregables para proyecto ID ${id}`);
-      await storage.deleteDeliverablesByProject(id);
-      
-      // 4. Si es un proyecto padre (Always-On), eliminar subproyectos
-      if (project.isAlwaysOnMacro) {
-        console.log(`[API] Eliminando subproyectos del proyecto macro ID ${id}`);
-        const subprojects = await storage.getActiveProjectsByParentId(id);
-        
-        for (const subproject of subprojects) {
-          // Eliminar entradas de tiempo y entregables de cada subproyecto
-          await storage.deleteTimeEntriesByProject(subproject.id);
-          await storage.deleteDeliverablesByProject(subproject.id);
-          await storage.deleteActiveProject(subproject.id);
+      // Usar transacción para garantizar integridad de datos
+      await db.transaction(async (tx) => {
+        // 1. Verificar que el proyecto existe
+        const project = await storage.getActiveProject(id);
+        if (!project) {
+          console.log(`[API] El proyecto ID ${id} no existe`);
+          throw new Error("El proyecto no existe");
         }
-      }
-      
-      // 5. Eliminar el proyecto principal
-      console.log(`[API] Eliminando proyecto principal ID ${id}`);
-      const success = await storage.deleteActiveProject(id);
-      
-      if (!success) {
-        console.log(`[API] Error al eliminar el proyecto ID ${id}`);
-        return res.status(500).json({ 
-          success: false, 
-          message: "Ocurrió un error al intentar eliminar el proyecto" 
-        });
-      }
+        
+        // 2. Si es un proyecto padre (Always-On), eliminar subproyectos primero
+        if (project.isAlwaysOnMacro) {
+          console.log(`[API] Eliminando subproyectos del proyecto macro ID ${id}`);
+          const subprojects = await storage.getActiveProjectsByParentId(id);
+          
+          for (const subproject of subprojects) {
+            // Eliminar entradas de tiempo y entregables de cada subproyecto
+            await tx.delete(timeEntries).where(eq(timeEntries.projectId, subproject.id));
+            await tx.delete(deliverables).where(eq(deliverables.project_id, subproject.id));
+            await tx.delete(activeProjects).where(eq(activeProjects.id, subproject.id));
+          }
+        }
+        
+        // 3. Eliminar entradas de tiempo del proyecto principal
+        console.log(`[API] Eliminando entradas de tiempo para proyecto ID ${id}`);
+        await tx.delete(timeEntries).where(eq(timeEntries.projectId, id));
+        
+        // 4. Eliminar entregables del proyecto principal
+        console.log(`[API] Eliminando entregables para proyecto ID ${id}`);
+        await tx.delete(deliverables).where(eq(deliverables.project_id, id));
+        
+        // 5. Eliminar informes de progreso
+        await tx.delete(progressReports).where(eq(progressReports.projectId, id));
+        
+        // 6. Eliminar componentes del proyecto
+        await tx.delete(projectComponents).where(eq(projectComponents.projectId, id));
+        
+        // 7. Eliminar el proyecto principal
+        console.log(`[API] Eliminando proyecto principal ID ${id}`);
+        await tx.delete(activeProjects).where(eq(activeProjects.id, id));
+      });
       
       console.log(`[API] Proyecto ID ${id} eliminado exitosamente`);
       res.json({ 
@@ -1455,7 +1457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[API] Error eliminando proyecto:", error);
       res.status(500).json({ 
         success: false, 
-        message: "Error al eliminar el proyecto" 
+        message: error instanceof Error ? error.message : "Error al eliminar el proyecto" 
       });
     }
   });
