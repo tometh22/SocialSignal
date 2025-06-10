@@ -93,7 +93,7 @@ export default function ProjectDetailsEnhanced() {
   // Mutaciones
   const updateProjectMutation = useMutation({
     mutationFn: async (data: { name?: string; status?: string; description?: string }) => {
-      return apiRequest(`/api/active-projects/${projectId}/update`, "PATCH", data);
+      return apiRequest(`/api/active-projects/${projectId}`, "PATCH", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
