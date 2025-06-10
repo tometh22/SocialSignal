@@ -190,7 +190,10 @@ export default function ActiveProjectsModern() {
           {(projects as any[]).map((project: any) => {
             const subprojects = allProjects.filter((p: any) => p.parentProjectId === project.id);
             const isExpanded = expandedProjects.has(project.id);
-            const isModoProject = project.id === 16;
+            const client = (clients as any[]).find((c: any) => c.id === project.clientId);
+            const projectName = project.quotation?.projectName || "Proyecto sin nombre";
+            const clientName = client?.name || "Cliente desconocido";
+            const totalAmount = project.quotation?.totalAmount || 0;
             
             return (
               <Card key={project.id} className="border-gray-200 shadow-sm hover:shadow-md transition-shadow">
@@ -214,9 +217,9 @@ export default function ActiveProjectsModern() {
 
                       {/* Avatar del Cliente */}
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={isModoProject ? "/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png" : ""} />
+                        <AvatarImage src={client?.logoUrl || ""} />
                         <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
-                          {isModoProject ? "MO" : "CL"}
+                          {clientName.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
 
@@ -225,7 +228,7 @@ export default function ActiveProjectsModern() {
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <div className="flex items-center gap-3">
                             <h3 className="text-lg font-semibold text-gray-900 truncate">
-                              MODO Always-On - Presupuesto Global
+                              {projectName}
                             </h3>
                             {getStatusBadge(project.status === "active" ? "active" : "en_progreso")}
                             {subprojects.length > 0 && (
@@ -250,20 +253,22 @@ export default function ActiveProjectsModern() {
                         <div className="flex items-center gap-6 text-sm text-gray-600">
                           <div className="flex items-center gap-1.5">
                             <Building2 className="h-4 w-4" />
-                            <span className="font-medium">MODO</span>
+                            <span className="font-medium">{clientName}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <DollarSign className="h-4 w-4" />
-                            <span className="font-semibold text-gray-900">$4,200.00</span>
-                            <span className="text-gray-500">/mes (consolidado)</span>
+                            <span className="font-semibold text-gray-900">${totalAmount.toFixed(2)}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-4 w-4" />
-                            <span>01/01/2023 - 31/12/2023</span>
+                            <span>
+                              {new Date(project.startDate).toLocaleDateString('es-ES')}
+                              {project.expectedEndDate && ` - ${new Date(project.expectedEndDate).toLocaleDateString('es-ES')}`}
+                            </span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <TrendingUp className="h-4 w-4 text-emerald-600" />
-                            <span className="text-emerald-600 font-medium">11 entregables activos</span>
+                            <Clock className="h-4 w-4 text-blue-600" />
+                            <span className="text-blue-600 font-medium">{getProjectHours(project.id).toFixed(1)}h registradas</span>
                           </div>
                         </div>
                       </div>
