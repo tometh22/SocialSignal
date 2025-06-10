@@ -80,53 +80,31 @@ export default function NewProjectFixed() {
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
   const clients = Array.isArray(clientsData) ? clientsData : [];
   
-  // Función para obtener logo y colores del cliente
-  const getClientInfo = (clientName: string) => {
-    const clientMap: Record<string, { logo?: string; bgColor: string; textColor: string }> = {
-      'MODO': { 
-        logo: '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
-        bgColor: 'bg-green-100', 
-        textColor: 'text-green-700' 
-      },
-      'Diamond Films': { 
-        bgColor: 'bg-purple-100', 
-        textColor: 'text-purple-700' 
-      },
-      'Pedidos Ya': { 
-        bgColor: 'bg-orange-100', 
-        textColor: 'text-orange-700' 
-      },
-      'Warner Bros.': { 
-        bgColor: 'bg-blue-100', 
-        textColor: 'text-blue-700' 
-      },
-      'Uber': { 
-        bgColor: 'bg-gray-100', 
-        textColor: 'text-gray-700' 
-      },
-      'Coca Cola': { 
-        bgColor: 'bg-red-100', 
-        textColor: 'text-red-700' 
-      },
-      'Arcos Dorados': { 
-        bgColor: 'bg-yellow-100', 
-        textColor: 'text-yellow-700' 
-      }
+  // Función para obtener colores del cliente
+  const getClientColors = (clientName: string) => {
+    const colorMap: Record<string, { bgColor: string; textColor: string }> = {
+      'MODO': { bgColor: 'bg-green-100', textColor: 'text-green-700' },
+      'Diamond Films': { bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
+      'Pedidos Ya': { bgColor: 'bg-orange-100', textColor: 'text-orange-700' },
+      'Warner Bros.': { bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+      'Uber': { bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+      'Coca Cola': { bgColor: 'bg-red-100', textColor: 'text-red-700' },
+      'Arcos Dorados': { bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' }
     };
-    return clientMap[clientName] || { bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
+    return colorMap[clientName] || { bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
   };
 
   // Combinar cotizaciones con información de clientes
   const quotationsWithClients = quotations.map((q: any) => {
     const client = clients.find((c: any) => c.id === q.clientId);
     const clientName = client?.name || 'Cliente no encontrado';
-    const clientInfo = getClientInfo(clientName);
+    const clientColors = getClientColors(clientName);
     return {
       ...q,
       clientName,
-      clientLogo: clientInfo.logo,
-      clientBgColor: clientInfo.bgColor,
-      clientTextColor: clientInfo.textColor,
+      clientLogo: client?.logoUrl, // Usar logoUrl directamente de la base de datos
+      clientBgColor: clientColors.bgColor,
+      clientTextColor: clientColors.textColor,
       clientInitials: clientName.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
     };
   });
@@ -293,10 +271,15 @@ export default function NewProjectFixed() {
                           <SelectItem key={q.id} value={q.id.toString()}>
                             <div className="flex items-center gap-3 py-2">
                               <Avatar className="h-8 w-8">
-                                <AvatarImage 
-                                  src={q.clientLogo} 
-                                  alt={q.clientName}
-                                />
+                                {q.clientLogo ? (
+                                  <AvatarImage 
+                                    src={q.clientLogo} 
+                                    alt={q.clientName}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                ) : null}
                                 <AvatarFallback className={`${q.clientBgColor} ${q.clientTextColor} text-xs font-medium`}>
                                   {q.clientInitials}
                                 </AvatarFallback>
