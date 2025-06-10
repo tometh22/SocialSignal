@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +38,8 @@ import {
   AlertCircle,
   BarChart3,
   Save,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from "lucide-react";
 
 export default function ProjectDetailsEnhanced() {
@@ -48,6 +50,9 @@ export default function ProjectDetailsEnhanced() {
 
   // Estados locales
   const [showTimeEntryForm, setShowTimeEntryForm] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -202,6 +207,42 @@ export default function ProjectDetailsEnhanced() {
     queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
   };
 
+  // Project deletion mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest(`/api/active-projects/${projectId}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Proyecto eliminado",
+        description: "El proyecto ha sido eliminado exitosamente.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+      // Redirect to projects list
+      window.location.href = "/active-projects";
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error al eliminar",
+        description: error.message || "No se pudo eliminar el proyecto.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleDeleteProject = () => {
+    if (deleteConfirmText.toLowerCase() === "delete" && !isDeleting) {
+      setIsDeleting(true);
+      deleteProjectMutation.mutate();
+    }
+  };
+
+  const resetDeleteDialog = () => {
+    setShowDeleteDialog(false);
+    setDeleteConfirmText("");
+    setIsDeleting(false);
+  };
+
   if (!projectData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -273,6 +314,14 @@ export default function ProjectDetailsEnhanced() {
               </Button>
               <Button variant="ghost" size="sm" onClick={handleOpenSettings}>
                 <Settings className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
