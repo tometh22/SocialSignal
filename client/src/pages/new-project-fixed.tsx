@@ -80,28 +80,53 @@ export default function NewProjectFixed() {
   const quotations = Array.isArray(quotationsData) ? quotationsData : [];
   const clients = Array.isArray(clientsData) ? clientsData : [];
   
-  // Función para obtener logo del cliente
-  const getClientLogo = (clientName: string) => {
-    const logoMap: Record<string, string> = {
-      'Warner Bros.': '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
-      'MODO': '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
-      'Diamond Films': '/uploads/diamond-films-logo.png',
-      'Pedidos Ya': '/uploads/pedidos-ya-logo.png',
-      'Uber': '/uploads/uber-logo.png',
-      'Coca Cola': '/uploads/coca-cola-logo.png',
-      'Arcos Dorados': '/uploads/mcdonalds-logo.png'
+  // Función para obtener logo y colores del cliente
+  const getClientInfo = (clientName: string) => {
+    const clientMap: Record<string, { logo?: string; bgColor: string; textColor: string }> = {
+      'MODO': { 
+        logo: '/uploads/logo-aad7da83-1d41-4c52-a130-dad57dea76db.png',
+        bgColor: 'bg-green-100', 
+        textColor: 'text-green-700' 
+      },
+      'Diamond Films': { 
+        bgColor: 'bg-purple-100', 
+        textColor: 'text-purple-700' 
+      },
+      'Pedidos Ya': { 
+        bgColor: 'bg-orange-100', 
+        textColor: 'text-orange-700' 
+      },
+      'Warner Bros.': { 
+        bgColor: 'bg-blue-100', 
+        textColor: 'text-blue-700' 
+      },
+      'Uber': { 
+        bgColor: 'bg-gray-100', 
+        textColor: 'text-gray-700' 
+      },
+      'Coca Cola': { 
+        bgColor: 'bg-red-100', 
+        textColor: 'text-red-700' 
+      },
+      'Arcos Dorados': { 
+        bgColor: 'bg-yellow-100', 
+        textColor: 'text-yellow-700' 
+      }
     };
-    return logoMap[clientName] || null;
+    return clientMap[clientName] || { bgColor: 'bg-blue-100', textColor: 'text-blue-700' };
   };
 
   // Combinar cotizaciones con información de clientes
   const quotationsWithClients = quotations.map((q: any) => {
     const client = clients.find((c: any) => c.id === q.clientId);
     const clientName = client?.name || 'Cliente no encontrado';
+    const clientInfo = getClientInfo(clientName);
     return {
       ...q,
       clientName,
-      clientLogo: getClientLogo(clientName),
+      clientLogo: clientInfo.logo,
+      clientBgColor: clientInfo.bgColor,
+      clientTextColor: clientInfo.textColor,
       clientInitials: clientName.split(' ').map((word: string) => word[0]).join('').toUpperCase().slice(0, 2)
     };
   });
@@ -272,7 +297,7 @@ export default function NewProjectFixed() {
                                   src={q.clientLogo} 
                                   alt={q.clientName}
                                 />
-                                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                                <AvatarFallback className={`${q.clientBgColor} ${q.clientTextColor} text-xs font-medium`}>
                                   {q.clientInitials}
                                 </AvatarFallback>
                               </Avatar>
