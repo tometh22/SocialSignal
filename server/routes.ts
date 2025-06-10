@@ -57,12 +57,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // setupChat(app, httpServer);
   
   // Clients routes
-  app.get("/api/clients", async (_, res) => {
+  app.get("/api/clients", requireAuth, async (_, res) => {
     const clients = await storage.getClients();
     res.json(clients);
   });
 
-  app.get("/api/clients/:id", async (req, res) => {
+  app.get("/api/clients/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -72,7 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(client);
   });
 
-  app.post("/api/clients", async (req, res) => {
+  app.post("/api/clients", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientSchema.parse(req.body);
       const client = await storage.createClient(validatedData);
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/clients/:id", async (req, res) => {
+  app.patch("/api/clients/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -116,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Ruta para cargar logo de cliente
-  app.post("/api/clients/:id/logo", upload.single('logo'), async (req, res) => {
+  app.post("/api/clients/:id/logo", requireAuth, upload.single('logo'), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
@@ -166,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(role);
   });
 
-  app.post("/api/roles", async (req, res) => {
+  app.post("/api/roles", requireAuth, async (req, res) => {
     try {
       const validatedData = insertRoleSchema.parse(req.body);
       const role = await storage.createRole(validatedData);
@@ -221,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Personnel routes
-  app.get("/api/personnel", async (_, res) => {
+  app.get("/api/personnel", requireAuth, async (_, res) => {
     try {
       const personnel = await db.select({
         id: sql`personnel.id`,
@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(person);
   });
 
-  app.post("/api/personnel", async (req, res) => {
+  app.post("/api/personnel", requireAuth, async (req, res) => {
     try {
       const validatedData = insertPersonnelSchema.parse(req.body);
       const person = await storage.createPersonnel(validatedData);
@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/personnel/:id", async (req, res) => {
+  app.patch("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
