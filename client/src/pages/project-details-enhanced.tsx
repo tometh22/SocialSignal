@@ -63,25 +63,14 @@ export default function ProjectDetailsEnhanced() {
   const [projectStatus, setProjectStatus] = useState("");
   const [filteredTimeEntries, setFilteredTimeEntries] = useState<any[]>([]);
 
-  // Queries
+  // Queries - using default query function that includes credentials
   const { data: projectData, isLoading, error } = useQuery({
     queryKey: ["/api/active-projects", projectId],
-    queryFn: () => fetch(`/api/active-projects/${projectId}`, {
-      credentials: 'include'
-    }).then(res => {
-      if (!res.ok) {
-        throw new Error(`Failed to fetch project: ${res.status} ${res.statusText}`);
-      }
-      return res.json();
-    }),
     enabled: !!projectId,
   });
 
   const { data: allProjects = [] } = useQuery({
-    queryKey: ["/api/active-projects", true],
-    queryFn: () => fetch("/api/active-projects?showSubprojects=true", {
-      credentials: 'include'
-    }).then(res => res.json()),
+    queryKey: ["/api/active-projects?showSubprojects=true"],
   });
 
   const { data: clients = [] } = useQuery({
@@ -89,8 +78,7 @@ export default function ProjectDetailsEnhanced() {
   });
 
   const { data: timeEntries = [] } = useQuery({
-    queryKey: ["/api/time-entries/project", projectId],
-    queryFn: () => fetch(`/api/time-entries/project/${projectId}`).then(res => res.json()),
+    queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
   });
 
@@ -257,6 +245,36 @@ export default function ProjectDetailsEnhanced() {
   };
 
   if (error) {
+    // Check if it's an authentication error
+    if (error.message.includes('401') || error.message.includes('No autenticado')) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+            <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
+            <p className="text-muted-foreground mb-6">
+              Necesitas iniciar sesión para ver los detalles del proyecto.
+            </p>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => window.location.href = "/auth"} 
+                className="w-full"
+              >
+                Iniciar Sesión
+              </Button>
+              <Button 
+                onClick={() => window.location.href = "/active-projects"} 
+                variant="outline"
+                className="w-full"
+              >
+                Volver a Proyectos
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
