@@ -256,12 +256,22 @@ export default function NewProjectFixed() {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
               {/* Selección de cotización */}
-              <FormField
-                control={form.control}
-                name="quotationId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cotización Aprobada</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="quotationId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center gap-2">
+                        <FormLabel>Cotización Aprobada</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Selecciona la cotización aprobada que quieres convertir en proyecto activo.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     <Select onValueChange={(value) => field.onChange(parseInt(value))}>
                       <FormControl>
                         <SelectTrigger>
@@ -309,7 +319,17 @@ export default function NewProjectFixed() {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Estado inicial</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormLabel>Estado inicial</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Define el estado inicial del proyecto (Activo, En pausa, etc.)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -494,6 +514,7 @@ export default function NewProjectFixed() {
                 )}
               </Button>
             </div>
+            </CardContent>
           </form>
         </Form>
       </Card>
