@@ -1805,8 +1805,8 @@ export class DatabaseStorage implements IStorage {
           subprojectName: cycleName,
           deliverableType: template.deliverableType,
           deliverableFrequency: template.frequency,
-          deliverableBudget: template.baseBudget,
-          deliverableDescription: template.description,
+          deliverableBudget: template.baseBudget ?? undefined,
+          deliverableDescription: template.description ?? undefined,
           completionStatus: 'pending'
         };
 

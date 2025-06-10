@@ -1,0 +1,43 @@
+iagnóstico del error actual
+
+Error clave:
+Could not connect to Redis at 127.0.0.1:6379: Connection refused
+El worker Celery no puede conectarse a Redis porque Redis no está corriendo o no está accesible en la dirección y puerto especificados.
+El comando redis-server --port 6379 --daemonize yes lanzó un warning sobre vm.overcommit_memory, pero eso no debería impedir que el servidor Redis levante.
+Sin embargo, el ping a Redis falla, lo que indica que Redis probablemente no se inició correctamente o no está escuchando en localhost.
+Pasos para resolverlo
+
+1. Verificar si Redis realmente está corriendo
+Ejecutá:
+
+ps aux | grep redis
+Si no aparece ningún proceso redis-server, entonces Redis NO está activo.
+2. Intentar levantar Redis manualmente (sin daemonize)
+Ejecutá:
+
+redis-server --port 6379
+Esto mostrará logs y errores directamente en consola, para verificar si hay algún fallo crítico.
+Si levanta sin errores, abrí otra terminal y probá:
+redis-cli ping
+Debe responder PONG.
+3. Corregir problema de vm.overcommit_memory
+El warning indica que falta configurar este parámetro, lo cual puede afectar la estabilidad.
+Ejecutar en el host (o contenedor, si corresponde):
+sudo sysctl vm.overcommit_memory=1
+Para hacerlo persistente, agregar en /etc/sysctl.conf:
+vm.overcommit_memory=1
+Reiniciar Redis después de aplicar esto.
+4. Verificar puerto y binding
+Confirmar que Redis está escuchando en 127.0.0.1:6379 (localhost).
+Si el entorno es Docker o K8s, asegurarse de que las configuraciones de red permitan acceder a Redis desde donde se ejecuta Celery.
+5. Validar variables de entorno y configuración en Celery
+El CELERY_BROKER_URL=redis://localhost:6379/1 debe ser accesible.
+Si se usa Docker, probablemente localhost no sea la IP correcta; usar el nombre del servicio Redis o IP correcta.
+Resumen y siguiente paso inmediato
+
+Parar Redis si está en estado inconsistente.
+Ejecutar Redis sin daemon para ver errores.
+Corregir vm.overcommit_memory en el host.
+Probar redis-cli ping y verificar que Redis responde PONG.
+Confirmar configuración correcta de CELERY_BROKER_URL.
+Una vez Redis esté activo y accesible, iniciar Celery worker.

@@ -1325,16 +1325,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           console.log(`Buscando entregables para proyecto ${projectId}`);
           
-          // Consulta directa a la base de datos para obtener entregables
-          const result = await db.execute(
-            `SELECT * FROM deliverables WHERE project_id = ${projectId}`
-          );
+          // Consulta parametrizada segura para obtener entregables
+          const projectDeliverables = await db.select().from(deliverables)
+            .where(eq(deliverables.project_id, projectId));
           
-          if (result.rows && result.rows.length > 0) {
-            console.log(`Entregables encontrados para proyecto ID ${projectId}: ${result.rows.length}`);
+          if (projectDeliverables && projectDeliverables.length > 0) {
+            console.log(`Entregables encontrados para proyecto ID ${projectId}: ${projectDeliverables.length}`);
             
             // Agregar información del subproyecto a cada entregable
-            const deliverablesWithProject = result.rows.map((d: any) => ({
+            const deliverablesWithProject = projectDeliverables.map((d: any) => ({
               ...d,
               subProjectId: projectId,
               displayTitle: `${d.title || `Entregable ${d.id}`} (Subproyecto ${projectId})`
