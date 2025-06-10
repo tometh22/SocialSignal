@@ -854,7 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar todos los miembros del equipo de una cotización
-  app.delete("/api/quotation-team/:quotationId", async (req, res) => {
+  app.delete("/api/quotation-team/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -863,7 +863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Eliminar un miembro específico del equipo por su ID
-  app.delete("/api/quotation-team-member/:id", async (req, res) => {
+  app.delete("/api/quotation-team-member/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid team member ID" });
     
@@ -878,7 +878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ruta alternativa para la misma funcionalidad (mantener compatibilidad con el cliente)
-  app.delete("/api/quotation-team/by-quotation/:quotationId", async (req, res) => {
+  app.delete("/api/quotation-team/by-quotation/:quotationId", requireAuth, async (req, res) => {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -1104,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener un proyecto activo específico
-  app.get("/api/active-projects/:id", async (req, res) => {
+  app.get("/api/active-projects/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
@@ -1315,7 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener entregables de todos los subproyectos Always-On de MODO
-  app.get("/api/projects/always-on/deliverables", async (req, res) => {
+  app.get("/api/projects/always-on/deliverables", requireAuth, async (req, res) => {
     try {
       console.log("Obteniendo entregables de todos los subproyectos Always-On de MODO");
       

@@ -2,8 +2,24 @@ import { Request, Response, NextFunction } from "express";
 
 // Input sanitization middleware to prevent XSS and injection attacks
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
+  const dangerousPatterns = [
+    /(\bUNION\b|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b)/i,
+    /(\-\-|\;|\|)/g,
+    /(exec|execute|sp_|xp_)/gi,
+    /(\bOR\b|\bAND\b).*(\=|\<|\>)/i
+  ];
+
+  const containsSQLInjection = (input: string): boolean => {
+    return dangerousPatterns.some(pattern => pattern.test(input));
+  };
+
   const sanitizeValue = (value: any): any => {
     if (typeof value === 'string') {
+      // Check for SQL injection patterns
+      if (containsSQLInjection(value)) {
+        throw new Error('Potentially dangerous SQL pattern detected');
+      }
+      
       // Remove potentially dangerous HTML tags and scripts
       return value
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -12,6 +28,7 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
         .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
         .replace(/javascript:/gi, '')
         .replace(/on\w+\s*=/gi, '')
+        .replace(/[\x00-\x1f\x7f]/g, '') // Remove control characters
         .trim();
     }
     
@@ -30,22 +47,30 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
     return value;
   };
 
-  // Sanitize request body
-  if (req.body) {
-    req.body = sanitizeValue(req.body);
-  }
+  try {
+    // Sanitize request body
+    if (req.body) {
+      req.body = sanitizeValue(req.body);
+    }
 
-  // Sanitize query parameters
-  if (req.query) {
-    req.query = sanitizeValue(req.query);
-  }
+    // Sanitize query parameters
+    if (req.query) {
+      req.query = sanitizeValue(req.query);
+    }
 
-  // Sanitize URL parameters
-  if (req.params) {
-    req.params = sanitizeValue(req.params);
-  }
+    // Sanitize URL parameters
+    if (req.params) {
+      req.params = sanitizeValue(req.params);
+    }
 
-  next();
+    next();
+  } catch (error) {
+    console.error('Input sanitization error:', error);
+    res.status(400).json({ 
+      message: 'Invalid or potentially dangerous input detected',
+      error: 'Input validation failed'
+    });
+  }
 };
 
 // Rate limiting configuration
