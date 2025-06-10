@@ -151,17 +151,14 @@ const NewActiveProject: React.FC = () => {
   const [stepsCompleted, setStepsCompleted] = useState<number[]>([]);
   const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
   
-  // Queries para obtener datos con timeout y manejo de errores
-  const { data: quotations = [], isLoading: isLoadingQuotations, error: quotationsError } = useQuery({
+  // Query optimizada para cotizaciones con tipo explícito
+  const { data: quotations, isLoading: isLoadingQuotations, error: quotationsError } = useQuery<any[]>({
     queryKey: ["/api/quotations"],
-    queryFn: async () => {
-      const response = await fetch("/api/quotations");
-      if (!response.ok) throw new Error("Error al cargar cotizaciones");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-    retryDelay: 500,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: false,
   });
 
   // Opciones hardcodeadas para evitar queries innecesarias
@@ -179,13 +176,10 @@ const NewActiveProject: React.FC = () => {
     { value: "monthly", label: "Mensual" }
   ];
 
-  // Filtrar cotizaciones aprobadas
+  // Filtrar cotizaciones aprobadas con memoización estable
   const approvedQuotations = React.useMemo(() => {
-    if (!quotations) return [];
-    console.log("Todas las cotizaciones:", quotations);
-    const approved = quotations.filter((q: any) => q.status === "approved");
-    console.log("Cotizaciones aprobadas:", approved);
-    return approved;
+    if (!quotations || !Array.isArray(quotations)) return [];
+    return quotations.filter((q: any) => q?.status === "approved");
   }, [quotations]);
 
   // Configurar formulario con valores predeterminados inteligentes
@@ -285,7 +279,7 @@ const NewActiveProject: React.FC = () => {
   console.log("Estados de carga:", {
     isLoadingQuotations,
     isLoading,
-    quotationsLength: quotations?.length,
+    quotationsLength: Array.isArray(quotations) ? quotations.length : 0,
     approvedLength: approvedQuotations.length,
     errors: { quotationsError }
   });
