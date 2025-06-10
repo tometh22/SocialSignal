@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
@@ -30,7 +32,8 @@ import {
   Plus,
   Clock,
   Building2,
-  HelpCircle
+  HelpCircle,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -47,6 +50,8 @@ const formSchema = z.object({
   startDate: z.date(),
   expectedEndDate: z.date().optional(),
   notes: z.string().optional(),
+  isAlwaysOnMacro: z.boolean().default(false),
+  macroMonthlyBudget: z.number().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -466,6 +471,75 @@ export default function NewProjectWithTooltips() {
                       </FormItem>
                     )}
                   />
+                </div>
+
+                {/* Configuración Always-On */}
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <h3 className="text-lg font-semibold mb-4">Configuración del Proyecto</h3>
+                  
+                  <FormField
+                    control={form.control}
+                    name="isAlwaysOnMacro"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-white">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <FormLabel className="text-base">Proyecto Always-On</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Los proyectos Always-On permiten múltiples subproyectos recurrentes con presupuesto mensual consolidado</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Activa esta opción para proyectos con fee mensual y múltiples entregables
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Presupuesto mensual - solo visible si Always-On está activado */}
+                  {form.watch('isAlwaysOnMacro') && (
+                    <FormField
+                      control={form.control}
+                      name="macroMonthlyBudget"
+                      render={({ field }) => (
+                        <FormItem className="mt-4">
+                          <div className="flex items-center gap-2">
+                            <FormLabel>Presupuesto Mensual Consolidado</FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Presupuesto mensual total para todos los subproyectos de este proyecto Always-On</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="4200.00"
+                              {...field}
+                              value={field.value || ''}
+                              onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : '')}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
 
                 {/* Notas */}

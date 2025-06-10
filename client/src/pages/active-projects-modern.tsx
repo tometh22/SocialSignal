@@ -195,8 +195,8 @@ export default function ActiveProjectsModern() {
             const clientName = client?.name || "Cliente desconocido";
             const totalAmount = project.quotation?.totalAmount || 0;
             
-            // Determinar si es un proyecto Always-On (tiene subproyectos) o proyecto único
-            const isAlwaysOnProject = subprojects.length > 0;
+            // Determinar si es un proyecto Always-On basado en el campo de base de datos
+            const isAlwaysOnProject = project.isAlwaysOnMacro || subprojects.length > 0;
             const hasExpandableContent = isAlwaysOnProject;
             
             return (
