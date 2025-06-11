@@ -69,6 +69,8 @@ export default function ActiveProjects() {
   });
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
+  const [deleteMacroProjectId, setDeleteMacroProjectId] = useState<number | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -156,10 +158,15 @@ export default function ActiveProjects() {
     setDeleteProjectId(projectId);
   };
 
+  const handleDeleteMacroProject = (projectId: number) => {
+    setDeleteMacroProjectId(projectId);
+    setDeleteConfirmationText("");
+  };
+
   // Mutation para eliminar proyectos
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
-      const response = await apiRequest('DELETE', `/api/active-projects/${projectId}`);
+      const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
       return response;
     },
     onSuccess: () => {
@@ -182,9 +189,41 @@ export default function ActiveProjects() {
     }
   });
 
+  // Mutation para eliminar proyectos macro
+  const deleteMacroProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Proyecto macro eliminado",
+        description: "El proyecto macro y todos sus subproyectos han sido eliminados correctamente.",
+      });
+      // Importante: invalidar la caché y forzar recarga de datos
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      // Cerrar el diálogo y limpiar estado
+      setDeleteMacroProjectId(null);
+      setDeleteConfirmationText("");
+    },
+    onError: (error) => {
+      console.error('Error al eliminar el proyecto macro:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el proyecto macro. Inténtalo de nuevo más tarde.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const confirmDelete = () => {
     if (!deleteProjectId) return;
     deleteProjectMutation.mutate(deleteProjectId);
+  };
+
+  const confirmDeleteMacro = () => {
+    if (!deleteMacroProjectId || deleteConfirmationText !== "DELETE") return;
+    deleteMacroProjectMutation.mutate(deleteMacroProjectId);
   };
 
   const openAssignClientDialog = (e: React.MouseEvent, projectId: number) => {
@@ -556,12 +595,12 @@ export default function ActiveProjects() {
                       {/* Botón especial para proyectos macro Always-On */}
                       {project.isAlwaysOnMacro ? (
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
-                          className="h-6 px-2 text-xs font-medium"
+                          className="h-6 px-2 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteProject(project.id);
+                            handleDeleteMacroProject(project.id);
                           }}
                           title="Eliminar proyecto macro y todos sus subproyectos"
                         >
@@ -603,6 +642,82 @@ export default function ActiveProjects() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteProjectId(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación para eliminar proyecto macro */}
+      <Dialog open={deleteMacroProjectId !== null} onOpenChange={() => {
+        setDeleteMacroProjectId(null);
+        setDeleteConfirmationText("");
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              ⚠️ Eliminar Proyecto Macro Always-On
+            </DialogTitle>
+            <DialogDescription className="space-y-3 text-left">
+              <p className="font-medium">
+                Estás a punto de eliminar el proyecto macro{" "}
+                <span className="font-semibold text-red-700">
+                  "{visibleProjects.find(p => p.id === deleteMacroProjectId)?.quotation?.projectName}"
+                </span>{" "}
+                y <strong>TODOS sus subproyectos asociados</strong>.
+              </p>
+              
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <p className="font-semibold text-red-800 mb-2">Esta acción es IRREVERSIBLE y eliminará:</p>
+                <ul className="list-disc list-inside text-red-700 space-y-1 text-sm">
+                  <li>El proyecto macro y todos los subproyectos</li>
+                  <li>Todas las entradas de tiempo registradas</li>
+                  <li>Todos los informes de progreso</li>
+                  <li>Las conversaciones de chat relacionadas</li>
+                  <li>Todos los componentes y configuraciones</li>
+                  <li>Las asignaciones de presupuesto</li>
+                </ul>
+              </div>
+              
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <p className="text-yellow-800 text-sm font-medium mb-2">
+                  Para confirmar la eliminación, escribe <span className="font-bold">DELETE</span> en el campo de abajo:
+                </p>
+                <Input
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="Escribe DELETE para confirmar"
+                  className="bg-white"
+                />
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteMacroProjectId(null);
+                setDeleteConfirmationText("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteMacro}
+              disabled={deleteConfirmationText !== "DELETE" || deleteMacroProjectMutation.isPending}
+            >
+              {deleteMacroProjectMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  ELIMINAR PROYECTO COMPLETO
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
