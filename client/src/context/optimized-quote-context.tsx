@@ -930,6 +930,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     setMarkupAmount(calculatedMarkup);
     setTotalAmount(finalTotal);
     
+    setCostSummary({
       baseCost,
       adjustment,
       totalBaseCost,
@@ -1228,6 +1229,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           );
           setTotalAmount(total);
           
+          setCostSummary({
             baseCost: templateBaseCost,
             adjustment,
             markup,
@@ -1264,6 +1266,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       );
       setTotalAmount(total);
       
+      setCostSummary({
         baseCost,
         adjustment,
         markup,
