@@ -442,21 +442,7 @@ export default function ActiveProjects() {
                         )}
                       </div>
                       
-                      {/* Botón de eliminar para proyectos macro visible en la columna del nombre */}
-                      {project.isAlwaysOnMacro && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 ml-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteMacroProject(project.id);
-                          }}
-                          title="Eliminar proyecto macro y todos sus subproyectos"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      
                     </div>
                   </td>
                   <td className="px-2 py-1.5">
@@ -610,12 +596,12 @@ export default function ActiveProjects() {
                         </Button>
                       )}
                       
-                      {/* Botón especial para proyectos macro Always-On */}
+                      {/* Botón de eliminar - diferente estilo para proyectos macro Always-On */}
                       {project.isAlwaysOnMacro ? (
                         <Button
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
-                          className="h-6 px-2 text-xs font-medium border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                          className="h-6 px-2 text-xs font-medium"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteMacroProject(project.id);
