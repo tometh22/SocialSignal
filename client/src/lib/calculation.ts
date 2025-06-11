@@ -199,18 +199,5 @@ export const calculateTotalAmount = (
   // Calcular el subtotal incluyendo margen
   const subtotal = operativeCost + markupAmount;
   
-    baseCost,
-    complexityAdjustment,
-    adjustedBaseCost,
-    platformCost,
-    operativeCost,
-    operativeSubtotal,
-    markupAmount,
-    deviationPercentage: `${deviationPercentage}% (aplicado sobre subtotal operativo)`,
-    subtotal,
-    deviationAmount,
-    total: subtotal + deviationAmount
-  });
-  
   return subtotal + deviationAmount;
 };
