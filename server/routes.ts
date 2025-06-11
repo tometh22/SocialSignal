@@ -151,12 +151,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Roles routes
-  app.get("/api/roles", async (_, res) => {
+  app.get("/api/roles", requireAuth, async (_, res) => {
     const roles = await storage.getRoles();
     res.json(roles);
   });
 
-  app.get("/api/roles/:id", async (req, res) => {
+  app.get("/api/roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
 
@@ -241,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/personnel/role/:roleId", async (req, res) => {
+  app.get("/api/personnel/role/:roleId", requireAuth, async (req, res) => {
     const roleId = parseInt(req.params.roleId);
     if (isNaN(roleId)) return res.status(400).json({ message: "Invalid role ID" });
 
@@ -249,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(personnel);
   });
 
-  app.get("/api/personnel/:id", async (req, res) => {
+  app.get("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
@@ -315,13 +315,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Report templates routes
-  app.get("/api/templates", async (_, res) => {
+  app.get("/api/templates", requireAuth, async (_, res) => {
     const templates = await storage.getReportTemplates();
     res.json(templates);
   });
   
   // Ruta alternativa para las plantillas (para compatibilidad con el flujo optimizado)
-  app.get("/api/report-templates", async (_, res) => {
+  app.get("/api/report-templates", requireAuth, async (_, res) => {
     const templates = await storage.getReportTemplates();
     res.json(templates);
   });
