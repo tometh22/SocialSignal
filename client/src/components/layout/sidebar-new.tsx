@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   ChevronRight,
@@ -47,6 +48,18 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  // Consulta para obtener el número real de proyectos activos
+  const { data: activeProjectsCount = 0 } = useQuery({
+    queryKey: ['/api/active-projects/count'],
+    queryFn: async () => {
+      const response = await fetch('/api/active-projects?showSubprojects=false');
+      if (!response.ok) return 0;
+      const projects = await response.json();
+      return projects.length;
+    },
+    refetchInterval: 30000, // Actualizar cada 30 segundos
+  });
   
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {
@@ -67,7 +80,7 @@ export default function Sidebar() {
     operaciones: [
       { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear propuesta comercial" },
       { href: "/manage-quotes", title: "Gestionar Cotizaciones", icon: FileText, description: "Revisar propuestas" },
-      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: "12", description: "Proyectos en curso" },
+      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: activeProjectsCount.toString(), description: "Proyectos en curso" },
     ],
     clientes: [
       { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" },
