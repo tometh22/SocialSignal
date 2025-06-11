@@ -326,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(templates);
   });
 
-  app.get("/api/templates/:id", async (req, res) => {
+  app.get("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -337,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Ruta alternativa para obtener una plantilla específica (para compatibilidad con el flujo optimizado)
-  app.get("/api/report-templates/:id", async (req, res) => {
+  app.get("/api/report-templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -347,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(template);
   });
 
-  app.post("/api/templates", async (req, res) => {
+  app.post("/api/templates", requireAuth, async (req, res) => {
     try {
       const validatedData = insertReportTemplateSchema.parse(req.body);
       const template = await storage.createReportTemplate(validatedData);
@@ -360,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/templates/:id", async (req, res) => {
+  app.patch("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -382,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Eliminar plantilla de reporte
-  app.delete("/api/templates/:id", async (req, res) => {
+  app.delete("/api/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Ruta para obtener asignaciones de roles para una plantilla específica
-  app.get("/api/templates/:id/role-assignments", async (req, res) => {
+  app.get("/api/templates/:id/role-assignments", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid template ID" });
 
@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ---------- RUTAS PARA MULTIPLICADORES DE COSTOS ----------
   
   // Obtener todos los multiplicadores de costos
-  app.get("/api/cost-multipliers", async (req, res) => {
+  app.get("/api/cost-multipliers", requireAuth, async (req, res) => {
     try {
       const multipliers = await storage.getCostMultipliers();
       res.json(multipliers);
@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener multiplicadores por categoría
-  app.get("/api/cost-multipliers/category/:category", async (req, res) => {
+  app.get("/api/cost-multipliers/category/:category", requireAuth, async (req, res) => {
     const category = req.params.category;
     
     try {
@@ -452,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Actualizar multiplicador de costo
-  app.patch("/api/cost-multipliers/:id", async (req, res) => {
+  app.patch("/api/cost-multipliers/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
 
@@ -479,7 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear nuevo multiplicador de costo
-  app.post("/api/cost-multipliers", async (req, res) => {
+  app.post("/api/cost-multipliers", requireAuth, async (req, res) => {
     try {
       const { category, subcategory, multiplier, label, description } = req.body;
       
