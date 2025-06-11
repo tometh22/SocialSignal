@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp, PlayCircle, PauseCircle } from "lucide-react";
+import { Calendar, Clock, Edit, Save, X, CheckCircle, TrendingUp, PlayCircle, PauseCircle, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface SubprojectManagerProps {
   subprojects: any[];
@@ -32,6 +33,8 @@ export function SubprojectManager({
   const [selectedSubproject, setSelectedSubproject] = useState<any>(null);
   const [newStatus, setNewStatus] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [subprojectToDelete, setSubprojectToDelete] = useState<any>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -106,6 +109,29 @@ export function SubprojectManager({
     },
   });
 
+  const deleteSubprojectMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/active-projects/${id}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+      setDeleteDialogOpen(false);
+      setSubprojectToDelete(null);
+      toast({
+        title: "Subproyecto eliminado",
+        description: "El subproyecto ha sido eliminado correctamente.",
+      });
+    },
+    onError: (error) => {
+      console.error("Error al eliminar subproyecto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el subproyecto. Intente nuevamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditName = (subproject: any) => {
     setEditingSubproject(subproject.id);
     setEditingName(subproject.subprojectName || `Entregable ${subproject.id}`);
@@ -136,6 +162,17 @@ export function SubprojectManager({
 
   const handleQuickStatusUpdate = (subproject: any, newStatus: string) => {
     updateStatusMutation.mutate({ id: subproject.id, status: newStatus });
+  };
+
+  const handleDeleteSubproject = (subproject: any) => {
+    setSubprojectToDelete(subproject);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSubproject = () => {
+    if (subprojectToDelete) {
+      deleteSubprojectMutation.mutate(subprojectToDelete.id);
+    }
   };
 
   if (!isExpanded || subprojects.length === 0) return null;
@@ -184,14 +221,24 @@ export function SubprojectManager({
                               <h4 className="font-medium text-gray-900 text-sm flex-1">
                                 {subproject.subprojectName || `Entregable ${subproject.id}`}
                               </h4>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditName(subproject)}
-                                className="h-6 w-6 p-0"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditName(subproject)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteSubproject(subproject)}
+                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-800 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </>
                           )}
                         </div>
@@ -380,6 +427,46 @@ export function SubprojectManager({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para confirmar eliminación */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar subproyecto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el subproyecto "{subprojectToDelete?.subprojectName || `Entregable ${subprojectToDelete?.id}`}".
+              <br /><br />
+              <strong>Esta acción es irreversible</strong> y eliminará:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Todas las entradas de tiempo registradas</li>
+                <li>Los informes de progreso asociados</li>
+                <li>Las conversaciones de chat del proyecto</li>
+                <li>Todos los componentes y configuraciones</li>
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSubproject}
+              disabled={deleteSubprojectMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteSubprojectMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar Subproyecto
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

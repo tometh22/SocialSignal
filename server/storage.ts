@@ -208,7 +208,7 @@ export interface IStorage {
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
-  
+
   constructor() {
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
@@ -229,29 +229,29 @@ export class DatabaseStorage implements IStorage {
     // Obtener información del proyecto y personal para validar presupuesto
     const project = await this.getActiveProject(entry.projectId);
     const personnel = await this.getPersonnelById(entry.personnelId);
-    
+
     if (!project || !personnel) {
       throw new Error("Proyecto o personal no encontrado");
     }
-    
+
     // Calcular costo de esta entrada
     const entryCost = entry.hours * personnel.hourlyRate;
-    
+
     // Obtener total gastado hasta ahora
     const existingEntries = await this.getTimeEntriesByProject(entry.projectId);
     const currentCost = await this.calculateProjectTotalCost(entry.projectId);
-    
+
     // Validar límite de presupuesto
     const totalBudget = project.quotation.baseCost || 0;
     if (currentCost + entryCost > totalBudget) {
       throw new Error(`Esta entrada excedería el presupuesto del proyecto. Límite: $${totalBudget}, Actual: $${currentCost}, Nueva entrada: $${entryCost}`);
     }
-    
+
     // Alerta cuando se acerca al límite (90%)
     if (currentCost + entryCost > totalBudget * 0.9) {
       console.warn(`ALERTA: El proyecto ${project.id} está cerca del límite de presupuesto (${((currentCost + entryCost) / totalBudget * 100).toFixed(1)}%)`);
     }
-    
+
     const [newEntry] = await db.insert(timeEntries).values(entry).returning();
     return newEntry;
   }
@@ -265,7 +265,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("La relación padre-hijo crearía un ciclo en la jerarquía de proyectos");
       }
     }
-    
+
     const [newProject] = await db.insert(activeProjects).values(project).returning();
     return newProject;
   }
@@ -276,7 +276,7 @@ export class DatabaseStorage implements IStorage {
       if (project.parentProjectId === id) {
         throw new Error("Un proyecto no puede ser padre de sí mismo");
       }
-      
+
       if (project.parentProjectId) {
         const isValidParent = await this.validateProjectHierarchy(project.parentProjectId, id);
         if (!isValidParent) {
@@ -296,30 +296,30 @@ export class DatabaseStorage implements IStorage {
   // **VALIDACIÓN CRÍTICA 3: ELIMINACIÓN SEGURA CON CONSTRAINTS**
   async deleteActiveProject(id: number): Promise<boolean> {
     try {
-      
+
       // Usar transacción para garantizar integridad
       await db.transaction(async (tx) => {
         // 1. Eliminar conversaciones de chat
         await tx.delete(chatConversations).where(eq(chatConversations.projectId, id));
-        
+
         // 2. Eliminar entradas de tiempo
         await tx.delete(timeEntries).where(eq(timeEntries.projectId, id));
-        
+
         // 3. Eliminar informes de progreso
         await tx.delete(progressReports).where(eq(progressReports.projectId, id));
-        
+
         // 4. Eliminar componentes del proyecto
         await tx.delete(projectComponents).where(eq(projectComponents.projectId, id));
-        
+
         // 5. Actualizar proyectos hijos para quitar la referencia padre
         await tx.update(activeProjects)
           .set({ parentProjectId: null })
           .where(eq(activeProjects.parentProjectId, id));
-        
+
         // 6. Finalmente eliminar el proyecto
         await tx.delete(activeProjects).where(eq(activeProjects.id, id));
       });
-      
+
       return true;
     } catch (error) {
       console.error("Error al eliminar el proyecto activo:", error);
@@ -333,32 +333,32 @@ export class DatabaseStorage implements IStorage {
     const checkCycle = async (currentId: number, targetId: number, visited: Set<number> = new Set()): Promise<boolean> => {
       if (visited.has(currentId)) return false; // Ciclo detectado
       if (currentId === targetId) return false; // Ciclo directo
-      
+
       visited.add(currentId);
-      
+
       const [parent] = await db.select()
         .from(activeProjects)
         .where(eq(activeProjects.id, currentId));
-      
+
       if (!parent || !parent.parentProjectId) return true;
-      
+
       return await checkCycle(parent.parentProjectId, targetId, visited);
     };
-    
+
     return await checkCycle(parentId, childId);
   }
 
   private async calculateProjectTotalCost(projectId: number): Promise<number> {
     const entries = await this.getTimeEntriesByProject(projectId);
     let totalCost = 0;
-    
+
     for (const entry of entries) {
       const personnel = await this.getPersonnelById(entry.personnelId);
       if (personnel) {
         totalCost += entry.hours * personnel.hourlyRate;
       }
     }
-    
+
     return totalCost;
   }
 
@@ -501,7 +501,7 @@ export class DatabaseStorage implements IStorage {
   async deleteReportTemplate(id: number): Promise<boolean> {
     // Primero eliminar todas las asignaciones de roles asociadas a esta plantilla
     await db.delete(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, id));
-    
+
     // Luego eliminar la plantilla
     await db.delete(reportTemplates).where(eq(reportTemplates.id, id));
     const template = await db.select().from(reportTemplates).where(eq(reportTemplates.id, id));
@@ -580,7 +580,7 @@ export class DatabaseStorage implements IStorage {
     .from(templateRoleAssignments)
     .innerJoin(roles, eq(templateRoleAssignments.roleId, roles.id))
     .where(eq(templateRoleAssignments.templateId, templateId));
-    
+
     return assignments.map(item => ({
       ...item.assignment,
       role: item.role
@@ -631,15 +631,15 @@ export class DatabaseStorage implements IStorage {
   async getClientEngagementOptions() {
     return clientEngagementOptions;
   }
-  
+
   async getProjectStatusOptions() {
     return projectStatusOptions;
   }
-  
+
   async getTrackingFrequencyOptions() {
     return trackingFrequencyOptions;
   }
-  
+
   // Active project operations
   async getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } })[]> {
     const projects = await db.select({
@@ -650,7 +650,7 @@ export class DatabaseStorage implements IStorage {
     .from(activeProjects)
     .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
     .leftJoin(clients, eq(quotations.clientId, clients.id));
-    
+
     return projects.map(item => ({
       ...item.project,
       quotation: {
@@ -659,11 +659,11 @@ export class DatabaseStorage implements IStorage {
       }
     }));
   }
-  
+
   async getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]> {
     const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
     const clientQuotationIds = clientQuotations.map(q => q.id);
-    
+
     const result = [];
     for (const quotationId of clientQuotationIds) {
       const projects = await db.select({
@@ -673,7 +673,7 @@ export class DatabaseStorage implements IStorage {
       .from(activeProjects)
       .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
       .where(eq(quotations.id, quotationId));
-      
+
       for (const item of projects) {
         result.push({
           ...item.project,
@@ -681,10 +681,10 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
-      
+
     return result;
   }
-  
+
   async getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined> {
     const projects = await db.select({
       project: activeProjects,
@@ -695,9 +695,9 @@ export class DatabaseStorage implements IStorage {
     .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
     .leftJoin(clients, eq(quotations.clientId, clients.id))
     .where(eq(activeProjects.id, id));
-    
+
     if (projects.length === 0) return undefined;
-    
+
     const item = projects[0];
     return {
       ...item.project,
@@ -707,17 +707,17 @@ export class DatabaseStorage implements IStorage {
       }
     };
   }
-  
+
   // Project component operations
   async getProjectComponents(projectId: number): Promise<ProjectComponent[]> {
     return await db.select().from(projectComponents).where(eq(projectComponents.projectId, projectId));
   }
-  
+
   async createProjectComponent(component: InsertProjectComponent): Promise<ProjectComponent> {
     const [newComponent] = await db.insert(projectComponents).values(component).returning();
     return newComponent;
   }
-  
+
   async updateProjectComponent(id: number, component: Partial<InsertProjectComponent>): Promise<ProjectComponent | undefined> {
     const [updatedComponent] = await db
       .update(projectComponents)
@@ -726,22 +726,22 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedComponent;
   }
-  
+
   async deleteProjectComponent(id: number): Promise<boolean> {
     await db.delete(projectComponents).where(eq(projectComponents.id, id));
     const component = await db.select().from(projectComponents).where(eq(projectComponents.id, id));
     return component.length === 0;
   }
-  
+
   // Time entry operations
   async getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
     return await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
   }
-  
+
   async getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]> {
     return await db.select().from(timeEntries).where(eq(timeEntries.personnelId, personnelId));
   }
-  
+
   async getTimeEntries(): Promise<TimeEntry[]> {
     return await db.select().from(timeEntries);
   }
@@ -749,19 +749,19 @@ export class DatabaseStorage implements IStorage {
   async getTimeEntriesByClient(clientId: number): Promise<TimeEntry[]> {
     const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, clientId));
     const clientQuotationIds = clientQuotations.map(q => q.id);
-    
+
     const projects = await db.select().from(activeProjects).where(inArray(activeProjects.quotationId, clientQuotationIds));
     const projectIds = projects.map(p => p.id);
-    
+
     if (projectIds.length === 0) return [];
     return await db.select().from(timeEntries).where(inArray(timeEntries.projectId, projectIds));
   }
-  
+
   async getTimeEntryById(id: number): Promise<TimeEntry | undefined> {
     const [entry] = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
     return entry;
   }
-  
+
   async updateTimeEntry(id: number, entry: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined> {
     const [updatedEntry] = await db
       .update(timeEntries)
@@ -770,13 +770,13 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedEntry;
   }
-  
+
   async deleteTimeEntry(id: number): Promise<boolean> {
     await db.delete(timeEntries).where(eq(timeEntries.id, id));
     const entry = await db.select().from(timeEntries).where(eq(timeEntries.id, id));
     return entry.length === 0;
   }
-  
+
   async approveTimeEntry(id: number, approverId: number): Promise<TimeEntry | undefined> {
     const [updatedEntry] = await db
       .update(timeEntries)
@@ -793,17 +793,17 @@ export class DatabaseStorage implements IStorage {
   async deleteTimeEntriesByProject(projectId: number): Promise<void> {
     await db.delete(timeEntries).where(eq(timeEntries.projectId, projectId));
   }
-  
+
   // Progress report operations
   async getProgressReports(projectId: number): Promise<ProgressReport[]> {
     return await db.select().from(progressReports).where(eq(progressReports.projectId, projectId));
   }
-  
+
   async createProgressReport(report: InsertProgressReport): Promise<ProgressReport> {
     const [newReport] = await db.insert(progressReports).values(report).returning();
     return newReport;
   }
-  
+
   async updateProgressReport(id: number, report: Partial<InsertProgressReport>): Promise<ProgressReport | undefined> {
     const [updatedReport] = await db
       .update(progressReports)
@@ -812,7 +812,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedReport;
   }
-  
+
   async deleteProgressReport(id: number): Promise<boolean> {
     await db.delete(progressReports).where(eq(progressReports.id, id));
     const report = await db.select().from(progressReports).where(eq(progressReports.id, id));
@@ -843,17 +843,17 @@ export class DatabaseStorage implements IStorage {
       conversationId,
       userId
     }).returning();
-    
+
     return participant.id > 0;
   }
-  
+
   async updateConversationLastActivity(conversationId: number): Promise<void> {
     await db
       .update(chatConversations)
       .set({ lastMessageAt: new Date(), updatedAt: new Date() })
       .where(eq(chatConversations.id, conversationId));
   }
-  
+
   async markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void> {
     await db
       .update(chatMessages)
@@ -870,20 +870,20 @@ export class DatabaseStorage implements IStorage {
   async getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]> {
     try {
       if (projectIds.length === 0) return [];
-      
-      
+
+
       const deliverableList = await db.select().from(deliverables).where(inArray(deliverables.project_id, projectIds));
-      
+
       return deliverableList;
     } catch (error) {
       console.error("Error al obtener entregables:", error);
       throw error;
     }
   }
-  
+
   async createDeliverable(deliverable: any): Promise<Deliverable> {
     try {
-      
+
       const dataToInsert = {
         clientId: deliverable.clientId || deliverable.client_id,
         name: deliverable.name || deliverable.title,
@@ -902,8 +902,8 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      
-      
+
+
       const [newDeliverable] = await db.insert(deliverables).values([dataToInsert]).returning();
       return newDeliverable;
     } catch (error) {
@@ -911,12 +911,12 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  
+
   async updateDeliverable(id: number, data: any): Promise<Deliverable | undefined> {
     try {
-      
+
       const updateData: any = { updatedAt: new Date() };
-      
+
       // Mapear campos correctamente
       if (data.name !== undefined) updateData.name = data.name;
       if (data.title !== undefined) updateData.name = data.title;
@@ -929,7 +929,7 @@ export class DatabaseStorage implements IStorage {
       if (data.onTime !== undefined) updateData.onTime = data.onTime;
       if (data.deliveryOnTime !== undefined) updateData.onTime = data.deliveryOnTime;
       if (data.on_time !== undefined) updateData.onTime = data.on_time;
-      
+
       // Mapear campos de calidad (frontend "_score" -> backend sin sufijo)
       if (data.narrative_quality_score !== undefined) updateData.narrativeQuality = data.narrative_quality_score;
       if (data.narrative_quality !== undefined) updateData.narrativeQuality = data.narrative_quality;
@@ -946,18 +946,18 @@ export class DatabaseStorage implements IStorage {
       if (data.brief_compliance_score !== undefined) updateData.briefCompliance = data.brief_compliance_score;
       if (data.brief_compliance !== undefined) updateData.briefCompliance = data.brief_compliance;
       if (data.notes !== undefined) updateData.notes = data.notes;
-      
-      
+
+
       const [updatedDeliverable] = await db
         .update(deliverables)
         .set(updateData)
         .where(eq(deliverables.id, id))
         .returning();
-      
+
       if (!updatedDeliverable) {
         return undefined;
       }
-      
+
       return updatedDeliverable;
     } catch (error) {
       console.error(`Error al actualizar entregable ID ${id}:`, error);
@@ -987,21 +987,21 @@ export class DatabaseStorage implements IStorage {
     latestComment?: ClientModoComment;
   }> {
     try {
-      
+
       // Obtener proyectos del cliente
       const clientProjects = await this.getActiveProjectsByClient(clientId);
       const projectIds = clientProjects.map(p => p.id);
-      
-      
+
+
       // Obtener entregables
       const deliverablesList = await this.getDeliverablesByProjects(projectIds);
-      
-      
+
+
       // Calcular estadísticas
       const totalDeliverables = deliverablesList.length;
       const onTimeDeliveries = deliverablesList.filter(d => d.deliveryOnTime).length;
       const deliveryRate = totalDeliverables > 0 ? (onTimeDeliveries / totalDeliverables) * 100 : 0;
-      
+
       // Calcular promedios de calidad
       let sumNarrativeQuality = 0, countNarrativeQuality = 0;
       let sumGraphicsEffectiveness = 0, countGraphicsEffectiveness = 0;
@@ -1010,7 +1010,7 @@ export class DatabaseStorage implements IStorage {
       let sumOperationsFeedback = 0, countOperationsFeedback = 0;
       let sumClientFeedback = 0, countClientFeedback = 0;
       let sumBriefCompliance = 0, countBriefCompliance = 0;
-      
+
       deliverablesList.forEach(d => {
         if (d.narrativeQuality != null) { sumNarrativeQuality += parseFloat(String(d.narrativeQuality)); countNarrativeQuality++; }
         if (d.graphicsEffectiveness != null) { sumGraphicsEffectiveness += parseFloat(String(d.graphicsEffectiveness)); countGraphicsEffectiveness++; }
@@ -1020,7 +1020,7 @@ export class DatabaseStorage implements IStorage {
         if (d.clientFeedback != null) { sumClientFeedback += parseFloat(String(d.clientFeedback)); countClientFeedback++; }
         if (d.briefCompliance != null) { sumBriefCompliance += parseFloat(String(d.briefCompliance)); countBriefCompliance++; }
       });
-      
+
       const averageNarrativeQuality = countNarrativeQuality > 0 ? sumNarrativeQuality / countNarrativeQuality : 0;
       const averageGraphicsEffectiveness = countGraphicsEffectiveness > 0 ? sumGraphicsEffectiveness / countGraphicsEffectiveness : 0;
       const averageFormatDesign = countFormatDesign > 0 ? sumFormatDesign / countFormatDesign : 0;
@@ -1028,18 +1028,18 @@ export class DatabaseStorage implements IStorage {
       const averageOperationsFeedback = countOperationsFeedback > 0 ? sumOperationsFeedback / countOperationsFeedback : 0;
       const averageClientFeedback = countClientFeedback > 0 ? sumClientFeedback / countClientFeedback : 0;
       const averageBriefCompliance = countBriefCompliance > 0 ? sumBriefCompliance / countBriefCompliance : 0;
-      
+
       // Obtener comentarios MODO
       const comments = await db
         .select()
         .from(clientModoComments)
         .where(eq(clientModoComments.clientId, clientId))
         .orderBy(desc(clientModoComments.year));
-      
-      
+
+
       const totalComments = comments.length;
       const latestComment = comments.length > 0 ? comments[0] : undefined;
-      
+
       return {
         totalDeliverables,
         onTimeDeliveries,
@@ -1069,17 +1069,17 @@ export class DatabaseStorage implements IStorage {
         .from(clientModoComments)
         .where(eq(clientModoComments.clientId, clientId))
         .orderBy(desc(clientModoComments.year));
-      
+
       return comments;
     } catch (error) {
       console.error("Error al obtener comentarios MODO:", error);
       throw error;
     }
   }
-  
+
   async createClientModoComment(comment: any): Promise<ClientModoComment> {
     try {
-      
+
       const dataToInsert = {
         clientId: comment.clientId || comment.client_id,
         comments: comment.comments || comment.comment_text,
@@ -1089,9 +1089,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date(),
         updatedAt: new Date()
       };
-      
+
       const [newComment] = await db.insert(clientModoComments).values([dataToInsert]).returning();
-      
+
       return newComment;
     } catch (error) {
       console.error("Error al crear comentario MODO:", error);
@@ -1164,7 +1164,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== RECURRING TEMPLATES WITH TEAM ASSIGNMENT ====================
-  
+
   async createRecurringTemplateWithTeam(template: any): Promise<any> {
     try {
       const [newTemplate] = await db.insert(recurringProjectTemplates).values({
@@ -1266,7 +1266,7 @@ export class DatabaseStorage implements IStorage {
 
       // Cache the result
       this.templateCache.set(projectId, { data: result, timestamp: Date.now() });
-      
+
       return result;
     } catch (error) {
       console.error('Error fetching recurring templates:', error);
@@ -1313,15 +1313,15 @@ export class DatabaseStorage implements IStorage {
 
       // First delete team assignments
       await db.delete(recurringTemplatePersonnel).where(eq(recurringTemplatePersonnel.templateId, id));
-      
+
       // Then delete the template
       await db.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.id, id));
-      
+
       // Invalidate cache for this project
       if (templateToDelete) {
         this.templateCache.delete(templateToDelete.parentProjectId);
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error deleting recurring template:', error);
@@ -1335,7 +1335,17 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(activeProjects).where(eq(activeProjects.quotationId, quotationId));
     } catch (error) {
       console.error("Error al obtener proyectos activos por cotización:", error);
-      throw error;
+      return [];
+    }
+  }
+
+  // Obtener subproyectos por ID del proyecto padre
+  async getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]> {
+    try {
+      return await db.select().from(activeProjects).where(eq(activeProjects.parentProjectId, parentId));
+    } catch (error) {
+      console.error("Error al obtener subproyectos por proyecto padre:", error);
+      return [];
     }
   }
 
@@ -1361,10 +1371,10 @@ export class DatabaseStorage implements IStorage {
     try {
       const projects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, clientId));
       const allTimeEntries = await db.select().from(timeEntries);
-      
+
       let totalCost = 0;
       let totalBudget = 0;
-      
+
       for (const project of projects) {
         totalBudget += parseFloat(String(project.deliverableBudget || 0));
         const projectTimeEntries = allTimeEntries.filter((te: any) => te.projectId === project.id);
@@ -1372,7 +1382,7 @@ export class DatabaseStorage implements IStorage {
           totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
         }
       }
-      
+
       return {
         totalCost,
         totalBudget,
@@ -1439,14 +1449,14 @@ export class DatabaseStorage implements IStorage {
       if (!project) return null;
 
       const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
-      
+
       let totalCost = 0;
       for (const entry of entries) {
         totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
       }
-      
+
       const budget = parseFloat(String(project.deliverableBudget || 0));
-      
+
       return {
         projectId,
         totalCost,
@@ -1544,10 +1554,10 @@ export class DatabaseStorage implements IStorage {
     try {
       const comments = await db.select().from(clientModoComments)
         .where(eq(clientModoComments.clientId, clientId));
-      
+
       const projects = await db.select().from(activeProjects)
         .where(eq(activeProjects.clientId, clientId));
-      
+
       return {
         clientId,
         totalComments: comments.length,
@@ -1571,7 +1581,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== MULTIPLICADORES DE COSTOS ====================
-  
+
   async getCostMultipliers(): Promise<CostMultiplier[]> {
     return await db.select().from(costMultipliers).orderBy(costMultipliers.category, costMultipliers.subcategory);
   }
@@ -1593,12 +1603,12 @@ export class DatabaseStorage implements IStorage {
         ...multiplier,
         updatedAt: new Date(),
       };
-      
+
       const [updated] = await db.update(costMultipliers)
         .set(updateData)
         .where(eq(costMultipliers.id, id))
         .returning();
-        
+
       return updated || undefined;
     } catch (error) {
       console.error("Error al actualizar multiplicador de costo:", error);
@@ -1606,7 +1616,8 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createCostMultiplier(multiplier: InsertCostMultiplier): Promise<CostMultiplier> {
+  async createCostMultiplier(multiplier: InsertCostMultiplier): Promise```python
+CostMultiplier> {
     const [created] = await db.insert(costMultipliers).values(multiplier).returning();
     return created;
   }
@@ -1710,7 +1721,7 @@ export class DatabaseStorage implements IStorage {
       if (cycle.subprojectId) {
         const costSummary = await this.getProjectCostSummary(cycle.subprojectId);
         actualCost = costSummary.totalCost;
-        
+
         // Obtener template para comparar con presupuesto base
         if (cycle.templateId) {
           const template = await this.getRecurringTemplate(cycle.templateId);
@@ -1754,7 +1765,7 @@ export class DatabaseStorage implements IStorage {
       if (!parentProject) throw new Error("Parent project not found");
 
       const generatedProjects: ActiveProject[] = [];
-      
+
       // Generar subproyectos basados en la frecuencia
       let currentDate = new Date(periodStart);
       const endDate = new Date(periodEnd);
@@ -1821,7 +1832,7 @@ export class DatabaseStorage implements IStorage {
       for (const template of templates) {
         // Verificar si necesita crear próximo ciclo
         const shouldCreate = await this.shouldCreateNextCycle(template, today);
-        
+
         if (shouldCreate) {
           const nextCycleStart = this.calculateNextCycleStart(template);
           const nextCycleEnd = this.calculateCycleEnd(template.frequency, nextCycleStart);
@@ -1853,7 +1864,7 @@ export class DatabaseStorage implements IStorage {
   private generateCycleName(frequency: string, date: Date): string {
     const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    
+
     switch (frequency) {
       case 'monthly':
         return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
@@ -1870,7 +1881,7 @@ export class DatabaseStorage implements IStorage {
 
   private calculateCycleEnd(frequency: string, startDate: Date): Date {
     const endDate = new Date(startDate);
-    
+
     switch (frequency) {
       case 'weekly':
         endDate.setDate(endDate.getDate() + 6);
@@ -1886,13 +1897,13 @@ export class DatabaseStorage implements IStorage {
         endDate.setMonth(endDate.getMonth() + 1);
         break;
     }
-    
+
     return endDate;
   }
 
   private getNextCycleDate(frequency: string, currentDate: Date): Date {
     const nextDate = new Date(currentDate);
-    
+
     switch (frequency) {
       case 'weekly':
         nextDate.setDate(nextDate.getDate() + 7);
@@ -1904,7 +1915,7 @@ export class DatabaseStorage implements IStorage {
         nextDate.setMonth(nextDate.getMonth() + 1);
         break;
     }
-    
+
     return nextDate;
   }
 
@@ -1921,14 +1932,14 @@ export class DatabaseStorage implements IStorage {
     // Verificar si debe crear basado en días de anticipación
     const nextCycleStart = this.calculateNextCycleStart(template);
     const daysUntilNext = Math.ceil((nextCycleStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     return daysUntilNext <= (template.autoCreateDaysInAdvance || 7);
   }
 
   private calculateNextCycleStart(template: RecurringProjectTemplate): Date {
     const today = new Date();
     const nextStart = new Date(today);
-    
+
     switch (template.frequency) {
       case 'monthly':
         if (template.dayOfMonth) {
@@ -1952,7 +1963,7 @@ export class DatabaseStorage implements IStorage {
       default:
         nextStart.setDate(today.getDate() + 7);
     }
-    
+
     return nextStart;
   }
 }

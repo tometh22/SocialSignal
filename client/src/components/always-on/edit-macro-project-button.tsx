@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { PencilIcon, DollarSign } from "lucide-react";
+import { PencilIcon, DollarSign, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface EditMacroProjectButtonProps {
   project: any;
@@ -26,7 +28,9 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   const [isOpen, setIsOpen] = useState(false);
   const [budget, setBudget] = useState("4200");
   const [status, setStatus] = useState("active");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   
   // Actualizar estados cuando cambia el proyecto
   useEffect(() => {
@@ -56,6 +60,31 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
       toast({
         title: "Error",
         description: "No se pudo actualizar el proyecto. Intente nuevamente.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation para eliminar el proyecto macro
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: number) => {
+      return apiRequest(`/api/active-projects/${id}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Proyecto eliminado",
+        description: "El proyecto Always-On y todos sus subproyectos han sido eliminados."
+      });
+      // Invalidar queries y redirigir
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      setDeleteDialogOpen(false);
+      setLocation("/active-projects");
+    },
+    onError: (error) => {
+      console.error("Error al eliminar el proyecto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el proyecto. Intente nuevamente.",
         variant: "destructive"
       });
     }
@@ -93,6 +122,17 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
     }
   };
 
+  // Manejar eliminación del proyecto
+  const handleDeleteProject = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteProject = () => {
+    if (project?.id) {
+      deleteProjectMutation.mutate(project.id);
+    }
+  };
+
   // Debugging para ver si detecta correctamente el proyecto macro
   
   // Siempre renderizar para proyectos Always-On o con ID 16 (MODO Always-On)
@@ -100,14 +140,26 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   
   return (
     <>
-      <Button 
-        onClick={() => setIsOpen(true)}
-        className="mb-4 ml-4 bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center animate-pulse"
-        title="Editar proyecto Always-On"
-      >
-        <PencilIcon className="h-5 w-5 mr-2" />
-        Editar Proyecto Always-On
-      </Button>
+      <div className="flex gap-2 mb-4 ml-4">
+        <Button 
+          onClick={() => setIsOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center animate-pulse"
+          title="Editar proyecto Always-On"
+        >
+          <PencilIcon className="h-5 w-5 mr-2" />
+          Editar Proyecto Always-On
+        </Button>
+        
+        <Button 
+          onClick={handleDeleteProject}
+          variant="destructive"
+          className="shadow-lg flex items-center justify-center"
+          title="Eliminar proyecto Always-On"
+        >
+          <Trash2 className="h-5 w-5 mr-2" />
+          Eliminar Proyecto
+        </Button>
+      </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -187,6 +239,59 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para confirmar eliminación del proyecto macro */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="sm:max-w-[500px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">
+              ⚠️ ¿Eliminar proyecto Always-On completo?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Estás a punto de eliminar el proyecto macro <strong>"{project?.quotation?.projectName || "Always-On"}"</strong> 
+                y <strong>TODOS sus subproyectos asociados</strong>.
+              </p>
+              
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <p className="font-semibold text-red-800 mb-2">Esta acción es IRREVERSIBLE y eliminará:</p>
+                <ul className="list-disc list-inside text-red-700 space-y-1 text-sm">
+                  <li>El proyecto macro y todos los subproyectos</li>
+                  <li>Todas las entradas de tiempo registradas</li>
+                  <li>Todos los informes de progreso</li>
+                  <li>Las conversaciones de chat relacionadas</li>
+                  <li>Todos los componentes y configuraciones</li>
+                  <li>Las asignaciones de presupuesto</li>
+                </ul>
+              </div>
+              
+              <p className="text-sm text-gray-600">
+                Si solo quieres eliminar subproyectos específicos, cancela esta acción y usa los botones de eliminación individuales.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteProject}
+              disabled={deleteProjectMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteProjectMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  SÍ, ELIMINAR PROYECTO COMPLETO
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
