@@ -49,28 +49,19 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const queryClient = useQueryClient();
-  const [projectCount, setProjectCount] = useState(0);
-
-  // Consulta para obtener el número real de proyectos activos
-  const { data: activeProjectsData } = useQuery({
-    queryKey: ['/api/active-projects'],
+  // Consulta para obtener el número real de proyectos activos usando la ruta pública
+  const { data: projectCountData = { count: 0 } } = useQuery({
+    queryKey: ['/api/active-projects/count'],
     queryFn: async () => {
-      const response = await fetch('/api/active-projects?showSubprojects=false');
-      if (!response.ok) return [];
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      const response = await fetch('/api/active-projects/count');
+      if (!response.ok) throw new Error('Error fetching count');
+      return response.json();
     },
     staleTime: 0,
-    refetchInterval: 10000,
+    refetchInterval: 3000, // Actualizar cada 3 segundos
   });
 
-  // Actualizar el contador cuando cambie la data
-  useEffect(() => {
-    if (activeProjectsData) {
-      setProjectCount(activeProjectsData.length);
-    }
-  }, [activeProjectsData]);
+  const projectCount = projectCountData.count;
   
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {

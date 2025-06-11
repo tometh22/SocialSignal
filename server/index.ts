@@ -2,10 +2,23 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-data";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Ruta pública para contador de proyectos (sin autenticación)
+app.get("/api/active-projects/count", async (req, res) => {
+  try {
+    const projects = await storage.getActiveProjects();
+    const count = projects.filter(p => !p.parentProjectId).length;
+    res.json({ count });
+  } catch (error) {
+    console.error("Error getting projects count:", error);
+    res.json({ count: 0 });
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
