@@ -1616,8 +1616,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createCostMultiplier(multiplier: InsertCostMultiplier): Promise```python
-CostMultiplier> {
+  async createCostMultiplier(multiplier: InsertCostMultiplier): Promise<CostMultiplier> {
     const [created] = await db.insert(costMultipliers).values(multiplier).returning();
     return created;
   }
