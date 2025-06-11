@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar multiplicador de costo
-  app.delete("/api/cost-multipliers/:id", async (req, res) => {
+  app.delete("/api/cost-multipliers/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid multiplier ID" });
 
@@ -523,12 +523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quotations routes
-  app.get("/api/quotations", async (_, res) => {
+  app.get("/api/quotations", requireAuth, async (_, res) => {
     const quotations = await storage.getQuotations();
     res.json(quotations);
   });
 
-  app.get("/api/quotations/client/:clientId", async (req, res) => {
+  app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
 
@@ -536,7 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(quotations);
   });
 
-  app.get("/api/quotations/:id", async (req, res) => {
+  app.get("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
@@ -546,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(quotation);
   });
 
-  app.post("/api/quotations", async (req, res) => {
+  app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
       console.log("POST /api/quotations - Recibido payload:", req.body);
       
@@ -2558,7 +2558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener comentarios MODO por cliente
-  app.get("/api/modo-comments/client/:clientId", async (req, res) => {
+  app.get("/api/modo-comments/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
     
@@ -2572,7 +2572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener un comentario MODO por ID
-  app.get("/api/modo-comments/:id", async (req, res) => {
+  app.get("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
     
@@ -2589,7 +2589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Buscar comentario MODO por trimestre/año
-  app.get("/api/modo-comments/quarter", async (req, res) => {
+  app.get("/api/modo-comments/quarter", requireAuth, async (req, res) => {
     const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : null;
     const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : null;
     const year = req.query.year ? parseInt(req.query.year as string) : null;
@@ -2611,7 +2611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Crear un nuevo comentario MODO
-  app.post("/api/modo-comments", async (req, res) => {
+  app.post("/api/modo-comments", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientModoCommentSchema.parse(req.body);
       const comment = await storage.createClientModoComment(validatedData);
