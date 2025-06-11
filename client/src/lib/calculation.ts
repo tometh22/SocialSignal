@@ -136,14 +136,6 @@ export const calculateComplexityAdjustment = (
     countriesFactor +
     clientEngagementFactor +
     templateFactor;
-  
-    analysisTypeFactor, 
-    mentionsVolumeFactor, 
-    countriesFactor, 
-    clientEngagementFactor, 
-    templateFactor,
-    totalFactor
-  });
 
   // Aplicar el factor al costo base
   return baseCost * totalFactor;
