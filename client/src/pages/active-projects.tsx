@@ -598,19 +598,19 @@ export default function ActiveProjects() {
                       )}
 
                       {/* Botón de eliminar - diferente estilo para proyectos macro Always-On */}
-                      {project.isAlwaysOnMacro ? (
+                      {project.isAlwaysOnMacro || project.id === 16 ? (
                         <Button
                           variant="destructive"
                           size="sm"
-                          className="h-6 px-2 text-xs font-medium"
+                          className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteMacroProject(project.id);
                           }}
-                          title="Eliminar proyecto macro y todos sus subproyectos"
+                          title="ELIMINAR PROYECTO MACRO COMPLETO"
                         >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Eliminar Macro
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          ELIMINAR MACRO
                         </Button>
                       ) : (
                         <Button
