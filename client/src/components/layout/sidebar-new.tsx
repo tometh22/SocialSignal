@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   ChevronRight,
@@ -49,17 +49,37 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  // Consulta para obtener el número real de proyectos activos
-  const { data: activeProjectsCount = 0 } = useQuery({
-    queryKey: ['/api/active-projects/count'],
-    queryFn: async () => {
+  const queryClient = useQueryClient();
+  const [projectCount, setProjectCount] = useState(0);
+
+  // Función para obtener el conteo de proyectos
+  const fetchProjectCount = async () => {
+    try {
       const response = await fetch('/api/active-projects?showSubprojects=false');
-      if (!response.ok) return 0;
+      if (!response.ok) {
+        setProjectCount(0);
+        return;
+      }
       const projects = await response.json();
-      return projects.length;
-    },
-    refetchInterval: 30000, // Actualizar cada 30 segundos
-  });
+      const count = Array.isArray(projects) ? projects.length : 0;
+      setProjectCount(count);
+    } catch (error) {
+      console.error('Error fetching project count:', error);
+      setProjectCount(0);
+    }
+  };
+
+  // Actualizar conteo al montar el componente y cada 5 segundos
+  useEffect(() => {
+    fetchProjectCount();
+    const interval = setInterval(fetchProjectCount, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Invalidar cache cuando el componente se monta
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+  }, [queryClient]);
   
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {
@@ -80,7 +100,7 @@ export default function Sidebar() {
     operaciones: [
       { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear propuesta comercial" },
       { href: "/manage-quotes", title: "Gestionar Cotizaciones", icon: FileText, description: "Revisar propuestas" },
-      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: activeProjectsCount.toString(), description: "Proyectos en curso" },
+      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso" },
     ],
     clientes: [
       { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" },
