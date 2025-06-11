@@ -401,43 +401,61 @@ export default function ActiveProjects() {
                   onClick={() => setLocation(`/project-analytics/${project.id}`)}
                 >
                   <td className="px-2 py-1.5 font-medium">
-                    <div className="flex items-center">
-                      {/* Botón para expandir/colapsar para proyectos macro */}
-                      {project.isAlwaysOnMacro && (
-                        <Button 
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 mr-1 text-blue-600"
-                          onClick={(e) => toggleProjectExpansion(e, project.id)}
-                        >
-                          {expandedProjects[project.id] ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                              <path d="M19 12h-14"></path>
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                              <path d="M12 5v14M5 12h14"></path>
-                            </svg>
-                          )}
-                          <span className="sr-only">
-                            {expandedProjects[project.id] ? 'Colapsar' : 'Expandir'}
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center">
+                        {/* Botón para expandir/colapsar para proyectos macro */}
+                        {project.isAlwaysOnMacro && (
+                          <Button 
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 mr-1 text-blue-600"
+                            onClick={(e) => toggleProjectExpansion(e, project.id)}
+                          >
+                            {expandedProjects[project.id] ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                                <path d="M19 12h-14"></path>
+                              </svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                                <path d="M12 5v14M5 12h14"></path>
+                              </svg>
+                            )}
+                            <span className="sr-only">
+                              {expandedProjects[project.id] ? 'Colapsar' : 'Expandir'}
+                            </span>
+                          </Button>
+                        )}
+                      
+                        {project.isAlwaysOnMacro && (
+                          <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
+                            Always On
+                          </Badge>
+                        )}
+                        {project.parentProjectId && (
+                          <span className="text-gray-400 mr-1">└─</span>
+                        )}
+                        {project.quotation?.projectName || '-'}
+                        {project.isAlwaysOnMacro && (
+                          <span className="ml-2 text-blue-600 text-[10px]">
+                            ${project.macroMonthlyBudget?.toLocaleString()} / mes
                           </span>
+                        )}
+                      </div>
+                      
+                      {/* Botón de eliminar para proyectos macro visible en la columna del nombre */}
+                      {project.isAlwaysOnMacro && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 ml-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMacroProject(project.id);
+                          }}
+                          title="Eliminar proyecto macro y todos sus subproyectos"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                    
-                      {project.isAlwaysOnMacro && (
-                        <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
-                          Always On
-                        </Badge>
-                      )}
-                      {project.parentProjectId && (
-                        <span className="text-gray-400 mr-1">└─</span>
-                      )}
-                      {project.quotation?.projectName || '-'}
-                      {project.isAlwaysOnMacro && (
-                        <span className="ml-2 text-blue-600 text-[10px]">
-                          ${project.macroMonthlyBudget?.toLocaleString()} / mes
-                        </span>
                       )}
                     </div>
                   </td>
