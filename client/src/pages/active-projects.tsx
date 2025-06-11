@@ -76,7 +76,7 @@ export default function ActiveProjects() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({16: true}); // ID 16 es el proyecto macro MODO, inicialmente expandido
   const { toast } = useToast();
-  
+
   // Consulta para obtener subproyectos de un proyecto específico
   const { data: subprojects = [], refetch: refetchSubprojects, isLoading: isLoadingSubprojects } = useQuery<ActiveProject[]>({
     queryKey: ['/api/active-projects/parent', expandedProjects],
@@ -85,12 +85,12 @@ export default function ActiveProjects() {
       const expandedIds = Object.keys(expandedProjects)
         .filter(id => expandedProjects[parseInt(id)])
         .map(id => parseInt(id));
-      
+
       if (expandedIds.length === 0) return [];
-      
+
       // Realizar consultas para todos los proyectos expandidos
       const allSubprojects: ActiveProject[] = [];
-      
+
       for (const id of expandedIds) {
         try {
           const response = await fetch(`/api/active-projects/parent/${id}`);
@@ -102,12 +102,12 @@ export default function ActiveProjects() {
           console.error(`Error al obtener subproyectos para el proyecto ${id}:`, error);
         }
       }
-      
+
       return allSubprojects;
     },
     enabled: Object.values(expandedProjects).some(expanded => expanded),
   });
-  
+
   // Función para desplegar o colapsar un proyecto
   const toggleProjectExpansion = (e: React.MouseEvent, projectId: number) => {
     e.stopPropagation(); // Evita que se active el onClick del tr
@@ -116,7 +116,7 @@ export default function ActiveProjects() {
         ...prev,
         [projectId]: !prev[projectId]
       };
-      
+
       // Refrescar subproyectos si es necesario
       if (newState[projectId]) {
         // Retrasamos la llamada para dar tiempo a que se actualice el estado
@@ -124,7 +124,7 @@ export default function ActiveProjects() {
           refetchSubprojects();
         }, 100);
       }
-      
+
       return newState;
     });
   };
@@ -154,16 +154,17 @@ export default function ActiveProjects() {
     }
   });
 
+  // Función para manejar la eliminación de proyecto individual
   const handleDeleteProject = (projectId: number) => {
     setDeleteProjectId(projectId);
   };
 
+  // Función para manejar la eliminación de proyecto macro Always-On
   const handleDeleteMacroProject = (projectId: number) => {
     setDeleteMacroProjectId(projectId);
-    setDeleteConfirmationText("");
   };
 
-  // Mutation para eliminar proyectos
+  // Mutación para eliminar un proyecto
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
       const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
@@ -189,7 +190,7 @@ export default function ActiveProjects() {
     }
   });
 
-  // Mutation para eliminar proyectos macro
+  // Mutación para eliminar proyectos macro
   const deleteMacroProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
       const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
@@ -256,25 +257,25 @@ export default function ActiveProjects() {
 
   // Estado para almacenar todos los proyectos visibles (proyectos principales + subproyectos)
   const [allVisibleProjects, setAllVisibleProjects] = useState<ActiveProject[]>([]);
-  
+
   // Efecto para cargar subproyectos cuando se expande un proyecto
   useEffect(() => {
     const loadSubprojectsForExpandedProjects = async () => {
       // Primero empezamos con los proyectos principales
       const updatedProjects = [...projects];
-      
+
       // Para cada proyecto expandido, cargamos sus subproyectos
       for (const projectId in expandedProjects) {
         if (expandedProjects[parseInt(projectId)]) {
           try {
             const response = await fetch(`/api/active-projects/parent/${projectId}`);
-            
+
             if (response.ok) {
               const childProjects = await response.json();
-              
+
               // Encontrar la posición del proyecto padre
               const parentIndex = updatedProjects.findIndex(p => p.id === parseInt(projectId));
-              
+
               if (parentIndex !== -1) {
                 // Insertar los subproyectos justo después del padre
                 updatedProjects.splice(parentIndex + 1, 0, ...childProjects);
@@ -285,13 +286,13 @@ export default function ActiveProjects() {
           }
         }
       }
-      
+
       setAllVisibleProjects(updatedProjects);
     };
-    
+
     loadSubprojectsForExpandedProjects();
   }, [projects, expandedProjects]);
-  
+
   // Usamos allVisibleProjects en lugar de visibleProjects
   const visibleProjects = allVisibleProjects;
 
@@ -318,7 +319,7 @@ export default function ActiveProjects() {
             <Search className="h-3.5 w-3.5 mr-1 text-gray-500" />
             Filtros:
           </div>
-          
+
           <div className="flex-1">
             <div className="relative">
               <Input
@@ -328,7 +329,7 @@ export default function ActiveProjects() {
               <Search className="absolute left-1.5 top-1.5 h-3.5 w-3.5 text-gray-400" />
             </div>
           </div>
-          
+
           <div className="w-40">
             <Select defaultValue="all">
               <SelectTrigger className="h-7 text-xs">
@@ -425,7 +426,7 @@ export default function ActiveProjects() {
                             </span>
                           </Button>
                         )}
-                      
+
                         {project.isAlwaysOnMacro && (
                           <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
                             Always On
@@ -441,8 +442,8 @@ export default function ActiveProjects() {
                           </span>
                         )}
                       </div>
-                      
-                      
+
+
                     </div>
                   </td>
                   <td className="px-2 py-1.5">
@@ -510,7 +511,7 @@ export default function ActiveProjects() {
                       >
                         <LineChart className="h-3.5 w-3.5" />
                       </Button>
-                      
+
                       {/* Botón para editar proyecto Always On (solo para proyectos macro) */}
                       {project.isAlwaysOnMacro && (
                         <Button
@@ -529,7 +530,7 @@ export default function ActiveProjects() {
                           </svg>
                         </Button>
                       )}
-                      
+
                       {/* Botón para editar indicadores de robustez */}
                       {project.status !== 'cancelled' && (
                         <Button
@@ -565,7 +566,7 @@ export default function ActiveProjects() {
                                       title: `Indicadores para ${project.quotation?.projectName || 'Proyecto'}`
                                     }),
                                   });
-                                  
+
                                   if (createResponse.ok) {
                                     const newDeliverable = await createResponse.json();
                                     setLocation(`/edit-robustness/${newDeliverable.id}`);
@@ -595,7 +596,7 @@ export default function ActiveProjects() {
                           </svg>
                         </Button>
                       )}
-                      
+
                       {/* Botón de eliminar - diferente estilo para proyectos macro Always-On */}
                       {project.isAlwaysOnMacro ? (
                         <Button
@@ -669,7 +670,7 @@ export default function ActiveProjects() {
                 </span>{" "}
                 y <strong>TODOS sus subproyectos asociados</strong>.
               </p>
-              
+
               <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                 <p className="font-semibold text-red-800 mb-2">Esta acción es IRREVERSIBLE y eliminará:</p>
                 <ul className="list-disc list-inside text-red-700 space-y-1 text-sm">
@@ -681,7 +682,7 @@ export default function ActiveProjects() {
                   <li>Las asignaciones de presupuesto</li>
                 </ul>
               </div>
-              
+
               <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                 <p className="text-yellow-800 text-sm font-medium mb-2">
                   Para confirmar la eliminación, escribe <span className="font-bold">DELETE</span> en el campo de abajo:
