@@ -405,7 +405,11 @@ export default function ActiveProjects() {
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center">
                         {/* Botón para expandir/colapsar para proyectos macro */}
-                        {project.isAlwaysOnMacro && (
+                        {(project.isAlwaysOnMacro || 
+                          project.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                          project.quotation?.projectName?.toLowerCase().includes('modo') ||
+                          project.macroMonthlyBudget ||
+                          (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) && (
                           <Button 
                             variant="ghost"
                             size="icon"
@@ -427,7 +431,11 @@ export default function ActiveProjects() {
                           </Button>
                         )}
 
-                        {project.isAlwaysOnMacro && (
+                        {(project.isAlwaysOnMacro || 
+                          project.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                          project.quotation?.projectName?.toLowerCase().includes('modo') ||
+                          project.macroMonthlyBudget ||
+                          (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) && (
                           <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
                             Always On
                           </Badge>
@@ -598,7 +606,11 @@ export default function ActiveProjects() {
                       )}
 
                       {/* Botón de eliminar - diferente estilo para proyectos macro Always-On */}
-                      {project.isAlwaysOnMacro || project.id === 16 ? (
+                      {(project.isAlwaysOnMacro || 
+                        project.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                        project.quotation?.projectName?.toLowerCase().includes('modo') ||
+                        project.macroMonthlyBudget ||
+                        (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) ? (
                         <Button
                           variant="destructive"
                           size="sm"
