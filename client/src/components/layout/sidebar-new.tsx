@@ -49,21 +49,22 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  // Consulta para obtener el número real de proyectos activos usando la ruta pública
+  // Consulta para obtener el número real de proyectos activos usando la ruta específica
   const { data: projectCountData = { count: 0 } } = useQuery({
     queryKey: ['/api/active-projects/count'],
     queryFn: async () => {
-      const response = await fetch('/api/active-projects?showSubprojects=false');
-      if (!response.ok) throw new Error('Error fetching projects');
-      const projects = await response.json();
-      // Filtrar solo proyectos con status 'active' o 'en_progreso'
-      const activeProjects = projects.filter((p: any) => 
-        p.status === 'active' || p.status === 'en_progreso'
-      );
-      return { count: activeProjects.length };
+      try {
+        const response = await fetch('/api/active-projects/count');
+        if (!response.ok) throw new Error('Error fetching project count');
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Error fetching project count:', error);
+        return { count: 0 };
+      }
     },
-    staleTime: 30000, // 30 segundos
-    refetchInterval: 30000, // Actualizar cada 30 segundos para no sobrecargar
+    staleTime: 10000, // 10 segundos
+    refetchInterval: 30000, // Actualizar cada 30 segundos
   });
 
   const projectCount = projectCountData.count;

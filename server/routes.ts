@@ -974,6 +974,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ---------- RUTAS PARA PROYECTOS ACTIVOS ----------
 
+  // Obtener conteo de proyectos activos principales
+  app.get("/api/active-projects/count", requireAuth, async (req, res) => {
+    try {
+      const result = await db.select({
+        count: sql`COUNT(*)`
+      })
+      .from(activeProjects)
+      .where(sql`parent_project_id IS NULL AND status = 'active'`);
+
+      const count = Number(result[0]?.count || 0);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching active projects count:", error);
+      res.status(500).json({ message: "Failed to fetch active projects count", count: 0 });
+    }
+  });
+
   // Obtener todos los proyectos activos
   app.get("/api/active-projects", requireAuth, async (req, res) => {
     try {
