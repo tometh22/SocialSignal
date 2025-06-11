@@ -3011,7 +3011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA PLANTILLAS RECURRENTES ===========
   
   // Crear plantilla recurrente
-  app.post("/api/recurring-templates", async (req, res) => {
+  app.post("/api/recurring-templates", requireAuth, async (req, res) => {
     try {
       const validatedData = insertRecurringProjectTemplateSchema.parse(req.body);
       const template = await storage.createRecurringTemplate(validatedData);
@@ -3026,7 +3026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Obtener plantillas recurrentes por proyecto padre
-  app.get("/api/projects/:parentProjectId/recurring-templates", async (req, res) => {
+  app.get("/api/projects/:parentProjectId/recurring-templates", requireAuth, async (req, res) => {
     try {
       const parentProjectId = parseInt(req.params.parentProjectId);
       if (isNaN(parentProjectId)) {
@@ -3062,7 +3062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar plantilla recurrente
-  app.delete("/api/recurring-templates/:id", async (req, res) => {
+  app.delete("/api/recurring-templates/:id", requireAuth, async (req, res) => {
     try {
       const templateId = parseInt(req.params.id);
       if (isNaN(templateId)) {
@@ -3084,7 +3084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== RUTAS PARA CICLOS DE PROYECTO ===========
   
   // Obtener ciclos por proyecto padre
-  app.get("/api/projects/:parentProjectId/cycles", async (req, res) => {
+  app.get("/api/projects/:parentProjectId/cycles", requireAuth, async (req, res) => {
     try {
       const parentProjectId = parseInt(req.params.parentProjectId);
       if (isNaN(parentProjectId)) {
@@ -3100,7 +3100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Crear ciclo de proyecto
-  app.post("/api/project-cycles", async (req, res) => {
+  app.post("/api/project-cycles", requireAuth, async (req, res) => {
     try {
       const validatedData = insertProjectCycleSchema.parse(req.body);
       const cycle = await storage.createProjectCycle(validatedData);
@@ -3115,7 +3115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Completar ciclo (marca como completado y calcula varianza)
-  app.patch("/api/project-cycles/:id/complete", async (req, res) => {
+  app.patch("/api/project-cycles/:id/complete", requireAuth, async (req, res) => {
     try {
       const cycleId = parseInt(req.params.id);
       if (isNaN(cycleId)) {
@@ -3137,7 +3137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =========== AUTOMATIZACIÓN DE PROYECTOS RECURRENTES ===========
   
   // Endpoint para generar automáticamente subproyectos desde plantillas
-  app.post("/api/projects/:parentProjectId/auto-generate", async (req, res) => {
+  app.post("/api/projects/:parentProjectId/auto-generate", requireAuth, async (req, res) => {
     try {
       const parentProjectId = parseInt(req.params.parentProjectId);
       if (isNaN(parentProjectId)) {
@@ -3161,7 +3161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint para verificar y crear próximos ciclos pendientes
-  app.post("/api/automation/check-pending-cycles", async (req, res) => {
+  app.post("/api/automation/check-pending-cycles", requireAuth, async (req, res) => {
     try {
       const pendingCycles = await storage.checkAndCreatePendingCycles();
       res.json({ 
