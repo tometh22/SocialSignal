@@ -52,34 +52,25 @@ export default function Sidebar() {
   const queryClient = useQueryClient();
   const [projectCount, setProjectCount] = useState(0);
 
-  // Función para obtener el conteo de proyectos
-  const fetchProjectCount = async () => {
-    try {
+  // Consulta para obtener el número real de proyectos activos
+  const { data: activeProjectsData } = useQuery({
+    queryKey: ['/api/active-projects'],
+    queryFn: async () => {
       const response = await fetch('/api/active-projects?showSubprojects=false');
-      if (!response.ok) {
-        setProjectCount(0);
-        return;
-      }
-      const projects = await response.json();
-      const count = Array.isArray(projects) ? projects.length : 0;
-      setProjectCount(count);
-    } catch (error) {
-      console.error('Error fetching project count:', error);
-      setProjectCount(0);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 0,
+    refetchInterval: 10000,
+  });
+
+  // Actualizar el contador cuando cambie la data
+  useEffect(() => {
+    if (activeProjectsData) {
+      setProjectCount(activeProjectsData.length);
     }
-  };
-
-  // Actualizar conteo al montar el componente y cada 5 segundos
-  useEffect(() => {
-    fetchProjectCount();
-    const interval = setInterval(fetchProjectCount, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Invalidar cache cuando el componente se monta
-  useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-  }, [queryClient]);
+  }, [activeProjectsData]);
   
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {

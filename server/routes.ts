@@ -1209,6 +1209,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ruta específica para obtener solo el contador de proyectos activos (sin autenticación para sidebar)
+  app.get("/api/active-projects/count", async (req, res) => {
+    try {
+      const projects = await storage.getActiveProjects();
+      const count = projects.filter(p => !p.parentProjectId).length; // Solo proyectos principales
+      res.json({ count });
+    } catch (error) {
+      console.error("Error getting projects count:", error);
+      res.json({ count: 0 });
+    }
+  });
+
   // Actualizar proyecto completo (nombre, estado, descripción)
   app.patch("/api/active-projects/:id/update", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
