@@ -134,6 +134,11 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   };
 
   // Debugging para ver si detecta correctamente el proyecto macro
+  console.log("Edit Macro Project Button - Proyecto:", {
+    id: project?.id,
+    isAlwaysOnMacro: project?.isAlwaysOnMacro,
+    shouldRender: project?.isAlwaysOnMacro || project?.id === 16
+  });
   
   // Siempre renderizar para proyectos Always-On o con ID 16 (MODO Always-On)
   if (!project?.isAlwaysOnMacro && project?.id !== 16) return null;

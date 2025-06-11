@@ -553,18 +553,35 @@ export default function ActiveProjects() {
                         </Button>
                       )}
                       
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteProject(project.id);
-                        }}
-                        title="Eliminar proyecto"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {/* Botón especial para proyectos macro Always-On */}
+                      {project.isAlwaysOnMacro ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-6 px-2 text-xs font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(project.id);
+                          }}
+                          title="Eliminar proyecto macro y todos sus subproyectos"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Eliminar Macro
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(project.id);
+                          }}
+                          title="Eliminar proyecto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

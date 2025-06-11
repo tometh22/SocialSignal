@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import EditMacroProjectButton from "@/components/always-on/edit-macro-project-button";
 
 // Interfaces para el tipado
 interface CostSummary {
@@ -129,11 +130,11 @@ const ProjectAnalyticsView: React.FC = () => {
     title: "",
     content: ""
   });
-  
+
   // Toast para notificaciones y estado del dialog
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  
+
   // Consultas de datos
   const { data: project, isLoading: isLoadingProject } = useQuery<ActiveProject>({
     queryKey: [`/api/active-projects/${parsedProjectId}`],
@@ -449,7 +450,7 @@ const ProjectAnalyticsView: React.FC = () => {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Volver
               </Button>
-              
+
               {/* Botón de editar proyecto Always-On al inicio de la página */}
               {project?.isAlwaysOnMacro || project?.id === 16 ? (
                 <Button 
@@ -461,7 +462,7 @@ const ProjectAnalyticsView: React.FC = () => {
                   Editar Proyecto
                 </Button>
               ) : null}
-              
+
               <Breadcrumb className="mb-1">
                 <BreadcrumbList>
                   <BreadcrumbItem>
@@ -486,11 +487,11 @@ const ProjectAnalyticsView: React.FC = () => {
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
-              
+
               <h1 className="text-2xl font-bold tracking-tight">
                 {project?.quotation?.projectName || "Cargando proyecto..."}
               </h1>
-              
+
               {project?.quotation?.client && (
                 <div className="flex items-center mt-2">
                   <User className="h-4 w-4 mr-1.5 text-muted-foreground" />
@@ -525,7 +526,7 @@ const ProjectAnalyticsView: React.FC = () => {
                       <ExternalLink className="ml-1 h-3 w-3" />
                     </Link>
                   </div>
-                  
+
                   {/* Panel de Gestión Always-On */}
                   <div className="mb-4 border border-blue-100 rounded-lg p-2 bg-white">
                     <div className="bg-blue-50 rounded-md p-2 mb-3">
@@ -538,14 +539,14 @@ const ProjectAnalyticsView: React.FC = () => {
                         <TabsTrigger value="health">Salud del Proyecto</TabsTrigger>
                         <TabsTrigger value="allocation">Asignación de Presupuesto</TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="summary" className="space-y-2">
                         <div className="text-xs text-muted-foreground mb-2">
                           Vista consolidada del presupuesto mensual y distribución entre subproyectos.
                         </div>
                         {project && <BudgetSummaryPanel project={project} />}
                       </TabsContent>
-                      
+
                       <TabsContent value="health" className="space-y-2">
                         <div className="text-xs text-muted-foreground mb-2">
                           Indicadores de salud para monitorear el estado del proyecto macro.
@@ -554,7 +555,7 @@ const ProjectAnalyticsView: React.FC = () => {
                           project={project} 
                         />
                       </TabsContent>
-                      
+
                       <TabsContent value="allocation" className="space-y-2">
                         <div className="text-xs text-muted-foreground mb-2">
                           Herramienta para distribuir el presupuesto entre los subproyectos.
@@ -567,7 +568,7 @@ const ProjectAnalyticsView: React.FC = () => {
                   </div>
                 </div>
               )}
-              
+
               {/* Si es un subproyecto */}
               {project?.parentProjectId && (
                 <AlwaysOnBudgetAlert 
@@ -579,7 +580,7 @@ const ProjectAnalyticsView: React.FC = () => {
               )}
             </>
           )}
-          
+
           {/* Estándar Analytics */}
           <div className="mt-4">
             <div className="border-b pb-2 mb-4">
@@ -644,13 +645,13 @@ const ProjectAnalyticsView: React.FC = () => {
                 Configure los detalles básicos del proyecto macro "Always On"
               </DialogDescription>
             </DialogHeader>
-            
+
             <form onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
               const budget = formData.get("budget") as string;
               const status = formData.get("status") as string;
-              
+
               if (!budget || !status) {
                 toast({
                   title: "Error",
@@ -659,9 +660,9 @@ const ProjectAnalyticsView: React.FC = () => {
                 });
                 return;
               }
-              
+
               const budgetValue = parseFloat(budget);
-              
+
               apiRequest(`/api/active-projects/${project.id}`, "PATCH", {
                 macroMonthlyBudget: budgetValue,
                 status
@@ -697,7 +698,7 @@ const ProjectAnalyticsView: React.FC = () => {
                     Presupuesto mensual que se compartirá entre todos los subproyectos
                   </p>
                 </div>
-                
+
                 <div className="grid gap-2">
                   <Label htmlFor="status">Estado</Label>
                   <Select name="status" defaultValue={project?.status || "active"}>
@@ -713,7 +714,7 @@ const ProjectAnalyticsView: React.FC = () => {
                   </Select>
                 </div>
               </div>
-              
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                   Cancelar
