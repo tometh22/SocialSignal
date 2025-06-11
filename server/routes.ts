@@ -2626,7 +2626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Actualizar un comentario MODO
-  app.patch("/api/modo-comments/:id", async (req, res) => {
+  app.patch("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
     
@@ -2649,7 +2649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Eliminar un comentario MODO
-  app.delete("/api/modo-comments/:id", async (req, res) => {
+  app.delete("/api/modo-comments/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid comment ID" });
     
@@ -2666,7 +2666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Obtener resumen MODO por cliente
-  app.get("/api/modo-summary/client/:clientId", async (req, res) => {
+  app.get("/api/modo-summary/client/:clientId", requireAuth, async (req, res) => {
     const clientId = parseInt(req.params.clientId);
     if (isNaN(clientId)) return res.status(400).json({ message: "Invalid client ID" });
     
@@ -2680,7 +2680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /* MODO Routes START */
-  app.get("/api/clients/:id/modo-summary", async (req, res) => {
+  app.get("/api/clients/:id/modo-summary", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
       if (isNaN(clientId)) {
@@ -2866,7 +2866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clients/:id/deliverables", async (req, res) => {
+  app.get("/api/clients/:id/deliverables", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
       if (isNaN(clientId)) {
@@ -2904,7 +2904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clients/:id/modo-comments", async (req, res) => {
+  app.get("/api/clients/:id/modo-comments", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
       if (isNaN(clientId)) {
@@ -2922,7 +2922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener entregables para un cliente específico
   /* Esta ruta está duplicada y no se usa */
 
-  app.post("/api/clients/:id/modo-comments", async (req, res) => {
+  app.post("/api/clients/:id/modo-comments", requireAuth, async (req, res) => {
     try {
       const clientId = parseInt(req.params.id);
       if (isNaN(clientId)) {
@@ -2951,7 +2951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/deliverables", async (req, res) => {
+  app.post("/api/deliverables", requireAuth, async (req, res) => {
     try {
       const currentUser = req.user as any;
       if (!currentUser) {
