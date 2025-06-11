@@ -813,6 +813,60 @@ export default function ActiveProjects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo para confirmar eliminación de todos los proyectos */}
+      <Dialog open={deleteAllProjectsDialogOpen} onOpenChange={setDeleteAllProjectsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">⚠️ Eliminar Todos los Proyectos</DialogTitle>
+            <DialogDescription className="space-y-3">
+              <p>
+                <strong>Esta acción eliminará TODOS los proyectos activos del sistema, incluyendo:</strong>
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Todos los proyectos macro (Always-On)</li>
+                <li>Todos los subproyectos asociados</li>
+                <li>Todas las plantillas recurrentes</li>
+                <li>Todos los registros de tiempo</li>
+                <li>Todos los reportes de progreso</li>
+                <li>Todos los entregables</li>
+              </ul>
+              <p className="text-red-600 font-medium">
+                Esta acción NO se puede deshacer. Se perderán todos los datos permanentemente.
+              </p>
+              <p>
+                Para confirmar, escribe exactamente: <code className="bg-gray-100 px-2 py-1 rounded">ELIMINAR TODO</code>
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={deleteAllConfirmationText}
+              onChange={(e) => setDeleteAllConfirmationText(e.target.value)}
+              placeholder="Escribe 'ELIMINAR TODO' para confirmar"
+              className="text-center"
+            />
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteAllProjectsDialogOpen(false);
+                setDeleteAllConfirmationText("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmDeleteAllProjects}
+              disabled={deleteAllConfirmationText !== "ELIMINAR TODO" || deleteAllProjectsMutation.isPending}
+            >
+              {deleteAllProjectsMutation.isPending ? "Eliminando..." : "Eliminar Todo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
