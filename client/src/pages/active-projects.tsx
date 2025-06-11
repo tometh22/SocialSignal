@@ -71,6 +71,8 @@ export default function ActiveProjects() {
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [deleteMacroProjectId, setDeleteMacroProjectId] = useState<number | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [deleteAllProjectsDialogOpen, setDeleteAllProjectsDialogOpen] = useState(false);
+  const [deleteAllConfirmationText, setDeleteAllConfirmationText] = useState("");
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
@@ -217,6 +219,32 @@ export default function ActiveProjects() {
     }
   });
 
+  // Mutación para eliminar todos los proyectos activos
+  const deleteAllProjectsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/active-projects", "DELETE");
+      return response;
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      await refetchProjects();
+      toast({
+        title: "Éxito",
+        description: `Se eliminaron ${data.deletedCount} proyectos correctamente.`,
+      });
+      setDeleteAllProjectsDialogOpen(false);
+      setDeleteAllConfirmationText("");
+    },
+    onError: (error) => {
+      console.error('Error al eliminar todos los proyectos:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar todos los proyectos. Inténtalo de nuevo más tarde.",
+        variant: "destructive",
+      });
+    }
+  });
+
   const confirmDelete = () => {
     if (!deleteProjectId) return;
     deleteProjectMutation.mutate(deleteProjectId);
@@ -225,6 +253,11 @@ export default function ActiveProjects() {
   const confirmDeleteMacro = () => {
     if (!deleteMacroProjectId || deleteConfirmationText !== "DELETE") return;
     deleteMacroProjectMutation.mutate(deleteMacroProjectId);
+  };
+
+  const confirmDeleteAllProjects = () => {
+    if (deleteAllConfirmationText !== "ELIMINAR TODO") return;
+    deleteAllProjectsMutation.mutate();
   };
 
   const openAssignClientDialog = (e: React.MouseEvent, projectId: number) => {
@@ -301,14 +334,26 @@ export default function ActiveProjects() {
       {/* Header más compacto */}
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg font-semibold">Gestión de Proyectos</h1>
-        <Button
-          onClick={() => setLocation("/active-projects/new")}
-          size="sm"
-          className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs"
-        >
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Nuevo Proyecto
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setDeleteAllProjectsDialogOpen(true)}
+            size="sm"
+            variant="destructive"
+            className="h-8 text-xs"
+            disabled={!projects || projects.length === 0}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Limpiar Todo
+          </Button>
+          <Button
+            onClick={() => setLocation("/active-projects/new")}
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Nuevo Proyecto
+          </Button>
+        </div>
       </div>
 
       {/* Filtros integrados en la tabla */}

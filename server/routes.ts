@@ -1173,6 +1173,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Eliminar todos los proyectos activos
+  app.delete("/api/active-projects", requireAuth, async (req, res) => {
+    try {
+      // Obtener todos los proyectos activos
+      const allProjects = await storage.getActiveProjects();
+      
+      if (allProjects.length === 0) {
+        return res.json({ message: "No projects to delete", deletedCount: 0 });
+      }
+
+      console.log(`Eliminando ${allProjects.length} proyectos activos...`);
+
+      // Eliminar todos los proyectos usando el método existente
+      let deletedCount = 0;
+      for (const project of allProjects) {
+        try {
+          const deleted = await storage.deleteActiveProject(project.id);
+          if (deleted) {
+            deletedCount++;
+          }
+        } catch (error) {
+          console.error(`Error eliminando proyecto ${project.id}:`, error);
+        }
+      }
+
+      res.json({ 
+        message: `Successfully deleted ${deletedCount} projects`, 
+        deletedCount,
+        totalProjects: allProjects.length
+      });
+    } catch (error) {
+      console.error("Error deleting all active projects:", error);
+      res.status(500).json({ message: "Failed to delete all projects" });
+    }
+  });
+
   // Actualizar proyecto completo (nombre, estado, descripción)
   app.patch("/api/active-projects/:id/update", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
