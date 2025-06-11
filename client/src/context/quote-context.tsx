@@ -154,11 +154,9 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateReportTemplate = useCallback((templateId: number) => {
     // Si seleccionamos la misma plantilla, no hacemos nada para evitar recargas innecesarias
     if (selectedTemplateId === templateId) {
-      console.log("[TEMPLATE] Evitando recarga innecesaria, misma plantilla:", templateId);
       return;
     }
     
-    console.log("[TEMPLATE] Actualizando plantilla a:", templateId);
     
     // Limpiamos el equipo actual para evitar duplicidades
     setTeamMembers([]);
@@ -172,7 +170,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Update template complexity factor
     if (templates && roles) {
       const template = templates.find(t => t.id === templateId);
-      console.log("[TEMPLATE] Plantilla encontrada:", template);
       
       if (template) {
         // Actualizar factor de complejidad
@@ -198,17 +195,14 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Esta llamada obtiene qué roles están asignados a la plantilla seleccionada
           apiRequest(`/api/template-roles/${templateId}`)
             .then(response => {
-              console.log("[TEMPLATE] Asignaciones de roles cargadas:", response);
               
               if (response && Array.isArray(response)) {
                 // Extraer los IDs de roles de las asignaciones
                 const recommendedIds = response.map(assignment => assignment.roleId);
-                console.log("[TEMPLATE] Roles recomendados basados en asignaciones:", recommendedIds);
                 
                 // Guardar los roles recomendados en el estado
                 setRecommendedRoleIds(recommendedIds);
               } else {
-                console.log("[TEMPLATE] No se encontraron asignaciones de roles para esta plantilla");
                 generarRolesRecomendadosPorComplejidad(template, roles);
               }
             })
@@ -226,8 +220,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // Función auxiliar para generar roles recomendados basados en complejidad
   const generarRolesRecomendadosPorComplejidad = (template: ReportTemplate, allRoles: Role[]) => {
-    console.log("Generando roles recomendados por complejidad:", template.complexity);
-    console.log("Roles disponibles para recomendación:", allRoles.map(r => ({ id: r.id, name: r.name })));
     
     const analistaId = allRoles.find(r => r.name.toLowerCase().includes("analista") && r.name.toLowerCase().includes("senior"))?.id;
     const cientificoId = allRoles.find(r => r.name.toLowerCase().includes("data") || r.name.toLowerCase().includes("científico"))?.id;
@@ -250,7 +242,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       recommendedIds = roleIds.slice(0, 2);  // Usar los primeros 2 roles
     }
     
-    console.log("Configurando roles recomendados por complejidad:", recommendedIds);
     setRecommendedRoleIds(recommendedIds);
   };
 
@@ -271,9 +262,7 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Cuando cambiamos a opción por equipo, debemos reflejar correctamente
     // que se usarán tarifas personalizadas por miembro en lugar de tarifas estándar
     if (option === "team") {
-      console.log("Cambiando a cotización por miembros específicos");
     } else {
-      console.log("Cambiando a cotización por roles estándar");
     }
   }, []);
 
@@ -318,27 +307,22 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Calculate base cost from team members
   const calculateBaseCost = useCallback(() => {
-    console.log("[COST-DEBUG] Calculando costo base desde:", teamMembers.length, "miembros del equipo");
     const total = teamMembers.reduce((sum, member) => sum + member.cost, 0);
-    console.log("[COST-DEBUG] Costo base calculado:", total);
     setBaseCost(total);
     return total;
   }, [teamMembers]);
 
   // Calculate total cost with complexity adjustments and markup
   const calculateTotalCost = useCallback(() => {
-    console.log("[COST] Iniciando cálculo de costo total");
     
     // Calculate base cost from team members
     const baseTeamCost = calculateBaseCost();
-    console.log("[COST] Costo base calculado:", baseTeamCost);
     
     // Si el costo base es 0 pero hay miembros en el equipo, hay un problema
     if (baseTeamCost === 0 && teamMembers.length > 0) {
       console.warn("[COST] ⚠️ Costo base es 0 pero hay", teamMembers.length, "miembros en el equipo");
       // Calcular manualmente el costo base sumando los costos de los miembros
       const manualBaseCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
-      console.log("[COST] Costo base calculado manualmente:", manualBaseCost);
       
       // Actualizar el costo base con el valor calculado manualmente
       if (manualBaseCost > 0) {
@@ -352,13 +336,11 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Calculate complexity adjustment
     const complexityAdj = calculateComplexityAdjustment(finalBaseCost, complexityFactors);
     setComplexityAdjustment(complexityAdj);
-    console.log("[COST] Ajuste por complejidad:", complexityAdj);
     
     // Calculate markup (minimum 2x)
     const adjusted = finalBaseCost + complexityAdj;
     const markup = calculateMarkup(adjusted);
     setMarkupAmount(markup);
-    console.log("[COST] Markup calculado:", markup);
     
     // Obtener los costos adicionales de la plantilla seleccionada
     let currentPlatformCost = platformCost;
@@ -376,8 +358,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
     
-    console.log("[COST] Costo de plataformas:", currentPlatformCost);
-    console.log("[COST] Porcentaje de desvío:", currentDeviationPercentage);
     
     // Calculate total with platform costs and deviation percentage
     const total = calculateTotalAmount(
@@ -388,7 +368,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       currentDeviationPercentage
     );
     
-    console.log("[COST] Monto total calculado:", total);
     setTotalAmount(total);
     
     return total;
@@ -397,26 +376,21 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Función para añadir roles recomendados al equipo basado en la plantilla seleccionada
   const addRecommendedRoles = useCallback(() => {
     try {
-      console.log("Añadiendo roles recomendados:", recommendedRoleIds);
       
       // Siempre limpiamos roles existentes al añadir los recomendados
       setTeamMembers([]);
       
       if (!roles || !selectedTemplateId) {
-        console.log("No hay roles disponibles o no se ha seleccionado plantilla");
         return;
       }
       
       // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
       apiRequest(`/api/template-roles/${selectedTemplateId}`)
         .then(assignments => {
-          console.log("[TEST] Asignaciones de roles para horas cargadas:", assignments);
           if (selectedTemplateId === 17) {
-            console.log("[TEST-WARNER] Asignaciones para Warner Bros en addRecommendedRoles:", assignments);
           }
           
           if (!Array.isArray(assignments) || assignments.length === 0) {
-            console.log("No hay asignaciones disponibles, usando roles por defecto");
             if (templates) {
               const template = templates.find(t => t.id === selectedTemplateId);
               if (template) {
@@ -429,7 +403,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Tenemos asignaciones, vamos a añadir los roles con sus horas correspondientes
           // Convertimos a array después de eliminar duplicados
           const rolesToAdd = Array.from(new Set(recommendedRoleIds)); 
-          console.log("Roles únicos a añadir:", rolesToAdd);
           
           let addedMembers: TeamMember[] = [];
           let addedRoleCount = 0;
@@ -439,7 +412,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Encontrar el rol en la lista de roles disponibles
             const role = roles.find(r => r.id === roleId);
             if (!role) {
-              console.log(`Rol con ID ${roleId} no encontrado en la lista de roles disponibles`);
               return;
             }
             
@@ -447,7 +419,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const roleAssignments = assignments.filter(a => a.roleId === roleId);
             
             if (roleAssignments.length === 0) {
-              console.log(`No hay asignaciones para el rol ${role.name}, usando horas predeterminadas`);
               // Usar horas predeterminadas
               addedMembers.push({
                 id: uuidv4(),
@@ -479,20 +450,17 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // Actualizar el estado con todos los miembros añadidos de una vez
           if (addedMembers.length > 0) {
             setTeamMembers(addedMembers);
-            console.log(`Se añadieron ${addedRoleCount} roles al equipo (${addedMembers.length} entradas)`);
             
             // Recalcular los costos después de añadir los roles
             // Primero calculamos costo base para asegurar que tenga valor correcto
             const newBaseCost = addedMembers.reduce((sum, member) => sum + member.cost, 0);
             setBaseCost(newBaseCost);
-            console.log("[COST] Costo base actualizado:", newBaseCost);
             
             // Luego calculamos costo total
             setTimeout(() => {
               calculateTotalCost();
             }, 100);
           } else {
-            console.log("No se añadió ningún rol, usando roles por defecto");
             if (templates) {
               const template = templates.find(t => t.id === selectedTemplateId);
               if (template) {
@@ -526,7 +494,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             
             if (addedMembers.length > 0) {
               setTeamMembers(addedMembers);
-              console.log(`Se añadieron ${addedMembers.length} roles al equipo (modo recuperación)`);
               
               // Recalcular costos después de añadir los roles en modo recuperación
               const newBaseCost = addedMembers.reduce((sum, member) => sum + member.cost, 0);
@@ -572,7 +539,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             cost: hours * roleToAdd.defaultRate
           }]);
           
-          console.log("Se añadió un rol de emergencia al equipo:", roleToAdd.name);
         }
       }
     }
@@ -582,7 +548,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const useDefaultRolesBasedOnComplexity = (template: ReportTemplate) => {
     if (!roles) return;
     
-    console.log("Usando roles predeterminados basados en complejidad:", template.complexity);
     
     try {
       // Buscar roles por nombre
@@ -599,7 +564,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ? availableRoles 
         : roles.slice(0, 3).map(r => r.id);
       
-      console.log("Roles predeterminados a utilizar:", defaultRoleIds);
       
       // Determinar cuántos roles usar según complejidad
       let roleIdsToUse: number[];
@@ -632,7 +596,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       });
       
-      console.log(`Se añadieron ${roleIdsToUse.length} roles predeterminados al equipo`);
       
       // Recalcular costos después de añadir roles predeterminados
       setTimeout(() => {
@@ -656,7 +619,6 @@ export const QuoteProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           cost: hours * role.defaultRate
         }]);
         
-        console.log("Se añadió un rol de emergencia al equipo:", role.name);
         
         // Recalcular costos después de añadir el rol de emergencia
         setTimeout(() => {

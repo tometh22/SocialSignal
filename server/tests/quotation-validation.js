@@ -212,35 +212,14 @@ const riskIndicatorsReal = calculoReal_RiskIndicators(costSummaryReal, projectMe
 const costSummaryManual = calculoManual_ProjectCost(mockTimeEntries, mockPersonnel, mockQuotation.totalAmount);
 
 // Imprimir y comparar resultados
-console.log("=== VALIDACIÓN DE CÁLCULOS CON IMPLEMENTACIÓN REAL ===");
 
-console.log("\n1. COMPARACIÓN DE COSTOS:");
-console.log(`Costo actual (real): $${costSummaryReal.actualCost.toFixed(2)}`);
-console.log(`Costo actual (manual): $${costSummaryManual.actualCost.toFixed(2)}`);
-console.log(`¿Coinciden los cálculos? ${costSummaryReal.actualCost === costSummaryManual.actualCost ? '✓ SÍ' : '✗ NO'}`);
 
-console.log(`\nPorcentaje usado (real): ${costSummaryReal.percentageUsed.toFixed(2)}%`);
-console.log(`Porcentaje usado (manual): ${costSummaryManual.percentageUsed.toFixed(2)}%`);
-console.log(`¿Coinciden los cálculos? ${Math.abs(costSummaryReal.percentageUsed - costSummaryManual.percentageUsed) < 0.01 ? '✓ SÍ' : '✗ NO'}`);
 
-console.log("\n2. MÉTRICAS DEL PROYECTO (CÁLCULO REAL):");
-console.log(`- Días totales: ${projectMetricsReal.daysTotal}`);
-console.log(`- Días transcurridos: ${projectMetricsReal.daysElapsed}`);
-console.log(`- Progreso: ${projectMetricsReal.progressPercentage.toFixed(2)}%`);
 
-console.log("\n3. INDICADORES DE RIESGO (CÁLCULO REAL):");
-console.log(`- Riesgo de presupuesto: ${riskIndicatorsReal.budgetRisk}%`);
-console.log(`- Riesgo de cronograma: ${riskIndicatorsReal.scheduleRisk}%`);
-console.log(`- Alertas activas: ${riskIndicatorsReal.activeAlerts}`);
 
-console.log("\n=== CONCLUSIÓN ===");
 const todoCorrecto = costSummaryReal.actualCost === costSummaryManual.actualCost &&
                      Math.abs(costSummaryReal.percentageUsed - costSummaryManual.percentageUsed) < 0.01;
 
 if (todoCorrecto) {
-  console.log("✅ Los cálculos simulados coinciden exactamente con los cálculos implementados en la aplicación.");
-  console.log("   La lógica de cálculo de costos, métricas y riesgos es consistente y correcta.");
 } else {
-  console.log("❌ Hay discrepancias entre los cálculos simulados y los implementados en la aplicación.");
-  console.log("   Se recomienda revisar las fórmulas y lógica de negocio.");
 }

@@ -134,7 +134,6 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
         hours_estimated: data.hoursEstimated
       };
       
-      console.log("Enviando datos al servidor (nueva ruta):", serverData);
       
       // Usar la nueva ruta especializada para indicadores
       const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
@@ -173,7 +172,6 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
   
   // Manejar el guardado de valores
   const handleSaveIndicators = async () => {
-    console.log("Valores a guardar:", editableValues);
     
     try {
       // Convertir los valores a los campos esperados por el servidor
@@ -191,7 +189,6 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
         hours_estimated: editableValues.hoursEstimated
       };
       
-      console.log("Datos formateados para nuevo endpoint:", serverData);
       
       // Usar la nueva ruta especializada para indicadores con POST
       const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {
@@ -207,7 +204,6 @@ export function ProjectModoMetrics({ deliverable, projectId }: ProjectModoMetric
       }
       
       const data = await response.json();
-      console.log("Actualización exitosa:", data);
       
       // Mostrar mensaje de éxito
       toast({

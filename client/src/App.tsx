@@ -61,7 +61,6 @@ function OptimizedQuoteWrapper() {
   const isRequote = !!cloneId;
   const finalId = isRequote ? cloneId : quotationId;
   
-  console.log(`OptimizedQuoteWrapper: id=${idParam}, clone=${cloneParam}, usando ID=${finalId}, isRequote=${isRequote}`);
   
   // Renderizar OptimizedQuote envuelto en su provider
   return (
@@ -74,7 +73,6 @@ function OptimizedQuoteWrapper() {
 // Wrapper para rutas con path parameters (como /optimized-quote/13)
 function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
   const quotationId = parseInt(params.id);
-  console.log(`OptimizedQuotePathWrapper: usando ID=${quotationId} del path`);
   
   return (
     <OptimizedQuoteProvider quotationId={quotationId} isRequote={false}>

@@ -23,12 +23,10 @@ specialRouter.post('/personnel/:id/update-rate', async (req, res) => {
       return res.status(400).json({ message: "ID inválido" });
     }
 
-    console.log("Datos recibidos para actualización especial:", req.body);
     
     // Validar y transformar los datos incluyendo el formato con coma
     const validatedData = updateRateSchema.parse(req.body);
     
-    console.log("Datos validados:", validatedData);
     
     // Actualizar el personal utilizando el valor numérico ya convertido
     const updatedPerson = await storage.updatePersonnel(id, validatedData);

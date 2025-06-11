@@ -69,7 +69,6 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
           : data.hourlyRate
       };
       
-      console.log("Enviando datos procesados:", processedData);
       const response = await fetch(`/api/personnel/${id}`, {
         method: 'PATCH',
         headers: {
@@ -85,7 +84,6 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
       return await response.json();
     },
     onSuccess: (updatedData: Personnel) => {
-      console.log("✅ PERSONAL ACTUALIZADO:", updatedData);
       
       // SOLUCIÓN DEFINITIVA: Forzar actualización inmediata con múltiples estrategias
       
@@ -178,7 +176,6 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         rateValue = Math.round(rateValue * 100) / 100;
       }
       
-      console.log(`Enviando actualización para ID ${person.id}:`, {
         name: editName,
         roleId: editRoleId,
         hourlyRate: rateValue
@@ -200,10 +197,8 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         
         if (response.ok) {
           const updatedData = await response.json();
-          console.log("Actualización exitosa:", updatedData);
           
           // Usar la respuesta directa del servidor como fuente de la verdad
-          console.log("Datos actualizados recibidos:", updatedData);
           
           // Actualizar el estado local con los datos recibidos
           setUpdatedPerson(updatedData);
@@ -230,7 +225,6 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
             
             // Forzar un refresco específico de la lista de personal después de una actualización exitosa
             const refreshData = async () => {
-              console.log("Refrescando datos de personal desde el servidor...");
               try {
                 // Obtener datos actualizados directamente del servidor
                 const response = await fetch("/api/personnel");
@@ -240,12 +234,10 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
                   // Actualizar la caché con los datos recién obtenidos
                   queryClient.setQueryData(["/api/personnel"], freshData);
                   
-                  console.log("Datos refrescados correctamente:", freshData);
                   
                   // Buscar el personal específico que se actualizó
                   const updatedPersonnel = freshData.find((p: Personnel) => p.id === person.id);
                   if (updatedPersonnel) {
-                    console.log("Datos actualizados confirmados:", updatedPersonnel);
                     
                     // Actualizar el estado local con los datos más recientes
                     setUpdatedPerson(updatedPersonnel);

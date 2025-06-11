@@ -40,7 +40,6 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
   
   // Calcular costos cuando cambian los miembros del equipo
   useEffect(() => {
-    console.log("[TEMPLATES] Recalculando costos en ReportTemplates");
     if (teamMembers.length > 0) {
       calculateBaseCost();
       calculateTotalCost();
@@ -68,7 +67,6 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
     // Solo procedemos si hay cambio genuino de plantilla y roles disponibles
     // y si no hemos cargado ya datos para esta plantilla
     if (selectedTemplateId && roles && loadedTemplateRef.current !== selectedTemplateId) {
-      console.log("[AUTOLOAD] Cargando roles y costos para la plantilla ID:", selectedTemplateId);
       
       // Marcar esta plantilla como ya cargada para evitar cargas repetidas
       loadedTemplateRef.current = selectedTemplateId;
@@ -78,10 +76,8 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
         // Primero cargaremos las asignaciones de roles para obtener las horas asociadas
         apiRequest(`/api/template-roles/${selectedTemplateId}`)
           .then((assignments: any) => {
-            console.log("[AUTOLOAD] Asignaciones de roles cargadas:", assignments);
             
             if (!Array.isArray(assignments) || assignments.length === 0) {
-              console.log("[AUTOLOAD] No hay asignaciones disponibles para esta plantilla");
               return;
             }
             
@@ -114,7 +110,6 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
             if (newTeamMembers.length > 0) {
               // Limpiar los roles actuales y establecer los nuevos
               setTeamMembers(newTeamMembers);
-              console.log(`[AUTOLOAD] Se cargaron ${newTeamMembers.length} roles automáticamente`);
               
               // Recalcular los costos inmediatamente
               calculateBaseCost();
@@ -307,7 +302,6 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
               onClick={() => {
                 if (validateForm()) {
                   // Implementación directa para añadir roles recomendados
-                  console.log("[TEST] Implementando método directo para añadir roles desde template.tsx");
                   
                   try {
                     if (!selectedTemplateId) {
@@ -340,7 +334,6 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                       return;
                     }
                     
-                    console.log("Procesando roles recomendados:", recommendedRoleIds);
                     
                     // Obtener roles únicos
                     const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
@@ -374,19 +367,15 @@ export default function ReportTemplates({ onPrevious, onNext }: { onPrevious: ()
                     setTeamMembers([]);
                     
                     // Agregar los nuevos roles 
-                    console.log("[DEBUGGING] Actualizando team members con:", newTeamMembers.length, "roles");
                     setTeamMembers(newTeamMembers);
                     
                     // Verificamos que el estado se ha actualizado correctamente
                     setTimeout(() => {
-                      console.log("[DEBUGGING] Estado de teamMembers después de actualizar:", teamMembers.length);
                     }, 100);
                     
-                    console.log("Roles añadidos:", newTeamMembers);
                     
                     // Recalcular costos - ejecutar después que team members se haya actualizado
                     setTimeout(() => {
-                      console.log("[DEBUGGING] Ejecutando cálculo de costos después de actualizar team members");
                       calculateTotalCost();
                     }, 200);
                     

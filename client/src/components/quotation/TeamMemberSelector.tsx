@@ -150,37 +150,26 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
         }
         
         const personData = await response.json();
-        console.log(`Datos frescos del servidor para ID ${personnelId}:`, personData);
-        console.log(`Tipo de hourlyRate:`, typeof personData.hourlyRate);
-        console.log(`Valor directo de hourlyRate:`, personData.hourlyRate);
         
         // Actualizamos el rol automáticamente
         setSelectedRole(personData.roleId.toString());
         
         // SOLUCIÓN PARA MATÍAS - Nivel de depuración alto
-        console.log(`VERIFICANDO ID: ${personnelId} === 46: ${personnelId === 46}`);
-        console.log(`TIPO ID: ${typeof personnelId}`);
-        console.log(`DIRECTO: ${personnelId} == 46: ${personnelId == 46}`);
         
         // Forzar valor directo con conversión explícita a números
         const idNumerico = Number(personnelId);
-        console.log(`ID numérico: ${idNumerico}, tipo: ${typeof idNumerico}, comparación: ${idNumerico === 46}`);
         
         if (idNumerico === 46) {
-          console.log("🔴 APLICANDO CORRECCIÓN PARA MATÍAS (ID 46) - Estableciendo 9.20");
           // Usamos setTimeout para asegurar que esta acción ocurre después del renderizado
           setTimeout(() => {
-            console.log("Ejecutando setRate con delay");
             setRate("9.20");
           }, 100);
         } else {
           // Actualizamos la tarifa con la tarifa personal específica desde el servidor
-          console.log(`Seleccionado personal: ${personData.name}, tarifa personal directa del servidor: ${personData.hourlyRate}`);
           
           // Asegurar que se usa el valor exacto con decimales del servidor
           // Convertir el número a cadena con exactamente 2 decimales
           const rateWithPrecision = Number(personData.hourlyRate).toFixed(2);
-          console.log(`Tarifa con precisión decimal exacta: ${rateWithPrecision}`);
           setRate(rateWithPrecision);
         }
       } catch (error) {
@@ -193,7 +182,6 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
           
           // Usar el mismo formato con precisión decimal exacta
           const fallbackRateWithPrecision = Number(person.hourlyRate).toFixed(2);
-          console.log(`Fallback - Tarifa con precisión decimal exacta: ${fallbackRateWithPrecision}`);
           setRate(fallbackRateWithPrecision);
         }
       }
@@ -246,7 +234,6 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
     setHours("10");
     
     // No mostramos alerta para mejorar la experiencia de usuario
-    console.log('Miembro añadido al equipo correctamente');
   };
 
   // Obtener nombre del rol a partir de su ID

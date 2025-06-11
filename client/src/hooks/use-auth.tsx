@@ -61,7 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Mutación para el inicio de sesión
   const loginMutation = useMutation<UserType, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
-      console.log("Iniciando petición de inicio de sesión");
       try {
         const response = await fetch("/api/login", {
           method: "POST",
@@ -75,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Si la respuesta es exitosa, procesar y devolver datos
         if (response.ok) {
           const userData = await response.json();
-          console.log("Login exitoso, datos recibidos:", userData);
           return userData;
         }
         

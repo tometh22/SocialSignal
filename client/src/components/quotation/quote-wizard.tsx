@@ -10,7 +10,6 @@ export default function QuoteWizard() {
   
   // Move to next step
   const nextStep = () => {
-    console.log(`Avanzando del paso ${currentStep} al ${currentStep + 1}`);
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
       // Scroll to top

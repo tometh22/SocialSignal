@@ -91,7 +91,6 @@ export async function apiRequest(
 ) {
   const url = endpoint;
   
-  console.log(`API Request: ${method} ${url}`, data);
   
   try {
     const options: RequestInit = {
@@ -133,7 +132,6 @@ export async function apiRequest(
     // Verificar si el cuerpo de la respuesta tiene contenido
     const responseText = await response.text();
     if (!responseText) {
-      console.log("Respuesta vacía de la API");
       return null;
     }
     

@@ -91,11 +91,9 @@ export default function ActiveProjects() {
       
       for (const id of expandedIds) {
         try {
-          console.log(`Obteniendo subproyectos para proyecto ID ${id}...`);
           const response = await fetch(`/api/active-projects/parent/${id}`);
           if (response.ok) {
             const data = await response.json();
-            console.log(`Se encontraron ${data.length} subproyectos para proyecto ID ${id}`);
             allSubprojects.push(...data);
           }
         } catch (error) {
@@ -230,12 +228,10 @@ export default function ActiveProjects() {
       for (const projectId in expandedProjects) {
         if (expandedProjects[parseInt(projectId)]) {
           try {
-            console.log(`Cargando subproyectos para proyecto ID ${projectId}...`);
             const response = await fetch(`/api/active-projects/parent/${projectId}`);
             
             if (response.ok) {
               const childProjects = await response.json();
-              console.log(`Encontrados ${childProjects.length} subproyectos para proyecto ID ${projectId}`);
               
               // Encontrar la posición del proyecto padre
               const parentIndex = updatedProjects.findIndex(p => p.id === parseInt(projectId));

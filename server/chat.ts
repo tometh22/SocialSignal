@@ -36,7 +36,6 @@ export class ChatManager {
 
   constructor(httpServer: Server, path: string = "/ws") {
     this.wss = new WebSocketServer({ server: httpServer, path });
-    console.log("Servidor WebSocket configurado en", path);
 
     this.wss.on("connection", (ws, req) => {
       try {
@@ -44,7 +43,6 @@ export class ChatManager {
         const userId = Number(query.userId);
 
         if (!userId || isNaN(userId)) {
-          console.log("Conexión rechazada: userId no válido");
           ws.close(1008, "userId no válido");
           return;
         }
@@ -58,7 +56,6 @@ export class ChatManager {
   }
 
   private handleConnection(ws: WebSocket, userId: number, req?: any) {
-    console.log(`Usuario conectado: ${userId}`);
     
     // Determinar la dirección IP y agente de usuario del cliente
     const ip = req?.socket?.remoteAddress || 'desconocido';
@@ -78,7 +75,6 @@ export class ChatManager {
 
     // Monitorear conexiones activas por usuario
     const userConnectionCount = this.connections.filter(conn => conn.userId === userId).length;
-    console.log(`Usuario ${userId} tiene ${userConnectionCount} conexión(es) activa(s)`);
 
     // Enviar mensaje de bienvenida con más información
     ws.send(JSON.stringify({ 
@@ -103,7 +99,6 @@ export class ChatManager {
 
     // Manejar cierre de conexión
     ws.on("close", () => {
-      console.log(`Usuario desconectado: ${userId}`);
       this.connections = this.connections.filter(conn => conn.userId !== userId || conn.socket !== ws);
     });
 

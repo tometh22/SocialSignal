@@ -453,7 +453,6 @@ const OptimizedFinancialReview: React.FC = () => {
                 type="percentage"
                 suffix="%"
                 onSave={async (newValue) => {
-                  console.log(`Actualizando factor de complejidad: ${newValue}%`);
                 }}
               />
             </div>
@@ -464,7 +463,6 @@ const OptimizedFinancialReview: React.FC = () => {
                 type="multiplier"
                 suffix="x"
                 onSave={async (newValue) => {
-                  console.log(`✅ Multiplicador actualizado: ${newValue}x`);
                 }}
               />
             </div>
@@ -475,7 +473,6 @@ const OptimizedFinancialReview: React.FC = () => {
                 type="percentage"
                 suffix="%"
                 onSave={async (newValue) => {
-                  console.log(`✅ Margen actualizado: ${newValue}%`);
                 }}
               />
             </div>

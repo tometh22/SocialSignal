@@ -60,10 +60,8 @@ const QualityScoresPage = () => {
 
   // Agrupar proyectos por jerarquía para MODO (Always-On)
   const projectsGrouped = React.useMemo(() => {
-    console.log("Processing projects:", allProjects);
     
     if (!allProjects || !Array.isArray(allProjects)) {
-      console.log("No projects data or not array");
       return [];
     }
     
@@ -73,8 +71,6 @@ const QualityScoresPage = () => {
       [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(p.id)
     );
     
-    console.log("Parent project (ID 16):", parentProject);
-    console.log("Sub projects:", subProjects);
     
     if (parentProject) {
       return [{
@@ -87,7 +83,6 @@ const QualityScoresPage = () => {
     return allProjects;
   }, [allProjects]);
 
-  console.log("Final grouped projects:", projectsGrouped);
 
   // Obtener entregables del proyecto seleccionado o de todos los subproyectos si es el padre
   const { data: deliverables } = useQuery({

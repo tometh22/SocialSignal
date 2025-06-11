@@ -34,9 +34,6 @@ async function createAdminUser() {
         [hashedPassword, firstName, lastName, userId]
       );
       
-      console.log(`Usuario administrador actualizado con ID: ${userId}`);
-      console.log(`Email: ${email}`);
-      console.log(`Contraseña: ${password}`);
     } else {
       // Crear un nuevo usuario
       const hashedPassword = await hashPassword(password);
@@ -46,9 +43,6 @@ async function createAdminUser() {
         [firstName, lastName, email, hashedPassword]
       );
       
-      console.log(`Usuario administrador creado con ID: ${result.rows[0].id}`);
-      console.log(`Email: ${email}`);
-      console.log(`Contraseña: ${password}`);
     }
   } catch (error) {
     console.error("Error al crear/actualizar usuario administrador:", error);

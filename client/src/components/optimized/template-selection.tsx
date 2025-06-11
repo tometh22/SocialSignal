@@ -47,10 +47,8 @@ const OptimizedTemplateSelection: React.FC = () => {
 
   // Manejar la selección de una plantilla
   const handleTemplateSelect = (template: ReportTemplate) => {
-    console.log("Plantilla seleccionada:", template);
     
     // Asegurarse de que el costo base de la plantilla sea un número válido
-    console.log("Costo base de la plantilla seleccionada:", template.baseCost);
     
     // Al seleccionar una plantilla, establecer también su nivel de complejidad
     let templateComplexity: 'low' | 'medium' | 'high' = 'medium';
@@ -83,7 +81,6 @@ const OptimizedTemplateSelection: React.FC = () => {
     
     // Forzar recálculo de costos después de actualizar la plantilla
     setTimeout(() => {
-      console.log("Valores después de seleccionar plantilla:", {
         baseCost,
         complexityAdjustment,
         totalAmount,
@@ -643,7 +640,6 @@ const OptimizedTemplateSelection: React.FC = () => {
           <Card 
             className={`cursor-pointer transition-all border-dashed mb-4 ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
             onClick={() => {
-              console.log("✅ Seleccionando opción 'Personalizado / Sin Plantilla'");
               
               // Establecer valores por defecto siempre para garantizar estado consistente
               updateAnalysisType('standard');

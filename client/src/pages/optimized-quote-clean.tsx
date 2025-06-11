@@ -175,15 +175,12 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
                   <DeliverableConfiguration 
                     isAlwaysOnProject={true}
                     onIsAlwaysOnProjectChange={(value) => {
-                      console.log("Always-On mode:", value);
                     }}
                     deliverables={quotationData.deliverables || []}
                     onDeliverablesChange={(deliverables) => {
-                      console.log("Actualizando entregables:", deliverables);
                     }}
                     additionalCost={quotationData.additionalDeliverableCost || 0}
                     onAdditionalCostChange={(cost) => {
-                      console.log("Actualizando costo adicional:", cost);
                     }}
                   />
                 </div>

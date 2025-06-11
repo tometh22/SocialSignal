@@ -6,11 +6,9 @@ export async function initializeDatabase() {
     // Verificar si ya hay datos en la base de datos
     const existingRoles = await db.select().from(roles);
     if (existingRoles.length > 0) {
-      console.log("La base de datos ya contiene datos. Omitiendo inicialización.");
       return;
     }
 
-    console.log("Inicializando base de datos con datos de muestra...");
 
     // Insertar roles
     const [seniorAnalyst] = await db.insert(roles).values({
@@ -125,7 +123,6 @@ export async function initializeDatabase() {
       }
     ]);
 
-    console.log("Inicialización de datos completada con éxito.");
   } catch (error) {
     console.error("Error al inicializar la base de datos:", error);
   }

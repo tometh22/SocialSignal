@@ -31,9 +31,6 @@ async function hashPassword(password: string) {
 
 // Función para comparar contraseñas
 async function comparePasswords(supplied: string, stored: string) {
-  console.log("Comparando contraseñas:");
-  console.log("- Contraseña proporcionada:", supplied);
-  console.log("- Contraseña almacenada:", stored);
   
   // Verificar que stored tenga el formato correcto
   if (!stored.includes(".")) {
@@ -42,25 +39,19 @@ async function comparePasswords(supplied: string, stored: string) {
   }
   
   const [hashed, salt] = stored.split(".");
-  console.log("- Hash extraído:", hashed.substring(0, 10) + "...");
-  console.log("- Salt extraída:", salt);
   
   try {
     const hashedBuf = Buffer.from(hashed, "hex");
-    console.log("- Buffer de hash creado, longitud:", hashedBuf.length);
     
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    console.log("- Buffer de contraseña cifrada, longitud:", suppliedBuf.length);
     
     try {
       const result = timingSafeEqual(hashedBuf, suppliedBuf);
-      console.log("- Resultado de comparación:", result);
       return result;
     } catch (error) {
       console.error("Error en timingSafeEqual:", error);
       // Fallback en caso de error con timingSafeEqual
       const result = Buffer.compare(hashedBuf, suppliedBuf) === 0;
-      console.log("- Resultado de comparación fallback:", result);
       return result;
     }
   } catch (error) {
@@ -163,40 +154,33 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const { email, password } = req.body;
       
-      console.log("Intento de inicio de sesión:", { email });
       
       // Buscar el usuario
       const user = await storage.getUserByEmail(email);
       
       if (!user) {
-        console.log("Usuario no encontrado:", email);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
-      console.log("Usuario encontrado:", { id: user.id, email: user.email, firstName: user.firstName });
       
       // SOLUCIÓN PARA VICTORIA PURICELLI
       // Se mantiene esta verificación específica para facilitar el acceso
       let isPasswordValid = false;
       
       if (email === "victoria.puricelli@epical.digital" && password === "epical2025") {
-        console.log("Acceso verificado para Victoria Puricelli");
         isPasswordValid = true;
       } else {
         // Verificar la contraseña para otros usuarios
         isPasswordValid = await comparePasswords(password, user.password);
       }
       
-      console.log("¿Contraseña válida?:", isPasswordValid);
       
       if (!isPasswordValid) {
-        console.log("Contraseña incorrecta");
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
       // Establecer la sesión
       req.session.userId = user.id;
-      console.log("Sesión establecida con ID:", user.id);
       
       // Preparar respuesta sin información sensible
       const userResponse = {

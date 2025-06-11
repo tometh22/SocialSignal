@@ -158,14 +158,10 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
 
   // Handle continue button click
   const handleContinue = () => {
-    console.log("Botón Continuar presionado");
     if (validateForm()) {
-      console.log("Formulario validado correctamente");
       calculateTotalCost();
-      console.log("Costos calculados, avanzando al siguiente paso");
       onNext();
     } else {
-      console.log("La validación del formulario falló");
     }
   };
 
@@ -256,7 +252,6 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
               const isRecommended = recommendedRoleIds.includes(role.id);
               
               // Debugging: log recomendaciones para este rol
-              console.log(`Rol: ${role.name} (ID: ${role.id}), Recomendado: ${isRecommended}, recommendedRoleIds: ${JSON.stringify(recommendedRoleIds)}`);
               
               // Find the team member for this role if it exists
               const teamMember = teamMembers.find(member => member.roleId === role.id);
@@ -506,7 +501,6 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                 variant="outline"
                 className="bg-blue-600 border-blue-300 text-white hover:bg-blue-700 shadow-sm font-medium"
                 onClick={() => {
-                  console.log("[TEST] Aplicando roles recomendados desde team-resources:", recommendedRoleIds);
                   
                   try {
                     // Implementación directa para añadir roles recomendados
@@ -532,7 +526,6 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                     
                     // Obtener roles únicos
                     const uniqueRoleIds = Array.from(new Set(recommendedRoleIds));
-                    console.log("Roles únicos a añadir:", uniqueRoleIds);
                     
                     // Crear array de nuevos miembros
                     const newTeamMembers: TeamMember[] = [];
@@ -564,12 +557,10 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                       setTeamMembers([]);
                       // Luego añadimos los nuevos
                       setTeamMembers(newTeamMembers);
-                      console.log("Team members actualizados con éxito");
                     } else {
                       console.error("setTeamMembers no está disponible");
                     }
                     
-                    console.log("Roles añadidos:", newTeamMembers);
                     
                     // Recalcular costos
                     calculateTotalCost();

@@ -24,8 +24,6 @@ async function createNewAdminUser() {
     // Hash de la contraseña
     const hashedPassword = await hashPassword(plainPassword);
     
-    console.log("Contraseña plana:", plainPassword);
-    console.log("Contraseña hasheada:", hashedPassword);
     
     // Insertar nuevo usuario
     const [newUser] = await db.insert(users).values({
@@ -38,16 +36,12 @@ async function createNewAdminUser() {
       updatedAt: new Date()
     }).returning();
     
-    console.log("Nuevo usuario administrador creado:", {
       id: newUser.id,
       email: newUser.email,
       firstName: newUser.firstName,
       lastName: newUser.lastName
     });
     
-    console.log("\nUtiliza estas credenciales para iniciar sesión:");
-    console.log("Email: tomas@epical.digital");
-    console.log("Contraseña: admin123");
     
   } catch (error) {
     console.error("Error al crear usuario administrador:", error);
@@ -55,6 +49,5 @@ async function createNewAdminUser() {
 }
 
 createNewAdminUser().finally(() => {
-  console.log("Proceso finalizado");
   process.exit(0);
 });

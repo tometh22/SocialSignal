@@ -167,44 +167,16 @@ const projectMetrics = calculateProjectMetrics(mockActiveProject, mockTimeEntrie
 const riskIndicators = calculateRiskIndicators(costSummary, projectMetrics);
 
 // Imprimir resultados
-console.log("=== TEST DE CÁLCULOS DEL SISTEMA DE COTIZACIÓN ===");
-console.log("\n1. RESUMEN DE COSTOS:");
-console.log(`- Costo estimado: $${costSummary.estimatedCost.toFixed(2)}`);
-console.log(`- Costo actual: $${costSummary.actualCost.toFixed(2)}`);
-console.log(`- Varianza: $${costSummary.variance.toFixed(2)}`);
-console.log(`- Porcentaje usado: ${costSummary.percentageUsed.toFixed(2)}%`);
 
-console.log("\n2. MÉTRICAS DEL PROYECTO:");
-console.log(`- Días totales: ${projectMetrics.daysTotal}`);
-console.log(`- Días transcurridos: ${projectMetrics.daysElapsed}`);
-console.log(`- Horas planeadas: ${projectMetrics.plannedHours}`);
-console.log(`- Horas actuales: ${projectMetrics.actualHours}`);
-console.log(`- Horas por día: ${projectMetrics.hoursPerDay.toFixed(2)}`);
-console.log(`- Porcentaje de progreso: ${projectMetrics.progressPercentage.toFixed(2)}%`);
 
-console.log("\n3. INDICADORES DE RIESGO:");
-console.log(`- Riesgo de presupuesto: ${riskIndicators.budgetRisk}%`);
-console.log(`- Riesgo de cronograma: ${riskIndicators.scheduleRisk}%`);
-console.log(`- Alertas activas: ${riskIndicators.activeAlerts}`);
 
 // Verificación de resultados
 const expectedActualCost = 3050;
 const expectedPercentageUsed = (expectedActualCost / mockQuotation.totalAmount) * 100;
 
-console.log("\n=== VERIFICACIÓN DE RESULTADOS ===");
-console.log(`Costo actual esperado: $${expectedActualCost}`);
-console.log(`Costo actual calculado: $${costSummary.actualCost}`);
-console.log(`¿Costos coinciden? ${expectedActualCost === costSummary.actualCost ? '✓ SÍ' : '✗ NO'}`);
 
-console.log(`\nPorcentaje usado esperado: ${expectedPercentageUsed.toFixed(2)}%`);
-console.log(`Porcentaje usado calculado: ${costSummary.percentageUsed.toFixed(2)}%`);
-console.log(`¿Porcentajes coinciden? ${Math.abs(expectedPercentageUsed - costSummary.percentageUsed) < 0.01 ? '✓ SÍ' : '✗ NO'}`);
 
 // Verificar la lógica de alertas
 const expectedBudgetRisk = Math.round(expectedPercentageUsed > projectMetrics.progressPercentage
   ? Math.min(100, (expectedPercentageUsed / projectMetrics.progressPercentage) * 70)
   : Math.min(70, (expectedPercentageUsed / 100) * 70));
-
-console.log(`\nRiesgo de presupuesto esperado: ${expectedBudgetRisk}%`);
-console.log(`Riesgo de presupuesto calculado: ${riskIndicators.budgetRisk}%`);
-console.log(`¿Riesgos de presupuesto coinciden? ${expectedBudgetRisk === riskIndicators.budgetRisk ? '✓ SÍ' : '✗ NO'}`);

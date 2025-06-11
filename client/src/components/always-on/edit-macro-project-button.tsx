@@ -39,7 +39,6 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   // Mutation para actualizar el proyecto
   const updateProjectMutation = useMutation({
     mutationFn: (data: any) => {
-      console.log("Actualizando proyecto:", data);
       return apiRequest(`/api/active-projects/${project.id}`, "PATCH", data);
     },
     onSuccess: () => {
@@ -95,7 +94,6 @@ export default function EditMacroProjectButton({ project }: EditMacroProjectButt
   };
 
   // Debugging para ver si detecta correctamente el proyecto macro
-  console.log("Proyecto recibido en botón de edición:", project?.id, project?.isAlwaysOnMacro);
   
   // Siempre renderizar para proyectos Always-On o con ID 16 (MODO Always-On)
   if (!project?.isAlwaysOnMacro && project?.id !== 16) return null;

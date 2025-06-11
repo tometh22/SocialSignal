@@ -82,15 +82,12 @@ export default function ManageQuotes() {
     : [];
 
   const handleStatusChange = async () => {
-    console.log(`[CLIENT] Iniciando actualización de estado`, { selectedQuote, newStatus });
     
     if (!selectedQuote || !newStatus) {
-      console.log(`[CLIENT] Faltan datos:`, { selectedQuote: !!selectedQuote, newStatus });
       return;
     }
 
     try {
-      console.log(`[CLIENT] Enviando PATCH a /api/quotations/${selectedQuote.id}/status con status: ${newStatus}`);
       
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
@@ -98,7 +95,6 @@ export default function ManageQuotes() {
         { status: newStatus }
       );
       
-      console.log(`[CLIENT] Actualización exitosa`);
       
       toast({
         title: "Estado actualizado",
@@ -203,7 +199,6 @@ export default function ManageQuotes() {
     if (!selectedQuote) return;
     
     try {
-      console.log(`[CLIENT] Intentando eliminar cotización ID ${selectedQuote.id}`);
       
       // Usamos fetch directamente en lugar de apiRequest para tener más control sobre el manejo de respuestas
       const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
@@ -214,7 +209,6 @@ export default function ManageQuotes() {
         }
       });
       
-      console.log(`[CLIENT] Respuesta del servidor:`, response.status);
       
       // Intentamos obtener la respuesta JSON, pero manejamos casos donde no sea posible
       let data;
@@ -226,11 +220,9 @@ export default function ManageQuotes() {
         data = { success: response.ok, message: response.statusText };
       }
       
-      console.log(`[CLIENT] Datos recibidos:`, data);
       
       // Manejar los diferentes casos según el código HTTP
       if (response.status === 409) {
-        console.log(`[CLIENT] La cotización está en uso (409 Conflict)`);
         toast({
           title: "No se puede eliminar",
           description: "Esta cotización está siendo utilizada por proyectos activos y no puede ser eliminada.",

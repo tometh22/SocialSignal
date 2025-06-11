@@ -39,7 +39,6 @@ const SimpleTeamConfig: React.FC = () => {
     // Cargar datos mediante llamada directa a la API
     const fetchData = async () => {
       try {
-        console.log("Cargando roles y personal directamente desde la API...");
         
         // Primero intentamos usar las funciones proporcionadas por el contexto
         loadRoles();
@@ -49,13 +48,11 @@ const SimpleTeamConfig: React.FC = () => {
         const rolesResponse = await fetch('/api/roles');
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json();
-          console.log("Roles cargados directamente:", rolesData.length);
         }
         
         const personnelResponse = await fetch('/api/personnel');
         if (personnelResponse.ok) {
           const personnelData = await personnelResponse.json();
-          console.log("Personal cargado directamente:", personnelData.length);
         }
       } catch (error) {
         console.error("Error al cargar datos:", error);
@@ -67,15 +64,11 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Verificar si hay datos cargados
   useEffect(() => {
-    console.log("Roles disponibles en el contexto:", availableRoles?.length || 0);
-    console.log("Personal disponible en el contexto:", availablePersonnel?.length || 0);
     
     if (availableRoles?.length) {
-      console.log("Ejemplo de rol:", availableRoles[0]);
     }
     
     if (availablePersonnel?.length) {
-      console.log("Ejemplo de personal:", availablePersonnel[0]);
     }
   }, [availableRoles, availablePersonnel]);
 
@@ -99,8 +92,6 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Manejar la adición de nuevo miembro
   const handleAddMember = () => {
-    console.log("🔄 Intentando agregar miembro:", newMember);
-    console.log("🔍 Estado actual del equipo:", quotationData.teamMembers);
     
     // Validación
     if (newMember.roleId <= 0 || newMember.hours <= 0 || newMember.rate <= 0) {
@@ -114,7 +105,6 @@ const SimpleTeamConfig: React.FC = () => {
     }
     
     try {
-      console.log("✅ Validación pasada, agregando miembro...");
       
       // Añadir miembro
       addTeamMember({
@@ -125,7 +115,6 @@ const SimpleTeamConfig: React.FC = () => {
         cost: newMember.hours * newMember.rate
       });
       
-      console.log("✅ Miembro agregado exitosamente");
       
       // Limpiar formulario pero mantener el rol seleccionado
       setNewMember(prev => ({
@@ -278,7 +267,6 @@ const SimpleTeamConfig: React.FC = () => {
                   value={newMember.roleId || ''}
                   onChange={(e) => {
                     const roleId = parseInt(e.target.value);
-                    console.log("Rol seleccionado:", roleId);
                     
                     setNewMember(prev => ({
                       ...prev,
@@ -316,19 +304,15 @@ const SimpleTeamConfig: React.FC = () => {
                       return;
                     }
                     
-                    console.log("Personal seleccionado ID:", personnelId);
                     
                     const selectedPerson = availablePersonnel?.find(p => p.id === personnelId);
                     if (!selectedPerson) {
-                      console.log("No se encontró el personal seleccionado");
                       return;
                     }
                     
-                    console.log("Personal seleccionado:", selectedPerson);
                     
                     // Solo actualizar personal y tarifa, NO cambiar el rol automáticamente
                     const officialRate = selectedPerson.hourlyRate || 0;
-                    console.log(`Aplicando tarifa oficial de ${selectedPerson.name}: $${officialRate}/hora`);
                     
                     setNewMember(prev => ({
                       ...prev,
@@ -405,7 +389,6 @@ const SimpleTeamConfig: React.FC = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log("🔔 Botón clickeado - iniciando handleAddMember");
                 handleAddMember();
               }}
               type="button"

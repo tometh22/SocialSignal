@@ -90,17 +90,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
 
     try {
-      console.log("Recibida solicitud de actualización de cliente:", id, req.body);
       
       // Partial validation - only validate the fields provided
       const validatedData = insertClientSchema.partial().parse(req.body);
-      console.log("Datos validados:", validatedData);
       
       const updatedClient = await storage.updateClient(id, validatedData);
-      console.log("Resultado de la actualización:", updatedClient);
       
       if (!updatedClient) {
-        console.log("Cliente no encontrado con ID:", id);
         return res.status(404).json({ message: "Client not found" });
       }
       
@@ -277,7 +273,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
-      console.log("PATCH /api/personnel/:id - Datos recibidos:", req.body);
       
       // Si hourlyRate viene como string, asegurarnos de convertirlo a número
       let data = { ...req.body };
@@ -289,12 +284,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!isNaN(rateNumber)) {
           data.hourlyRate = Math.round(rateNumber * 100) / 100; // Redondear a 2 decimales
-          console.log(`Tarifa convertida: ${req.body.hourlyRate} -> ${data.hourlyRate}`);
         }
       }
       
       const validatedData = insertPersonnelSchema.partial().parse(data);
-      console.log("Datos validados a guardar:", validatedData);
       
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
       
@@ -302,7 +295,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Personnel not found" });
       }
       
-      console.log("Personal actualizado exitosamente:", updatedPerson);
       res.json(updatedPerson);
     } catch (error) {
       console.error("Error al actualizar personal:", error);
@@ -548,16 +540,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
-      console.log("POST /api/quotations - Recibido payload:", req.body);
       
       try {
         // Validar datos con Zod
         const validatedData = insertQuotationSchema.parse(req.body);
-        console.log("Datos validados correctamente:", validatedData);
         
         // Crear cotización
         const quotation = await storage.createQuotation(validatedData);
-        console.log("Cotización creada exitosamente:", quotation);
         
         res.status(201).json(quotation);
       } catch (validationError) {
@@ -603,19 +592,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { status } = req.body;
-      console.log(`[API] Actualizando estado de cotización ID ${id} a: ${status}`);
       
       if (!status) return res.status(400).json({ message: "Status is required" });
 
       const updatedQuotation = await storage.updateQuotation(id, { status });
-      console.log(`[API] Resultado de actualización:`, updatedQuotation);
       
       if (!updatedQuotation) {
-        console.log(`[API] Error: Cotización ID ${id} no encontrada`);
         return res.status(404).json({ message: "Quotation not found" });
       }
       
-      console.log(`[API] Cotización ID ${id} actualizada exitosamente`);
       res.json(updatedQuotation);
     } catch (error) {
       console.error(`[API] Error actualizando estado de cotización ID ${id}:`, error);
@@ -629,12 +614,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
     
     try {
-      console.log(`[API] Procesando solicitud para eliminar cotización ID ${id}`);
       
       // 1. Verificar que la cotización exista
       const quotation = await storage.getQuotation(id);
       if (!quotation) {
-        console.log(`[API] La cotización ID ${id} no existe`);
         return res.status(404).json({ 
           success: false, 
           message: "La cotización no existe" 
@@ -643,10 +626,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 2. Verificar si la cotización está asociada a proyectos activos
       const activeProjects = await storage.getActiveProjectsByQuotationId(id);
-      console.log(`[API] La cotización ID ${id} tiene ${activeProjects.length} proyectos activos asociados`);
       
       if (activeProjects.length > 0) {
-        console.log(`[API] No se puede eliminar la cotización ID ${id} porque tiene proyectos activos`);
         
         const projectInfo = activeProjects.map(p => ({ id: p.id, name: `Proyecto ID ${p.id}` }));
         
@@ -658,19 +639,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 3. Proceder con la eliminación
-      console.log(`[API] Procediendo con la eliminación de la cotización ID ${id}`);
       await storage.deleteQuotationTeamMembers(id);
       const success = await storage.deleteQuotation(id);
       
       if (!success) {
-        console.log(`[API] Error al eliminar la cotización ID ${id}`);
         return res.status(500).json({ 
           success: false, 
           message: "Ocurrió un error al intentar eliminar la cotización" 
         });
       }
       
-      console.log(`[API] Cotización ID ${id} eliminada exitosamente`);
       res.json({ 
         success: true, 
         message: "Cotización eliminada exitosamente",
@@ -752,7 +730,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (projectsWithSameQuotation.length > 1) {
         // Si hay múltiples proyectos que usan la misma cotización, crear una copia
-        console.log(`Creando una nueva cotización para el proyecto ${projectId} y asignando cliente ${clientId}`);
         
         // Crear una copia de la cotización con el nuevo cliente
         const newQuotation = { ...currentQuotation, id: undefined, clientId };
@@ -768,7 +745,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Si solo hay un proyecto, simplemente actualizar el cliente en la cotización existente
-        console.log(`Actualizando cliente de la cotización ${project.quotationId} a ${clientId}`);
         await storage.updateQuotation(project.quotationId, { clientId });
         updatedProject = await storage.getActiveProject(projectId);
       }
@@ -795,18 +771,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotation-team", async (req, res) => {
     try {
-      console.log("POST /api/quotation-team - Recibido payload:", req.body);
       
       try {
         // Validar datos con Zod
         const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
-        console.log("Datos de miembro validados correctamente:", validatedData);
         
         // VALIDACIÓN OPCIONAL DE TARIFAS - Solo advertir si hay diferencias grandes
         if (validatedData.personnelId) {
           const personnel = await storage.getPersonnelById(validatedData.personnelId);
           if (personnel && personnel.hourlyRate !== validatedData.rate) {
-            console.log(`Nota: Personal ${personnel.name} tiene tarifa base ${personnel.hourlyRate} pero se asignó con ${validatedData.rate} (ajuste de proyecto)`);
             // Permitir la asignación con tarifa personalizada
           }
         }
@@ -822,7 +795,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (isDuplicate) {
-          console.log("Miembro duplicado detectado, omitiendo creación:", validatedData);
           // Simplemente devolver el primer miembro duplicado encontrado
           const duplicateMember = existingMembers.find(existing => 
             existing.personnelId === validatedData.personnelId && 
@@ -834,7 +806,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Si no es duplicado, crear el nuevo miembro
         const member = await storage.createQuotationTeamMember(validatedData);
-        console.log("Miembro del equipo creado exitosamente:", member);
         
         res.status(201).json(member);
       } catch (validationError) {
@@ -882,7 +853,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
-    console.log(`Eliminando miembros del equipo para cotización ${quotationId} (ruta alternativa)`);
     await storage.deleteQuotationTeamMembers(quotationId);
     res.status(204).send();
   });
@@ -1016,28 +986,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filtrar los proyectos según el parámetro
       let projects;
       
-      console.log("Parámetro showSubprojects:", showSubprojects, typeof showSubprojects);
       
       if (!showSubprojects) {
         // Modo normal - mostrar solo proyectos padres y proyectos sin padre
-        console.log("Filtrando para mostrar solo proyectos principales (sin parentProjectId)");
         projects = allProjects.filter(project => {
           const result = project.parentProjectId === null;
-          console.log(`Proyecto ID ${project.id}: parentProjectId=${project.parentProjectId}, incluido=${result}`);
           return result;
         });
       } else {
         // Modo completo - mostrar todos los proyectos
-        console.log("Mostrando todos los proyectos sin filtrar");
         projects = allProjects;
       }
       
       // Depuración para ver qué está pasando con las cotizaciones
-      console.log(`Proyectos activos filtrados (showSubprojects=${showSubprojects}): ${projects.length} de ${allProjects.length}`);
       projects.forEach(project => {
-        console.log(`Proyecto ID: ${project.id}, Cotización ID: ${project.quotationId}`);
         if (project.quotation) {
-          console.log(`Nombre del proyecto: ${project.quotation.projectName}`);
         }
       });
       
@@ -1290,7 +1253,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // En una implementación real, aquí actualizaríamos el presupuesto estimado en la base de datos
         // Por ahora, simulamos la actualización
-        console.log(`Asignando presupuesto de $${amount} al proyecto ${projectId}`);
         
         results.push({
           projectId,
@@ -1317,7 +1279,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener entregables de todos los subproyectos Always-On de MODO
   app.get("/api/projects/always-on/deliverables", requireAuth, async (req, res) => {
     try {
-      console.log("Obteniendo entregables de todos los subproyectos Always-On de MODO");
       
       // IDs de los subproyectos de MODO Always-On
       const subProjectIds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
@@ -1327,14 +1288,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Obtener entregables de cada subproyecto usando consulta directa
       for (const projectId of subProjectIds) {
         try {
-          console.log(`Buscando entregables para proyecto ${projectId}`);
           
           // Consulta parametrizada segura para obtener entregables
           const projectDeliverables = await db.select().from(deliverables)
             .where(eq(deliverables.project_id, projectId));
           
           if (projectDeliverables && projectDeliverables.length > 0) {
-            console.log(`Entregables encontrados para proyecto ID ${projectId}: ${projectDeliverables.length}`);
             
             // Agregar información del subproyecto a cada entregable
             const deliverablesWithProject = projectDeliverables.map((d: any) => ({
@@ -1344,14 +1303,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }));
             allDeliverables = allDeliverables.concat(deliverablesWithProject);
           } else {
-            console.log(`No se encontraron entregables para proyecto ${projectId}`);
           }
         } catch (error) {
           console.warn(`Error obteniendo entregables del proyecto ${projectId}:`, error);
         }
       }
       
-      console.log(`Total de entregables encontrados: ${allDeliverables.length}`);
       res.json(allDeliverables);
     } catch (error) {
       console.error("Error obteniendo entregables Always-On:", error);
@@ -1404,20 +1361,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
     
     try {
-      console.log(`[API] Procesando solicitud para eliminar proyecto ID ${id}`);
       
       // Usar transacción para garantizar integridad de datos
       await db.transaction(async (tx) => {
         // 1. Verificar que el proyecto existe
         const project = await storage.getActiveProject(id);
         if (!project) {
-          console.log(`[API] El proyecto ID ${id} no existe`);
           throw new Error("El proyecto no existe");
         }
         
         // 2. Si es un proyecto padre (Always-On), eliminar subproyectos primero
         if (project.isAlwaysOnMacro) {
-          console.log(`[API] Eliminando subproyectos del proyecto macro ID ${id}`);
           const subprojects = await storage.getActiveProjectsByParentId(id);
           
           for (const subproject of subprojects) {
@@ -1429,19 +1383,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // 3. Eliminar entradas de tiempo del proyecto principal
-        console.log(`[API] Eliminando entradas de tiempo para proyecto ID ${id}`);
         await tx.delete(timeEntries).where(eq(timeEntries.projectId, id));
         
         // 4. Eliminar entregables del proyecto principal
-        console.log(`[API] Eliminando entregables para proyecto ID ${id}`);
         await tx.delete(deliverables).where(eq(deliverables.project_id, id));
         
         // 5. Eliminar el proyecto principal
-        console.log(`[API] Eliminando proyecto principal ID ${id}`);
         await tx.delete(activeProjects).where(eq(activeProjects.id, id));
       });
       
-      console.log(`[API] Proyecto ID ${id} eliminado exitosamente`);
       res.json({ 
         success: true, 
         message: "Proyecto eliminado exitosamente",
@@ -1661,7 +1611,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(sql`time_entries.project_id = ${projectId}`)
       .orderBy(sql`time_entries.date DESC`);
       
-      console.log(`Fetched ${entries.length} time entries for project ${projectId}`);
       res.json(entries);
     } catch (error) {
       console.error("Error fetching project time entries:", error);
@@ -2052,51 +2001,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Actualizar nombre de proyecto
   app.patch("/api/projects/:id/update-name", async (req, res) => {
-    console.log("=== ENDPOINT DE ACTUALIZACIÓN DE NOMBRE LLAMADO ===");
-    console.log("Request body:", req.body);
     
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
-      console.log("ID inválido:", req.params.id);
       return res.status(400).json({ message: "Invalid project ID" });
     }
     
-    console.log("ID del proyecto a actualizar:", id);
     
     try {
       const { name } = req.body;
-      console.log("Nombre recibido:", name);
       
       if (!name || typeof name !== 'string' || name.trim() === '') {
-        console.log("Nombre inválido o vacío");
         return res.status(400).json({ message: "Project name is required" });
       }
       
-      console.log("Buscando proyecto con ID:", id);
       const project = await storage.getActiveProject(id);
       if (!project) {
-        console.log("Proyecto no encontrado con ID:", id);
         return res.status(404).json({ message: "Project not found" });
       }
       
-      console.log("Proyecto encontrado:", project.id);
-      console.log("Buscando cotización con ID:", project.quotationId);
       
       const quotation = await storage.getQuotation(project.quotationId);
       if (!quotation) {
-        console.log("Cotización no encontrada con ID:", project.quotationId);
         return res.status(404).json({ message: "Quotation not found" });
       }
       
-      console.log("Cotización encontrada, nombre anterior:", quotation.projectName);
       
       // Verificar si hay otros proyectos que usan la misma cotización
-      console.log("Verificando si hay otros proyectos usando la misma cotización...");
       const projectsWithSameQuotation = await storage.getActiveProjectsByQuotationId(project.quotationId);
       
       if (projectsWithSameQuotation.length > 1) {
         // Si hay más proyectos usando la misma cotización, crear una copia para este proyecto
-        console.log(`Encontrados ${projectsWithSameQuotation.length} proyectos con la misma cotización. Creando copia dedicada.`);
         
         // Crear una copia de la cotización con el nuevo nombre
         const { id, ...quotationWithoutId } = quotation;
@@ -2104,11 +2039,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const createdQuotation = await storage.createQuotation(newQuotation);
         if (!createdQuotation) {
-          console.log("Error al crear copia de la cotización");
           return res.status(500).json({ message: "Failed to create quotation copy" });
         }
         
-        console.log(`Nueva cotización creada con ID: ${createdQuotation.id} y nombre: ${createdQuotation.projectName}`);
         
         // Actualizar el proyecto para usar la nueva cotización
         const updatedProject = await storage.updateActiveProject(id, {
@@ -2116,20 +2049,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (!updatedProject) {
-          console.log("Error al actualizar la referencia del proyecto a la nueva cotización");
           return res.status(500).json({ message: "Failed to update project" });
         }
         
-        console.log(`Proyecto ${id} actualizado para usar la cotización ${createdQuotation.id}`);
         
         // Obtener el proyecto actualizado para devolver
         const finalProject = await storage.getActiveProject(id);
-        console.log("Retornando proyecto actualizado con nueva cotización");
         return res.json(finalProject);
       } else {
         // Si solo este proyecto usa la cotización, actualizar normalmente
-        console.log("Solo un proyecto usa esta cotización. Actualizando directamente.");
-        console.log("Actualizando a nuevo nombre:", name.trim());
         
         // Actualizar el nombre del proyecto en la cotización
         const updatedQuotation = await storage.updateQuotation(project.quotationId, {
@@ -2137,15 +2065,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         if (!updatedQuotation) {
-          console.log("Error al actualizar la cotización");
           return res.status(500).json({ message: "Failed to update project name" });
         }
         
-        console.log("Cotización actualizada exitosamente:", updatedQuotation.projectName);
         
         // Obtenemos el proyecto actualizado
         const updatedProject = await storage.getActiveProject(id);
-        console.log("Retornando proyecto actualizado");
         return res.json(updatedProject);
       }
     } catch (error) {
@@ -2394,11 +2319,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (rows.length === 0) {
-        console.log(`No se encontró entregables MODO para el proyecto ID ${projectId}`);
         return res.json(null);
       }
       
-      console.log(`Entregable MODO encontrado para proyecto ID ${projectId}`);
       res.json(rows[0]);
     } catch (error) {
       console.error(`Error al obtener entregable MODO para proyecto ID ${projectId}:`, error);
@@ -2418,7 +2341,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `SELECT * FROM deliverables WHERE project_id = ${projectId} ORDER BY created_at DESC`
       );
       
-      console.log(`Entregables encontrados para proyecto ID ${projectId}: ${rows.length}`);
       res.json(rows);
     } catch (error) {
       console.error(`Error al obtener entregables del proyecto ID ${projectId}:`, error);
@@ -2464,8 +2386,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
     
     try {
-      console.log("Recibido PATCH para actualizar entregable ID:", id);
-      console.log("Datos recibidos:", req.body);
       
       // Omitimos la validación de Zod y enviamos los datos directamente
       const updatedDeliverable = await storage.updateDeliverable(id, req.body);
@@ -2474,7 +2394,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Deliverable not found" });
       }
       
-      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
       res.json(updatedDeliverable);
     } catch (error) {
       console.error("Error updating deliverable:", error);
@@ -2488,23 +2407,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid deliverable ID" });
     
     try {
-      console.log("Recibido POST para actualizar indicadores del entregable ID:", id);
-      console.log("Datos recibidos:", req.body);
       
       // Solución simple: ejecutar una actualización SQL directa con los valores correctos
-      console.log("Datos recibidos en formato final:", {
-        narrative_quality: Number(req.body.narrative_quality || 0),
-        graphics_effectiveness: Number(req.body.graphics_effectiveness || 0),
-        format_design: Number(req.body.format_design || 0),
-        relevant_insights: Number(req.body.relevant_insights || 0),
-        operations_feedback: Number(req.body.operations_feedback || 0),
-        mes_entrega: Number(req.body.mes_entrega || 1),
-        retrabajo: req.body.retrabajo ? 'true' : 'false',
-        on_time: req.body.delivery_on_time ? 'true' : 'false',
-        analysts: (req.body.analysts || '').replace(/'/g, "''"),
-        pm: (req.body.pm || '').replace(/'/g, "''"),
-        hours_available: Number(req.body.hours_available || 0)
-      });
       
       await pool.query(`
         UPDATE deliverables 
@@ -2532,7 +2436,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Deliverable not found" });
       }
       
-      console.log("Entregable actualizado exitosamente:", updatedDeliverable);
       res.json(updatedDeliverable);
     } catch (error) {
       console.error("Error updating deliverable indicators:", error);
@@ -2696,7 +2599,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si no hay proyectos, devolver resultado vacío
       if (!activeProjects.length) {
-        console.log(`No hay proyectos activos para el cliente ID ${clientId}`);
         return res.json({
           totalDeliverables: 0,
           onTimeDeliveries: 0,
@@ -2728,9 +2630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `SELECT * FROM deliverables WHERE project_id IN (${projectIds})`
       );
       
-      console.log(`Obtenidos ${deliverables.length} entregables para proyectos: ${projectIds}`);
       
-      console.log(`Calculando resumen MODO para cliente ID ${clientId}: ${deliverables.length} entregables`);
       
       // Calcular métricas
       const totalDeliverables = deliverables.length;
@@ -2882,7 +2782,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si no hay proyectos, devolver array vacío
       if (!activeProjects.length) {
-        console.log(`No hay proyectos activos para el cliente ID ${clientId}`);
         return res.json([]);
       }
       
@@ -2896,7 +2795,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
          ORDER BY delivery_date DESC`
       );
       
-      console.log(`Obtenidos ${rows.length} entregables para el cliente ID ${clientId} en proyectos: ${projectIds}`);
       res.json(rows);
     } catch (error) {
       console.error("Error al obtener entregables:", error);

@@ -3,7 +3,6 @@ import { roles, personnel, clients, reportTemplates, templateRoleAssignments } f
 
 export async function reinitializeDatabase() {
   try {
-    console.log("Reinicializando la base de datos...");
 
     // Eliminar todos los datos existentes (en orden para respetar las restricciones de clave externa)
     await db.delete(templateRoleAssignments);
@@ -12,7 +11,6 @@ export async function reinitializeDatabase() {
     await db.delete(clients);
     await db.delete(roles);
 
-    console.log("Datos existentes eliminados. Insertando nuevos datos...");
 
     // Insertar roles
     const [seniorAnalyst] = await db.insert(roles).values({
@@ -246,7 +244,6 @@ export async function reinitializeDatabase() {
       }
     ]);
 
-    console.log("Reinicialización de datos completada con éxito.");
   } catch (error) {
     console.error("Error al reinicializar la base de datos:", error);
   }

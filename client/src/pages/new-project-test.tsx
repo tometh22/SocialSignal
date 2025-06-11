@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 export default function NewProjectTest() {
   const [, setLocation] = useLocation();
 
-  console.log("NewProjectTest component loaded successfully");
 
   return (
     <div style={{ padding: "20px" }}>

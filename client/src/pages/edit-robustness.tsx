@@ -130,7 +130,6 @@ const EditRobustnessPage = () => {
         hours_available: data.hoursEstimated
       };
       
-      console.log("Enviando datos al servidor:", serverData);
       
       // Usar la nueva ruta especializada para indicadores
       return fetch(`/api/deliverables/${id}/indicators`, {
@@ -199,7 +198,6 @@ const EditRobustnessPage = () => {
       fetch(`/api/deliverables/${id}`)
         .then(response => response.json())
         .then(data => {
-          console.log("Datos actualizados recargados:", data);
           setFormData({
             mes_entrega: data.mes_entrega || 1,
             analysts: data.analysts || "",

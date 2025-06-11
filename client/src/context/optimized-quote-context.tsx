@@ -276,7 +276,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       return;
     }
     
-    console.log(`Actualizando plantilla: ${template ? `ID: ${template.id}, ${template.name}` : 'Personalizado / Sin Plantilla'}`);
     
     // Limpiar equipos anteriores para evitar duplicidades
     setQuotationData(prev => ({
@@ -334,7 +333,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         });
     } else {
       // Caso "Personalizado / Sin Plantilla"
-      console.log("Configurando opción 'Personalizado / Sin Plantilla'");
       
       // Reiniciar los financials a valores predeterminados
       setQuotationData(prev => ({
@@ -497,7 +495,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         }
       }
       
-      console.log("Usando ID de personal por defecto para equipo recomendado:", defaultPersonnelId);
       
       // Ahora cargar asignaciones de roles para obtener horas (si hay plantilla)
       let assignments = [];
@@ -505,7 +502,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         assignments = await apiRequest(`/api/template-roles/${quotationData.template.id}`, 'GET');
       } else {
         // Caso "Sin plantilla": crear asignaciones básicas basadas en recommendedRoleIds
-        console.log("Usando configuración de equipo personalizada...");
         assignments = recommendedRoleIds.map(roleId => ({
           roleId: roleId,
           hours: "10" // Horas predeterminadas
@@ -646,7 +642,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       sanitizedUpdates.marginFactor = typeof value === 'number' && !isNaN(value) ? value : 1.0;
     }
     
-    console.log("Actualizaciones sanitizadas:", sanitizedUpdates);
     
     // Actualizar estado financiero con valores verificados
     setQuotationData(prev => {
@@ -658,7 +653,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       // Usar una función auxiliar para recalcular costos inmediatamente
       const recalculateNow = () => {
         try {
-          console.log("Actualizando financials en tiempo real:", sanitizedUpdates);
           
           // Obtener los valores actualizados para cálculos inmediatos
           const newBaseCost = baseCost || 0;
@@ -701,7 +695,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           setMarkupAmount(newMarkup);
           setTotalAmount(newTotal);
           
-          console.log("Nuevos valores calculados:", {
+          setCostSummary({
             baseCost: newBaseCost,
             adjustment: newAdjustment,
             markup: newMarkup,
@@ -762,13 +756,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   useEffect(() => {
     // Evitar recalcular si estamos en el paso 2 (selección de plantilla)
     if (currentStep === 2 && quotationData.template !== undefined) {
-      console.log("Omitiendo cálculo de costos basado en miembros del equipo en el paso 2");
       return;
     }
     
     // Solo calcular costos a partir de miembros del equipo cuando hay miembros
     if (quotationData.teamMembers.length > 0) {
-      console.log("Calculando costos basados en miembros del equipo:", quotationData.teamMembers.length);
       calculateCosts(quotationData.teamMembers);
     }
   }, [calculateCosts, quotationData.teamMembers, currentStep, quotationData.template]);
@@ -800,7 +792,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       
       // Si es una edición (hay un quotationId), guardar el paso en localStorage
       if (quotationId) {
-        console.log(`Guardando paso ${step} para cotización ${quotationId}`);
         localStorage.setItem(`quote_step_${quotationId}`, step.toString());
       }
     }
@@ -810,7 +801,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     // También guardar el paso actual + 1 si hay un ID de cotización
     if (quotationId && currentStep < 4) {
       const nextStepNumber = currentStep + 1;
-      console.log(`Guardando paso siguiente ${nextStepNumber} para cotización ${quotationId}`);
       localStorage.setItem(`quote_step_${quotationId}`, nextStepNumber.toString());
     }
     // Si estamos en el paso 1 (información básica), validar los campos de información básica
@@ -885,20 +875,16 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       if (quotationData.template.baseCost !== undefined && quotationData.template.baseCost !== null) {
         // Usar el costo base de la plantilla
         setBaseCost(quotationData.template.baseCost || 0);
-        console.log("Estableciendo costo base desde plantilla:", quotationData.template.baseCost);
       } else if (quotationData.template.platformCost !== undefined && quotationData.template.platformCost !== null) {
         // Usar el costo de la plataforma como alternativa
         setBaseCost(quotationData.template.platformCost || 0);
-        console.log("Usando platformCost como costo base:", quotationData.template.platformCost || 0);
       } else {
         // Un valor predeterminado si no hay costos
         setBaseCost(1500);
-        console.log("Usando valor predeterminado para la plantilla:", 1500);
       }
     } else if (quotationData.template === null) {
       // Si es modo personalizado, establecer un costo base predeterminado
       setBaseCost(1000);
-      console.log("Modo personalizado: estableciendo costo base predeterminado de 1000");
     }
   }, [quotationData.template]);
 
@@ -944,7 +930,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     setMarkupAmount(calculatedMarkup);
     setTotalAmount(finalTotal);
     
-    console.log("Recálculo financiero:", {
       baseCost,
       adjustment,
       totalBaseCost,
@@ -972,12 +957,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     try {
       // Evitar múltiples envíos simultáneos
       if (isSavingInProgress) {
-        console.log("Ya hay una operación de guardado en progreso. Ignorando esta solicitud.");
         return -1; // Retornar valor especial para indicar que no se realizó la operación
       }
       
       setIsSavingInProgress(true);
-      console.log(`Iniciando proceso de ${isEditing ? 'actualizar' : 'guardar'} cotización...`);
       
       // Validación básica
       if (!quotationData.client) {
@@ -1058,7 +1041,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         payload.status = "completed"; // Cambiar a completada cuando se guarda por primera vez
       }
       
-      console.log("Payload a enviar:", payload);
       
       let response;
       let quotationId;
@@ -1066,7 +1048,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       // Lógica diferente según si es edición o nueva cotización
       if (isEditing && editQuotationId && !isRecotizacion) {
         // Actualizar cotización existente
-        console.log(`Actualizando cotización ID: ${editQuotationId}`);
         response = await fetch(`/api/quotations/${editQuotationId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1077,7 +1058,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         quotationId = editQuotationId;
       } else {
         // Crear cotización nueva (o recotización)
-        console.log("Creando nueva cotización...");
         response = await fetch('/api/quotations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1086,7 +1066,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         });
       }
       
-      console.log("Estado de respuesta:", response.status);
       
       if (!response.ok) {
         let errorMessage = `Error ${response.status}: ${response.statusText}`;
@@ -1114,14 +1093,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         // Para nuevas cotizaciones o recotizaciones, obtener el ID de la respuesta
         try {
           const quotation = await response.json();
-          console.log("Cotización creada:", quotation);
           
           if (!quotation || !quotation.id) {
             throw new Error("La respuesta no contiene un ID de cotización válido");
           }
           
           quotationId = quotation.id;
-          console.log(`ID de cotización creada: ${quotationId}`);
         } catch (err) {
           console.error("Error al parsear respuesta como JSON:", err);
           throw new Error("No se pudo leer la respuesta del servidor");
@@ -1131,7 +1108,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       // En edición, primero eliminamos los miembros del equipo anteriores
       if (isEditing && !isRecotizacion) {
         try {
-          console.log(`Eliminando miembros anteriores para cotización ${quotationId}`);
           // Uso directo del endpoint correcto
           const deleteResponse = await fetch(`/api/quotation-team/${quotationId}`, {
             method: 'DELETE',
@@ -1139,7 +1115,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           });
           
           if (deleteResponse.ok) {
-            console.log("Miembros del equipo eliminados correctamente");
           } else {
             console.error(`Error al eliminar miembros del equipo: ${deleteResponse.status}`);
           }
@@ -1151,7 +1126,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       
       // Usar función consolidada para normalizar el equipo
       const uniqueTeamMembers = normalizeTeamMembers(quotationData.teamMembers);
-      console.log(`Equipo normalizado: ${uniqueTeamMembers.length} miembros únicos de ${quotationData.teamMembers.length} originales`);
       
       // Guardar cada miembro del equipo
       for (const member of uniqueTeamMembers) {
@@ -1163,14 +1137,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           const personnelWithRole = availablePersonnel.find(p => p.roleId === member.roleId);
           if (personnelWithRole) {
             personnelId = personnelWithRole.id;
-            console.log(`Asignando personnel ${personnelId} (${personnelWithRole.name}) al rol ${member.roleId}`);
           }
         }
         
         // Si aún no tenemos personnelId, usar el primer personnel disponible
         if (!personnelId && availablePersonnel && availablePersonnel.length > 0) {
           personnelId = availablePersonnel[0].id;
-          console.log(`Usando personnel predeterminado: ${personnelId}`);
         }
         
         // Asegurarnos de que el roleId coincida con el del personnel seleccionado
@@ -1179,7 +1151,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           const personnelInfo = availablePersonnel.find(p => p.id === personnelId);
           if (personnelInfo) {
             updatedRoleId = personnelInfo.roleId;
-            console.log(`Actualizando roleId al del personal seleccionado: ${personnelInfo.name} tiene roleId ${personnelInfo.roleId}`);
           }
         }
 
@@ -1192,7 +1163,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           cost: member.hours * member.rate
         };
         
-        console.log("Guardando miembro del equipo:", memberPayload);
         
         const teamResponse = await fetch('/api/quotation-team', {
           method: 'POST',
@@ -1213,10 +1183,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
         }
         
         const savedMember = await teamResponse.json();
-        console.log("Miembro guardado:", savedMember);
       }
       
-      console.log(`¡Cotización ${isEditing ? 'actualizada' : 'guardada'} con éxito!`);
       return quotationId;
       
     } catch (error) {
@@ -1235,12 +1203,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     if (baseCost <= 0 && currentStep === 2 && quotationData.template) {
       // Si estamos en el paso 2 y hay una plantilla seleccionada, pero baseCost es 0,
       // probablemente se acaba de seleccionar la plantilla y aún no se ha establecido baseCost
-      console.log("Esperando a que baseCost se establezca antes de recalcular...");
       
       // Verificar si hay un valor de costo base en la plantilla
       const templateBaseCost = quotationData.template.baseCost;
       if (templateBaseCost && templateBaseCost > 0) {
-        console.log("Usando baseCost desde la plantilla para el cálculo:", templateBaseCost);
         
         // Forzar el cálculo con el costo base de la plantilla
         try {
@@ -1262,7 +1228,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           );
           setTotalAmount(total);
           
-          console.log("Actualización forzada de costos completada:", {
             baseCost: templateBaseCost,
             adjustment,
             markup,
@@ -1276,7 +1241,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       }
     }
     
-    console.log("Recalculando financieros. Base cost:", baseCost);
     
     try {
       // Calcular el ajuste de complejidad basado en los factores
@@ -1300,7 +1264,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
       );
       setTotalAmount(total);
       
-      console.log("Actualización de costos completada:", {
         baseCost,
         adjustment,
         markup,
@@ -1328,18 +1291,15 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   // Efecto para cargar una cotización existente si hay quotationId
   useEffect(() => {
     if (quotationId) {
-      console.log(`Cargando cotización existente ID: ${quotationId} para edición`);
       
       // Para cualquier edición, ir directamente al paso de revisión
       if (!isRequote) {
         const finalStep = 4; // Por defecto paso 4 (revisión), se ajustará después si es Always-On
-        console.log(`Edición detectada - dirigiendo al paso de revisión: ${finalStep}`);
         setCurrentStep(finalStep);
       }
       
       const loadExistingQuotation = async () => {
         try {
-          console.log(`Cargando cotización existente ID: ${quotationId}`);
           
           // Obtener la cotización de la API
           const quotation = await apiRequest(`/api/quotations/${quotationId}`, "GET");
@@ -1350,7 +1310,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           
           // Si es Huggies, forzar paso 4 nuevamente y cargar datos específicos
           if (quotationId === 30) {
-            console.log("COTIZACIÓN HUGGIES - Forzando paso 4 y cargando datos específicos");
             setCurrentStep(4);
             
             // Cargar todos los datos específicos de Huggies
@@ -1359,7 +1318,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 // 1. Cargar cliente Huggies (ID 23)
                 const huggiesClient = await apiRequest("/api/clients/23", "GET");
                 if (huggiesClient) {
-                  console.log("Huggies: Cliente cargado correctamente", huggiesClient);
                   setQuotationData(prev => ({
                     ...prev,
                     client: huggiesClient,
@@ -1382,11 +1340,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 // 2. Cargar equipo Huggies
                 const huggiesTeam = await apiRequest("/api/quotation-team/30", "GET");
                 if (huggiesTeam && Array.isArray(huggiesTeam) && huggiesTeam.length > 0) {
-                  console.log(`Huggies: Equipo cargado - ${huggiesTeam.length} miembros`);
                   
                   // Cargar personal para obtener sus roles
                   const allPersonnel = await apiRequest("/api/personnel", "GET");
-                  console.log("Personnel cargados para Huggies:", allPersonnel.length);
                   
                   // Mapa para acceder rápidamente a los datos del personal
                   const personnelMap: Record<number, any> = {};
@@ -1412,7 +1368,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                     };
                   });
                   
-                  console.log("Huggies: Equipo convertido a formato interno", teamMembers);
                   
                   // Actualizar estado con el equipo cargado
                   setQuotationData(prev => ({
@@ -1436,7 +1391,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                     }
                   }));
                   
-                  console.log("Huggies: Costos base calculados en", baseCost);
                 }
               } catch (error) {
                 console.error("Error cargando datos específicos de Huggies:", error);
@@ -1485,9 +1439,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           // Cargar miembros del equipo
           let teamMembers: TeamMember[] = [];
           try {
-            console.log(`Cargando equipo para cotización ID: ${quotationId}`);
             let teamData = await apiRequest(`/api/quotation-team/${quotationId}`, "GET");
-            console.log("Equipo recibido (sin procesar):", teamData);
             
             if (Array.isArray(teamData) && teamData.length > 0) {
               // Limpiar duplicados en caso de error de persistencia
@@ -1496,18 +1448,15 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 const memberKey = `${member.personnelId}-${member.rate}-${member.hours}`;
                 // Si ya hemos visto este miembro exacto, filtrarlo
                 if (seenMemberKeys.has(memberKey)) {
-                  console.log(`Miembro duplicado detectado: ${memberKey}`);
                   return false;
                 }
                 seenMemberKeys.add(memberKey);
                 return true;
               });
               
-              console.log("Equipo recibido (limpio):", teamData);
               
               // Cargar personnel para obtener sus roles
               const allPersonnel = await apiRequest("/api/personnel", "GET");
-              console.log("Personnel cargados:", allPersonnel);
               
               // Mapa para acceder rápidamente a los datos del personal
               const personnelMap: Record<number, any> = {};
@@ -1526,14 +1475,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 
                 if (member.roleId) {
                   roleId = member.roleId;
-                  console.log(`Usando roleId guardado en BD: ${roleId}`);
                 } else if (person && person.roleId) {
                   roleId = person.roleId;
-                  console.log(`Usando roleId basado en el personal: ${roleId} (${person.name})`);
                 }
                 
                 const name = person ? person.name : "Desconocido";
-                console.log(`Miembro ${member.id}: personnelId=${member.personnelId}, nombre=${name}, roleId=${roleId}`);
                 
                 return {
                   id: uuidv4(), // Generar nuevo ID para la interfaz
@@ -1545,12 +1491,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                 };
               });
               
-              console.log("Equipo convertido (final):", teamMembers);
               
               // Si tiene miembros en el equipo, consideramos que está en el paso 4 (financiero)
               if (teamMembers.length > 0) {
                 detectedStep = 4;
-                console.log("Cotización con equipo completo, avanzando al paso 4");
                 
                 // Guardar permanentemente esta decisión en localStorage
                 localStorage.setItem(`quote_step_${quotationId}`, "4");
@@ -1562,7 +1506,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
           
           // Forzar para la cotización de Huggies
           if (quotationId === 30 && teamMembers.length > 0) {
-            console.log("Cotización de Huggies detectada. Forzando paso 4.");
             detectedStep = 4;
             localStorage.setItem(`quote_step_${quotationId}`, "4");
           }
@@ -1574,11 +1517,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             // Si es edición normal, ir al paso de revisión final
             // Usar quotation para detectar el tipo de proyecto
             finalStep = quotation.isAlwaysOnProject ? 5 : 4;
-            console.log(`Edición de cotización ID ${quotationId} - dirigiendo al paso de revisión: ${finalStep}`);
           } else {
             // Si es recotización, empezar desde el paso 1
             finalStep = 1;
-            console.log("Recotización - iniciando desde el paso 1");
           }
           
           // Actualizar el estado del paso
@@ -1699,7 +1640,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
                            (quotation.complexityAdjustment > 5000 ? 'high' : 
                            quotation.complexityAdjustment > 2000 ? 'medium' : 'low');
           
-          console.log("Análisis de los factores de complejidad de la cotización:", {
             analysisType: {
               fromId: getAnalysisTypeFromIdOrText(quotation.analysisTypeId),
               fromText: getAnalysisTypeFromIdOrText(undefined, quotation.analysisType),
@@ -1754,7 +1694,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
             }
           });
           
-          console.log("Cotización cargada exitosamente");
         } catch (error) {
           console.error("Error al cargar la cotización:", error);
         }

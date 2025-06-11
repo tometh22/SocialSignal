@@ -7,14 +7,12 @@ const HuggiesQuoteRedirect: React.FC = () => {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    console.log("Iniciando redirección especial para Huggies");
     
     // Primero forzar el paso 4 en localStorage
     localStorage.setItem('quote_step_30', '4');
     
     // Redireccionar después de un breve retraso para asegurar que el storage se actualice
     const redirectTimer = setTimeout(() => {
-      console.log("Redireccionando a cotización de Huggies con paso 4 forzado");
       setLocation('/optimized-quote?id=30');
     }, 500);
     

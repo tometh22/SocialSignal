@@ -24,7 +24,6 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
   
   // Asegurarnos de que los costos estén actualizados
   useEffect(() => {
-    console.log("[BREAKDOWN] Ejecutando cálculo de costos en CostBreakdown");
     calculateBaseCost();
     calculateTotalCost();
   }, [calculateBaseCost, calculateTotalCost, teamMembers]);
@@ -43,23 +42,19 @@ export default function CostBreakdown({ teamMembers, showComplexity = false }: C
     if (!personnelId) return "No asignado";
     
     if (!allPersonnel) {
-      console.log("[BREAKDOWN] Personal aún no cargado para ID:", personnelId);
       return "Cargando...";
     }
     
     const person = allPersonnel.find(p => p.id === personnelId);
-    console.log(`[BREAKDOWN] Buscando personal ID ${personnelId}:`, person ? person.name : "No encontrado");
     return person ? person.name : `Personal #${personnelId} no encontrado`;
   };
 
   const getRoleName = (roleId: number) => {
     if (!roles) {
-      console.log("[BREAKDOWN] Roles aún no cargados para ID:", roleId);
       return "Cargando...";
     }
     
     const role = roles.find(r => r.id === roleId);
-    console.log(`[BREAKDOWN] Buscando rol ID ${roleId}:`, role ? role.name : "No encontrado");
     return role ? role.name : `Rol #${roleId} no encontrado`;
   };
 

@@ -39,22 +39,18 @@ export default function ClientSummaryEnhanced() {
 
   // Navigation handlers for strategic actions
   const handleManageProjects = () => {
-    console.log("Navigating to active projects page");
     setLocation(`/active-projects`);
   };
 
   const handleNPSSurvey = () => {
-    console.log("Navigating to quarterly NPS survey");
     setLocation(`/quarterly-nps/${clientId}`);
   };
 
   const handleQualityScores = () => {
-    console.log("Navigating to quality scores page");
     setLocation(`/quality-scores/${clientId}`);
   };
 
   const handleViewFinancials = () => {
-    console.log("Switching to financials tab");
     setActiveTab("financials");
   };
 

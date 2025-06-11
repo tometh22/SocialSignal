@@ -17,7 +17,6 @@ export const loadCostMultipliers = async (forceReload = false): Promise<void> =>
   
   // Si el caché es reciente y no se fuerza la recarga, usar caché
   if (!forceReload && (now - cacheTimestamp) < CACHE_DURATION && Object.keys(multiplierCache).length > 0) {
-    console.log('Usando multiplicadores del caché');
     return;
   }
   
@@ -41,7 +40,6 @@ export const loadCostMultipliers = async (forceReload = false): Promise<void> =>
     });
     
     cacheTimestamp = now;
-    console.log('Multiplicadores cargados desde API:', multiplierCache);
   } catch (error) {
     console.error('Error loading cost multipliers:', error);
     // Usar valores por defecto si falla la carga
@@ -52,7 +50,6 @@ export const loadCostMultipliers = async (forceReload = false): Promise<void> =>
 // Función para invalidar el caché y forzar recarga
 export const invalidateCostMultipliersCache = (): void => {
   cacheTimestamp = 0;
-  console.log('Cache de multiplicadores invalidado');
 };
 
 // Función para establecer multiplicadores por defecto si falla la carga de la API
@@ -140,7 +137,6 @@ export const calculateComplexityAdjustment = (
     clientEngagementFactor +
     templateFactor;
   
-  console.log("Factores de complejidad:", { 
     analysisTypeFactor, 
     mentionsVolumeFactor, 
     countriesFactor, 
@@ -168,7 +164,6 @@ export const calculateMarkup = (
     ? marginFactor 
     : 1.0;
     
-  console.log(`Aplicando factor de margen: ${factor}x al costo ajustado: ${adjustedBaseCost}`);
   
   // El margen se calcula como un porcentaje extra sobre el costo ajustado
   // Un factor de 1.0x significa no agregar margen (100% del costo)
@@ -177,7 +172,6 @@ export const calculateMarkup = (
   const markupPercentage = factor - 1.0;
   const markup = adjustedBaseCost * markupPercentage;
   
-  console.log(`Margen calculado: ${markup} (${markupPercentage * 100}% del costo ajustado)`);
   
   return markup;
 };
@@ -213,7 +207,6 @@ export const calculateTotalAmount = (
   // Calcular el subtotal incluyendo margen
   const subtotal = operativeCost + markupAmount;
   
-  console.log("Cálculo total:", {
     baseCost,
     complexityAdjustment,
     adjustedBaseCost,

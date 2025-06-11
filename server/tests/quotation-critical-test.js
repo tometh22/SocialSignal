@@ -169,40 +169,13 @@ const projectMetrics = calculateProjectMetrics(mockActiveProject, mockTimeEntrie
 const riskIndicators = calculateRiskIndicators(costSummary, projectMetrics);
 
 // Imprimir resultados
-console.log("=== TEST DE ALERTAS DEL SISTEMA DE COTIZACIÓN (ESCENARIO CRÍTICO) ===");
-console.log("\n1. RESUMEN DE COSTOS:");
-console.log(`- Costo estimado: $${costSummary.estimatedCost.toFixed(2)}`);
-console.log(`- Costo actual: $${costSummary.actualCost.toFixed(2)}`);
-console.log(`- Varianza: $${costSummary.variance.toFixed(2)}`);
-console.log(`- Porcentaje usado: ${costSummary.percentageUsed.toFixed(2)}%`);
 
-console.log("\n2. MÉTRICAS DEL PROYECTO:");
-console.log(`- Días totales: ${projectMetrics.daysTotal}`);
-console.log(`- Días transcurridos: ${projectMetrics.daysElapsed}`);
-console.log(`- Horas planeadas: ${projectMetrics.plannedHours}`);
-console.log(`- Horas actuales: ${projectMetrics.actualHours}`);
-console.log(`- Horas por día: ${projectMetrics.hoursPerDay.toFixed(2)}`);
-console.log(`- Porcentaje de progreso: ${projectMetrics.progressPercentage.toFixed(2)}%`);
 
-console.log("\n3. INDICADORES DE RIESGO:");
-console.log(`- Riesgo de presupuesto: ${riskIndicators.budgetRisk}%`);
-console.log(`- Riesgo de cronograma: ${riskIndicators.scheduleRisk}%`);
-console.log(`- Alertas activas: ${riskIndicators.activeAlerts}`);
 
 // Verificación de resultados esperados en un escenario crítico
-console.log("\n=== VERIFICACIÓN DE RESULTADOS CRÍTICOS ===");
 
-console.log("\nVERIFICANDO SOBRECOSTO:");
-console.log(`Porcentaje de presupuesto usado: ${costSummary.percentageUsed.toFixed(2)}%`);
-console.log(`¿Excede el 100%? ${costSummary.percentageUsed > 100 ? '✓ SÍ' : '✗ NO'}`);
 
-console.log("\nVERIFICANDO RIESGO DE PRESUPUESTO:");
-console.log(`Riesgo calculado: ${riskIndicators.budgetRisk}%`);
-console.log(`¿Es riesgo alto (>=75%)? ${riskIndicators.budgetRisk >= 75 ? '✓ SÍ' : '✗ NO'}`);
 
-console.log("\nVERIFICANDO ALERTAS ACTIVAS:");
-console.log(`Número de alertas activas: ${riskIndicators.activeAlerts}`);
-console.log(`¿Hay al menos una alerta activa? ${riskIndicators.activeAlerts > 0 ? '✓ SÍ' : '✗ NO'}`);
 
 // Verificación de la lógica de generación de detalles de alertas
 const alertDetails = [];
@@ -227,15 +200,8 @@ if (costSummary.percentageUsed > 110) {
   });
 }
 
-console.log("\nDETALLES DE ALERTAS GENERADAS:");
 if (alertDetails.length > 0) {
   alertDetails.forEach((alert, index) => {
-    console.log(`\nAlerta ${index + 1}:`);
-    console.log(`- Tipo: ${alert.type}`);
-    console.log(`- Título: ${alert.title}`);
-    console.log(`- Severidad: ${alert.severity}`);
-    console.log(`- Valor: ${alert.value}`);
   });
 } else {
-  console.log("No se generaron alertas (esto no debería ocurrir en un escenario crítico)");
 }

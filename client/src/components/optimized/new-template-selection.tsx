@@ -256,7 +256,6 @@ export const OptimizedTemplateSelection = () => {
           <Card 
             className={`cursor-pointer transition-all border-dashed mb-4 ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
             onClick={() => {
-              console.log("✅ Seleccionando opción 'Personalizado / Sin Plantilla'");
               
               // Establecer valores por defecto siempre para garantizar estado consistente
               updateAnalysisType('standard');

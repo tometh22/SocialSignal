@@ -143,7 +143,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       webSocketRef.current = ws;
 
       ws.onopen = () => {
-        console.log("Conexión WebSocket establecida");
         setIsConnected(true);
         setIsConnecting(false);
       };
@@ -158,7 +157,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       };
 
       ws.onclose = () => {
-        console.log("Conexión WebSocket cerrada");
         setIsConnected(false);
         setIsConnecting(false);
         // Reconectar después de un tiempo

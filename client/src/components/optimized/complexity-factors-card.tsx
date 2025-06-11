@@ -58,7 +58,6 @@ export function ComplexityFactorsCard({
               value={analysisType || 'standard'} 
               onValueChange={(value) => {
                 updateAnalysisType(value);
-                console.log("Tipo de análisis actualizado:", value);
               }}
               className="grid grid-cols-1 sm:grid-cols-3 gap-2"
             >
@@ -104,7 +103,6 @@ export function ComplexityFactorsCard({
               value={mentionsVolume || 'medium'} 
               onValueChange={(value) => {
                 updateMentionsVolume(value);
-                console.log("Volumen de menciones actualizado:", value);
               }}
               className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2"
             >
@@ -159,7 +157,6 @@ export function ComplexityFactorsCard({
               value={countriesCovered || '1'} 
               onValueChange={(value) => {
                 updateCountriesCovered(value);
-                console.log("Países cubiertos actualizados:", value);
               }}
               className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2"
             >
@@ -213,7 +210,6 @@ export function ComplexityFactorsCard({
               value={clientEngagement || 'medium'} 
               onValueChange={(value) => {
                 updateClientEngagement(value);
-                console.log("Nivel de interacción actualizado:", value);
               }}
               className="grid grid-cols-1 sm:grid-cols-3 gap-2"
             >

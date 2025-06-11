@@ -13,7 +13,6 @@ import { formatCurrency } from "@/lib/utils";
 import { Loader } from "@/components/ui/loader";
 
 export default function ReviewQuote({ onPrevious }: { onPrevious: () => void }) {
-  console.log("Componente ReviewQuote renderizado");
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isSaving, setIsSaving] = useState(false);

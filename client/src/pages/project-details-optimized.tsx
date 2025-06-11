@@ -94,7 +94,6 @@ export default function ProjectDetailsOptimized() {
         });
         if (!isInRange) return false;
       } catch (error) {
-        console.log('Error en filtro de fechas:', error);
         return true; // En caso de error, mostrar la entrada
       }
     }
@@ -132,7 +131,6 @@ export default function ProjectDetailsOptimized() {
   const isNearLimit = costUsagePercentage > 80;
   const isOverLimit = totalCost > subprojectCostLimit;
   
-  console.log('Proyecto:', project?.id, 'Límite:', subprojectCostLimit, 'Gastado:', totalCost, 'Disponible:', remainingCostLimit);
 
   const handleTimeEntrySuccess = () => {
     refetchTimeEntries();

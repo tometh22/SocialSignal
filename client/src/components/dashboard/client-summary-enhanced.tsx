@@ -73,7 +73,6 @@ const ClientSummaryEnhanced: React.FC<ClientSummaryEnhancedProps> = ({ clientId,
     retry: false,
   });
 
-  console.log('Enhanced Debug:', { summaryData, deliverablesData, projectsData, timeEntriesData });
 
   const isLoading = summaryLoading || deliverablesLoading || projectsLoading || timeEntriesLoading;
 

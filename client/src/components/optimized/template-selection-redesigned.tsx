@@ -58,7 +58,6 @@ const TemplateSelectionRedesigned: React.FC = () => {
   // Seleccionar una plantilla
   const handleTemplateSelect = (template: ReportTemplate) => {
     // Asegurarse de que el costo base de la plantilla sea un número válido
-    console.log("Plantilla seleccionada:", template);
     
     // Al seleccionar una plantilla, establecer también su nivel de complejidad
     let templateComplexity: 'low' | 'medium' | 'high' = 'medium';
@@ -99,7 +98,6 @@ const TemplateSelectionRedesigned: React.FC = () => {
 
   // Seleccionar opción personalizada
   const handleCustomSelect = () => {
-    console.log("✅ Seleccionando opción 'Personalizado / Sin Plantilla'");
     
     // Establecer valores por defecto
     updateAnalysisType('standard');

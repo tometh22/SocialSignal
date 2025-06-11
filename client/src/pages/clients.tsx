@@ -85,7 +85,6 @@ export default function Clients() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertClient> }) => {
       try {
-        console.log("Actualizando cliente:", id, data);
         const response = await apiRequest(`/api/clients/${id}`, "PATCH", data);
         return response;
       } catch (error) {
@@ -224,7 +223,6 @@ export default function Clients() {
         logoUrl: logoPreview || values.logoUrl // Usar logoPreview si existe, o mantener la URL actual
       };
       
-      console.log("Datos a actualizar:", dataToUpdate);
       updateMutation.mutate({ id: currentClient.id, data: dataToUpdate });
     } else {
       createMutation.mutate(values);

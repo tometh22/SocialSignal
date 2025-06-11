@@ -235,7 +235,6 @@ export default function EditDeliverable() {
           : null,
       };
       
-      console.log("Datos enviados al servidor:", serverData);
       
       const response = await fetch(`/api/deliverables/${id}`, {
         method: "PATCH",

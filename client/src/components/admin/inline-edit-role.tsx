@@ -57,7 +57,6 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
       return updatedRole as Role;
     },
     onSuccess: (updatedData: Role) => {
-      console.log("✅ ROL ACTUALIZADO:", updatedData);
       
       // SOLUCIÓN DEFINITIVA: Forzar actualización inmediata con múltiples estrategias
       
@@ -162,17 +161,13 @@ export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps
         throw new Error(error.message || "Error al eliminar el rol");
       }
       
-      console.log(`Rol ${role.id} eliminado correctamente`);
       return role.id;
     },
     onSuccess: (deletedId) => {
       // Actualizar la caché directamente aquí para eliminar el rol
       queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
         if (!oldData) return [];
-        console.log("Eliminando rol ID:", deletedId);
-        console.log("Roles antes:", oldData.map(r => r.id));
         const filtered = oldData.filter(item => item.id !== deletedId);
-        console.log("Roles después:", filtered.map(r => r.id));
         return filtered;
       });
       

@@ -76,7 +76,6 @@ const EditIndicatorsForm: React.FC<EditIndicatorsFormProps> = ({
         hours_estimated: formData.hoursEstimated
       };
 
-      console.log('Enviando datos al servidor:', apiData);
 
       // Hacer la solicitud al servidor usando Fetch API
       const response = await fetch(`/api/deliverables/${deliverableId}/indicators`, {

@@ -44,7 +44,6 @@ export default function AuthPage() {
   // Redireccionar si el usuario ya está autenticado
   useEffect(() => {
     if (user) {
-      console.log("Usuario autenticado detectado, redirigiendo...", user);
       setRedirecting(true);
       // Redirección inmediata
       navigate("/");
@@ -79,7 +78,6 @@ export default function AuthPage() {
 
   // Manejar envío del formulario de inicio de sesión
   function onLoginSubmit(data: LoginFormValues) {
-    console.log("Iniciando login con:", data.email);
     // Limpiar errores previos - eliminando esta línea para evitar el parpadeo
     // loginForm.setError("root", { message: "" });
     
@@ -89,7 +87,6 @@ export default function AuthPage() {
     // Usar la mutación del hook de auth
     loginMutation.mutate(data, {
       onSuccess: (user) => {
-        console.log("Login exitoso, actualizando caché y redirigiendo...", user);
         // Actualizar el caché inmediatamente
         queryClient.setQueryData(["/api/current-user"], user);
         // Forzar invalidación para refrescar cualquier consulta dependiente
@@ -114,7 +111,6 @@ export default function AuthPage() {
     const { confirmPassword, ...userData } = data;
     registerMutation.mutate(userData, {
       onSuccess: (user) => {
-        console.log("Registro exitoso, redirigiendo...", user);
         // Actualizar el estado y redirigir
         queryClient.setQueryData(["/api/current-user"], user);
         setRedirecting(true);

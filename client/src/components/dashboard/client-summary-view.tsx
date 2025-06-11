@@ -141,7 +141,6 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   });
 
   // Log para debugging
-  console.log('ClientSummaryView Debug:', {
     clientId,
     summaryLoading,
     deliverablesLoading, 
@@ -245,7 +244,6 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   const isLoading = summaryLoading || deliverablesLoading || projectsLoading;
   const hasErrors = summaryError || deliverablesError || projectsError;
 
-  console.log('Loading state:', { isLoading, hasErrors, clientSummary });
 
   if (isLoading) {
     return (

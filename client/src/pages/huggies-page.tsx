@@ -8,16 +8,13 @@ const HuggiesPage = () => {
   useEffect(() => {
     // 1. Forzar paso 4 en localStorage
     localStorage.setItem('quote_step_30', '4');
-    console.log("HuggiesPage: Establecido paso 4 en localStorage");
     
     // 2. Añadir "force_huggies=true" como indicador para que el contexto lo reconozca
     localStorage.setItem('force_huggies', 'true');
-    console.log("HuggiesPage: Establecido flag force_huggies=true");
     
     // 3. Esperar brevemente para asegurar que los cambios en localStorage se guarden
     const timer = setTimeout(() => {
       // 4. Redirigir a la URL que sí funciona correctamente
-      console.log("HuggiesPage: Redirigiendo...");
       navigate('/optimized-quote?id=30');
     }, 500);
     

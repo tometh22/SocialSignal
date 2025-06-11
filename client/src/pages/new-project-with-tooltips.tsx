@@ -161,7 +161,6 @@ export default function NewProjectWithTooltips() {
   });
 
   const onSubmit = (data: FormData) => {
-    console.log("Datos del formulario:", data);
     createProjectMutation.mutate(data);
   };
 

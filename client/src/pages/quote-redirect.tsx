@@ -14,7 +14,6 @@ const QuoteRedirect: React.FC = () => {
     if (quoteId) {
       // Tratamiento especial para la cotización de Huggies (ID 30)
       if (quoteId === '30') {
-        console.log('Cotización de Huggies detectada. Aplicando tratamiento especial.');
         
         // Forzar el paso 4 (Revisión y Ajustes)
         localStorage.setItem('quote_step_30', '4');
@@ -24,7 +23,6 @@ const QuoteRedirect: React.FC = () => {
           .then(response => response.json())
           .then(data => {
             if (Array.isArray(data) && data.length > 0) {
-              console.log(`Huggies tiene ${data.length} miembros en su equipo.`);
               localStorage.setItem('huggies_team_members', JSON.stringify(data));
             }
           })
@@ -36,7 +34,6 @@ const QuoteRedirect: React.FC = () => {
         }, 1500);
       } else {
         // Redireccionar normal para otras cotizaciones
-        console.log(`Redireccionando a edición de cotización ID: ${quoteId}`);
         
         // Limpiar cualquier estado guardado previamente para asegurar una carga fresca
         localStorage.removeItem(`quote_step_${quoteId}`);

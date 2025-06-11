@@ -63,7 +63,6 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
           throw new Error(`Error al cargar roles: ${rolesResponse.status}`);
         }
         const rolesData = await rolesResponse.json();
-        console.log('Roles cargados:', rolesData.length);
         setRoles(rolesData);
         
         // Cargar personal
@@ -72,7 +71,6 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
           throw new Error(`Error al cargar personal: ${personnelResponse.status}`);
         }
         const personnelData = await personnelResponse.json();
-        console.log('Personal cargado:', personnelData.length);
         setPersonnel(personnelData);
       } catch (err) {
         console.error('Error al cargar datos:', err);
@@ -120,7 +118,6 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       const cost = newMember.hours * newMember.rate;
       
       // Para propósitos de depuración
-      console.log("Preparando miembro para añadir:", {
         roleId: newMember.roleId,
         personnelId: newMember.personnelId,
         hours: newMember.hours,

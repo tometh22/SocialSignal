@@ -113,7 +113,6 @@ const FixedProjectModoMetrics: React.FC<ProjectModoMetricsProps> = ({ deliverabl
         hours_estimated: editableValues.hoursEstimated
       };
       
-      console.log("Enviando datos a la API:", serverData);
       
       // Usar la nueva ruta simplificada para actualizar
       const response = await fetch(`/api/deliverables/${deliverable.id}/indicators`, {

@@ -26,7 +26,6 @@ const ClientSummarySimple: React.FC<ClientSummarySimpleProps> = ({ clientId, cli
     retry: false,
   });
 
-  console.log('Simple Debug:', { summaryData, deliverablesData, summaryLoading, deliverablesLoading });
 
   const isLoading = summaryLoading || deliverablesLoading;
 

@@ -296,7 +296,6 @@ export class DatabaseStorage implements IStorage {
   // **VALIDACIÓN CRÍTICA 3: ELIMINACIÓN SEGURA CON CONSTRAINTS**
   async deleteActiveProject(id: number): Promise<boolean> {
     try {
-      console.log(`Eliminando proyecto ID ${id} de forma segura...`);
       
       // Usar transacción para garantizar integridad
       await db.transaction(async (tx) => {
@@ -321,7 +320,6 @@ export class DatabaseStorage implements IStorage {
         await tx.delete(activeProjects).where(eq(activeProjects.id, id));
       });
       
-      console.log(`Proyecto ${id} eliminado correctamente`);
       return true;
     } catch (error) {
       console.error("Error al eliminar el proyecto activo:", error);
@@ -793,7 +791,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTimeEntriesByProject(projectId: number): Promise<void> {
-    console.log(`Eliminando entradas de tiempo para proyecto ID ${projectId}`);
     await db.delete(timeEntries).where(eq(timeEntries.projectId, projectId));
   }
   
@@ -874,11 +871,9 @@ export class DatabaseStorage implements IStorage {
     try {
       if (projectIds.length === 0) return [];
       
-      console.log(`Obteniendo entregables para los proyectos: ${projectIds.join(", ")}`);
       
       const deliverableList = await db.select().from(deliverables).where(inArray(deliverables.project_id, projectIds));
       
-      console.log(`Encontrados ${deliverableList.length} entregables`);
       return deliverableList;
     } catch (error) {
       console.error("Error al obtener entregables:", error);
@@ -888,7 +883,6 @@ export class DatabaseStorage implements IStorage {
   
   async createDeliverable(deliverable: any): Promise<Deliverable> {
     try {
-      console.log("Datos recibidos para crear entregable:", deliverable);
       
       const dataToInsert = {
         clientId: deliverable.clientId || deliverable.client_id,
@@ -909,7 +903,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date()
       };
       
-      console.log("Datos a insertar:", dataToInsert);
       
       const [newDeliverable] = await db.insert(deliverables).values([dataToInsert]).returning();
       return newDeliverable;
@@ -921,7 +914,6 @@ export class DatabaseStorage implements IStorage {
   
   async updateDeliverable(id: number, data: any): Promise<Deliverable | undefined> {
     try {
-      console.log(`Actualizando entregable ID ${id} con datos:`, data);
       
       const updateData: any = { updatedAt: new Date() };
       
@@ -955,7 +947,6 @@ export class DatabaseStorage implements IStorage {
       if (data.brief_compliance !== undefined) updateData.briefCompliance = data.brief_compliance;
       if (data.notes !== undefined) updateData.notes = data.notes;
       
-      console.log("Datos de actualización preparados:", updateData);
       
       const [updatedDeliverable] = await db
         .update(deliverables)
@@ -964,11 +955,9 @@ export class DatabaseStorage implements IStorage {
         .returning();
       
       if (!updatedDeliverable) {
-        console.log(`No se encontró el entregable con ID ${id}`);
         return undefined;
       }
       
-      console.log(`Entregable ID ${id} actualizado correctamente`);
       return updatedDeliverable;
     } catch (error) {
       console.error(`Error al actualizar entregable ID ${id}:`, error);
@@ -977,7 +966,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDeliverablesByProject(projectId: number): Promise<void> {
-    console.log(`Eliminando entregables para proyecto ID ${projectId}`);
     await db.delete(deliverables).where(eq(deliverables.project_id, projectId));
   }
 
@@ -999,18 +987,15 @@ export class DatabaseStorage implements IStorage {
     latestComment?: ClientModoComment;
   }> {
     try {
-      console.log(`Obteniendo estadísticas para el cliente ID: ${clientId}`);
       
       // Obtener proyectos del cliente
       const clientProjects = await this.getActiveProjectsByClient(clientId);
       const projectIds = clientProjects.map(p => p.id);
       
-      console.log(`Proyectos del cliente: [${projectIds.join(", ")}]`);
       
       // Obtener entregables
       const deliverablesList = await this.getDeliverablesByProjects(projectIds);
       
-      console.log(`Entregables encontrados: ${deliverablesList.length}`);
       
       // Calcular estadísticas
       const totalDeliverables = deliverablesList.length;
@@ -1051,7 +1036,6 @@ export class DatabaseStorage implements IStorage {
         .where(eq(clientModoComments.clientId, clientId))
         .orderBy(desc(clientModoComments.year));
       
-      console.log(`Encontrados ${comments.length} comentarios para el cliente ID: ${clientId}`);
       
       const totalComments = comments.length;
       const latestComment = comments.length > 0 ? comments[0] : undefined;
@@ -1095,7 +1079,6 @@ export class DatabaseStorage implements IStorage {
   
   async createClientModoComment(comment: any): Promise<ClientModoComment> {
     try {
-      console.log("Datos recibidos para crear comentario MODO:", comment);
       
       const dataToInsert = {
         clientId: comment.clientId || comment.client_id,
@@ -1107,7 +1090,6 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date()
       };
       
-      console.log("Datos a insertar:", dataToInsert);
       const [newComment] = await db.insert(clientModoComments).values([dataToInsert]).returning();
       
       return newComment;
@@ -1151,7 +1133,6 @@ export class DatabaseStorage implements IStorage {
   async createNpsSurvey(survey: InsertQuarterlyNpsSurvey): Promise<QuarterlyNpsSurvey> {
     try {
       const [newSurvey] = await db.insert(quarterlyNpsSurveys).values(survey).returning();
-      console.log(`Encuesta NPS creada para cliente ${survey.clientId}`);
       return newSurvey;
     } catch (error) {
       console.error(`Error al crear encuesta NPS:`, error);
