@@ -54,20 +54,44 @@ export default function Sidebar() {
     queryKey: ['/api/active-projects/count'],
     queryFn: async () => {
       try {
+        console.log('Fetching project count...');
         const response = await fetch('/api/active-projects/count');
         if (!response.ok) throw new Error('Error fetching project count');
         const data = await response.json();
+        console.log('Project count response:', data);
         return data;
       } catch (error) {
         console.error('Error fetching project count:', error);
         return { count: 0 };
       }
     },
-    staleTime: 10000, // 10 segundos
-    refetchInterval: 30000, // Actualizar cada 30 segundos
+    staleTime: 5000, // 5 segundos para testing
+    refetchInterval: 10000, // Actualizar cada 10 segundos para testing
+  });
+
+  // Debug query para verificar datos
+  const { data: debugData } = useQuery({
+    queryKey: ['/api/active-projects/debug'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/active-projects/debug');
+        if (!response.ok) return null;
+        const data = await response.json();
+        console.log('Debug data:', data);
+        return data;
+      } catch (error) {
+        console.error('Debug query error:', error);
+        return null;
+      }
+    },
+    staleTime: 5000,
   });
 
   const projectCount = projectCountData.count;
+  
+  // Log para debugging
+  console.log('Sidebar - Project count:', projectCount);
+  console.log('Sidebar - Debug data:', debugData);
   
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {

@@ -977,17 +977,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener conteo de proyectos activos principales
   app.get("/api/active-projects/count", requireAuth, async (req, res) => {
     try {
-      const result = await db.select({
-        count: sql`COUNT(*)`
-      })
-      .from(activeProjects)
-      .where(sql`parent_project_id IS NULL AND status = 'active'`);
+      // Usar consulta SQL directa para mayor control
+      const { rows } = await pool.query(`
+        SELECT COUNT(*) as count 
+        FROM active_projects 
+        WHERE parent_project_id IS NULL 
+        AND status = 'active'
+      `);
 
-      const count = Number(result[0]?.count || 0);
+      const count = parseInt(rows[0]?.count || '0');
+      console.log(`Conteo de proyectos activos: ${count}`);
       res.json({ count });
     } catch (error) {
       console.error("Error fetching active projects count:", error);
       res.status(500).json({ message: "Failed to fetch active projects count", count: 0 });
+    }
+  });
+
+  // Debug endpoint para verificar datos reales
+  app.get("/api/active-projects/debug", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT id, quotation_id, status, parent_project_id, is_always_on_macro, created_at
+        FROM active_projects 
+        ORDER BY id
+      `);
+      
+      console.log('Todos los proyectos en DB:', rows);
+      
+      const activeMainProjects = rows.filter(p => 
+        p.parent_project_id === null && p.status === 'active'
+      );
+      
+      console.log('Proyectos principales activos:', activeMainProjects);
+      
+      res.json({
+        totalProjects: rows.length,
+        allProjects: rows,
+        activeMainProjects: activeMainProjects,
+        activeMainCount: activeMainProjects.length
+      });
+    } catch (error) {
+      console.error("Error in debug endpoint:", error);
+      res.status(500).json({ error: String(error) });
     }
   });
 
