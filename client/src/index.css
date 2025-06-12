@@ -342,6 +342,49 @@ body.sidebar-dark .sidebar * {
   --accent-foreground: 220 15% 95%;
 }
 
+/* Efectos mejorados para la sidebar */
+.sidebar .group:hover {
+  transform-origin: left center;
+}
+
+.sidebar .group:hover .icon-container {
+  animation: iconPulse 0.3s ease-in-out;
+}
+
+@keyframes iconPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1.1); }
+}
+
+/* Efecto de brillo sutil en hover */
+.sidebar .group:hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(180deg, 
+    hsl(var(--sidebar-primary)) 0%, 
+    hsl(var(--sidebar-accent)) 100%);
+  border-radius: 0 2px 2px 0;
+  opacity: 0.8;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Mejorar el espaciado entre elementos */
+.sidebar nav .space-y-2 > * + * {
+  margin-top: 0.125rem;
+}
+
+/* Sombra suave para elementos activos */
+.sidebar [data-active="true"] {
+  box-shadow: 
+    0 2px 8px rgba(var(--sidebar-primary-rgb, 59, 130, 246), 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
 /* Mantener los fondos de tarjetas y contenido principales blancos */
 .card, 
 .glass-card,

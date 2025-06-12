@@ -88,16 +88,16 @@ export default function Sidebar() {
   });
 
   const projectCount = projectCountData.count;
-  
+
   // Log para debugging
   console.log('Sidebar - Project count:', projectCount);
   console.log('Sidebar - Debug data:', debugData);
-  
+
   // Toggle para secciones expandibles
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
-  
+
   // Función para obtener las iniciales del usuario
   const getUserInitials = () => {
     if (!user) return "US";
@@ -130,27 +130,29 @@ export default function Sidebar() {
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const isActive = currentPath === item.href;
-    
+
     return (
       <Link
         key={item.href}
         href={item.href}
         className={cn(
-          "flex items-center px-3 py-3 rounded-lg text-sm transition-all duration-200 relative group",
+          "group flex items-center px-3 py-2.5 my-1 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out relative overflow-hidden",
           isActive
-            ? "bg-blue-50 text-blue-700 font-medium shadow-sm border border-blue-200"
-            : "text-gray-700 hover:text-gray-900 hover:bg-gray-100 border border-transparent",
-          isCollapsed && "justify-center py-3"
+            ? "bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary shadow-[inset_0_0_0_1px_rgba(var(--sidebar-primary)/0.3),_0_2px_8px_rgba(var(--sidebar-primary)/0.15)] before:absolute before:inset-0 before:bg-gradient-to-r before:from-sidebar-primary/5 before:to-transparent"
+            : "text-sidebar-foreground/80 hover:bg-gradient-to-r hover:from-sidebar-accent/8 hover:to-sidebar-primary/5 hover:text-sidebar-foreground hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:scale-[1.02] hover:translate-x-1",
+          item.highlight && !isActive && "bg-gradient-to-r from-sidebar-accent/8 to-sidebar-accent/5 border border-sidebar-accent/20 shadow-sm",
+          isCollapsed && "justify-center px-2"
         )}
       >
         <div className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-md transition-colors",
-          isActive ? "bg-blue-100" : "bg-gray-100 group-hover:bg-gray-200",
-          isCollapsed ? "mr-0" : "mr-3"
-        )}>
+                "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ease-in-out relative",
+                isActive 
+                  ? "bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 text-white shadow-[0_4px_12px_rgba(var(--sidebar-primary)/0.4),_inset_0_1px_0_rgba(255,255,255,0.2)]" 
+                  : "bg-sidebar-border/20 text-sidebar-foreground/70 group-hover:text-sidebar-foreground group-hover:bg-gradient-to-br group-hover:from-sidebar-accent/20 group-hover:to-sidebar-primary/15 group-hover:shadow-[0_2px_8px_rgba(var(--sidebar-accent)/0.3)] group-hover:scale-110"
+              )}>
           <Icon className="h-4 w-4" />
         </div>
-        
+
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
@@ -173,7 +175,7 @@ export default function Sidebar() {
             )}
           </div>
         )}
-        
+
         {isCollapsed && item.status === 'new' && (
           <span className="absolute right-0.5 top-0.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
         )}
@@ -188,7 +190,7 @@ export default function Sidebar() {
         <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
            onClick={() => setIsOpen(false)} />
       )}
-    
+
       {/* Barra lateral modernizada */}
       <motion.div
         className={cn(
@@ -223,7 +225,7 @@ export default function Sidebar() {
                 </div>
               )}
             </Link>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -259,12 +261,12 @@ export default function Sidebar() {
                 {navCategories.principal.map((item) => renderNavLink(item))}
               </nav>
             </div>
-            
+
             {/* Operaciones */}
             <div className="px-3">
               <div 
                 className={cn(
-                  "flex items-center justify-between mb-2 px-2 group cursor-pointer",
+                  "flex items-center justify-between mb-2 px-2 py-1 group cursor-pointer rounded-md transition-all duration-200 hover:bg-sidebar-border/10",
                   isCollapsed && "justify-center"
                 )}
                 onClick={() => !isCollapsed && toggleSection('operaciones')}
@@ -291,16 +293,16 @@ export default function Sidebar() {
                 {navCategories.operaciones.map((item) => renderNavLink(item))}
               </nav>
             </div>
-            
+
             {/* Clientes */}
             <div className="px-3">
               <div 
-                className={cn(
-                  "flex items-center justify-between mb-2 px-2 group cursor-pointer",
-                  isCollapsed && "justify-center"
-                )}
-                onClick={() => !isCollapsed && toggleSection('clientes')}
-              >
+                    className={cn(
+                      "flex items-center justify-between mb-2 px-2 py-1 group cursor-pointer rounded-md transition-all duration-200 hover:bg-sidebar-border/10",
+                      isCollapsed && "justify-center"
+                    )}
+                    onClick={() => !isCollapsed && toggleSection('clientes')}
+                  >
                 <h3 className={cn(
                   "text-xs font-semibold text-sidebar-foreground/70 tracking-wider",
                   isCollapsed ? "sr-only" : "uppercase"
@@ -344,7 +346,7 @@ export default function Sidebar() {
                 {navCategories.automatizacion.map((item) => renderNavLink(item))}
               </nav>
             </div>
-            
+
             {/* Sistema */}
             <div className="px-3">
               <div className={cn(
@@ -365,7 +367,7 @@ export default function Sidebar() {
                 {navCategories.sistema.map((item) => renderNavLink(item))}
               </nav>
             </div>
-            
+
             {/* Actividad Reciente - Solo visible cuando no está colapsado */}
             {!isCollapsed && (
               <div className="mt-auto px-3">
@@ -432,8 +434,7 @@ export default function Sidebar() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="ml-auto h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-border/20 rounded-full"
-                          onClick={() => logoutMutation.mutate()}
+                          className="ml-auto h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-gradient-to-br hover:from-red-500/10 hover:to-red-600/5 hover:shadow-md rounded-full transition-all duration-200 hover:scale-110"
                         >
                           <LogOut className="h-4 w-4" />
                         </Button>
