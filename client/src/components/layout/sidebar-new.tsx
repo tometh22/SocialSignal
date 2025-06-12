@@ -40,6 +40,7 @@ type NavItem = {
   badge?: string;
   status?: 'new';
   description?: string;
+  highlight?: boolean;
 };
 
 export default function Sidebar() {
@@ -139,8 +140,7 @@ export default function Sidebar() {
           "group flex items-center px-3 py-2.5 my-1 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out relative overflow-hidden",
           isActive
             ? "bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary shadow-[inset_0_0_0_1px_rgba(var(--sidebar-primary)/0.3),_0_2px_8px_rgba(var(--sidebar-primary)/0.15)] before:absolute before:inset-0 before:bg-gradient-to-r before:from-sidebar-primary/5 before:to-transparent"
-            : "text-sidebar-foreground/80 hover:bg-gradient-to-r hover:from-sidebar-accent/8 hover:to-sidebar-primary/5 hover:text-sidebar-foreground hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:scale-[1.02] hover:translate-x-1",
-          item.highlight && !isActive && "bg-gradient-to-r from-sidebar-accent/8 to-sidebar-accent/5 border border-sidebar-accent/20 shadow-sm",
+            : "text-sidebar-foreground/80 hover:bg-gradient-to-r hover:from-purple-500/90 hover:to-purple-600/90 hover:text-white hover:shadow-[0_2px_8px_rgba(147,51,234,0.25)] hover:scale-[1.02] hover:translate-x-1",
           isCollapsed && "justify-center px-2"
         )}
       >
@@ -148,7 +148,7 @@ export default function Sidebar() {
                 "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ease-in-out relative",
                 isActive 
                   ? "bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 text-white shadow-[0_4px_12px_rgba(var(--sidebar-primary)/0.4),_inset_0_1px_0_rgba(255,255,255,0.2)]" 
-                  : "bg-sidebar-border/20 text-sidebar-foreground/70 group-hover:text-sidebar-foreground group-hover:bg-gradient-to-br group-hover:from-sidebar-accent/20 group-hover:to-sidebar-primary/15 group-hover:shadow-[0_2px_8px_rgba(var(--sidebar-accent)/0.3)] group-hover:scale-110"
+                  : "bg-sidebar-border/20 text-sidebar-foreground/70 group-hover:text-white group-hover:bg-gradient-to-br group-hover:from-purple-400/30 group-hover:to-purple-500/30 group-hover:shadow-[0_2px_8px_rgba(147,51,234,0.3)] group-hover:scale-110"
               )}>
           <Icon className="h-4 w-4" />
         </div>
