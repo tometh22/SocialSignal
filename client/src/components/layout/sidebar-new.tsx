@@ -156,7 +156,6 @@ export default function Sidebar() {
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <span className="truncate font-medium">{item.title}</span>
               <div className="flex items-center gap-2">
                 {item.badge && (
                   <Badge variant="secondary" className="text-xs">
@@ -171,7 +170,10 @@ export default function Sidebar() {
               </div>
             </div>
             {item.description && (
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>
+              <p className={cn(
+                "text-xs mt-0.5 truncate transition-colors duration-200",
+                isActive ? "text-blue-600/70" : "text-gray-500 group-hover:text-gray-600"
+              )}>{item.description}</p>
             )}
           </div>
         )}
