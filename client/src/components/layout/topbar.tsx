@@ -115,17 +115,47 @@ export default function Topbar() {
     // Mapear los segmentos de ruta a nombres legibles
     const routeLabels: Record<string, string> = {
       'optimized-quote': 'Nueva Cotización',
-      'manage-quotes': 'Gestionar Cotizaciones',
+      'manage-quotes': 'Gestión de Cotizaciones',
+      'quotations': 'Cotizaciones',
+      'quote': 'Cotización',
+      'quotation': 'Cotización',
       'active-projects': 'Proyectos Activos',
+      'project-details': 'Detalles del Proyecto',
       'clients': 'Clientes',
-      'statistics': 'Estadísticas',
-      'admin': 'Administración',
+      'statistics': 'Análisis',
+      'admin': 'Configuración',
       'project-summary': 'Resumen de Proyecto',
+      'project-analytics': 'Analytics del Proyecto',
       'client-summary': 'Resumen de Cliente',
       'time-entries': 'Registro de Horas',
+      'quality-scores': 'Puntuaciones de Calidad',
+      'quarterly-nps': 'Encuesta NPS Trimestral',
+      'edit-deliverable': 'Editar Entregable',
+      'edit-indicators': 'Editar Indicadores',
+      'edit-always-on': 'Editar Always-On',
+      'always-on-demo': 'Demo Always-On',
+      'always-on-project': 'Proyecto Always-On',
+      'recurring-templates': 'Always-On',
+      'projects': 'Proyectos',
+      'temp-helpers': 'Herramientas Temporales',
+      'apply-warner-team': 'Aplicar Equipo Warner',
+      'new': 'Nuevo',
+      'history': 'Historial'
     };
+
+    // Casos especiales para páginas principales que no necesitan "Dashboard" como padre
+    const standalonePages = [
+      'quotations', 'manage-quotes', 'optimized-quote', 'active-projects', 
+      'clients', 'statistics', 'admin', 'recurring-templates'
+    ];
     
-    // Generar las migas de pan
+    // Si es una página principal, no incluir Dashboard en el breadcrumb
+    if (paths.length === 1 && standalonePages.includes(paths[0])) {
+      const name = routeLabels[paths[0]] || paths[0].charAt(0).toUpperCase() + paths[0].slice(1);
+      return [{ name, path: location }];
+    }
+    
+    // Generar las migas de pan normales para rutas complejas
     const breadcrumbs = [{ name: 'Dashboard', path: '/' }];
     let currentPath = '';
     
