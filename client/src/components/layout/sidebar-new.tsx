@@ -155,8 +155,13 @@ export default function Sidebar() {
 
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2"></div>
+            <div className="flex items-center justify-between mb-1">
+              <span className={cn(
+                "truncate font-medium transition-colors duration-200",
+                isActive ? "text-blue-600" : "text-gray-900 group-hover:text-white"
+              )}>
+                {item.title}
+              </span>
               <div className="flex items-center gap-2">
                 {item.badge && (
                   <Badge variant="secondary" className="text-xs">
@@ -170,15 +175,13 @@ export default function Sidebar() {
                 )}
               </div>
             </div>
-            <span className={cn(
-              "truncate font-medium transition-colors duration-200",
-              isActive ? "text-blue-600" : "text-gray-900 group-hover:text-white"
-            )}>{item.title}</span>
             {item.description && (
               <p className={cn(
-                "text-xs mt-0.5 truncate transition-colors duration-200",
+                "text-xs truncate transition-colors duration-200",
                 isActive ? "text-blue-600/70" : "text-gray-500 group-hover:text-white/90"
-              )}>{item.description}</p>
+              )}>
+                {item.description}
+              </p>
             )}
           </div>
         )}
