@@ -183,16 +183,16 @@ export default function Topbar() {
       <div className="topbar h-12 px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm">
         {/* Breadcrumbs minimalistas */}
         <div className="flex items-center">
-          <div className="flex items-center text-sm text-muted-foreground">
+          <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
             {breadcrumbs.map((crumb, i) => (
               <div key={i} className="flex items-center">
-                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-muted-foreground/60" />}
+                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-slate-400 dark:text-slate-500" />}
                 {i < breadcrumbs.length - 1 ? (
-                  <Link href={crumb.path} className="hover:text-foreground transition-colors font-medium">
+                  <Link href={crumb.path} className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors font-medium text-slate-600 dark:text-slate-300">
                     {crumb.name}
                   </Link>
                 ) : (
-                  <span className="font-semibold text-foreground">{crumb.name}</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{crumb.name}</span>
                 )}
               </div>
             ))}
@@ -205,7 +205,7 @@ export default function Topbar() {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="h-8 w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800"
             onClick={() => setIsSearchOpen(true)}
           >
             <Search className="h-4 w-4" />
@@ -217,10 +217,10 @@ export default function Topbar() {
           {/* Notificaciones */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground hover:text-foreground hover:bg-accent">
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-slate-100 dark:hover:bg-slate-800">
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-destructive rounded-full" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-500 rounded-full" />
                 )}
               </Button>
             </DropdownMenuTrigger>
@@ -309,9 +309,9 @@ export default function Topbar() {
           {/* Menu de usuario */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-accent">
+              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-slate-100 dark:hover:bg-slate-800">
                 {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-600 dark:text-slate-300" />
                 ) : (
                   <>
                     <Avatar className="h-6 w-6">
@@ -320,7 +320,7 @@ export default function Topbar() {
                       </AvatarFallback>
                       {user?.avatar && <AvatarImage src={user.avatar} />}
                     </Avatar>
-                    <span className="text-sm font-medium text-foreground">
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {user ? user.firstName : 'Usuario'}
                     </span>
                   </>
