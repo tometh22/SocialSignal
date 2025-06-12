@@ -150,19 +150,19 @@ export default function Topbar() {
 
   return (
     <>
-      <div className="topbar h-12 px-4 border-b border-slate-200/60 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm">
+      <div className="topbar h-12 px-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm">
         {/* Breadcrumbs minimalistas */}
         <div className="flex items-center">
-          <div className="flex items-center text-sm text-slate-600">
+          <div className="flex items-center text-sm text-muted-foreground">
             {breadcrumbs.map((crumb, i) => (
               <div key={i} className="flex items-center">
-                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-slate-400" />}
+                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-muted-foreground/60" />}
                 {i < breadcrumbs.length - 1 ? (
-                  <Link href={crumb.path} className="hover:text-slate-900 transition-colors font-medium">
+                  <Link href={crumb.path} className="hover:text-foreground transition-colors font-medium">
                     {crumb.name}
                   </Link>
                 ) : (
-                  <span className="font-semibold text-slate-900">{crumb.name}</span>
+                  <span className="font-semibold text-foreground">{crumb.name}</span>
                 )}
               </div>
             ))}
@@ -175,7 +175,7 @@ export default function Topbar() {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
             onClick={() => setIsSearchOpen(true)}
           >
             <Search className="h-4 w-4" />
@@ -187,10 +187,10 @@ export default function Topbar() {
           {/* Notificaciones */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground hover:text-foreground hover:bg-accent">
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-500 rounded-full" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-destructive rounded-full" />
                 )}
               </Button>
             </DropdownMenuTrigger>
