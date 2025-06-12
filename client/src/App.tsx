@@ -106,7 +106,7 @@ function AppRoutes() {
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
-                  <ProtectedRoute path="/recurring-templates" component={TestAlwaysOn} />
+                  <ProtectedRoute path="/recurring-templates" component={AlwaysOnLanding} />
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
