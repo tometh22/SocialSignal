@@ -274,23 +274,23 @@ export default function Topbar() {
           </DropdownMenu>
           
           {/* Separador vertical */}
-          <div className="h-4 w-px bg-slate-200 mx-2"></div>
+          <div className="h-4 w-px bg-border mx-2"></div>
           
           {/* Menu de usuario */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-slate-100 rounded-lg">
+              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-accent">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
                     <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-medium">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
                         {getUserInitials()}
                       </AvatarFallback>
                       {user?.avatar && <AvatarImage src={user.avatar} />}
                     </Avatar>
-                    <span className="text-sm font-medium text-slate-900">
+                    <span className="text-sm font-medium text-foreground">
                       {user ? user.firstName : 'Usuario'}
                     </span>
                   </>
