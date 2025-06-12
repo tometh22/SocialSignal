@@ -152,17 +152,14 @@ export default function SidebarFixed() {
         "flex flex-col h-screen bg-gradient-to-b from-slate-50 to-white border-r border-slate-200/60 transition-all duration-300 shadow-xl",
         isCollapsed ? "w-16" : "w-64"
       )}>
-        {/* Header ultra compacto */}
-        <div className="flex items-center justify-between p-3 border-b border-slate-200/50">
+        {/* Header minimalista */}
+        <div className="flex items-center justify-between p-2.5 border-b border-slate-200/50">
           {!isCollapsed && (
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-sm">
                 <span className="text-white text-sm font-bold">M</span>
               </div>
-              <div>
-                <h1 className="text-sm font-bold text-slate-900">Mind</h1>
-                <p className="text-xs text-slate-500">Epical Digital</p>
-              </div>
+              <h1 className="text-base font-bold text-slate-900">Mind</h1>
             </div>
           )}
           
@@ -170,9 +167,9 @@ export default function SidebarFixed() {
             variant="ghost"
             size="sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="h-7 w-7 p-0 hover:bg-slate-100"
+            className="h-6 w-6 p-0 hover:bg-slate-100"
           >
-            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform text-slate-500", isCollapsed ? "" : "rotate-180")} />
+            <ChevronRight className={cn("h-3 w-3 transition-transform text-slate-500", isCollapsed ? "" : "rotate-180")} />
           </Button>
         </div>
 
@@ -183,20 +180,10 @@ export default function SidebarFixed() {
           </nav>
         </div>
 
-        {/* Status bar compacto */}
-        {!isCollapsed && (
-          <div className="px-3 py-2 border-t border-slate-200/50">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <div className="h-2 w-2 rounded-full bg-green-500"></div>
-              <span>Sistema operativo</span>
-            </div>
-          </div>
-        )}
-
-        {/* Footer ultra compacto */}
+        {/* Footer minimalista */}
         <div className="border-t border-slate-200/50 p-2">
           <div className="flex items-center gap-2">
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-6 w-6">
               <AvatarImage src={user?.avatar || ""} />
               <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-semibold">
                 {getUserInitials()}
@@ -208,7 +195,10 @@ export default function SidebarFixed() {
                 <p className="text-xs font-medium text-slate-900 truncate">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="text-xs text-slate-500 truncate">Admin</p>
+                <div className="flex items-center gap-1">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                  <span className="text-xs text-slate-500">Online</span>
+                </div>
               </div>
             )}
             
@@ -218,9 +208,9 @@ export default function SidebarFixed() {
                   variant="ghost"
                   size="sm"
                   onClick={() => logoutMutation.mutate()}
-                  className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600"
+                  className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-600"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
