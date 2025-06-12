@@ -326,14 +326,20 @@ body.sidebar-dark .sidebar {
 }
 
 /* Estilos para textos y elementos en las barras oscuras */
-body.sidebar-dark .topbar .text-muted-foreground,
-body.sidebar-dark .sidebar .text-muted-foreground {
-  color: rgba(255, 255, 255, 0.7);
+body.sidebar-dark .topbar,
+body.sidebar-dark .topbar * {
+  --foreground: 220 15% 95%;
+  --muted-foreground: 220 15% 75%;
+  --accent: 260 25% 20%;
+  --accent-foreground: 220 15% 95%;
 }
 
-body.sidebar-dark .topbar button[variant="ghost"]:hover,
-body.sidebar-dark .sidebar button[variant="ghost"]:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+body.sidebar-dark .sidebar,
+body.sidebar-dark .sidebar * {
+  --foreground: 220 15% 95%;
+  --muted-foreground: 220 15% 75%;
+  --accent: 260 25% 20%;
+  --accent-foreground: 220 15% 95%;
 }
 
 /* Mantener los fondos de tarjetas y contenido principales blancos */
