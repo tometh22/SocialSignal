@@ -106,7 +106,7 @@ export default function AlwaysOnLanding() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <FileText className="h-5 w-5 text-blue-600" />
+                <FileText className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium text-sm">Plantillas Recurrentes</p>
                   <p className="text-xs text-muted-foreground">Automatiza la creación de entregables periódicos</p>
@@ -114,7 +114,7 @@ export default function AlwaysOnLanding() {
               </div>
               
               <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Clock className="h-5 w-5 text-green-600" />
+                <Clock className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium text-sm">Programación Automática</p>
                   <p className="text-xs text-muted-foreground">Configura frecuencias y fechas de entrega</p>
@@ -122,7 +122,7 @@ export default function AlwaysOnLanding() {
               </div>
               
               <div className="flex items-center gap-3 p-3 border rounded-lg">
-                <Target className="h-5 w-5 text-purple-600" />
+                <Target className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium text-sm">Gestión de Recursos</p>
                   <p className="text-xs text-muted-foreground">Asigna equipos y presupuestos automáticamente</p>
@@ -138,8 +138,8 @@ export default function AlwaysOnLanding() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{projects.length}</p>
@@ -152,8 +152,8 @@ export default function AlwaysOnLanding() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-green-600" />
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Zap className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">0</p>
@@ -166,8 +166,8 @@ export default function AlwaysOnLanding() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-purple-600" />
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">0</p>
