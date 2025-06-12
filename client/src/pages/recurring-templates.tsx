@@ -97,6 +97,7 @@ export default function RecurringTemplatesPage() {
   const [activeTab, setActiveTab] = useState("templates");
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<{[key: number]: {hours: number, required: boolean}}>({});
   const [showTeamSection, setShowTeamSection] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<number | null>(projectId ? parseInt(projectId) : null);
   const [formData, setFormData] = useState({
     templateName: '',
     deliverableType: '',
@@ -107,17 +108,25 @@ export default function RecurringTemplatesPage() {
     autoCreateDaysInAdvance: '7'
   });
 
+  // Query for all projects when no specific project is selected
+  const { data: projects = [] } = useQuery({
+    queryKey: ['/api/active-projects'],
+    enabled: !projectId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1
+  });
+
   // Queries with proper error handling and faster loading
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['/api/projects', projectId, 'recurring-templates'],
-    enabled: !!projectId,
+    queryKey: ['/api/projects', selectedProject || projectId, 'recurring-templates'],
+    enabled: !!(selectedProject || projectId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1
   });
 
   const { data: cycles = [], isLoading: cyclesLoading } = useQuery({
-    queryKey: ['/api/projects', projectId, 'project-cycles'],
-    enabled: !!projectId,
+    queryKey: ['/api/projects', selectedProject || projectId, 'project-cycles'],
+    enabled: !!(selectedProject || projectId),
     staleTime: 5 * 60 * 1000,
     retry: 1
   });
@@ -130,12 +139,18 @@ export default function RecurringTemplatesPage() {
 
   // Mutations
   const createTemplateMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/recurring-templates', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/recurring-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to create template');
+      return response.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'recurring-templates'] });
+      const currentProjectId = selectedProject || projectId;
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProjectId, 'recurring-templates'] });
       toast({ title: "Plantilla creada exitosamente" });
     },
     onError: () => {
@@ -144,11 +159,16 @@ export default function RecurringTemplatesPage() {
   });
 
   const deleteTemplateMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/recurring-templates/${id}`, {
-      method: 'DELETE'
-    }),
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/recurring-templates/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete template');
+      return response.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'recurring-templates'] });
+      const currentProjectId = selectedProject || projectId;
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProjectId, 'recurring-templates'] });
       toast({ title: "Plantilla eliminada" });
     }
   });
@@ -235,23 +255,74 @@ export default function RecurringTemplatesPage() {
     }));
   };
 
+  // Show project selector if no specific project is selected
+  if (!projectId && !selectedProject) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => setLocation("/")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver al Dashboard
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Plantillas Always-On</h1>
+              <p className="text-muted-foreground">Gestiona automación y recurrencia para proyectos</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border rounded-lg p-6">
+          <div className="max-w-md">
+            <h3 className="text-lg font-medium mb-4">Seleccionar Proyecto</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Selecciona un proyecto activo para configurar plantillas recurrentes
+            </p>
+            <Select 
+              value={selectedProject?.toString() || ""} 
+              onValueChange={(value) => setSelectedProject(parseInt(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar proyecto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project: any) => (
+                  <SelectItem key={project.id} value={project.id.toString()}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => setLocation(`/active-projects/${projectId}`)}>
+          <Button variant="ghost" onClick={() => projectId ? setLocation(`/active-projects/${projectId}`) : setLocation("/")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver al Proyecto
+            {projectId ? "Volver al Proyecto" : "Volver al Dashboard"}
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Automatización del Proyecto</h1>
-            <p className="text-muted-foreground">Configurar recurrencia y automatización para este proyecto específico</p>
+            <h1 className="text-3xl font-bold">
+              {projectId ? "Automatización del Proyecto" : "Plantillas Always-On"}
+            </h1>
+            <p className="text-muted-foreground">
+              {projectId 
+                ? "Configurar recurrencia y automatización para este proyecto específico"
+                : "Gestiona plantillas de automatización para proyectos recurrentes"
+              }
+            </p>
           </div>
         </div>
 
         <div className="flex gap-2">
-          {!showWizard && (
+          {!showWizard && (selectedProject || projectId) && (
             <Button onClick={() => setShowWizard(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nueva Configuración Recurrente

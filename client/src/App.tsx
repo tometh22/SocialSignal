@@ -34,6 +34,7 @@ import EditAlwaysOnProject from "@/pages/edit-always-on-project";
 import AlwaysOnDeliverablesDemo from "@/pages/always-on-deliverables-demo";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import RecurringTemplatesPage from "@/pages/recurring-templates";
+import AlwaysOnLanding from "@/pages/always-on-landing";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -139,7 +140,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
-                  <ProtectedRoute path="/recurring-templates" component={RecurringTemplatesPage} />
+                  <ProtectedRoute path="/recurring-templates" component={AlwaysOnLanding} />
                   <ProtectedRoute path="/projects/:projectId/recurring-templates" component={RecurringTemplatesPage} />
                   <Route component={NotFound} />
                 </Switch>
