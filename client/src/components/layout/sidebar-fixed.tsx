@@ -4,9 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
-import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
 
 import {
@@ -44,9 +42,7 @@ type NavItem = {
 export default function SidebarFixed() {
   const { user, logoutMutation } = useAuth();
   const [currentPath] = useLocation();
-  const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [projectCount, setProjectCount] = useState(0);
 
   // Función para obtener el conteo real
@@ -69,11 +65,6 @@ export default function SidebarFixed() {
     const interval = setInterval(fetchProjectCount, 2000);
     return () => clearInterval(interval);
   }, []);
-
-  // Toggle para secciones expandibles
-  const toggleSection = (section: string) => {
-    setExpandedSection(expandedSection === section ? null : section);
-  };
   
   // Función para obtener las iniciales del usuario
   const getUserInitials = () => {
@@ -81,95 +72,96 @@ export default function SidebarFixed() {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  // Categorías de navegación
-  const navCategories = {
-    principal: [
-      { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Vista general del negocio" },
-    ],
-    operaciones: [
-      { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear propuesta comercial" },
-      { href: "/manage-quotes", title: "Gestionar Cotizaciones", icon: FileText, description: "Revisar propuestas" },
-      { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso" },
-    ],
-    clientes: [
-      { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" },
-      { href: "/statistics", title: "Análisis", icon: BarChart3, description: "Métricas y reportes" },
-    ],
-    automatizacion: [
-      { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const, description: "Servicios recurrentes" },
-    ],
-    sistema: [
-      { href: "/admin", title: "Configuración", icon: Settings, description: "Panel administrativo" },
-    ],
-  };
+  // Navegación compacta sin secciones expandibles
+  const navItems = [
+    { href: "/", title: "Dashboard", icon: LayoutDashboard },
+    { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const },
+    { href: "/manage-quotes", title: "Cotizaciones", icon: FileText },
+    { href: "/active-projects", title: "Proyectos", icon: Briefcase, badge: projectCount.toString() },
+    { href: "/clients", title: "Clientes", icon: Building2 },
+    { href: "/statistics", title: "Análisis", icon: BarChart3 },
+    { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const },
+    { href: "/admin", title: "Configuración", icon: Settings },
+  ];
 
-  // Renderizar enlace de navegación
+  // Renderizar enlace de navegación compacto
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const isActive = currentPath === item.href;
     
     return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className={cn(
-          "flex items-center px-3 py-3 rounded-lg text-sm transition-all duration-200 relative group",
-          isActive
-            ? "bg-blue-50 text-blue-700 font-medium shadow-sm border border-blue-200"
-            : "text-gray-700 hover:text-gray-900 hover:bg-gray-100 border border-transparent",
-          isCollapsed && "justify-center py-3"
-        )}
-      >
-        <div className="flex items-center flex-1 min-w-0">
-          <Icon className={cn("h-5 w-5 flex-shrink-0", isCollapsed ? "mx-auto" : "mr-3")} />
-          
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="truncate font-medium">{item.title}</span>
-                <div className="flex items-center gap-1 ml-2">
-                  {item.badge && (
-                    <Badge 
-                      variant="secondary" 
-                      className="h-5 px-1.5 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
-                  {item.status === 'new' && (
-                    <Badge 
-                      variant="default" 
-                      className="h-5 px-1.5 text-xs bg-green-500 text-white"
-                    >
-                      Nuevo
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {item.description && (
-                <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>
+      <TooltipProvider key={item.href}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              href={item.href}
+              className={cn(
+                "flex items-center px-3 py-2.5 rounded-xl text-sm transition-all duration-200 relative group",
+                isActive
+                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-transparent",
+                isCollapsed && "justify-center px-2"
               )}
-            </div>
+            >
+              <div className="flex items-center flex-1 min-w-0">
+                <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed ? "mx-auto" : "mr-3")} />
+                
+                {!isCollapsed && (
+                  <div className="flex items-center justify-between flex-1">
+                    <span className="truncate font-medium">{item.title}</span>
+                    <div className="flex items-center gap-1.5 ml-2">
+                      {item.badge && (
+                        <Badge 
+                          variant="secondary" 
+                          className={cn(
+                            "h-4 px-1.5 text-xs font-medium",
+                            isActive 
+                              ? "bg-white/20 text-white border-white/30" 
+                              : "bg-blue-100 text-blue-700"
+                          )}
+                        >
+                          {item.badge}
+                        </Badge>
+                      )}
+                      {item.status === 'new' && (
+                        <div className={cn(
+                          "h-2 w-2 rounded-full",
+                          isActive ? "bg-white" : "bg-green-500"
+                        )} />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Link>
+          </TooltipTrigger>
+          {isCollapsed && (
+            <TooltipContent side="right" className="font-medium">
+              {item.title}
+              {item.badge && ` (${item.badge})`}
+            </TooltipContent>
           )}
-        </div>
-      </Link>
+        </Tooltip>
+      </TooltipProvider>
     );
   };
 
   return (
     <TooltipProvider>
       <div className={cn(
-        "flex flex-col h-screen bg-white border-r border-gray-200 transition-all duration-300",
-        isCollapsed ? "w-16" : "w-72"
+        "flex flex-col h-screen bg-gradient-to-b from-slate-50 to-white border-r border-slate-200/60 transition-all duration-300 shadow-xl",
+        isCollapsed ? "w-16" : "w-64"
       )}>
-        {/* Header con logo y controles */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        {/* Header ultra compacto */}
+        <div className="flex items-center justify-between p-3 border-b border-slate-200/50">
           {!isCollapsed && (
-            <div className="flex items-center gap-3">
-              <Logo className="h-8 w-8" />
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">M</span>
+              </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">Mind</h1>
-                <p className="text-xs text-gray-500">Epical Digital</p>
+                <h1 className="text-sm font-bold text-slate-900">Mind</h1>
+                <p className="text-xs text-slate-500">Epical Digital</p>
               </div>
             </div>
           )}
@@ -178,102 +170,63 @@ export default function SidebarFixed() {
             variant="ghost"
             size="sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0 hover:bg-slate-100"
           >
-            <ChevronRight className={cn("h-4 w-4 transition-transform", isCollapsed ? "" : "rotate-180")} />
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform text-slate-500", isCollapsed ? "" : "rotate-180")} />
           </Button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex flex-col flex-grow overflow-y-auto px-3 py-5 space-y-6">
-          {/* Principal */}
-          <div>
-            <div className={cn("flex items-center mb-2 px-2", isCollapsed && "justify-center")}>
-              <h3 className={cn("text-xs font-semibold text-gray-500 tracking-wider", isCollapsed ? "sr-only" : "uppercase")}>
-                Principal
-              </h3>
-            </div>
-            <nav className="space-y-2">
-              {navCategories.principal.map((item) => renderNavLink(item))}
-            </nav>
-          </div>
-          
-          {/* Operaciones */}
-          <div>
-            <div className={cn("flex items-center mb-2 px-2", isCollapsed && "justify-center")}>
-              <h3 className={cn("text-xs font-semibold text-gray-500 tracking-wider", isCollapsed ? "sr-only" : "uppercase")}>
-                Flujo de Trabajo
-              </h3>
-            </div>
-            <nav className="space-y-2">
-              {navCategories.operaciones.map((item) => renderNavLink(item))}
-            </nav>
-          </div>
-          
-          {/* Clientes */}
-          <div>
-            <div className={cn("flex items-center mb-2 px-2", isCollapsed && "justify-center")}>
-              <h3 className={cn("text-xs font-semibold text-gray-500 tracking-wider", isCollapsed ? "sr-only" : "uppercase")}>
-                Clientes
-              </h3>
-            </div>
-            <nav className="space-y-2">
-              {navCategories.clientes.map((item) => renderNavLink(item))}
-            </nav>
-          </div>
-          
-          {/* Automatización */}
-          <div>
-            <div className={cn("flex items-center mb-2 px-2", isCollapsed && "justify-center")}>
-              <h3 className={cn("text-xs font-semibold text-gray-500 tracking-wider", isCollapsed ? "sr-only" : "uppercase")}>
-                Automatización
-              </h3>
-            </div>
-            <nav className="space-y-2">
-              {navCategories.automatizacion.map((item) => renderNavLink(item))}
-            </nav>
-          </div>
-          
-          {/* Sistema */}
-          <div>
-            <div className={cn("flex items-center mb-2 px-2", isCollapsed && "justify-center")}>
-              <h3 className={cn("text-xs font-semibold text-gray-500 tracking-wider", isCollapsed ? "sr-only" : "uppercase")}>
-                Sistema
-              </h3>
-            </div>
-            <nav className="space-y-2">
-              {navCategories.sistema.map((item) => renderNavLink(item))}
-            </nav>
-          </div>
+        {/* Navegación principal - sin scroll, altura fija */}
+        <div className="flex-1 px-2 py-3">
+          <nav className="space-y-1">
+            {navItems.map((item) => renderNavLink(item))}
+          </nav>
         </div>
 
-        {/* Footer con usuario */}
-        <div className="border-t border-gray-100 p-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8">
+        {/* Status bar compacto */}
+        {!isCollapsed && (
+          <div className="px-3 py-2 border-t border-slate-200/50">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="h-2 w-2 rounded-full bg-green-500"></div>
+              <span>Sistema operativo</span>
+            </div>
+          </div>
+        )}
+
+        {/* Footer ultra compacto */}
+        <div className="border-t border-slate-200/50 p-2">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-7 w-7">
               <AvatarImage src={user?.avatar || ""} />
-              <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+              <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-semibold">
                 {getUserInitials()}
               </AvatarFallback>
             </Avatar>
             
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-xs font-medium text-slate-900 truncate">
                   {user?.firstName} {user?.lastName}
                 </p>
-                <p className="text-xs text-gray-500 truncate">Administrador</p>
+                <p className="text-xs text-slate-500 truncate">Admin</p>
               </div>
             )}
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="h-8 w-8 p-0"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => logoutMutation.mutate()}
+                  className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                Cerrar sesión
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>
