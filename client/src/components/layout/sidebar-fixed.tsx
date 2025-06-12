@@ -99,7 +99,7 @@ export default function SidebarFixed() {
                 "flex items-center px-3 py-2.5 rounded-xl text-sm transition-all duration-200 relative group",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-lg"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent",
+                  : "text-muted-foreground hover:text-white hover:bg-gradient-to-r hover:from-purple-500 hover:to-purple-600 border border-transparent",
                 isCollapsed && "justify-center px-2"
               )}
             >
