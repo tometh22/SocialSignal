@@ -150,60 +150,57 @@ export default function Topbar() {
 
   return (
     <>
-      <div className="topbar h-16 px-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between sticky top-0 z-20 w-full">
-        {/* Breadcrumbs y título */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center text-sm text-muted-foreground">
+      <div className="topbar h-12 px-4 border-b border-slate-200/60 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 flex items-center justify-between sticky top-0 z-20 w-full shadow-sm">
+        {/* Breadcrumbs minimalistas */}
+        <div className="flex items-center">
+          <div className="flex items-center text-sm text-slate-600">
             {breadcrumbs.map((crumb, i) => (
               <div key={i} className="flex items-center">
-                {i > 0 && <ChevronRight className="h-3.5 w-3.5 mx-1 text-muted-foreground/50" />}
+                {i > 0 && <ChevronRight className="h-3 w-3 mx-1.5 text-slate-400" />}
                 {i < breadcrumbs.length - 1 ? (
-                  <Link href={crumb.path} className="hover:text-primary hover:underline">
+                  <Link href={crumb.path} className="hover:text-slate-900 transition-colors font-medium">
                     {crumb.name}
                   </Link>
                 ) : (
-                  <span className="font-medium text-foreground">{crumb.name}</span>
+                  <span className="font-semibold text-slate-900">{crumb.name}</span>
                 )}
               </div>
             ))}
           </div>
         </div>
         
-        {/* Acciones y perfil */}
-        <div className="flex items-center space-x-1.5">
+        {/* Acciones compactas */}
+        <div className="flex items-center space-x-1">
           {/* Búsqueda global */}
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
             onClick={() => setIsSearchOpen(true)}
           >
-            <Search className="h-4.5 w-4.5" />
+            <Search className="h-4 w-4" />
           </Button>
           
-          {/* Mensajes - Temporalmente deshabilitado */}
-          {/* <MessagesPopup /> */}
-          
-          {/* Ayuda - Usando el componente HelpPopup */}
+          {/* Ayuda */}
           <HelpPopup />
           
           {/* Notificaciones */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 relative text-muted-foreground hover:text-foreground">
-                <Bell className="h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
+                <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-red-500 rounded-full" />
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-              <div className="flex items-center justify-between px-4 py-2">
-                <DropdownMenuLabel className="font-normal">Alertas de Proyectos</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-80 shadow-lg border-slate-200">
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <DropdownMenuLabel className="font-medium text-slate-900">Alertas de Proyectos</DropdownMenuLabel>
                 {unreadCount > 0 && (
                   <Button 
                     variant="ghost" 
-                    className="text-xs h-7 px-2"
+                    className="text-xs h-6 px-2 text-slate-600 hover:text-slate-900"
                     onClick={markAllAsRead}
                   >
                     Marcar todas como leídas
@@ -277,23 +274,23 @@ export default function Topbar() {
           </DropdownMenu>
           
           {/* Separador vertical */}
-          <div className="h-6 w-px bg-border mx-1.5"></div>
+          <div className="h-4 w-px bg-slate-200 mx-2"></div>
           
           {/* Menu de usuario */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-9 pl-2 pr-3 gap-2">
+              <Button variant="ghost" className="h-8 pl-2 pr-3 gap-2 hover:bg-slate-100 rounded-lg">
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-700 text-white text-xs font-medium">
                         {getUserInitials()}
                       </AvatarFallback>
                       {user?.avatar && <AvatarImage src={user.avatar} />}
                     </Avatar>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium text-slate-900">
                       {user ? user.firstName : 'Usuario'}
                     </span>
                   </>
