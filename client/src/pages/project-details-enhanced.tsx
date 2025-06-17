@@ -174,8 +174,13 @@ export default function ProjectDetailsEnhanced() {
   const estimatedHours = 8; // Valor estimado
   const progress = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
   const totalCost = timeEntries.reduce((sum: number, entry: any) => {
-    const person = Array.isArray(personnel) ? personnel.find((p: any) => p.id === entry.personnelId) : null;
-    return sum + (entry.hours * (person?.hourlyRate || 50));
+    // Use the totalCost field if available, otherwise calculate from hours and historical rate
+    if (entry.totalCost) {
+      return sum + entry.totalCost;
+    }
+    // Fallback to calculation using historical rate or current rate
+    const hourlyRate = entry.hourlyRateAtTime || entry.hourlyRate || 50;
+    return sum + (entry.hours * hourlyRate);
   }, 0);
 
   // Preparar datos para el proyecto actual para comparativa
@@ -742,8 +747,8 @@ export default function ProjectDetailsEnhanced() {
         </div>
       </div>
 
-      {/* Modal de Registro de Tiempo */}
-      <TimeEntryForm 
+      {/* Modal de Registro de Costos y Tiempo */}
+      <CostTimeEntryForm 
         projectId={projectId!} 
         open={showTimeEntryForm}
         onOpenChange={(open) => {
