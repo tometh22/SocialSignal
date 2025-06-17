@@ -39,8 +39,7 @@ export default function ActiveProjectsModern() {
   });
 
   const { data: allProjects = [] } = useQuery({
-    queryKey: ["/api/active-projects", true],
-    queryFn: () => fetch("/api/active-projects?showSubprojects=true").then(res => res.json()),
+    queryKey: ["/api/active-projects?showSubprojects=true"],
   });
 
   // Obtener datos de tiempo para todos los proyectos
@@ -187,10 +186,13 @@ export default function ActiveProjectsModern() {
 
         {/* Lista de Proyectos */}
         <div className="space-y-4">
-          {(projects as any[]).map((project: any) => {
-            const subprojects = allProjects.filter((p: any) => p.parentProjectId === project.id);
+          {Array.isArray(projects) && projects.length > 0 ? projects.filter((project: any) => {
+            // Solo mostrar proyectos principales (no subproyectos)
+            return !project.parentProjectId;
+          }).map((project: any) => {
+            const subprojects = Array.isArray(allProjects) ? allProjects.filter((p: any) => p.parentProjectId === project.id) : [];
             const isExpanded = expandedProjects.has(project.id);
-            const client = (clients as any[]).find((c: any) => c.id === project.clientId);
+            const client = Array.isArray(clients) ? clients.find((c: any) => c.id === project.clientId) : null;
             const projectName = project.quotation?.projectName || "Proyecto sin nombre";
             const clientName = client?.name || "Cliente desconocido";
             const totalAmount = project.quotation?.totalAmount || 0;
@@ -310,10 +312,14 @@ export default function ActiveProjectsModern() {
                 </CardContent>
               </Card>
             );
-          })}
+          }) : (
+            <div className="text-center py-8 text-gray-500">
+              No hay proyectos disponibles
+            </div>
+          )}
         </div>
 
-        {(projects as any[]).length === 0 && (
+        {Array.isArray(projects) && projects.length === 0 && (
           <div className="text-center py-12">
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay proyectos activos</h3>
