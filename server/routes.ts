@@ -20,6 +20,9 @@ import {
   insertRecurringProjectTemplateSchema,
   insertRecurringTemplatePersonnelSchema,
   insertProjectCycleSchema,
+  insertProjectBaseTeamSchema,
+  insertQuickTimeEntrySchema,
+  insertQuickTimeEntryDetailSchema,
   projectStatusOptions,
   trackingFrequencyOptions,
   deliverables,
@@ -31,7 +34,10 @@ import {
   roles,
   recurringProjectTemplates,
   recurringTemplatePersonnel,
-  projectCycles
+  projectCycles,
+  projectBaseTeam,
+  quickTimeEntries,
+  quickTimeEntryDetails
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";

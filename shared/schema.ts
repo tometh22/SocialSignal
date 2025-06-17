@@ -295,6 +295,78 @@ export const insertRecurringTemplatePersonnelSchema = createInsertSchema(recurri
   id: true,
 });
 
+// ==================== EQUIPO BASE DEL PROYECTO ====================
+// Equipo base asignado al proyecto desde la cotización aprobada
+export const projectBaseTeam = pgTable("project_base_team", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  roleId: integer("role_id").notNull().references(() => roles.id),
+  estimatedHours: doublePrecision("estimated_hours").notNull(),
+  hourlyRate: doublePrecision("hourly_rate").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectBaseTeamSchema = createInsertSchema(projectBaseTeam).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ProjectBaseTeam = typeof projectBaseTeam.$inferSelect;
+export type InsertProjectBaseTeam = z.infer<typeof insertProjectBaseTeamSchema>;
+
+// ==================== REGISTRO RÁPIDO DE HORAS ====================
+// Registro masivo de horas para el equipo base por períodos
+export const quickTimeEntries = pgTable("quick_time_entries", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  periodName: text("period_name").notNull(), // "Enero 2025", "Primera quincena marzo"
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  status: text("status").notNull().default("draft"), // draft, submitted, approved
+  totalHours: doublePrecision("total_hours").notNull().default(0),
+  totalCost: doublePrecision("total_cost").notNull().default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+  submittedAt: timestamp("submitted_at"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: integer("approved_by").references(() => users.id),
+});
+
+export const insertQuickTimeEntrySchema = createInsertSchema(quickTimeEntries).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  submittedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  approvedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
+export type QuickTimeEntry = typeof quickTimeEntries.$inferSelect;
+export type InsertQuickTimeEntry = z.infer<typeof insertQuickTimeEntrySchema>;
+
+// Detalle de horas por persona en el registro rápido
+export const quickTimeEntryDetails = pgTable("quick_time_entry_details", {
+  id: serial("id").primaryKey(),
+  quickTimeEntryId: integer("quick_time_entry_id").notNull().references(() => quickTimeEntries.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  roleId: integer("role_id").notNull().references(() => roles.id),
+  hours: doublePrecision("hours").notNull(),
+  hourlyRate: doublePrecision("hourly_rate").notNull(),
+  totalCost: doublePrecision("total_cost").notNull(),
+  description: text("description"),
+});
+
+export const insertQuickTimeEntryDetailSchema = createInsertSchema(quickTimeEntryDetails).omit({
+  id: true,
+});
+
+export type QuickTimeEntryDetail = typeof quickTimeEntryDetails.$inferSelect;
+export type InsertQuickTimeEntryDetail = z.infer<typeof insertQuickTimeEntryDetailSchema>;
+
 // ==================== CICLOS DE PROYECTO ====================
 // Seguimiento de ciclos mensuales/semanales para proyectos always-on
 export const projectCycles = pgTable("project_cycles", {

@@ -18,12 +18,16 @@ import {
   type RecurringProjectTemplate, type InsertRecurringProjectTemplate,
   type RecurringTemplatePersonnel, type InsertRecurringTemplatePersonnel,
   type ProjectCycle, type InsertProjectCycle,
+  type ProjectBaseTeam, type InsertProjectBaseTeam,
+  type QuickTimeEntry, type InsertQuickTimeEntry,
+  type QuickTimeEntryDetail, type InsertQuickTimeEntryDetail,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
-  deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles
+  deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
+  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
@@ -203,6 +207,28 @@ export interface IStorage {
   // Automation operations
   autoGenerateSubprojects(parentProjectId: number, templateId: number, periodStart: Date, periodEnd: Date): Promise<ActiveProject[]>;
   checkAndCreatePendingCycles(): Promise<ProjectCycle[]>;
+
+  // Project base team operations
+  getProjectBaseTeam(projectId: number): Promise<ProjectBaseTeam[]>;
+  createProjectBaseTeam(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam>;
+  updateProjectBaseTeam(id: number, team: Partial<InsertProjectBaseTeam>): Promise<ProjectBaseTeam | undefined>;
+  deleteProjectBaseTeam(id: number): Promise<boolean>;
+  copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]>;
+
+  // Quick time entry operations
+  getQuickTimeEntries(projectId: number): Promise<QuickTimeEntry[]>;
+  getQuickTimeEntry(id: number): Promise<QuickTimeEntry | undefined>;
+  createQuickTimeEntry(entry: InsertQuickTimeEntry): Promise<QuickTimeEntry>;
+  updateQuickTimeEntry(id: number, entry: Partial<InsertQuickTimeEntry>): Promise<QuickTimeEntry | undefined>;
+  deleteQuickTimeEntry(id: number): Promise<boolean>;
+
+  // Quick time entry detail operations
+  getQuickTimeEntryDetails(quickTimeEntryId: number): Promise<QuickTimeEntryDetail[]>;
+  createQuickTimeEntryDetail(detail: InsertQuickTimeEntryDetail): Promise<QuickTimeEntryDetail>;
+  updateQuickTimeEntryDetail(id: number, detail: Partial<InsertQuickTimeEntryDetail>): Promise<QuickTimeEntryDetail | undefined>;
+  deleteQuickTimeEntryDetail(id: number): Promise<boolean>;
+  submitQuickTimeEntry(id: number): Promise<QuickTimeEntry | undefined>;
+  approveQuickTimeEntry(id: number, approverId: number): Promise<QuickTimeEntry | undefined>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -1964,6 +1990,232 @@ export class DatabaseStorage implements IStorage {
     }
 
     return nextStart;
+  }
+
+  // ==================== PROJECT BASE TEAM OPERATIONS ====================
+  async getProjectBaseTeam(projectId: number): Promise<ProjectBaseTeam[]> {
+    try {
+      return await db.select().from(projectBaseTeam).where(eq(projectBaseTeam.projectId, projectId));
+    } catch (error) {
+      console.error("Error al obtener equipo base del proyecto:", error);
+      throw error;
+    }
+  }
+
+  async createProjectBaseTeam(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam> {
+    try {
+      const [created] = await db.insert(projectBaseTeam).values(team).returning();
+      return created;
+    } catch (error) {
+      console.error("Error al crear miembro del equipo base:", error);
+      throw error;
+    }
+  }
+
+  async updateProjectBaseTeam(id: number, team: Partial<InsertProjectBaseTeam>): Promise<ProjectBaseTeam | undefined> {
+    try {
+      const [updated] = await db.update(projectBaseTeam).set(team).where(eq(projectBaseTeam.id, id)).returning();
+      return updated;
+    } catch (error) {
+      console.error("Error al actualizar miembro del equipo base:", error);
+      throw error;
+    }
+  }
+
+  async deleteProjectBaseTeam(id: number): Promise<boolean> {
+    try {
+      await db.delete(projectBaseTeam).where(eq(projectBaseTeam.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar miembro del equipo base:", error);
+      throw error;
+    }
+  }
+
+  async copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]> {
+    try {
+      // Obtener el equipo de la cotización
+      const quotationTeam = await db.select({
+        personnelId: quotationTeamMembers.personnelId,
+        roleId: quotationTeamMembers.roleId,
+        estimatedHours: quotationTeamMembers.estimatedHours,
+        hourlyRate: quotationTeamMembers.hourlyRate
+      }).from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+
+      // Crear el equipo base del proyecto
+      const baseTeam: InsertProjectBaseTeam[] = quotationTeam.map(member => ({
+        projectId,
+        personnelId: member.personnelId,
+        roleId: member.roleId,
+        estimatedHours: member.estimatedHours,
+        hourlyRate: member.hourlyRate,
+        isActive: true
+      }));
+
+      if (baseTeam.length > 0) {
+        return await db.insert(projectBaseTeam).values(baseTeam).returning();
+      }
+
+      return [];
+    } catch (error) {
+      console.error("Error al copiar equipo de cotización a proyecto:", error);
+      throw error;
+    }
+  }
+
+  // ==================== QUICK TIME ENTRY OPERATIONS ====================
+  async getQuickTimeEntries(projectId: number): Promise<QuickTimeEntry[]> {
+    try {
+      return await db.select().from(quickTimeEntries).where(eq(quickTimeEntries.projectId, projectId)).orderBy(desc(quickTimeEntries.createdAt));
+    } catch (error) {
+      console.error("Error al obtener registros rápidos de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async getQuickTimeEntry(id: number): Promise<QuickTimeEntry | undefined> {
+    try {
+      const [entry] = await db.select().from(quickTimeEntries).where(eq(quickTimeEntries.id, id));
+      return entry;
+    } catch (error) {
+      console.error("Error al obtener registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async createQuickTimeEntry(entry: InsertQuickTimeEntry): Promise<QuickTimeEntry> {
+    try {
+      const [created] = await db.insert(quickTimeEntries).values(entry).returning();
+      return created;
+    } catch (error) {
+      console.error("Error al crear registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async updateQuickTimeEntry(id: number, entry: Partial<InsertQuickTimeEntry>): Promise<QuickTimeEntry | undefined> {
+    try {
+      const [updated] = await db.update(quickTimeEntries).set(entry).where(eq(quickTimeEntries.id, id)).returning();
+      return updated;
+    } catch (error) {
+      console.error("Error al actualizar registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async deleteQuickTimeEntry(id: number): Promise<boolean> {
+    try {
+      // Eliminar detalles primero
+      await db.delete(quickTimeEntryDetails).where(eq(quickTimeEntryDetails.quickTimeEntryId, id));
+      // Eliminar entrada principal
+      await db.delete(quickTimeEntries).where(eq(quickTimeEntries.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async getQuickTimeEntryDetails(quickTimeEntryId: number): Promise<QuickTimeEntryDetail[]> {
+    try {
+      return await db.select().from(quickTimeEntryDetails).where(eq(quickTimeEntryDetails.quickTimeEntryId, quickTimeEntryId));
+    } catch (error) {
+      console.error("Error al obtener detalles de registro rápido:", error);
+      throw error;
+    }
+  }
+
+  async createQuickTimeEntryDetail(detail: InsertQuickTimeEntryDetail): Promise<QuickTimeEntryDetail> {
+    try {
+      const [created] = await db.insert(quickTimeEntryDetails).values(detail).returning();
+      
+      // Actualizar totales del registro principal
+      await this.updateQuickTimeEntryTotals(detail.quickTimeEntryId);
+      
+      return created;
+    } catch (error) {
+      console.error("Error al crear detalle de registro rápido:", error);
+      throw error;
+    }
+  }
+
+  async updateQuickTimeEntryDetail(id: number, detail: Partial<InsertQuickTimeEntryDetail>): Promise<QuickTimeEntryDetail | undefined> {
+    try {
+      const [updated] = await db.update(quickTimeEntryDetails).set(detail).where(eq(quickTimeEntryDetails.id, id)).returning();
+      
+      if (updated) {
+        // Actualizar totales del registro principal
+        await this.updateQuickTimeEntryTotals(updated.quickTimeEntryId);
+      }
+      
+      return updated;
+    } catch (error) {
+      console.error("Error al actualizar detalle de registro rápido:", error);
+      throw error;
+    }
+  }
+
+  async deleteQuickTimeEntryDetail(id: number): Promise<boolean> {
+    try {
+      const [detail] = await db.select().from(quickTimeEntryDetails).where(eq(quickTimeEntryDetails.id, id));
+      if (detail) {
+        await db.delete(quickTimeEntryDetails).where(eq(quickTimeEntryDetails.id, id));
+        // Actualizar totales del registro principal
+        await this.updateQuickTimeEntryTotals(detail.quickTimeEntryId);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error al eliminar detalle de registro rápido:", error);
+      throw error;
+    }
+  }
+
+  async submitQuickTimeEntry(id: number): Promise<QuickTimeEntry | undefined> {
+    try {
+      const [updated] = await db.update(quickTimeEntries)
+        .set({ 
+          status: "submitted",
+          submittedAt: new Date()
+        })
+        .where(eq(quickTimeEntries.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error al enviar registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  async approveQuickTimeEntry(id: number, approverId: number): Promise<QuickTimeEntry | undefined> {
+    try {
+      const [updated] = await db.update(quickTimeEntries)
+        .set({ 
+          status: "approved",
+          approvedAt: new Date(),
+          approvedBy: approverId
+        })
+        .where(eq(quickTimeEntries.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error al aprobar registro rápido de tiempo:", error);
+      throw error;
+    }
+  }
+
+  private async updateQuickTimeEntryTotals(quickTimeEntryId: number): Promise<void> {
+    try {
+      const details = await this.getQuickTimeEntryDetails(quickTimeEntryId);
+      const totalHours = details.reduce((sum, detail) => sum + detail.hours, 0);
+      const totalCost = details.reduce((sum, detail) => sum + detail.totalCost, 0);
+
+      await db.update(quickTimeEntries)
+        .set({ totalHours, totalCost })
+        .where(eq(quickTimeEntries.id, quickTimeEntryId));
+    } catch (error) {
+      console.error("Error al actualizar totales de registro rápido:", error);
+      throw error;
+    }
   }
 }
 
