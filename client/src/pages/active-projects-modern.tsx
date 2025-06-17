@@ -318,7 +318,10 @@ export default function ActiveProjectsModern() {
             <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hay proyectos activos</h3>
             <p className="text-gray-600 mb-6">Comienza creando tu primer proyecto para gestionar tus operaciones.</p>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button 
+              onClick={() => setLocation("/active-projects/new")}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Crear Proyecto
             </Button>
