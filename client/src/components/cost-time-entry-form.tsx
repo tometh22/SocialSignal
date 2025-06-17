@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -349,7 +348,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     : "border-gray-200 hover:border-gray-300 text-gray-600"
                 )}
               >
-                <Calendar className="h-5 w-5" />
+                <CalendarIcon className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">Fecha única</div>
                   <div className="text-xs opacity-70">Un día específico</div>
@@ -376,19 +375,19 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
             {!isDateRange ? (
               /* Fecha única */
-              <div className="space-y-3">
-                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <Label className="text-sm font-medium text-blue-900 mb-2 block">
+              <div className="space-y-4 mb-6">
+                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                  <Label className="text-sm font-medium text-blue-900 mb-3 block">
                     Seleccionar fecha
                   </Label>
                   <Input
                     type="date"
                     value={date ? format(date, "yyyy-MM-dd") : ""}
                     onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : undefined)}
-                    className="w-full h-12 text-lg border-blue-300 focus:border-blue-500"
+                    className="w-full h-12 text-lg border-blue-300 focus:border-blue-500 relative z-10"
                   />
                   {date && (
-                    <div className="mt-2 text-sm text-blue-700">
+                    <div className="mt-3 text-sm text-blue-700 font-medium">
                       📅 {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
                     </div>
                   )}
