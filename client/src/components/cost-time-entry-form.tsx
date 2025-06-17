@@ -183,23 +183,29 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Registrar Costos y Tiempo
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 border-0 shadow-2xl backdrop-blur-sm">
+        <DialogHeader className="pb-8 border-b border-slate-200/50">
+          <DialogTitle className="flex items-center gap-4 text-2xl font-bold">
+            <div className="p-3 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-2xl shadow-lg">
+              <Calculator className="h-7 w-7 text-white" />
+            </div>
+            <span className="bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 bg-clip-text text-transparent">
+              Registrar Costos y Tiempo
+            </span>
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8 pt-2">
           {/* Selector de Persona */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <User className="h-4 w-4" />
+          <div className="space-y-4">
+            <Label className="flex items-center gap-3 text-lg font-semibold text-slate-700">
+              <div className="p-2 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg shadow-md">
+                <User className="h-5 w-5 text-white" />
+              </div>
               Miembro del Equipo *
             </Label>
             <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel}>
-              <SelectTrigger>
+              <SelectTrigger className="h-14 bg-white/80 border-2 border-slate-200 hover:border-emerald-300 focus:border-emerald-400 shadow-sm backdrop-blur-sm transition-all duration-200">
                 <SelectValue placeholder="Seleccionar persona..." />
               </SelectTrigger>
               <SelectContent>
@@ -218,63 +224,118 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
           </div>
 
           {/* Método de Registro */}
-          <div className="space-y-3">
-            <Label>Método de Registro</Label>
-            <RadioGroup value={entryType} onValueChange={(value) => setEntryType(value as "hours" | "cost")}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="hours" id="hours" />
-                <Label htmlFor="hours" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Registrar por Horas Trabajadas
-                </Label>
+          <div className="space-y-6">
+            <Label className="flex items-center gap-3 text-lg font-semibold text-slate-700">
+              <div className="p-2 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg shadow-md">
+                <DollarSign className="h-5 w-5 text-white" />
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="cost" id="cost" />
-                <Label htmlFor="cost" className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Registrar por Costo Total
-                </Label>
+              Método de Registro
+            </Label>
+            <RadioGroup value={entryType} onValueChange={(value) => setEntryType(value as "hours" | "cost")} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={cn(
+                "relative p-5 rounded-xl border-2 transition-all duration-300 cursor-pointer group",
+                entryType === "hours" 
+                  ? "border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg ring-2 ring-blue-200" 
+                  : "border-slate-200 bg-white/70 hover:border-slate-300 hover:shadow-md"
+              )}>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="hours" id="hours" className="text-blue-600" />
+                  <Label htmlFor="hours" className="flex items-center gap-3 cursor-pointer font-medium">
+                    <div className={cn(
+                      "p-2 rounded-lg transition-colors",
+                      entryType === "hours" ? "bg-blue-500 text-white" : "bg-slate-200 text-slate-600"
+                    )}>
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Registrar por Horas Trabajadas</div>
+                      <div className="text-sm text-slate-500">Ingresa las horas y se calcula el costo</div>
+                    </div>
+                  </Label>
+                </div>
+              </div>
+              <div className={cn(
+                "relative p-5 rounded-xl border-2 transition-all duration-300 cursor-pointer group",
+                entryType === "cost" 
+                  ? "border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg ring-2 ring-emerald-200" 
+                  : "border-slate-200 bg-white/70 hover:border-slate-300 hover:shadow-md"
+              )}>
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem value="cost" id="cost" className="text-emerald-600" />
+                  <Label htmlFor="cost" className="flex items-center gap-3 cursor-pointer font-medium">
+                    <div className={cn(
+                      "p-2 rounded-lg transition-colors",
+                      entryType === "cost" ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-600"
+                    )}>
+                      <DollarSign className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Registrar por Costo Total</div>
+                      <div className="text-sm text-slate-500">Ingresa el costo y se calculan las horas</div>
+                    </div>
+                  </Label>
+                </div>
               </div>
             </RadioGroup>
           </div>
 
           {/* Campo Principal de Entrada */}
-          {entryType === "hours" ? (
-            <div className="space-y-2">
-              <Label htmlFor="hours">Horas Trabajadas *</Label>
-              <Input
-                id="hours"
-                type="number"
-                step="0.25"
-                min="0"
-                placeholder="8.0"
-                value={hours}
-                onChange={(e) => handleHoursChange(e.target.value)}
-                className="text-lg"
-              />
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="cost">Costo Total *</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="cost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="400.00"
-                  value={totalCost}
-                  onChange={(e) => handleCostChange(e.target.value)}
-                  className="pl-9 text-lg"
-                />
+          <div className="space-y-6">
+            {entryType === "hours" ? (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-3 text-lg font-semibold text-slate-700">
+                  <div className="p-2 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg shadow-md">
+                    <Clock className="h-5 w-5 text-white" />
+                  </div>
+                  Horas Trabajadas *
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="hours"
+                    type="number"
+                    step="0.25"
+                    min="0"
+                    placeholder="8.0"
+                    value={hours}
+                    onChange={(e) => handleHoursChange(e.target.value)}
+                    className="h-16 text-2xl font-semibold text-center bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 focus:border-blue-400 shadow-sm backdrop-blur-sm"
+                  />
+                  <div className="absolute -bottom-8 left-0 text-sm text-slate-500">
+                    {selectedPerson && hours && `💰 Costo calculado: $${(parseFloat(hours) * currentHourlyRate).toFixed(2)}`}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="space-y-4">
+                <Label className="flex items-center gap-3 text-lg font-semibold text-slate-700">
+                  <div className="p-2 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg shadow-md">
+                    <DollarSign className="h-5 w-5 text-white" />
+                  </div>
+                  Costo Total *
+                </Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-4 top-5 h-6 w-6 text-emerald-500 z-10" />
+                  <Input
+                    id="cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="400.00"
+                    value={totalCost}
+                    onChange={(e) => handleCostChange(e.target.value)}
+                    className="h-16 text-2xl font-semibold text-center pl-12 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 focus:border-emerald-400 shadow-sm backdrop-blur-sm"
+                  />
+                  <div className="absolute -bottom-8 left-0 text-sm text-slate-500">
+                    {selectedPerson && totalCost && `⏱️ Horas calculadas: ${(parseFloat(totalCost) / currentHourlyRate).toFixed(2)}h`}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Cálculo en Tiempo Real */}
           {selectedPerson && (
-            <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-lg">
+            <div className="p-6 bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/70 border-2 border-slate-200/60 rounded-2xl shadow-lg backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-4">
                 <Calculator className="h-4 w-4 text-emerald-600" />
                 <span className="text-sm font-medium text-emerald-900">Cálculo en Tiempo Real</span>
@@ -330,46 +391,72 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
           )}
 
           {/* Período de Trabajo */}
-          <div className="space-y-4">
-            <Label className="text-base font-semibold flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
+          <div className="space-y-6">
+            <Label className="flex items-center gap-3 text-lg font-semibold text-slate-700">
+              <div className="p-2 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-lg shadow-md">
+                <CalendarDays className="h-5 w-5 text-white" />
+              </div>
               Período de Trabajo *
             </Label>
 
             {/* Selector de tipo de período con mejor diseño */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setIsDateRange(false)}
                 className={cn(
-                  "flex items-center justify-center gap-2 p-4 rounded-lg border-2 transition-all",
+                  "group relative p-6 rounded-2xl border-2 transition-all duration-300 overflow-hidden",
                   !isDateRange 
-                    ? "border-blue-500 bg-blue-50 text-blue-700" 
-                    : "border-gray-200 hover:border-gray-300 text-gray-600"
+                    ? "border-purple-400 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 text-purple-700 shadow-lg ring-2 ring-purple-200" 
+                    : "border-slate-200 bg-white/70 hover:border-slate-300 hover:shadow-md text-slate-600"
                 )}
               >
-                <CalendarIcon className="h-5 w-5" />
-                <div className="text-left">
-                  <div className="font-medium">Fecha única</div>
-                  <div className="text-xs opacity-70">Un día específico</div>
+                <div className="flex flex-col items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-300",
+                    !isDateRange ? "bg-purple-500 text-white shadow-md" : "bg-slate-200 text-slate-600"
+                  )}>
+                    <CalendarIcon className="h-6 w-6" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-lg">Fecha única</div>
+                    <div className="text-sm opacity-70">Un día específico</div>
+                  </div>
                 </div>
+                {!isDateRange && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                )}
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsDateRange(true)}
                 className={cn(
-                  "flex items-center justify-center gap-2 p-4 rounded-lg border-2 transition-all",
+                  "group relative p-6 rounded-2xl border-2 transition-all duration-300 overflow-hidden",
                   isDateRange 
-                    ? "border-blue-500 bg-blue-50 text-blue-700" 
-                    : "border-gray-200 hover:border-gray-300 text-gray-600"
+                    ? "border-purple-400 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 text-purple-700 shadow-lg ring-2 ring-purple-200" 
+                    : "border-slate-200 bg-white/70 hover:border-slate-300 hover:shadow-md text-slate-600"
                 )}
               >
-                <CalendarIcon className="h-5 w-5" />
-                <div className="text-left">
-                  <div className="font-medium">Período</div>
-                  <div className="text-xs opacity-70">Rango de fechas</div>
+                <div className="flex flex-col items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-300",
+                    isDateRange ? "bg-purple-500 text-white shadow-md" : "bg-slate-200 text-slate-600"
+                  )}>
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-lg">Período</div>
+                    <div className="text-sm opacity-70">Rango de fechas</div>
+                  </div>
                 </div>
+                {isDateRange && (
+                  <div className="absolute top-2 right-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                )}
               </button>
             </div>
 
