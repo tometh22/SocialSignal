@@ -579,11 +579,12 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              className="min-h-[80px]"
             />
           </div>
 
           {/* Botones */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-6 border-t">
             <Button
               type="button"
               variant="outline"
