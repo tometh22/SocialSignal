@@ -55,6 +55,7 @@ export default function ProjectDetailsEnhanced() {
 
   // Estados locales
   const [showTimeEntryForm, setShowTimeEntryForm] = useState(false);
+  const [showQuickTimeRegister, setShowQuickTimeRegister] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -899,6 +900,26 @@ export default function ProjectDetailsEnhanced() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de Registro Rápido de Tiempo */}
+      <Dialog open={showQuickTimeRegister} onOpenChange={setShowQuickTimeRegister}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5" />
+              Registro Rápido por Período
+            </DialogTitle>
+          </DialogHeader>
+          <QuickTimeRegister
+            projectId={parseInt(projectId!)}
+            onSuccess={() => {
+              setShowQuickTimeRegister(false);
+              queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+            }}
+            onCancel={() => setShowQuickTimeRegister(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
