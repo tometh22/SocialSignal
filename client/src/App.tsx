@@ -14,7 +14,7 @@ import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
-import ActiveProjects from "@/pages/active-projects-modern";
+import ActiveProjects from "@/pages/active-projects-redesigned";
 import ProjectDetailsEnhanced from "@/pages/project-details-enhanced";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
