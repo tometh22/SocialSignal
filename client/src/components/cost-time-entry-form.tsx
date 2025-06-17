@@ -33,7 +33,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
   const [isDateRange, setIsDateRange] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -48,7 +48,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
   // Manejadores para cálculos en tiempo real
   const handleHoursChange = (value: string) => {
     setHours(value);
-    
+
     if (entryType === "hours" && value && currentHourlyRate > 0) {
       const numHours = parseFloat(value) || 0;
       const calculatedCost = numHours * currentHourlyRate;
@@ -58,7 +58,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
   const handleCostChange = (value: string) => {
     setTotalCost(value);
-    
+
     if (entryType === "cost" && value && currentHourlyRate > 0) {
       const numCost = parseFloat(value) || 0;
       const calculatedHours = numCost / currentHourlyRate;
@@ -115,7 +115,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedPersonnel) {
       toast({
         variant: "destructive",
@@ -158,7 +158,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
     // Crear entrada usando la fecha principal o la fecha de inicio si es un rango
     const entryDate = isDateRange ? startDate! : date!;
-    
+
     // Crear descripción del período automática
     let periodDescription = "";
     if (isDateRange && startDate && endDate) {
@@ -285,14 +285,14 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                   </Badge>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="text-center p-3 bg-white rounded-lg border">
                   <div className="text-xs text-gray-500 mb-1">Valor Hora</div>
                   <div className="text-lg font-bold text-gray-900">${currentHourlyRate}</div>
                   <div className="text-xs text-gray-400">por hora</div>
                 </div>
-                
+
                 <div className="text-center p-3 bg-white rounded-lg border">
                   <div className="text-xs text-gray-500 mb-1">Horas</div>
                   <div className={`text-lg font-bold transition-colors ${
@@ -304,7 +304,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     {entryType === "hours" ? "ingresado" : "calculado"}
                   </div>
                 </div>
-                
+
                 <div className="text-center p-3 bg-white rounded-lg border">
                   <div className="text-xs text-gray-500 mb-1">Costo</div>
                   <div className={`text-lg font-bold transition-colors ${
@@ -317,7 +317,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                   </div>
                 </div>
               </div>
-              
+
               {(hours && totalCost && parseFloat(hours) > 0) && (
                 <div className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-blue-100 to-emerald-100 rounded-lg text-sm">
                   <span className="font-semibold text-blue-700">{hours}h</span>
@@ -333,7 +333,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
           {/* Período de Trabajo */}
           <div className="space-y-3">
             <Label>Período de Trabajo *</Label>
-            
+
             {/* Selector de tipo de período */}
             <RadioGroup value={isDateRange ? "range" : "single"} onValueChange={(value) => setIsDateRange(value === "range")}>
               <div className="flex items-center space-x-2">
@@ -404,7 +404,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     </PopoverContent>
                   </Popover>
                 </div>
-                
+
                 <div>
                   <Label className="text-xs text-gray-600">Fecha de fin</Label>
                   <Popover>
@@ -498,7 +498,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     Segunda quincena
                   </Button>
                 </div>
-                
+
                 {/* Selector de semana actual */}
                 <div className="flex flex-wrap gap-2">
                   <Button
