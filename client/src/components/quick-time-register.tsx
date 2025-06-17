@@ -123,7 +123,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
   const getTotalHours = () => Object.values(teamHours).reduce((sum, hours) => sum + hours, 0);
   
   const getTotalCost = () => {
-    if (!baseTeam) return 0;
+    if (!Array.isArray(baseTeam)) return 0;
     return Object.entries(teamHours).reduce((sum, [personnelId, hours]) => {
       const member = baseTeam.find((m: any) => m.personnelId === parseInt(personnelId));
       return sum + (member ? hours * member.hourlyRate : 0);
@@ -140,7 +140,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
     );
   }
 
-  if (!baseTeam || baseTeam.length === 0) {
+  if (!Array.isArray(baseTeam) || baseTeam.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -237,7 +237,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                     Horas por Miembro del Equipo
                   </h4>
                   
-                  {baseTeam.map((member: any) => (
+                  {Array.isArray(baseTeam) && baseTeam.map((member: any) => (
                     <div key={member.personnelId} className="grid grid-cols-3 gap-3 items-center">
                       <div>
                         <p className="font-medium text-sm">{member.personnel?.name}</p>

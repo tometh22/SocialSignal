@@ -1134,7 +1134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Si es un proyecto macro, obtener sus subproyectos
       if (project.isAlwaysOnMacro) {
         try {
-          const subprojects = await storage.getActiveProjectsByParentId(id);
+          const subprojects = await storage.getSubprojectsByParentId(id);
           // Agregamos los subproyectos a un nuevo objeto para evitar problemas de tipado
           return res.json({
             ...project,
@@ -1159,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(parentId)) return res.status(400).json({ message: "ID de proyecto padre inválido" });
 
     try {
-      const subprojects = await storage.getActiveProjectsByParentId(parentId);
+      const subprojects = await storage.getSubprojectsByParentId(parentId);
       res.json(subprojects);
     } catch (error) {
       console.error("Error obteniendo subproyectos:", error);
@@ -1211,7 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Si es un proyecto macro, verificar si tiene subproyectos
       if (project.isAlwaysOnMacro) {
-        const subprojects = await storage.getActiveProjectsByParentId(id);
+        const subprojects = await storage.getSubprojectsByParentId(id);
         console.log(`Eliminando proyecto macro ${id} con ${subprojects.length} subproyectos`);
       }
 
