@@ -116,15 +116,15 @@ export default function ProjectDetailsEnhanced() {
   });
 
   // Lógica de cálculos - solo si projectData existe
-  const isSubproject = projectData?.parentProjectId !== null && projectData?.parentProjectId !== undefined;
-  const parentProject = isSubproject && projectData && Array.isArray(allProjects) ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
-  const clientData = Array.isArray(clients) && projectData ? clients.find((c: any) => c.id === projectData.clientId) : null;
+  const isSubproject = (projectData as any)?.parentProjectId !== null && (projectData as any)?.parentProjectId !== undefined;
+  const parentProject = isSubproject && projectData && Array.isArray(allProjects) ? allProjects.find((p: any) => p.id === (projectData as any).parentProjectId) : null;
+  const clientData = Array.isArray(clients) && projectData ? clients.find((c: any) => c.id === (projectData as any).clientId) : null;
   
   // Obtener subproyectos hermanos - solo si projectData existe
-  const siblingProjects = isSubproject && projectData
+  const siblingProjects = isSubproject && projectData && Array.isArray(allProjects)
     ? allProjects.filter((p: any) => 
-        p.parentProjectId === projectData.parentProjectId && 
-        p.id !== projectData.id
+        p.parentProjectId === (projectData as any).parentProjectId && 
+        p.id !== (projectData as any).id
       ).map((p: any) => ({
         id: p.id,
         name: p.subprojectName || p.projectName,
@@ -136,21 +136,21 @@ export default function ProjectDetailsEnhanced() {
     : [];
 
   // Obtener todos los subproyectos del mismo cliente (incluyendo el actual)
-  const allClientSubprojects = isSubproject && projectData
+  const allClientSubprojects = isSubproject && projectData && Array.isArray(allProjects)
     ? allProjects.filter((p: any) => 
-        p.parentProjectId === projectData.parentProjectId
+        p.parentProjectId === (projectData as any).parentProjectId
       ).map((p: any) => ({
         id: p.id,
         name: p.subprojectName || p.projectName,
         completionStatus: p.completionStatus,
-        totalHours: p.id === projectData.id ? totalHours : 0, // Solo tenemos datos del actual
+        totalHours: p.id === (projectData as any).id ? totalHours : 0, // Solo tenemos datos del actual
         estimatedHours: 8,
-        totalCost: p.id === projectData.id ? totalCost : 0
+        totalCost: p.id === (projectData as any).id ? totalCost : 0
       }))
     : [];
   
   const getProjectName = (id: number) => {
-    const project = allProjects.find((p: any) => p.id === id);
+    const project = Array.isArray(allProjects) ? allProjects.find((p: any) => p.id === id) : null;
     return project?.subprojectName || project?.projectName || "Proyecto sin nombre";
   };
 
