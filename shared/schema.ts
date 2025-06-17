@@ -351,6 +351,11 @@ export const timeEntries = pgTable("time_entries", {
   hourlyRateAtTime: doublePrecision("hourly_rate_at_time").notNull(), // Valor hora al momento del registro (histórico)
   entryType: varchar("entry_type", { length: 20 }).notNull().default("hours"), // "hours" o "cost"
   description: text("description"),
+  // Nuevos campos para manejar períodos de tiempo
+  isDateRange: boolean("is_date_range").default(false), // Indica si es un período o día específico
+  startDate: timestamp("start_date"), // Fecha de inicio del período (opcional)
+  endDate: timestamp("end_date"), // Fecha de fin del período (opcional)
+  periodDescription: text("period_description"), // Descripción del período (ej: "Enero 2025", "Primera quincena marzo")
   approved: boolean("approved").default(true),
   approvedBy: integer("approved_by").references(() => personnel.id),
   approvedDate: timestamp("approved_date"),
@@ -369,9 +374,13 @@ const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
 export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  endDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
   entryType: z.enum(["hours", "cost"]).default("hours"),
   totalCost: z.number().positive("El costo total debe ser positivo"),
   hourlyRateAtTime: z.number().positive("El valor hora debe ser positivo"),
+  isDateRange: z.boolean().optional(),
+  periodDescription: z.string().optional(),
 });
 
 // ==================== INFORMES DE PROGRESO ====================

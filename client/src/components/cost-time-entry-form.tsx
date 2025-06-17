@@ -159,11 +159,11 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
     // Crear entrada usando la fecha principal o la fecha de inicio si es un rango
     const entryDate = isDateRange ? startDate! : date!;
     
-    // Agregar descripción del período si es un rango
-    let finalDescription = description;
+    // Crear descripción del período automática
+    let periodDescription = "";
     if (isDateRange && startDate && endDate) {
-      const periodDescription = `Período: ${format(startDate, "dd/MM/yyyy", { locale: es })} - ${format(endDate, "dd/MM/yyyy", { locale: es })}`;
-      finalDescription = finalDescription ? `${periodDescription}\n${description}` : periodDescription;
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      periodDescription = `${format(startDate, "dd/MM/yyyy", { locale: es })} - ${format(endDate, "dd/MM/yyyy", { locale: es })} (${daysDiff} días)`;
     }
 
     createTimeEntry.mutate({
@@ -173,8 +173,12 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
       totalCost: finalCost,
       hourlyRateAtTime: currentHourlyRate,
       entryType,
-      description: finalDescription,
+      description: description,
       date: entryDate.toISOString(),
+      isDateRange: isDateRange,
+      startDate: isDateRange ? startDate!.toISOString() : undefined,
+      endDate: isDateRange ? endDate!.toISOString() : undefined,
+      periodDescription: periodDescription || undefined,
     });
   };
 
@@ -431,52 +435,137 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
             {/* Botones rápidos para períodos comunes */}
             {isDateRange && (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const now = new Date();
-                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                    setStartDate(firstDay);
-                    setEndDate(lastDay);
-                  }}
-                  className="text-xs"
-                >
-                  Este mes
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const now = new Date();
-                    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-                    setStartDate(firstDay);
-                    setEndDate(lastDay);
-                  }}
-                  className="text-xs"
-                >
-                  Mes pasado
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const now = new Date();
-                    const firstDay = new Date(2025, 0, 1); // Enero 2025
-                    const lastDay = new Date(2025, 0, 31);
-                    setStartDate(firstDay);
-                    setEndDate(lastDay);
-                  }}
-                  className="text-xs"
-                >
-                  Enero 2025
-                </Button>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                      setStartDate(firstDay);
+                      setEndDate(lastDay);
+                    }}
+                    className="text-xs"
+                  >
+                    Este mes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+                      setStartDate(firstDay);
+                      setEndDate(lastDay);
+                    }}
+                    className="text-xs"
+                  >
+                    Mes pasado
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                      const lastDay = new Date(now.getFullYear(), now.getMonth(), 15);
+                      setStartDate(firstDay);
+                      setEndDate(lastDay);
+                    }}
+                    className="text-xs"
+                  >
+                    Primera quincena
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                      const firstDay = new Date(now.getFullYear(), now.getMonth(), 16);
+                      setStartDate(firstDay);
+                      setEndDate(lastDay);
+                    }}
+                    className="text-xs"
+                  >
+                    Segunda quincena
+                  </Button>
+                </div>
+                
+                {/* Selector de semana actual */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const currentDay = now.getDay();
+                      const firstDayOfWeek = new Date(now);
+                      firstDayOfWeek.setDate(now.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
+                      const lastDayOfWeek = new Date(firstDayOfWeek);
+                      lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+                      setStartDate(firstDayOfWeek);
+                      setEndDate(lastDayOfWeek);
+                    }}
+                    className="text-xs"
+                  >
+                    Esta semana
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const currentDay = now.getDay();
+                      const firstDayOfLastWeek = new Date(now);
+                      firstDayOfLastWeek.setDate(now.getDate() - currentDay + (currentDay === 0 ? -6 : 1) - 7);
+                      const lastDayOfLastWeek = new Date(firstDayOfLastWeek);
+                      lastDayOfLastWeek.setDate(firstDayOfLastWeek.getDate() + 6);
+                      setStartDate(firstDayOfLastWeek);
+                      setEndDate(lastDayOfLastWeek);
+                    }}
+                    className="text-xs"
+                  >
+                    Semana pasada
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const firstDay = new Date(now.getFullYear(), 0, 1); // Primer día del año
+                      const lastDay = new Date(now.getFullYear(), 2, 31); // Último día de marzo
+                      setStartDate(firstDay);
+                      setEndDate(lastDay);
+                    }}
+                    className="text-xs"
+                  >
+                    Q1 (Ene-Mar)
+                  </Button>
+                </div>
+
+                {/* Descripción del período seleccionado */}
+                {startDate && endDate && (
+                  <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded border">
+                    <span className="font-medium">Período seleccionado:</span>
+                    <br />
+                    {format(startDate, "dd 'de' MMMM yyyy", { locale: es })} - {format(endDate, "dd 'de' MMMM yyyy", { locale: es })}
+                    <br />
+                    <span className="text-xs text-gray-500">
+                      ({Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} días)
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
