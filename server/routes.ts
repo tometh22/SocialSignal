@@ -1739,12 +1739,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         processedData.hourlyRateAtTime = person.hourlyRate || 50;
       }
 
-      // Cálculos bidireccionales para asegurar consistencia
-      if (processedData.entryType === "hours") {
-        // Si se registró por horas, calcular el costo
+      // Solo calcular si faltan datos, para no sobrescribir los cálculos del frontend
+      if (processedData.entryType === "hours" && !processedData.totalCost) {
+        // Si se registró por horas y no hay costo, calcularlo
         processedData.totalCost = processedData.hours * processedData.hourlyRateAtTime;
-      } else if (processedData.entryType === "cost") {
-        // Si se registró por costo, calcular las horas
+      } else if (processedData.entryType === "cost" && !processedData.hours) {
+        // Si se registró por costo y no hay horas, calcularlas
         processedData.hours = processedData.totalCost / processedData.hourlyRateAtTime;
       }
 

@@ -48,22 +48,26 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
   const handleHoursChange = (value: string) => {
     setHours(value);
 
-    if (entryType === "hours" && value && currentHourlyRate > 0) {
-      const numHours = parseFloat(value) || 0;
+    // Solo calcular costo si estamos en modo horas y hay una tarifa válida
+    if (entryType === "hours" && value && parseFloat(value) > 0 && currentHourlyRate > 0) {
+      const numHours = parseFloat(value);
       const calculatedCost = numHours * currentHourlyRate;
       setTotalCost(calculatedCost.toFixed(2));
+    } else if (entryType === "hours" && (!value || parseFloat(value) <= 0)) {
+      setTotalCost("");
     }
   };
 
   const handleCostChange = (value: string) => {
     setTotalCost(value);
 
-    if (entryType === "cost" && value && currentHourlyRate > 0) {
-      const numCost = parseFloat(value) || 0;
+    // Solo calcular horas si estamos en modo costo y hay una tarifa válida
+    if (entryType === "cost" && value && parseFloat(value) > 0 && currentHourlyRate > 0) {
+      const numCost = parseFloat(value);
       const calculatedHours = numCost / currentHourlyRate;
-      // Asegurar que las horas calculadas sean razonables (máximo 744 horas por mes)
-      const reasonableHours = Math.min(calculatedHours, 744);
-      setHours(reasonableHours.toFixed(2));
+      setHours(calculatedHours.toFixed(2));
+    } else if (entryType === "cost" && (!value || parseFloat(value) <= 0)) {
+      setHours("");
     }
   };
 
@@ -143,16 +147,32 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
       return;
     }
 
-    const finalHours = parseFloat(hours) || 0;
-    const finalCost = parseFloat(totalCost) || 0;
+    // Calcular valores finales según el método de entrada
+    let finalHours: number;
+    let finalCost: number;
 
-    if (finalHours <= 0 || finalCost <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Valores inválidos",
-        description: "Las horas y el costo deben ser mayores a cero",
-      });
-      return;
+    if (entryType === "hours") {
+      if (!hours || parseFloat(hours) <= 0) {
+        toast({
+          variant: "destructive",
+          title: "Campo requerido",
+          description: "Por favor ingresa las horas trabajadas",
+        });
+        return;
+      }
+      finalHours = parseFloat(hours);
+      finalCost = finalHours * currentHourlyRate;
+    } else {
+      if (!totalCost || parseFloat(totalCost) <= 0) {
+        toast({
+          variant: "destructive",
+          title: "Campo requerido", 
+          description: "Por favor ingresa el costo total",
+        });
+        return;
+      }
+      finalCost = parseFloat(totalCost);
+      finalHours = finalCost / currentHourlyRate;
     }
 
     // Crear entrada usando la fecha principal o la fecha de inicio si es un rango
@@ -164,6 +184,17 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
       const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       periodDescription = `${format(startDate, "dd/MM/yyyy", { locale: es })} - ${format(endDate, "dd/MM/yyyy", { locale: es })} (${daysDiff} días)`;
     }
+
+    // Log para debugging
+    console.log("Enviando datos al backend:", {
+      entryType,
+      hours: finalHours,
+      totalCost: finalCost,
+      hourlyRateAtTime: currentHourlyRate,
+      calculation: entryType === "hours" 
+        ? `${finalHours} horas × $${currentHourlyRate} = $${finalCost}`
+        : `$${finalCost} ÷ $${currentHourlyRate} = ${finalHours} horas`
+    });
 
     createTimeEntry.mutate({
       projectId: parseInt(projectId),
