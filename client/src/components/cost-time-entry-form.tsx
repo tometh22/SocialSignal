@@ -354,81 +354,35 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
             {!isDateRange ? (
               /* Fecha única */
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="space-y-2">
+                <Input
+                  type="date"
+                  value={date ? format(date, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  className="w-full"
+                />
+              </div>
             ) : (
               /* Rango de fechas */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs text-gray-600">Fecha de inicio</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !startDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, "dd/MM", { locale: es }) : "Inicio"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={startDate}
-                        onSelect={setStartDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Fecha de inicio</Label>
+                  <Input
+                    type="date"
+                    value={startDate ? format(startDate, "yyyy-MM-dd") : ""}
+                    onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                    className="w-full"
+                  />
                 </div>
 
-                <div>
-                  <Label className="text-xs text-gray-600">Fecha de fin</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !endDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, "dd/MM", { locale: es }) : "Fin"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={endDate}
-                        onSelect={setEndDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Fecha de fin</Label>
+                  <Input
+                    type="date"
+                    value={endDate ? format(endDate, "yyyy-MM-dd") : ""}
+                    onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                    className="w-full"
+                  />
                 </div>
               </div>
             )}
