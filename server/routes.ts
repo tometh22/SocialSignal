@@ -1655,22 +1655,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
-      const entries = await db.select({
-        id: sql`time_entries.id`,
-        projectId: sql`time_entries.project_id`,
-        personnelId: sql`time_entries.personnel_id`,
-        hours: sql`time_entries.hours`,
-        description: sql`time_entries.description`,
-        date: sql`time_entries.date`,
-        hourlyRate: sql`personnel.hourly_rate`,
-        personnelName: sql`personnel.name`,
-        roleName: sql`roles.name`
-      })
-      .from(sql`time_entries`)
-      .leftJoin(sql`personnel`, sql`time_entries.personnel_id = personnel.id`)
-      .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)
-      .where(sql`time_entries.project_id = ${projectId}`)
-      .orderBy(sql`time_entries.date DESC`);
+      const entries = await db
+        .select({
+          id: timeEntries.id,
+          projectId: timeEntries.projectId,
+          personnelId: timeEntries.personnelId,
+          hours: timeEntries.hours,
+          description: timeEntries.description,
+          date: timeEntries.date,
+          hourlyRate: personnel.hourlyRate,
+          personnelName: personnel.name,
+          roleName: roles.name,
+          entryType: timeEntries.entryType,
+          totalCost: timeEntries.totalCost,
+          hourlyRateAtTime: timeEntries.hourlyRateAtTime
+        })
+        .from(timeEntries)
+        .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .leftJoin(roles, eq(personnel.roleId, roles.id))
+        .where(eq(timeEntries.projectId, projectId))
+        .orderBy(desc(timeEntries.date));
 
       res.json(entries);
     } catch (error) {
