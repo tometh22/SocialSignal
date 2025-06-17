@@ -184,7 +184,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
@@ -367,7 +367,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
                   <Calendar
                     mode="single"
                     selected={date}
@@ -378,7 +378,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
               </Popover>
             ) : (
               /* Rango de fechas */
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-gray-600">Fecha de inicio</Label>
                   <Popover>
@@ -394,7 +394,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         {startDate ? format(startDate, "dd/MM", { locale: es }) : "Inicio"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
                       <Calendar
                         mode="single"
                         selected={startDate}
@@ -420,7 +420,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         {endDate ? format(endDate, "dd/MM", { locale: es }) : "Fin"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
                       <Calendar
                         mode="single"
                         selected={endDate}
@@ -436,7 +436,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
             {/* Botones rápidos para períodos comunes */}
             {isDateRange && (
               <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -480,7 +480,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     }}
                     className="text-xs"
                   >
-                    Primera quincena
+                    1ra quincena
                   </Button>
                   <Button
                     type="button"
@@ -495,12 +495,12 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     }}
                     className="text-xs"
                   >
-                    Segunda quincena
+                    2da quincena
                   </Button>
                 </div>
 
                 {/* Selector de semana actual */}
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -535,7 +535,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     }}
                     className="text-xs"
                   >
-                    Semana pasada
+                    Sem. pasada
                   </Button>
                   <Button
                     type="button"
@@ -550,7 +550,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     }}
                     className="text-xs"
                   >
-                    Q1 (Ene-Mar)
+                    Q1
                   </Button>
                 </div>
 
