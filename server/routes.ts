@@ -28,6 +28,7 @@ import {
   quotations,
   timeEntries,
   personnel,
+  roles,
   recurringProjectTemplates,
   recurringTemplatePersonnel,
   projectCycles
