@@ -415,8 +415,10 @@ export default function ActiveProjectsRedesigned() {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Proyectos Activos</h1>
-              <p className="text-gray-600 mt-1">Gestiona y monitorea todos tus proyectos</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                🚀 Proyectos Rediseñados
+              </h1>
+              <p className="text-gray-600 mt-1 text-lg">Dashboard moderno con UX/UI de clase mundial</p>
             </div>
             
             <Button 
