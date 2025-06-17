@@ -1722,7 +1722,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Adaptar fechas si vienen como strings ISO
       const processedData = {
         ...req.body,
-        date: req.body.date ? new Date(req.body.date) : undefined
+        date: req.body.date ? new Date(req.body.date) : undefined,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+        approvedDate: req.body.approvedDate ? new Date(req.body.approvedDate) : undefined
       };
 
       // Verificar que la persona existe para obtener el valor hora actual si no se proporciona
