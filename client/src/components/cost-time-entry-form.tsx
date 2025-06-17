@@ -364,69 +364,46 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
             {!isDateRange ? (
               /* Fecha única */
-              <div className="space-y-4 mb-6">
-                <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <Label className="text-sm font-medium text-blue-900 mb-3 block">
-                    Seleccionar fecha
-                  </Label>
-                  <Input
-                    type="date"
-                    value={date ? format(date, "yyyy-MM-dd") : ""}
-                    onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : undefined)}
-                    className="w-full h-12 text-lg border-blue-300 focus:border-blue-500 relative z-10"
-                  />
-                  {date && (
-                    <div className="mt-3 text-sm text-blue-700 font-medium">
-                      📅 {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Input
+                  type="date"
+                  value={date ? format(date, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : undefined)}
+                  className="h-10 bg-white border border-slate-300 focus:border-purple-500"
+                />
               </div>
             ) : (
               /* Rango de fechas */
               <div className="space-y-4">
-                <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-emerald-900">
-                        📅 Fecha de inicio
-                      </Label>
-                      <Input
-                        type="date"
-                        value={startDate ? format(startDate, "yyyy-MM-dd") : ""}
-                        onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : undefined)}
-                        className="w-full h-11 border-emerald-300 focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-emerald-900">
-                        📅 Fecha de fin
-                      </Label>
-                      <Input
-                        type="date"
-                        value={endDate ? format(endDate, "yyyy-MM-dd") : ""}
-                        onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : undefined)}
-                        className="w-full h-11 border-emerald-300 focus:border-emerald-500"
-                      />
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600">Fecha de inicio</Label>
+                    <Input
+                      type="date"
+                      value={startDate ? format(startDate, "yyyy-MM-dd") : ""}
+                      onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                      className="h-10 bg-white border border-slate-300 focus:border-purple-500"
+                    />
                   </div>
 
-                  {/* Vista previa del período */}
-                  {startDate && endDate && (
-                    <div className="mt-4 p-3 bg-white rounded-lg border border-emerald-200">
-                      <div className="text-sm font-medium text-emerald-800 mb-1">
-                        📊 Período seleccionado
-                      </div>
-                      <div className="text-emerald-700">
-                        {format(startDate, "dd/MM/yyyy", { locale: es })} → {format(endDate, "dd/MM/yyyy", { locale: es })}
-                      </div>
-                      <div className="text-xs text-emerald-600 mt-1">
-                        ⏱️ {Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} días
-                      </div>
-                    </div>
-                  )}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-600">Fecha de fin</Label>
+                    <Input
+                      type="date"
+                      value={endDate ? format(endDate, "yyyy-MM-dd") : ""}
+                      onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                      className="h-10 bg-white border border-slate-300 focus:border-purple-500"
+                    />
+                  </div>
                 </div>
+
+                {/* Vista previa del período */}
+                {startDate && endDate && (
+                  <div className="p-2 bg-slate-50 rounded text-sm text-slate-600">
+                    {format(startDate, "dd/MM/yyyy", { locale: es })} - {format(endDate, "dd/MM/yyyy", { locale: es })} 
+                    ({Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} días)
+                  </div>
+                )}
 
                 {/* Botones rápidos organizados */}
                 <div className="space-y-3">
@@ -449,7 +426,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        🗓️ Este mes
+                        Este mes
                       </Button>
                       <Button
                         type="button"
@@ -464,7 +441,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        ⬅️ Mes pasado
+                        Mes pasado
                       </Button>
                     </div>
                   </div>
@@ -489,7 +466,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        📅 Esta semana
+                        Esta semana
                       </Button>
                       <Button
                         type="button"
@@ -507,7 +484,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        ⬅️ Sem. pasada
+                        Sem. pasada
                       </Button>
                     </div>
                     
