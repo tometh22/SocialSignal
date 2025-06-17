@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import TimeEntryForm from "@/components/time-entry-form";
+import CostTimeEntryForm from "@/components/cost-time-entry-form";
 import { SubprojectAlerts } from "@/components/subproject-alerts";
 import { SubprojectNavigation } from "@/components/subproject-navigation";
 import { CompletionPredictor } from "@/components/completion-predictor";

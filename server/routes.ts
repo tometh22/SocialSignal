@@ -1720,6 +1720,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: req.body.date ? new Date(req.body.date) : undefined
       };
 
+      // Verificar que la persona existe para obtener el valor hora actual si no se proporciona
+      const person = await storage.getPersonnelById(processedData.personnelId);
+      if (!person) {
+        return res.status(404).json({ message: "Personal no encontrado" });
+      }
+
+      // Si no se proporciona hourlyRateAtTime, usar el valor actual
+      if (!processedData.hourlyRateAtTime) {
+        processedData.hourlyRateAtTime = person.hourlyRate || 50;
+      }
+
+      // Cálculos bidireccionales para asegurar consistencia
+      if (processedData.entryType === "hours") {
+        // Si se registró por horas, calcular el costo
+        processedData.totalCost = processedData.hours * processedData.hourlyRateAtTime;
+      } else if (processedData.entryType === "cost") {
+        // Si se registró por costo, calcular las horas
+        processedData.hours = processedData.totalCost / processedData.hourlyRateAtTime;
+      }
+
       // Añadir por defecto que está aprobado y establecer la fecha de aprobación
       const dataWithDefaults = {
         ...processedData,
@@ -1736,21 +1756,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Proyecto no encontrado" });
       }
 
-      // Verificar que la persona existe
-      const person = await storage.getPersonnelById(validatedData.personnelId);
-      if (!person) {
-        return res.status(404).json({ message: "Personal no encontrado" });
-      }
-
       const entry = await storage.createTimeEntry(validatedData);
       res.status(201).json(entry);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Error de validación:", error.errors);
-        return res.status(400).json({ message: "Datos de registro de horas inválidos", errors: error.errors });
+        return res.status(400).json({ message: "Datos de registro inválidos", errors: error.errors });
       }
       console.error("Error creating time entry:", error);
-      res.status(500).json({ message: "Error al crear el registro de horas" });
+      res.status(500).json({ message: "Error al crear el registro" });
     }
   });
 
