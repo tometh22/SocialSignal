@@ -367,7 +367,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                     {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
+                <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={date}
@@ -394,7 +394,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         {startDate ? format(startDate, "dd/MM", { locale: es }) : "Inicio"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
+                    <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
                         selected={startDate}
@@ -420,7 +420,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         {endDate ? format(endDate, "dd/MM", { locale: es }) : "Fin"}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom" sideOffset={5}>
+                    <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
                         selected={endDate}
