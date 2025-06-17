@@ -3,8 +3,8 @@ const testCostTimeTracking = async () => {
   try {
     // Test 1: Create a time entry by hours
     const timeEntry = {
-      projectId: 1,
-      personnelId: 1,
+      projectId: 18,
+      personnelId: 40,
       date: new Date().toISOString(),
       hours: 8,
       description: "Test time entry by hours",
@@ -28,8 +28,8 @@ const testCostTimeTracking = async () => {
 
     // Test 2: Create a cost entry by cost
     const costEntry = {
-      projectId: 1,
-      personnelId: 1,
+      projectId: 18,
+      personnelId: 40,
       date: new Date().toISOString(),
       totalCost: 400,
       description: "Test cost entry by cost",
@@ -52,7 +52,7 @@ const testCostTimeTracking = async () => {
     }
 
     // Test 3: Fetch time entries to verify bidirectional calculations
-    const response3 = await fetch('http://localhost:5000/api/time-entries/project/1');
+    const response3 = await fetch('http://localhost:5000/api/time-entries/project/18');
     if (response3.ok) {
       const entries = await response3.json();
       console.log('✓ Fetched entries for project 1:', entries.length, 'entries');
