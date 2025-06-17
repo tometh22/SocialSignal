@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CostTimeEntryForm from "@/components/cost-time-entry-form";
+import QuickTimeRegister from "@/components/quick-time-register";
 import { SubprojectAlerts } from "@/components/subproject-alerts";
 import { SubprojectNavigation } from "@/components/subproject-navigation";
 import { CompletionPredictor } from "@/components/completion-predictor";
@@ -654,11 +655,19 @@ export default function ProjectDetailsEnhanced() {
               <CardContent className="space-y-3">
                 <Button 
                   className="w-full justify-start" 
+                  onClick={() => setShowQuickTimeRegister(true)}
+                >
+                  <Timer className="h-4 w-4 mr-2" />
+                  Registro Rápido por Período
+                </Button>
+                
+                <Button 
+                  className="w-full justify-start" 
                   variant="outline"
                   onClick={() => setShowTimeEntryForm(true)}
                 >
                   <Clock className="h-4 w-4 mr-2" />
-                  Registrar Tiempo
+                  Registrar Tiempo Individual
                 </Button>
                 
                 <Button 

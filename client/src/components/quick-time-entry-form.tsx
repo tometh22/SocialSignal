@@ -47,7 +47,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   });
 
   // Obtener equipo base del proyecto
-  const { data: baseTeam, isLoading: loadingTeam } = useQuery({
+  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery({
     queryKey: [`/api/projects/${projectId}/base-team`],
     enabled: !!projectId
   });
@@ -55,10 +55,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   // Crear entrada rápida de tiempo
   const createQuickEntry = useMutation({
     mutationFn: (data: z.infer<typeof quickTimeEntrySchema>) =>
-      apiRequest(`/api/projects/${projectId}/quick-time-entries`, {
-        method: "POST",
-        body: JSON.stringify(data)
-      }),
+      apiRequest(`/api/projects/${projectId}/quick-time-entries`, "POST", data),
     onSuccess: (newEntry) => {
       setCurrentQuickEntryId(newEntry.id);
       toast({
@@ -78,10 +75,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   // Agregar detalle de horas
   const addTimeDetail = useMutation({
     mutationFn: ({ quickTimeEntryId, data }: { quickTimeEntryId: number; data: any }) =>
-      apiRequest(`/api/quick-time-entries/${quickTimeEntryId}/details`, {
-        method: "POST",
-        body: JSON.stringify(data)
-      }),
+      apiRequest(`/api/quick-time-entries/${quickTimeEntryId}/details`, "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/quick-time-entries`] });
     }
@@ -90,9 +84,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   // Enviar para aprobación
   const submitQuickEntry = useMutation({
     mutationFn: (entryId: number) =>
-      apiRequest(`/api/quick-time-entries/${entryId}/submit`, {
-        method: "POST"
-      }),
+      apiRequest(`/api/quick-time-entries/${entryId}/submit`, "POST"),
     onSuccess: () => {
       toast({
         title: "Registro enviado",
