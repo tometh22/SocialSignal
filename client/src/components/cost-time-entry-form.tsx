@@ -502,7 +502,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        1️⃣ 1ra quincena
+                        1ra quincena
                       </Button>
                       <Button
                         type="button"
@@ -517,7 +517,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         }}
                         className="text-xs h-8"
                       >
-                        2️⃣ 2da quincena
+                        2da quincena
                       </Button>
                     </div>
                   </div>
@@ -528,30 +528,33 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
 
           {/* Descripción */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción del Trabajo</Label>
+            <Label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Info className="h-4 w-4 text-slate-600" />
+              Descripción del Trabajo
+            </Label>
             <Textarea
               id="description"
               placeholder="Describe las actividades realizadas..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="min-h-[80px]"
+              className="min-h-[60px] bg-white border border-slate-300 focus:border-blue-500"
             />
           </div>
 
           {/* Botones */}
-          <div className="flex gap-3 pt-6 border-t">
+          <div className="flex gap-3 pt-4 border-t border-slate-200">
             <Button
               type="button"
               variant="outline"
-              className="flex-1"
+              className="flex-1 h-10"
               onClick={() => onOpenChange(false)}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              className="flex-1 h-10 bg-blue-600 hover:bg-blue-700"
               disabled={createTimeEntry.isPending}
             >
               {createTimeEntry.isPending ? "Guardando..." : "Registrar"}
