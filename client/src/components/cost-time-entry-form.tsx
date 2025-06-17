@@ -42,20 +42,35 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
   const selectedPerson = personnelArray.find((p: any) => p.id.toString() === selectedPersonnel);
   const currentHourlyRate = selectedPerson?.hourlyRate || 0;
 
-  // Cálculos bidireccionales
-  useEffect(() => {
-    if (!selectedPerson) return;
-
-    if (entryType === "hours" && hours) {
-      // Calcular costo basado en horas
-      const calculatedCost = parseFloat(hours) * currentHourlyRate;
+  // Manejadores para cálculos en tiempo real
+  const handleHoursChange = (value: string) => {
+    setHours(value);
+    
+    if (entryType === "hours" && value && currentHourlyRate > 0) {
+      const numHours = parseFloat(value) || 0;
+      const calculatedCost = numHours * currentHourlyRate;
       setTotalCost(calculatedCost.toFixed(2));
-    } else if (entryType === "cost" && totalCost) {
-      // Calcular horas basado en costo
-      const calculatedHours = parseFloat(totalCost) / currentHourlyRate;
+    }
+  };
+
+  const handleCostChange = (value: string) => {
+    setTotalCost(value);
+    
+    if (entryType === "cost" && value && currentHourlyRate > 0) {
+      const numCost = parseFloat(value) || 0;
+      const calculatedHours = numCost / currentHourlyRate;
       setHours(calculatedHours.toFixed(2));
     }
-  }, [entryType, hours, totalCost, selectedPerson, currentHourlyRate]);
+  };
+
+  // Efecto para limpiar campos cuando cambia el tipo de entrada
+  useEffect(() => {
+    if (entryType === "hours") {
+      setTotalCost("");
+    } else {
+      setHours("");
+    }
+  }, [entryType]);
 
   const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
@@ -194,7 +209,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                 min="0"
                 placeholder="8.0"
                 value={hours}
-                onChange={(e) => setHours(e.target.value)}
+                onChange={(e) => handleHoursChange(e.target.value)}
                 className="text-lg"
               />
             </div>
@@ -210,48 +225,67 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                   min="0"
                   placeholder="400.00"
                   value={totalCost}
-                  onChange={(e) => setTotalCost(e.target.value)}
+                  onChange={(e) => handleCostChange(e.target.value)}
                   className="pl-9 text-lg"
                 />
               </div>
             </div>
           )}
 
-          {/* Cálculo Automático Mostrado */}
-          {selectedPerson && (hours || totalCost) && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">Cálculo Automático</span>
+          {/* Cálculo en Tiempo Real */}
+          {selectedPerson && (
+            <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-4">
+                <Calculator className="h-4 w-4 text-emerald-600" />
+                <span className="text-sm font-medium text-emerald-900">Cálculo en Tiempo Real</span>
+                {(hours || totalCost) && (
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {entryType === "hours" ? "Costo calculado" : "Horas calculadas"}
+                  </Badge>
+                )}
               </div>
               
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-700">Persona:</span>
-                  <span className="font-medium text-blue-900">{selectedPerson.name}</span>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="text-center p-3 bg-white rounded-lg border">
+                  <div className="text-xs text-gray-500 mb-1">Valor Hora</div>
+                  <div className="text-lg font-bold text-gray-900">${currentHourlyRate}</div>
+                  <div className="text-xs text-gray-400">por hora</div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-700">Valor hora actual:</span>
-                  <span className="font-medium text-blue-900">${currentHourlyRate}/h</span>
-                </div>
-                <div className="border-t border-blue-200 pt-2 mt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-700">Horas:</span>
-                    <span className="font-bold text-blue-900">{hours || "0"}h</span>
+                
+                <div className="text-center p-3 bg-white rounded-lg border">
+                  <div className="text-xs text-gray-500 mb-1">Horas</div>
+                  <div className={`text-lg font-bold transition-colors ${
+                    entryType === "hours" ? "text-blue-600" : "text-emerald-600"
+                  }`}>
+                    {hours || "0.00"}
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-700">Costo total:</span>
-                    <span className="font-bold text-blue-900">${totalCost || "0"}</span>
+                  <div className="text-xs text-gray-400">
+                    {entryType === "hours" ? "ingresado" : "calculado"}
+                  </div>
+                </div>
+                
+                <div className="text-center p-3 bg-white rounded-lg border">
+                  <div className="text-xs text-gray-500 mb-1">Costo</div>
+                  <div className={`text-lg font-bold transition-colors ${
+                    entryType === "cost" ? "text-blue-600" : "text-emerald-600"
+                  }`}>
+                    ${totalCost || "0.00"}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {entryType === "cost" ? "ingresado" : "calculado"}
                   </div>
                 </div>
               </div>
               
-              <div className="mt-3 text-xs text-blue-600 bg-blue-100 p-2 rounded">
-                {entryType === "hours" 
-                  ? `${hours}h × $${currentHourlyRate}/h = $${totalCost}`
-                  : `$${totalCost} ÷ $${currentHourlyRate}/h = ${hours}h`
-                }
-              </div>
+              {(hours && totalCost && parseFloat(hours) > 0) && (
+                <div className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-blue-100 to-emerald-100 rounded-lg text-sm">
+                  <span className="font-semibold text-blue-700">{hours}h</span>
+                  <span className="text-gray-600">×</span>
+                  <span className="text-gray-700">${currentHourlyRate}/h</span>
+                  <span className="text-gray-600">=</span>
+                  <span className="font-bold text-emerald-700">${totalCost}</span>
+                </div>
+              )}
             </div>
           )}
 
