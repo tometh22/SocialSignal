@@ -15,7 +15,7 @@ import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
 import ActiveProjects from "@/pages/active-projects-redesigned";
-import ProjectDetailsEnhanced from "@/pages/project-details-enhanced";
+import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
 // Dashboard moderno mantenido - todos los antiguos eliminados
@@ -124,8 +124,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin" component={Admin} />
                   {/* Rutas para gestión de proyectos activos */}
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsEnhanced} />
-                  <ProtectedRoute path="/project-details/:id" component={ProjectDetailsEnhanced} />
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
+                  <ProtectedRoute path="/project-details/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
