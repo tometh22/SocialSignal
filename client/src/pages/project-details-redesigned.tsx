@@ -468,23 +468,23 @@ export default function ProjectDetailsRedesigned() {
                   <div className="grid grid-cols-3 gap-6">
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Nombre</p>
-                      <p className="font-semibold">{client.name}</p>
+                      <p className="font-semibold">{clientData?.name}</p>
                     </div>
-                    {client.email && (
+                    {clientData?.email && (
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Email</p>
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-gray-400" />
-                          <p className="font-semibold">{client.email}</p>
+                          <p className="font-semibold">{clientData.email}</p>
                         </div>
                       </div>
                     )}
-                    {client.phone && (
+                    {clientData?.phone && (
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Teléfono</p>
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-gray-400" />
-                          <p className="font-semibold">{client.phone}</p>
+                          <p className="font-semibold">{clientData.phone}</p>
                         </div>
                       </div>
                     )}
@@ -624,23 +624,23 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Tipo</p>
-                    <p className="font-semibold">{project.deliverableType || "No especificado"}</p>
+                    <p className="font-semibold">{projectData.deliverableType || "No especificado"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Fecha de inicio</p>
                     <p className="font-semibold">
-                      {project.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : "No definida"}
+                      {projectData.startDate ? new Date(projectData.startDate).toLocaleDateString('es-ES') : "No definida"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Fecha estimada de fin</p>
                     <p className="font-semibold">
-                      {project.expectedEndDate ? new Date(project.expectedEndDate).toLocaleDateString('es-ES') : "No definida"}
+                      {projectData.expectedEndDate ? new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : "No definida"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Estado de completitud</p>
-                    <p className="font-semibold">{project.completionStatus || "Sin actualizar"}</p>
+                    <p className="font-semibold">{projectData.completionStatus || "Sin actualizar"}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -654,10 +654,10 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {project.notes ? (
+                    {projectData.notes ? (
                       <div>
                         <p className="text-sm text-gray-600 mb-2">Descripción</p>
-                        <p className="text-gray-800 leading-relaxed">{project.notes}</p>
+                        <p className="text-gray-800 leading-relaxed">{projectData.notes}</p>
                       </div>
                     ) : (
                       <div className="text-center py-8">
