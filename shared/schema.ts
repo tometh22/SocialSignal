@@ -337,8 +337,8 @@ export const insertProjectComponentSchema = createInsertSchema(projectComponents
   updatedAt: true,
 });
 
-// ==================== REGISTRO DE HORAS ====================
-// Registro de horas
+// ==================== REGISTRO DE HORAS Y COSTOS ====================
+// Registro de horas y costos
 export const timeEntries = pgTable("time_entries", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull().references(() => activeProjects.id),
@@ -346,6 +346,10 @@ export const timeEntries = pgTable("time_entries", {
   personnelId: integer("personnel_id").notNull().references(() => personnel.id),
   date: timestamp("date").notNull(),
   hours: doublePrecision("hours").notNull(),
+  // Nuevos campos para manejo de costos
+  totalCost: doublePrecision("total_cost").notNull(), // Costo total calculado o ingresado
+  hourlyRateAtTime: doublePrecision("hourly_rate_at_time").notNull(), // Valor hora al momento del registro (histórico)
+  entryType: varchar("entry_type", { length: 20 }).notNull().default("hours"), // "hours" o "cost"
   description: text("description"),
   approved: boolean("approved").default(true),
   approvedBy: integer("approved_by").references(() => personnel.id),
@@ -361,10 +365,13 @@ const baseInsertTimeEntrySchema = createInsertSchema(timeEntries).omit({
   createdAt: true,
 });
 
-// Esquema personalizado que permite tanto Date como string para las fechas
+// Esquema personalizado que permite tanto Date como string para las fechas y valida los nuevos campos
 export const insertTimeEntrySchema = baseInsertTimeEntrySchema.extend({
   date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   approvedDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  entryType: z.enum(["hours", "cost"]).default("hours"),
+  totalCost: z.number().positive("El costo total debe ser positivo"),
+  hourlyRateAtTime: z.number().positive("El valor hora debe ser positivo"),
 });
 
 // ==================== INFORMES DE PROGRESO ====================
