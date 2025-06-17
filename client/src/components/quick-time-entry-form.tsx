@@ -111,7 +111,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
 
     const promises = Object.entries(teamHours).map(([personnelId, data]) => {
       if (data.hours > 0) {
-        const teamMember = baseTeam?.find((member: any) => member.personnelId === parseInt(personnelId));
+        const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
         if (teamMember) {
           return addTimeDetail.mutateAsync({
             quickTimeEntryId: currentQuickEntryId,
@@ -156,7 +156,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
 
   const getTotalCost = () => {
     return Object.entries(teamHours).reduce((sum, [personnelId, data]) => {
-      const teamMember = baseTeam?.find((member: any) => member.personnelId === parseInt(personnelId));
+      const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
       if (teamMember && data.hours > 0) {
         return sum + (data.hours * teamMember.hourlyRate);
       }
@@ -174,7 +174,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     );
   }
 
-  if (!baseTeam || baseTeam.length === 0) {
+  if (!Array.isArray(baseTeam) || baseTeam.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -190,7 +190,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
           <Button
             onClick={() => {
               // Copiar equipo de cotización
-              apiRequest(`/api/projects/${projectId}/copy-quotation-team`, { method: "POST" })
+              apiRequest(`/api/projects/${projectId}/copy-quotation-team`, "POST")
                 .then(() => {
                   queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/base-team`] });
                   toast({
@@ -314,7 +314,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {baseTeam.map((member: any) => (
+              {Array.isArray(baseTeam) && baseTeam.map((member: any) => (
                 <div key={member.personnelId} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>

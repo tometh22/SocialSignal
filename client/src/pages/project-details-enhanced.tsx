@@ -90,7 +90,7 @@ export default function ProjectDetailsEnhanced() {
 
   // Inicializar filteredTimeEntries cuando timeEntries cambie
   useEffect(() => {
-    setFilteredTimeEntries(timeEntries);
+    setFilteredTimeEntries(Array.isArray(timeEntries) ? timeEntries : []);
   }, [timeEntries]);
 
   // Mutaciones
@@ -117,7 +117,7 @@ export default function ProjectDetailsEnhanced() {
 
   // Lógica de cálculos - solo si projectData existe
   const isSubproject = projectData?.parentProjectId !== null && projectData?.parentProjectId !== undefined;
-  const parentProject = isSubproject && projectData ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
+  const parentProject = isSubproject && projectData && Array.isArray(allProjects) ? allProjects.find((p: any) => p.id === projectData.parentProjectId) : null;
   const clientData = Array.isArray(clients) && projectData ? clients.find((c: any) => c.id === projectData.clientId) : null;
   
   // Obtener subproyectos hermanos - solo si projectData existe
