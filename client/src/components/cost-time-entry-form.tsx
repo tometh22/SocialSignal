@@ -107,17 +107,39 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
     setTotalCost("");
     setDescription("");
     setDate(new Date());
+    setStartDate(new Date());
+    setEndDate(new Date());
+    setIsDateRange(false);
     setEntryType("hours");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedPersonnel || !date) {
+    if (!selectedPersonnel) {
       toast({
         variant: "destructive",
         title: "Campos requeridos",
-        description: "Por favor completa todos los campos obligatorios",
+        description: "Por favor selecciona el personal",
+      });
+      return;
+    }
+
+    // Validar fechas según el tipo seleccionado
+    if (!isDateRange && !date) {
+      toast({
+        variant: "destructive",
+        title: "Campos requeridos",
+        description: "Por favor selecciona una fecha",
+      });
+      return;
+    }
+
+    if (isDateRange && (!startDate || !endDate)) {
+      toast({
+        variant: "destructive",
+        title: "Campos requeridos",
+        description: "Por favor selecciona las fechas de inicio y fin",
       });
       return;
     }
@@ -134,6 +156,16 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
       return;
     }
 
+    // Crear entrada usando la fecha principal o la fecha de inicio si es un rango
+    const entryDate = isDateRange ? startDate! : date!;
+    
+    // Agregar descripción del período si es un rango
+    let finalDescription = description;
+    if (isDateRange && startDate && endDate) {
+      const periodDescription = `Período: ${format(startDate, "dd/MM/yyyy", { locale: es })} - ${format(endDate, "dd/MM/yyyy", { locale: es })}`;
+      finalDescription = finalDescription ? `${periodDescription}\n${description}` : periodDescription;
+    }
+
     createTimeEntry.mutate({
       projectId: parseInt(projectId),
       personnelId: parseInt(selectedPersonnel),
@@ -141,8 +173,8 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
       totalCost: finalCost,
       hourlyRateAtTime: currentHourlyRate,
       entryType,
-      description,
-      date: date.toISOString(),
+      description: finalDescription,
+      date: entryDate.toISOString(),
     });
   };
 
