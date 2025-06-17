@@ -109,7 +109,7 @@ function ProjectCard({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <Card className="group hover:shadow-md transition-all duration-200 border-l-4 border-l-blue-500">
+    <Card className="group hover:shadow-lg hover:scale-[1.01] transition-all duration-300 border border-gray-200 hover:border-blue-300 bg-gradient-to-r from-white to-gray-50">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
@@ -136,39 +136,56 @@ function ProjectCard({
               </div>
             </div>
 
-            {/* Métricas principales */}
-            <div className="grid grid-cols-3 gap-4 mb-3">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
+            {/* Métricas principales compactas */}
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="bg-green-50 p-2 rounded-lg flex items-center gap-2 hover:bg-green-100 transition-colors">
+                <div className="p-1 bg-green-500 rounded-full">
+                  <DollarSign className="h-3 w-3 text-white" />
+                </div>
                 <div>
-                  <div className="text-lg font-bold text-gray-900">${totalAmount.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">Presupuesto</div>
+                  <div className="text-sm font-bold text-green-800">${totalAmount.toLocaleString()}</div>
+                  <div className="text-xs text-green-600">Presupuesto</div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
+              <div className="bg-blue-50 p-2 rounded-lg flex items-center gap-2 hover:bg-blue-100 transition-colors">
+                <div className="p-1 bg-blue-500 rounded-full">
+                  <Clock className="h-3 w-3 text-white" />
+                </div>
                 <div>
-                  <div className="text-lg font-bold text-gray-900">{totalHours.toFixed(1)}h</div>
-                  <div className="text-xs text-gray-500">Registradas</div>
+                  <div className="text-sm font-bold text-blue-800">{totalHours.toFixed(1)}h</div>
+                  <div className="text-xs text-blue-600">Registradas</div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-purple-600" />
+              <div className="bg-purple-50 p-2 rounded-lg flex items-center gap-2 hover:bg-purple-100 transition-colors">
+                <div className="p-1 bg-purple-500 rounded-full">
+                  <Target className="h-3 w-3 text-white" />
+                </div>
                 <div>
-                  <div className="text-lg font-bold text-gray-900">{progressPercentage.toFixed(0)}%</div>
-                  <div className="text-xs text-gray-500">Progreso</div>
+                  <div className="text-sm font-bold text-purple-800">{progressPercentage.toFixed(0)}%</div>
+                  <div className="text-xs text-purple-600">Progreso</div>
                 </div>
               </div>
             </div>
 
-            {/* Barra de progreso */}
+            {/* Barra de progreso avanzada */}
             <div className="mb-3">
-              <Progress value={progressPercentage} className="h-2" />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>{totalHours.toFixed(1)}h trabajadas</span>
-                <span>{estimatedHours.toFixed(0)}h estimadas</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-gray-700">Progreso del proyecto</span>
+                <span className="text-xs font-bold text-gray-900">{progressPercentage.toFixed(1)}%</span>
+              </div>
+              <div className="relative">
+                <Progress value={progressPercentage} className="h-3 bg-gray-200" />
+                {progressPercentage > 100 && (
+                  <div className="absolute top-0 left-0 h-3 bg-red-500 opacity-30 rounded-full" style={{width: '100%'}}></div>
+                )}
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-gray-600 font-medium">{totalHours.toFixed(1)}h trabajadas</span>
+                <span className={`font-medium ${progressPercentage > 100 ? 'text-red-600' : 'text-gray-600'}`}>
+                  {estimatedHours.toFixed(0)}h estimadas
+                </span>
               </div>
             </div>
 
@@ -189,41 +206,54 @@ function ProjectCard({
             </div>
           </div>
 
-          {/* Acciones */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Acciones rápidas */}
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button
-              variant="ghost"
+              variant="default"
               size="sm"
               onClick={() => onNavigate(`/active-projects/${project.id}`)}
-              className="h-8 px-3"
+              className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
             >
-              <Eye className="h-4 w-4 mr-1" />
-              Ver
+              <Eye className="h-3 w-3 mr-1" />
+              Abrir
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate(`/active-projects/${project.id}/time-entries`)}
+              className="h-8 px-2"
+            >
+              <Clock className="h-3 w-3" />
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
+                  <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onNavigate(`/active-projects/${project.id}/edit`)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
+              <DropdownMenuContent align="end" className="w-52 shadow-lg border-gray-200">
+                <DropdownMenuItem onClick={() => onNavigate(`/active-projects/${project.id}/edit`)} className="cursor-pointer">
+                  <Edit className="h-4 w-4 mr-2 text-blue-600" />
+                  Editar Proyecto
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Users className="h-4 w-4 mr-2" />
+                <DropdownMenuItem className="cursor-pointer">
+                  <Users className="h-4 w-4 mr-2 text-green-600" />
                   Gestionar Equipo
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Ver Reportes
+                <DropdownMenuItem className="cursor-pointer">
+                  <TrendingUp className="h-4 w-4 mr-2 text-purple-600" />
+                  Ver Analíticas
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Timer className="h-4 w-4 mr-2 text-orange-600" />
+                  Registro de Tiempo
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600">
+                <DropdownMenuItem className="text-red-600 cursor-pointer hover:bg-red-50">
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
+                  Eliminar Proyecto
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -411,7 +441,7 @@ export default function ActiveProjectsRedesigned() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-gradient-to-r from-white via-blue-50 to-purple-50 border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -430,47 +460,86 @@ export default function ActiveProjectsRedesigned() {
             </Button>
           </div>
 
-          {/* Estadísticas */}
+          {/* Estadísticas mejoradas */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-blue-600" />
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
-                  <div className="text-sm text-blue-700">Total Proyectos</div>
+                  <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
+                  <div className="text-sm text-blue-700 font-medium">Total Proyectos</div>
+                </div>
+                <div className="p-3 bg-blue-500 rounded-full shadow-lg">
+                  <Building2 className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Play className="h-5 w-5 text-green-600" />
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-green-900">{stats.active}</div>
-                  <div className="text-sm text-green-700">Activos</div>
+                  <div className="text-3xl font-bold text-green-900">{stats.active}</div>
+                  <div className="text-sm text-green-700 font-medium">Activos</div>
+                </div>
+                <div className="p-3 bg-green-500 rounded-full shadow-lg">
+                  <Play className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-purple-600" />
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-purple-900">${stats.totalBudget.toLocaleString()}</div>
-                  <div className="text-sm text-purple-700">Presupuesto Total</div>
+                  <div className="text-3xl font-bold text-purple-900">${stats.totalBudget.toLocaleString()}</div>
+                  <div className="text-sm text-purple-700 font-medium">Presupuesto Total</div>
+                </div>
+                <div className="p-3 bg-purple-500 rounded-full shadow-lg">
+                  <DollarSign className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-orange-600" />
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-orange-900">{stats.totalHours.toFixed(0)}h</div>
-                  <div className="text-sm text-orange-700">Horas Registradas</div>
+                  <div className="text-3xl font-bold text-orange-900">{stats.totalHours.toFixed(0)}h</div>
+                  <div className="text-sm text-orange-700 font-medium">Horas Registradas</div>
+                </div>
+                <div className="p-3 bg-orange-500 rounded-full shadow-lg">
+                  <Clock className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Filtros rápidos */}
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              variant={filterStatus === "active" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus(filterStatus === "active" ? "all" : "active")}
+              className="h-8"
+            >
+              <Play className="h-3 w-3 mr-1" />
+              Activos ({stats.active})
+            </Button>
+            <Button
+              variant={filterStatus === "paused" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus(filterStatus === "paused" ? "all" : "paused")}
+              className="h-8"
+            >
+              <Pause className="h-3 w-3 mr-1" />
+              Pausados
+            </Button>
+            <Button
+              variant={filterStatus === "completed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterStatus(filterStatus === "completed" ? "all" : "completed")}
+              className="h-8"
+            >
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Completados
+            </Button>
           </div>
 
           {/* Filtros y búsqueda */}
@@ -478,11 +547,21 @@ export default function ActiveProjectsRedesigned() {
             <div className="relative flex-1 min-w-[300px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar proyectos o clientes..."
+                placeholder="Buscar proyectos, clientes o descripción..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white/50 backdrop-blur-sm border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                >
+                  ×
+                </Button>
+              )}
             </div>
 
             <Select value={filterStatus} onValueChange={setFilterStatus}>
