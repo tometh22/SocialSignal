@@ -2038,17 +2038,17 @@ export class DatabaseStorage implements IStorage {
       const quotationTeam = await db.select({
         personnelId: quotationTeamMembers.personnelId,
         roleId: quotationTeamMembers.roleId,
-        estimatedHours: quotationTeamMembers.estimatedHours,
-        hourlyRate: quotationTeamMembers.hourlyRate
+        hours: quotationTeamMembers.hours,
+        rate: quotationTeamMembers.rate
       }).from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
 
       // Crear el equipo base del proyecto
       const baseTeam: InsertProjectBaseTeam[] = quotationTeam.map(member => ({
         projectId,
         personnelId: member.personnelId,
-        roleId: member.roleId,
-        estimatedHours: member.estimatedHours,
-        hourlyRate: member.hourlyRate,
+        roleId: member.roleId || 1, // Default role if null
+        estimatedHours: member.hours,
+        hourlyRate: member.rate,
         isActive: true
       }));
 

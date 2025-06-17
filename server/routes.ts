@@ -3162,5 +3162,281 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== PROJECT BASE TEAM ROUTES ===========
+
+  // Obtener equipo base de un proyecto
+  app.get("/api/projects/:id/base-team", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const baseTeam = await storage.getProjectBaseTeam(projectId);
+      
+      // Enriquecer con información de personal y roles
+      const enrichedTeam = await Promise.all(
+        baseTeam.map(async (member) => {
+          const [personnelData] = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
+          const [roleData] = await db.select().from(roles).where(eq(roles.id, member.roleId));
+          
+          return {
+            ...member,
+            personnel: personnelData,
+            role: roleData
+          };
+        })
+      );
+
+      res.json(enrichedTeam);
+    } catch (error) {
+      console.error("Error fetching project base team:", error);
+      res.status(500).json({ message: "Failed to fetch project base team" });
+    }
+  });
+
+  // Copiar equipo de cotización a proyecto
+  app.post("/api/projects/:id/copy-quotation-team", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      // Obtener la cotización del proyecto
+      const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const baseTeam = await storage.copyQuotationTeamToProject(project.quotationId, projectId);
+      res.json(baseTeam);
+    } catch (error) {
+      console.error("Error copying quotation team to project:", error);
+      res.status(500).json({ message: "Failed to copy quotation team" });
+    }
+  });
+
+  // Crear miembro del equipo base
+  app.post("/api/projects/:id/base-team", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const teamData = insertProjectBaseTeamSchema.parse({
+        ...req.body,
+        projectId
+      });
+
+      const member = await storage.createProjectBaseTeam(teamData);
+      res.json(member);
+    } catch (error) {
+      console.error("Error creating base team member:", error);
+      res.status(500).json({ message: "Failed to create base team member" });
+    }
+  });
+
+  // Actualizar miembro del equipo base
+  app.patch("/api/base-team/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid team member ID" });
+      }
+
+      const updateData = req.body;
+      const member = await storage.updateProjectBaseTeam(id, updateData);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+
+      res.json(member);
+    } catch (error) {
+      console.error("Error updating base team member:", error);
+      res.status(500).json({ message: "Failed to update base team member" });
+    }
+  });
+
+  // Eliminar miembro del equipo base
+  app.delete("/api/base-team/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid team member ID" });
+      }
+
+      const success = await storage.deleteProjectBaseTeam(id);
+      res.json({ success });
+    } catch (error) {
+      console.error("Error deleting base team member:", error);
+      res.status(500).json({ message: "Failed to delete base team member" });
+    }
+  });
+
+  // =========== QUICK TIME ENTRY ROUTES ===========
+
+  // Obtener registros rápidos de tiempo de un proyecto
+  app.get("/api/projects/:id/quick-time-entries", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const entries = await storage.getQuickTimeEntries(projectId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching quick time entries:", error);
+      res.status(500).json({ message: "Failed to fetch quick time entries" });
+    }
+  });
+
+  // Crear nuevo registro rápido de tiempo
+  app.post("/api/projects/:id/quick-time-entries", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const entryData = insertQuickTimeEntrySchema.parse({
+        ...req.body,
+        projectId,
+        createdBy: req.user?.id
+      });
+
+      const entry = await storage.createQuickTimeEntry(entryData);
+      res.json(entry);
+    } catch (error) {
+      console.error("Error creating quick time entry:", error);
+      res.status(500).json({ message: "Failed to create quick time entry" });
+    }
+  });
+
+  // Obtener detalles de un registro rápido
+  app.get("/api/quick-time-entries/:id/details", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      const details = await storage.getQuickTimeEntryDetails(id);
+      
+      // Enriquecer con información de personal y roles
+      const enrichedDetails = await Promise.all(
+        details.map(async (detail) => {
+          const [personnelData] = await db.select().from(personnel).where(eq(personnel.id, detail.personnelId));
+          const [roleData] = await db.select().from(roles).where(eq(roles.id, detail.roleId));
+          
+          return {
+            ...detail,
+            personnel: personnelData,
+            role: roleData
+          };
+        })
+      );
+
+      res.json(enrichedDetails);
+    } catch (error) {
+      console.error("Error fetching quick time entry details:", error);
+      res.status(500).json({ message: "Failed to fetch quick time entry details" });
+    }
+  });
+
+  // Agregar detalle a registro rápido
+  app.post("/api/quick-time-entries/:id/details", requireAuth, async (req, res) => {
+    try {
+      const quickTimeEntryId = parseInt(req.params.id);
+      if (isNaN(quickTimeEntryId)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      const detailData = insertQuickTimeEntryDetailSchema.parse({
+        ...req.body,
+        quickTimeEntryId
+      });
+
+      const detail = await storage.createQuickTimeEntryDetail(detailData);
+      res.json(detail);
+    } catch (error) {
+      console.error("Error creating quick time entry detail:", error);
+      res.status(500).json({ message: "Failed to create quick time entry detail" });
+    }
+  });
+
+  // Actualizar detalle de registro rápido
+  app.patch("/api/quick-time-entry-details/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid detail ID" });
+      }
+
+      const updateData = req.body;
+      const detail = await storage.updateQuickTimeEntryDetail(id, updateData);
+      
+      if (!detail) {
+        return res.status(404).json({ message: "Detail not found" });
+      }
+
+      res.json(detail);
+    } catch (error) {
+      console.error("Error updating quick time entry detail:", error);
+      res.status(500).json({ message: "Failed to update quick time entry detail" });
+    }
+  });
+
+  // Eliminar detalle de registro rápido
+  app.delete("/api/quick-time-entry-details/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid detail ID" });
+      }
+
+      const success = await storage.deleteQuickTimeEntryDetail(id);
+      res.json({ success });
+    } catch (error) {
+      console.error("Error deleting quick time entry detail:", error);
+      res.status(500).json({ message: "Failed to delete quick time entry detail" });
+    }
+  });
+
+  // Enviar registro rápido para aprobación
+  app.post("/api/quick-time-entries/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      const entry = await storage.submitQuickTimeEntry(id);
+      res.json(entry);
+    } catch (error) {
+      console.error("Error submitting quick time entry:", error);
+      res.status(500).json({ message: "Failed to submit quick time entry" });
+    }
+  });
+
+  // Aprobar registro rápido
+  app.post("/api/quick-time-entries/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid entry ID" });
+      }
+
+      const entry = await storage.approveQuickTimeEntry(id, req.user?.id || 1);
+      res.json(entry);
+    } catch (error) {
+      console.error("Error approving quick time entry:", error);
+      res.status(500).json({ message: "Failed to approve quick time entry" });
+    }
+  });
+
   return httpServer;
 }
