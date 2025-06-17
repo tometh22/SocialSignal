@@ -1366,7 +1366,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Obtener subproyectos por ID del proyecto padre
-  async getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]> {
+  async getSubprojectsByParentId(parentId: number): Promise<ActiveProject[]> {
     try {
       return await db.select().from(activeProjects).where(eq(activeProjects.parentProjectId, parentId));
     } catch (error) {
@@ -1421,14 +1421,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getActiveProjectsByParentId(parentId: number): Promise<ActiveProject[]> {
-    try {
-      return await db.select().from(activeProjects).where(eq(activeProjects.parentProjectId, parentId));
-    } catch (error) {
-      console.error("Error al obtener proyectos activos por padre:", error);
-      throw error;
-    }
-  }
+
 
   async getProjectComponent(id: number): Promise<any> {
     try {

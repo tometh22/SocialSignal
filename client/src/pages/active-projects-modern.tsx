@@ -175,7 +175,7 @@ export default function ActiveProjectsModern() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los clientes</SelectItem>
-              {(clients as any[]).map((client: any) => (
+              {Array.isArray(clients) && clients.map((client: any) => (
                 <SelectItem key={client.id} value={client.id.toString()}>
                   {client.name}
                 </SelectItem>
@@ -188,7 +188,21 @@ export default function ActiveProjectsModern() {
         <div className="space-y-4">
           {Array.isArray(projects) && projects.length > 0 ? projects.filter((project: any) => {
             // Solo mostrar proyectos principales (no subproyectos)
-            return !project.parentProjectId;
+            if (project.parentProjectId) return false;
+
+            // Aplicar filtros
+            const client = Array.isArray(clients) ? clients.find((c: any) => c.id === project.clientId) : null;
+            const projectName = project.quotation?.projectName || "Proyecto sin nombre";
+            const clientName = client?.name || "";
+
+            const matchesSearch = searchTerm === "" || 
+              projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              clientName.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesStatus = filterStatus === "all" || project.status === filterStatus;
+            const matchesClient = filterClient === "all" || project.clientId.toString() === filterClient;
+
+            return matchesSearch && matchesStatus && matchesClient;
           }).map((project: any) => {
             const subprojects = Array.isArray(allProjects) ? allProjects.filter((p: any) => p.parentProjectId === project.id) : [];
             const isExpanded = expandedProjects.has(project.id);
@@ -286,7 +300,7 @@ export default function ActiveProjectsModern() {
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-4 w-4" />
                             <span>
-                              {new Date(project.startDate).toLocaleDateString('es-ES')}
+                              {project.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'Sin fecha'}
                               {project.expectedEndDate && ` - ${new Date(project.expectedEndDate).toLocaleDateString('es-ES')}`}
                             </span>
                           </div>

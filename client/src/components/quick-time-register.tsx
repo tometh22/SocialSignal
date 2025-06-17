@@ -69,7 +69,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
       const promises = Object.entries(teamHours)
         .filter(([_, hours]) => hours > 0)
         .map(([personnelId, hours]) => {
-          const member = baseTeam?.find((m: any) => m.personnelId === parseInt(personnelId));
+          const member = Array.isArray(baseTeam) ? baseTeam.find((m: any) => m.personnelId === parseInt(personnelId)) : null;
           if (member) {
             return apiRequest(`/api/time-entries`, "POST", {
               projectId,
