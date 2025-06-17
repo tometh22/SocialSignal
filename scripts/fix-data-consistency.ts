@@ -6,7 +6,7 @@ async function fixDataConsistency() {
   try {
     // 1. Obtener cotizaciones aprobadas sin proyectos activos
     const { rows: approvedQuotations } = await pool.query(`
-      SELECT q.id, q.project_name, q.client_id, q.estimated_hours, q.total_amount
+      SELECT q.id, q.project_name, q.client_id, q.total_amount
       FROM quotations q
       LEFT JOIN active_projects ap ON ap.quotation_id = q.id
       WHERE q.status = 'approved' AND ap.id IS NULL
