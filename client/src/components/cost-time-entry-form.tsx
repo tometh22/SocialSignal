@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar as CalendarIcon, Clock, User, DollarSign, Calculator, Info } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays, Clock, User, DollarSign, Calculator, Info } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,9 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
   const [totalCost, setTotalCost] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [isDateRange, setIsDateRange] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -59,7 +62,9 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
     if (entryType === "cost" && value && currentHourlyRate > 0) {
       const numCost = parseFloat(value) || 0;
       const calculatedHours = numCost / currentHourlyRate;
-      setHours(calculatedHours.toFixed(2));
+      // Asegurar que las horas calculadas sean razonables (máximo 744 horas por mes)
+      const reasonableHours = Math.min(calculatedHours, 744);
+      setHours(reasonableHours.toFixed(2));
     }
   };
 
@@ -289,31 +294,159 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
             </div>
           )}
 
-          {/* Fecha */}
-          <div className="space-y-2">
-            <Label>Fecha de Trabajo *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
+          {/* Período de Trabajo */}
+          <div className="space-y-3">
+            <Label>Período de Trabajo *</Label>
+            
+            {/* Selector de tipo de período */}
+            <RadioGroup value={isDateRange ? "range" : "single"} onValueChange={(value) => setIsDateRange(value === "range")}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="single" id="single-date" />
+                <Label htmlFor="single-date" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Un día específico
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="range" id="date-range" />
+                <Label htmlFor="date-range" className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  Período (ej: todo enero)
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {!isDateRange ? (
+              /* Fecha única */
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            ) : (
+              /* Rango de fechas */
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-600">Fecha de inicio</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "dd/MM", { locale: es }) : "Inicio"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div>
+                  <Label className="text-xs text-gray-600">Fecha de fin</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "dd/MM", { locale: es }) : "Fin"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+
+            {/* Botones rápidos para períodos comunes */}
+            {isDateRange && (
+              <div className="flex flex-wrap gap-2">
                 <Button
+                  type="button"
                   variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    setStartDate(firstDay);
+                    setEndDate(lastDay);
+                  }}
+                  className="text-xs"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  Este mes
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+                    setStartDate(firstDay);
+                    setEndDate(lastDay);
+                  }}
+                  className="text-xs"
+                >
+                  Mes pasado
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const firstDay = new Date(2025, 0, 1); // Enero 2025
+                    const lastDay = new Date(2025, 0, 31);
+                    setStartDate(firstDay);
+                    setEndDate(lastDay);
+                  }}
+                  className="text-xs"
+                >
+                  Enero 2025
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Descripción */}
