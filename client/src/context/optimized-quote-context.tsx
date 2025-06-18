@@ -190,6 +190,84 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   const [isRecotizacion, setIsRecotizacion] = useState<boolean>(!!isRequote);
   const [editQuotationId, setEditQuotationId] = useState<number | null>(quotationId || null);
 
+  // Cargar datos de cotización existente
+  useEffect(() => {
+    const loadQuotationData = async () => {
+      if (quotationId) {
+        try {
+          console.log('Cargando cotización:', quotationId);
+          const quotation = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
+          console.log('Datos de cotización cargados:', quotation);
+          
+          if (quotation) {
+            setQuotationData({
+              client: quotation.client || null,
+              project: {
+                name: quotation.projectName || '',
+                type: quotation.projectType || '',
+                duration: quotation.projectDuration || ''
+              },
+              template: quotation.template || null,
+              complexity: quotation.complexity || '',
+              customization: quotation.customization || '',
+              analysisType: quotation.analysisType || '',
+              mentionsVolume: quotation.mentionsVolume || '',
+              countriesCovered: quotation.countriesCovered || '',
+              clientEngagement: quotation.clientEngagement || '',
+              teamOption: 'manual',
+              teamMembers: quotation.teamMembers || [],
+              isAlwaysOnProject: quotation.isAlwaysOnProject || false,
+              deliverables: quotation.deliverables || [],
+              additionalDeliverableCost: quotation.additionalDeliverableCost || 0,
+              financials: {
+                platformCost: quotation.platformCost || 0,
+                deviationPercentage: quotation.deviationPercentage || 0,
+                discount: quotation.discount || 0,
+                marginFactor: quotation.marginFactor || 1.0
+              }
+            });
+
+            // Cargar equipo específico de la cotización
+            try {
+              const teamData = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
+              console.log('Equipo específico cargado:', teamData);
+              
+              if (teamData && Array.isArray(teamData) && teamData.length > 0) {
+                const formattedTeam = teamData.map((member: any) => ({
+                  id: member.id || `team-${member.roleId}-${member.personnelId}`,
+                  roleId: member.roleId,
+                  personnelId: member.personnelId,
+                  hours: member.hours || 0,
+                  rate: member.hourlyRate || member.rate || 0,
+                  cost: (member.hours || 0) * (member.hourlyRate || member.rate || 0),
+                  fte: member.fte,
+                  dedication: member.dedication,
+                  quantity: member.quantity || 1
+                }));
+                
+                setQuotationData(prev => ({
+                  ...prev,
+                  teamMembers: formattedTeam
+                }));
+                
+                console.log('Equipo formateado:', formattedTeam);
+              }
+            } catch (teamError) {
+              console.error('Error al cargar equipo:', teamError);
+            }
+
+            // Establecer paso apropiado
+            setCurrentStep(4); // Ir directo al paso de revisión
+          }
+        } catch (error) {
+          console.error('Error al cargar cotización:', error);
+        }
+      }
+    };
+
+    loadQuotationData();
+  }, [quotationId]);
+
   // Helper functions for complexity factors
   const getAnalysisTypeFactor = (type: string): number => {
     switch (type) {
