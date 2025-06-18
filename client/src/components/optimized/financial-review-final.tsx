@@ -4,6 +4,17 @@ import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+const formatCurrency = (amount: number) => {
+    const formatted = new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount || 0);
+    console.log(`Formatting currency: ${amount} -> ${formatted}`);
+    return formatted;
+  };
+
 export default function FinancialReviewFinal() {
   const {
     quotationData,
@@ -14,6 +25,18 @@ export default function FinancialReviewFinal() {
     complexityFactors,
     calculateTotalCost
   } = useOptimizedQuote();
+
+  // Debug log para verificar valores
+  useEffect(() => {
+    console.log('Financial Review - Current values:', {
+      baseCost,
+      complexityAdjustment,
+      markupAmount,
+      totalAmount,
+      complexityFactors,
+      teamMembers: quotationData.teamMembers
+    });
+  }, [baseCost, complexityAdjustment, markupAmount, totalAmount, complexityFactors, quotationData.teamMembers]);
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {

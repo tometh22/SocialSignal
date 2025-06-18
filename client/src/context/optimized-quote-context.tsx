@@ -193,14 +193,19 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
 
   // Calculate base cost from team members
   useEffect(() => {
+    console.log('Calculating base cost with team members:', quotationData.teamMembers);
+    
     const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
-      return total + (member.cost || 0);
+      const memberCost = (member.hours || 0) * (member.rate || 0);
+      console.log(`Member ${member.id} cost: ${member.hours} hours * ${member.rate} rate = ${memberCost}`);
+      return total + memberCost;
     }, 0);
 
     const templateCost = quotationData.template?.baseCost || 0;
     const deliverableCost = quotationData.additionalDeliverableCost || 0;
     const totalBaseCost = teamBaseCost + templateCost + deliverableCost;
 
+    console.log('Base cost calculation:', { teamBaseCost, templateCost, deliverableCost, totalBaseCost });
     setBaseCost(totalBaseCost);
   }, [quotationData.teamMembers, quotationData.template, quotationData.additionalDeliverableCost]);
 
@@ -329,8 +334,10 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const addTeamMember = useCallback((member: Omit<OptimizedTeamMember, "id">) => {
     const newMember: OptimizedTeamMember = {
       ...member,
-      id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      cost: (member.hours || 0) * (member.rate || 0)
     };
+    console.log('Adding new team member:', newMember);
     setQuotationData(prev => ({
       ...prev,
       teamMembers: [...prev.teamMembers, newMember]
@@ -340,9 +347,18 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
     setQuotationData(prev => ({
       ...prev,
-      teamMembers: prev.teamMembers.map(member =>
-        member.id === id ? { ...member, ...updates } : member
-      )
+      teamMembers: prev.teamMembers.map(member => {
+        if (member.id === id) {
+          const updatedMember = { ...member, ...updates };
+          // Recalcular el costo cuando se actualizan horas o rate
+          if ('hours' in updates || 'rate' in updates) {
+            updatedMember.cost = (updatedMember.hours || 0) * (updatedMember.rate || 0);
+          }
+          console.log('Updated team member:', updatedMember);
+          return updatedMember;
+        }
+        return member;
+      })
     }));
   }, []);
 
