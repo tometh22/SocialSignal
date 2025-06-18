@@ -251,8 +251,8 @@ export default function ProjectDetailsRedesigned() {
                   {projectName}
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  {/* Logo del cliente */}
-                  <div className="flex items-center gap-2 text-gray-600">
+                  {/* Logo e información del cliente compacta */}
+                  <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-1 rounded-full border border-gray-200">
                     {clientData?.logoUrl ? (
                       <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
                         <img 
@@ -271,7 +271,15 @@ export default function ProjectDetailsRedesigned() {
                         </span>
                       </div>
                     )}
-                    <span className="font-medium text-sm">{clientName}</span>
+                    <div>
+                      <span className="font-medium text-sm">{clientName}</span>
+                      {clientData?.contactEmail && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-2 w-2 text-gray-400" />
+                          <span className="text-xs text-gray-500">{clientData.contactEmail}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <Separator orientation="vertical" className="h-3" />
                   <Badge 
@@ -391,7 +399,8 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Grid de 3 columnas para mejor uso del espacio */}
+            <div className="grid grid-cols-3 gap-4">
               {/* Progreso del proyecto */}
               <Card>
                 <CardHeader className="pb-3">
@@ -409,26 +418,23 @@ export default function ProjectDetailsRedesigned() {
                     <Progress value={parseFloat(metrics[2]?.value.replace('%', '') || '0')} className="h-3" />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">Horas trabajadas</p>
-                      <p className="font-semibold text-lg">{metrics[1]?.value}</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Horas trabajadas</span>
+                      <span className="font-semibold">{metrics[1]?.value}</span>
                     </div>
-                    <div>
-                      <p className="text-gray-600">Presupuesto usado</p>
-                      <p className="font-semibold text-lg">{metrics[0]?.subtitle}</p>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Presupuesto usado</span>
+                      <span className="font-semibold">{metrics[0]?.subtitle}</span>
                     </div>
                   </div>
 
                   {parseFloat(metrics[2]?.value.replace('%', '') || '0') > 100 && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
                       <div className="flex items-center gap-2 text-red-700">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="font-medium">Proyecto excedido</span>
+                        <AlertTriangle className="h-3 w-3" />
+                        <span className="font-medium text-xs">Proyecto excedido</span>
                       </div>
-                      <p className="text-sm text-red-600 mt-1">
-                        El proyecto ha superado las horas estimadas. Requiere atención inmediata.
-                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -443,111 +449,72 @@ export default function ProjectDetailsRedesigned() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {recentTimeEntries.length > 0 ? (
-                      recentTimeEntries.map((entry: TimeEntry, index) => (
-                        <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
+                      recentTimeEntries.slice(0, 3).map((entry: TimeEntry, index) => (
+                        <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
                               <AvatarFallback className="text-xs">
                                 {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-sm">{entry.personnelName}</p>
+                              <p className="font-medium text-xs">{entry.personnelName}</p>
                               <p className="text-xs text-gray-500">
                                 {new Date(entry.date).toLocaleDateString('es-ES')}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold text-sm">{entry.hours}h</p>
-                            <p className="text-xs text-gray-500">{entry.roleName}</p>
+                            <p className="font-semibold text-xs">{entry.hours}h</p>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>No hay registros de tiempo aún</p>
+                      <div className="text-center py-4 text-gray-500">
+                        <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                        <p className="text-xs">No hay registros aún</p>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* Información del cliente */}
-            {client && (
+              {/* Información útil del proyecto */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 text-purple-600" />
-                    Información del Cliente
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    Información del Proyecto
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-start gap-4">
-                    {/* Logo prominente del cliente */}
-                    <div className="flex-shrink-0">
-                      {clientData?.logoUrl ? (
-                        <div className="w-16 h-16 rounded-xl overflow-hidden shadow-lg border border-gray-200">
-                          <img 
-                            src={clientData.logoUrl} 
-                            alt={`${clientName} logo`} 
-                            className="h-full w-full object-contain bg-white"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                          <span className="text-white text-2xl font-bold">
-                            {clientName.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Información del cliente */}
-                    <div className="flex-1 grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">Nombre del Cliente</p>
-                        <p className="font-semibold text-lg">{clientData?.name}</p>
-                      </div>
-                      
-                      {clientData?.email && (
-                        <div>
-                          <p className="text-xs text-gray-600 mb-1">Email</p>
-                          <div className="flex items-center gap-2">
-                            <Mail className="h-3 w-3 text-gray-400" />
-                            <p className="font-medium text-sm">{clientData.email}</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {clientData?.phone && (
-                        <div>
-                          <p className="text-xs text-gray-600 mb-1">Teléfono</p>
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-3 w-3 text-gray-400" />
-                            <p className="font-medium text-sm">{clientData.phone}</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">Estado</p>
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                          Cliente Activo
-                        </Badge>
-                      </div>
-                    </div>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Tipo de entregable</p>
+                    <p className="font-semibold text-sm">{projectData.deliverableType || "No especificado"}</p>
                   </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Fecha de inicio</p>
+                    <p className="font-semibold text-sm">
+                      {projectData.startDate ? new Date(projectData.startDate).toLocaleDateString('es-ES') : "No definida"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Fecha estimada de fin</p>
+                    <p className="font-semibold text-sm">
+                      {projectData.expectedEndDate ? new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : "No definida"}
+                    </p>
+                  </div>
+                  {projectData.notes && (
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Notas</p>
+                      <p className="text-xs text-gray-800 line-clamp-2">{projectData.notes}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+            </div>
           </TabsContent>
 
           <TabsContent value="time" className="space-y-6">
