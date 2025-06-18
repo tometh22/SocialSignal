@@ -272,7 +272,12 @@ export default function ProjectDetailsRedesigned() {
                   Analíticas
                 </Button>
                 
-                <Button variant="outline" size="sm" className="h-8">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8"
+                  onClick={() => setLocation(`/project-settings/${projectId}`)}
+                >
                   <Settings className="h-3 w-3 mr-1" />
                   Configurar
                 </Button>
