@@ -82,6 +82,9 @@ export default function ProjectDetailsRedesigned() {
     enabled: !!(project as any)?.clientId,
   });
 
+  // Debug: Log client data to verify logoUrl is present
+  console.log('Client data:', client);
+
   const { data: timeEntries = [] } = useQuery({
     queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
@@ -250,11 +253,24 @@ export default function ProjectDetailsRedesigned() {
                 <div className="flex items-center gap-2 mt-1">
                   {/* Logo del cliente */}
                   <div className="flex items-center gap-2 text-gray-600">
-                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">
-                        {clientName.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    {clientData?.logoUrl ? (
+                      <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
+                        <img 
+                          src={clientData.logoUrl} 
+                          alt={`${clientName} logo`} 
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">
+                          {clientName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     <span className="font-medium text-sm">{clientName}</span>
                   </div>
                   <Separator orientation="vertical" className="h-3" />
@@ -474,11 +490,24 @@ export default function ProjectDetailsRedesigned() {
                   <div className="flex items-start gap-4">
                     {/* Logo prominente del cliente */}
                     <div className="flex-shrink-0">
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <span className="text-white text-2xl font-bold">
-                          {clientName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
+                      {clientData?.logoUrl ? (
+                        <div className="w-16 h-16 rounded-xl overflow-hidden shadow-lg border border-gray-200">
+                          <img 
+                            src={clientData.logoUrl} 
+                            alt={`${clientName} logo`} 
+                            className="h-full w-full object-contain bg-white"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                          <span className="text-white text-2xl font-bold">
+                            {clientName.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Información del cliente */}
