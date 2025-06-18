@@ -250,9 +250,9 @@ export default function ProjectDetailsRedesigned() {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   {projectName}
                 </h1>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-3 mt-2">
                   {/* Logo e información del cliente compacta */}
-                  <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-1 rounded-full border border-gray-200">
+                  <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-2 rounded-full border border-gray-200">
                     {clientData?.logoUrl ? (
                       <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
                         <img 
@@ -271,8 +271,8 @@ export default function ProjectDetailsRedesigned() {
                         </span>
                       </div>
                     )}
-                    <div>
-                      <span className="font-medium text-sm">{clientName}</span>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm leading-tight">{clientName}</span>
                       {clientData?.contactEmail && (
                         <div className="flex items-center gap-1">
                           <Mail className="h-2 w-2 text-gray-400" />
@@ -281,21 +281,20 @@ export default function ProjectDetailsRedesigned() {
                       )}
                     </div>
                   </div>
-                  <Separator orientation="vertical" className="h-3" />
-                  <Badge 
-                    variant="outline" 
-                    className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs`}
-                  >
-                    {metrics[3]?.value}
-                  </Badge>
-                  {projectData.isAlwaysOnMacro && (
-                    <>
-                      <Separator orientation="vertical" className="h-3" />
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                  
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs py-1`}
+                    >
+                      {metrics[3]?.value}
+                    </Badge>
+                    {projectData.isAlwaysOnMacro && (
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs py-1">
                         Always-On
                       </Badge>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
