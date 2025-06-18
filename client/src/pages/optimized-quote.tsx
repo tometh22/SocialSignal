@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
@@ -9,7 +10,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText,
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
-import OptimizedFinancialReview from '@/components/optimized/review-ultra-compact';
+import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 
 interface OptimizedQuoteProps {
@@ -17,7 +18,7 @@ interface OptimizedQuoteProps {
   isRequote?: boolean;
 }
 
-const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
+const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const {
@@ -26,18 +27,21 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
     previousStep,
     goToStep,
     quotationData,
-    saveQuotation
+    saveQuotation,
+    loadQuotation
   } = useOptimizedQuote();
 
   const isEditing = Boolean(quotationId);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Forzar navegación al paso correcto para edición
+  // Load quotation if editing
   useEffect(() => {
     if (quotationId && !isRequote) {
-      goToStep(4);
+      loadQuotation(quotationId).then(() => {
+        goToStep(4);
+      });
     }
-  }, [quotationId, isRequote, goToStep]);
+  }, [quotationId, isRequote, loadQuotation, goToStep]);
 
   const handleSave = async () => {
     try {
@@ -60,9 +64,29 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
     }
   };
 
+  const getSteps = () => {
+    const baseSteps = [
+      { num: 1, title: "Info" },
+      { num: 2, title: "Plantilla" },
+      { num: 3, title: "Equipo" },
+    ];
+
+    if (quotationData.project?.type === 'always-on') {
+      baseSteps.push({ num: 4, title: "Entregables" });
+      baseSteps.push({ num: 5, title: "Revisión" });
+    } else {
+      baseSteps.push({ num: 4, title: "Revisión" });
+    }
+
+    return baseSteps;
+  };
+
+  const steps = getSteps();
+  const isLastStep = currentStep === steps[steps.length - 1].num;
+
   return (
     <div className="page-container">
-      {/* Breadcrumbs unificados */}
+      {/* Breadcrumbs */}
       <div className="breadcrumb-nav">
         <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
           <span>Dashboard</span>
@@ -110,18 +134,12 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
         </div>
       </div>
 
-      {/* Progreso del proceso de cotización */}
+      {/* Progress indicator */}
       <div className="standard-card mb-6">
         <div className="card-content py-4">
           <div className="flex items-center justify-center">
             <div className="flex items-center gap-1">
-              {[
-                { num: 1, title: "Info" },
-                { num: 2, title: "Plantilla" },
-                { num: 3, title: "Equipo" },
-                ...(quotationData.project?.type === 'always-on' ? [{ num: 4, title: "Entregables" }] : []),
-                { num: quotationData.project?.type === 'always-on' ? 5 : 4, title: "Revisión" }
-              ].map((step, index, array) => (
+              {steps.map((step, index) => (
                 <div key={step.num} className="flex items-center">
                   <div 
                     onClick={() => step.num < currentStep && goToStep(step.num)}
@@ -141,7 +159,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
                     ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
                     {step.title}
                   </span>
-                  {index < array.length - 1 && (
+                  {index < steps.length - 1 && (
                     <div className={`mx-4 h-px w-12 transition-colors
                       ${step.num < currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
                   )}
@@ -152,7 +170,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
         </div>
       </div>
 
-      {/* Contenido principal */}
+      {/* Main content */}
       <div className="space-y-6">
         <div className="standard-card">
           <div className="card-content">
@@ -164,14 +182,11 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
               <div className="p-6">
                 <DeliverableConfiguration 
                   isAlwaysOnProject={true}
-                  onIsAlwaysOnProjectChange={(value) => {
-                  }}
+                  onIsAlwaysOnProjectChange={() => {}}
                   deliverables={quotationData.deliverables || []}
-                  onDeliverablesChange={(deliverables) => {
-                  }}
+                  onDeliverablesChange={() => {}}
                   additionalCost={quotationData.additionalDeliverableCost || 0}
-                  onAdditionalCostChange={(cost) => {
-                  }}
+                  onAdditionalCostChange={() => {}}
                 />
               </div>
             )}
@@ -183,16 +198,14 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
           </div>
         </div>
         
-        {/* Tips section solo en primer paso */}
+        {/* Tips section only on first step */}
         {currentStep === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <Card className="bg-white border border-neutral-100 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center text-base">
                   <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                    </svg>
+                    <Building2 className="h-4 w-4 text-primary" />
                   </span>
                   Tipos de Proyecto
                 </CardTitle>
@@ -208,9 +221,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center text-base">
                   <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Z"/>
-                    </svg>
+                    <FileText className="h-4 w-4 text-primary" />
                   </span>
                   Entregables
                 </CardTitle>
@@ -226,9 +237,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center text-base">
                   <span className="bg-primary/5 p-2 rounded-sm mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 3v18h18"/>
-                    </svg>
+                    <Calendar className="h-4 w-4 text-primary" />
                   </span>
                   Presupuesto
                 </CardTitle>
@@ -242,7 +251,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
           </div>
         )}
 
-        {/* Footer con botones de navegación */}
+        {/* Navigation buttons */}
         <div className="flex justify-between items-center pt-6 border-t">
           <Button
             variant="ghost"
@@ -255,8 +264,7 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
           </Button>
           
           <div className="flex gap-3">
-            {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
-              (currentStep === 5 && quotationData.project?.type === 'always-on')) ? (
+            {isLastStep ? (
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
@@ -287,6 +295,14 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
         </div>
       </div>
     </div>
+  );
+};
+
+const OptimizedQuote: React.FC<OptimizedQuoteProps> = (props) => {
+  return (
+    <OptimizedQuoteProvider>
+      <OptimizedQuoteContent {...props} />
+    </OptimizedQuoteProvider>
   );
 };
 

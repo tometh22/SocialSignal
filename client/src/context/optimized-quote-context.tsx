@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
@@ -10,7 +11,8 @@ import {
   calculateComplexityAdjustment,
   calculateMarkup,
   calculateTotalAmount,
-  ComplexityFactors
+  ComplexityFactors,
+  loadCostMultipliers
 } from "@/lib/calculation";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -23,17 +25,23 @@ export interface OptimizedTeamMember {
   cost: number;
 }
 
+export interface ProjectData {
+  name: string;
+  type: string;
+}
+
 export interface QuotationData {
   client: Client | null;
-  projectName: string;
+  project: ProjectData;
   analysisType: string;
-  projectType: string;
   mentionsVolume: string;
   countriesCovered: string;
   clientEngagement: string;
   template: ReportTemplate | null;
   complexity: 'basic' | 'medium' | 'high';
   teamMembers: OptimizedTeamMember[];
+  deliverables: any[];
+  additionalDeliverableCost: number;
   financials: {
     platformCost: number;
     deviationPercentage: number;
@@ -43,16 +51,28 @@ export interface QuotationData {
 }
 
 interface OptimizedQuoteContextType {
+  // Data
   quotationData: QuotationData;
   baseCost: number;
   complexityAdjustment: number;
   markupAmount: number;
   totalAmount: number;
   complexityFactors: ComplexityFactors;
+  availableRoles: Role[];
+  availablePersonnel: Personnel[];
+  recommendedRoleIds: number[];
+  
+  // Navigation
+  currentStep: number;
+  nextStep: () => void;
+  previousStep: () => void;
+  goToStep: (step: number) => void;
+  
+  // Update functions
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
-  updateAnalysisType: (type: string) => void;
   updateProjectType: (type: string) => void;
+  updateAnalysisType: (type: string) => void;
   updateMentionsVolume: (volume: string) => void;
   updateCountriesCovered: (countries: string) => void;
   updateClientEngagement: (engagement: string) => void;
@@ -63,24 +83,33 @@ interface OptimizedQuoteContextType {
   updateTeamMember: (id: string, updates: Partial<OptimizedTeamMember>) => void;
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
+  
+  // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
+  saveQuotation: () => Promise<void>;
   calculateTotalCost: () => void;
   resetQuotation: () => void;
+  loadRoles: () => void;
+  loadPersonnel: () => void;
 }
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
 
 const initialQuotationData: QuotationData = {
   client: null,
-  projectName: "",
+  project: {
+    name: "",
+    type: "one-time"
+  },
   analysisType: "",
-  projectType: "",
   mentionsVolume: "",
   countriesCovered: "",
   clientEngagement: "",
   template: null,
   complexity: 'basic',
   teamMembers: [],
+  deliverables: [],
+  additionalDeliverableCost: 0,
   financials: {
     platformCost: 0,
     deviationPercentage: 0,
@@ -95,17 +124,43 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [currentStep, setCurrentStep] = useState(1);
 
   const queryClient = useQueryClient();
 
   // Get data from queries
-  const { data: roles } = useQuery<Role[]>({
+  const { data: roles = [] } = useQuery<Role[]>({
     queryKey: ["/api/roles"],
   });
 
-  const { data: personnel } = useQuery<Personnel[]>({
+  const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
   });
+
+  const { data: templates = [] } = useQuery<ReportTemplate[]>({
+    queryKey: ["/api/report-templates"],
+  });
+
+  // Load cost multipliers on mount
+  useEffect(() => {
+    loadCostMultipliers().catch(console.error);
+  }, []);
+
+  // Calculate recommended roles based on template
+  const recommendedRoleIds = useMemo(() => {
+    if (!quotationData.template) return [];
+    
+    // Basic role recommendations based on template complexity
+    const baseRoles = [1, 2]; // Analyst and Project Manager
+    
+    if (quotationData.template.complexity === 'medium') {
+      baseRoles.push(3); // Senior Analyst
+    } else if (quotationData.template.complexity === 'high') {
+      baseRoles.push(3, 4); // Senior Analyst and Director
+    }
+    
+    return baseRoles;
+  }, [quotationData.template]);
 
   // Calculate complexity factors
   const complexityFactors = useMemo((): ComplexityFactors => {
@@ -135,10 +190,11 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     }, 0);
 
     const templateCost = quotationData.template?.baseCost || 0;
-    const totalBaseCost = teamBaseCost + templateCost;
+    const deliverableCost = quotationData.additionalDeliverableCost || 0;
+    const totalBaseCost = teamBaseCost + templateCost + deliverableCost;
 
     setBaseCost(totalBaseCost);
-  }, [quotationData.teamMembers, quotationData.template]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.additionalDeliverableCost]);
 
   // Calculate complexity adjustment
   useEffect(() => {
@@ -156,7 +212,6 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       const baseWithComplexity = baseCost + complexityAdjustment;
       const platformCostAmount = quotationData.financials.platformCost || 0;
       const deviationAmount = baseWithComplexity * ((quotationData.financials.deviationPercentage || 0) / 100);
-      const marginMultiplier = quotationData.financials.marginFactor || 2.0;
 
       // Calculate markup
       const markup = calculateMarkup(baseWithComplexity);
@@ -179,21 +234,48 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [baseCost, complexityAdjustment, quotationData.financials]);
 
+  // Navigation functions
+  const nextStep = useCallback(() => {
+    const maxStep = quotationData.project.type === 'always-on' ? 5 : 4;
+    if (currentStep < maxStep) {
+      setCurrentStep(currentStep + 1);
+    }
+  }, [currentStep, quotationData.project.type]);
+
+  const previousStep = useCallback(() => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
+
+  const goToStep = useCallback((step: number) => {
+    const maxStep = quotationData.project.type === 'always-on' ? 5 : 4;
+    if (step >= 1 && step <= maxStep) {
+      setCurrentStep(step);
+    }
+  }, [quotationData.project.type]);
+
   // Context methods
   const updateClient = useCallback((client: Client | null) => {
     setQuotationData(prev => ({ ...prev, client }));
   }, []);
 
-  const updateProjectName = useCallback((projectName: string) => {
-    setQuotationData(prev => ({ ...prev, projectName }));
+  const updateProjectName = useCallback((name: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, name }
+    }));
+  }, []);
+
+  const updateProjectType = useCallback((type: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, type }
+    }));
   }, []);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
     setQuotationData(prev => ({ ...prev, analysisType }));
-  }, []);
-
-  const updateProjectType = useCallback((projectType: string) => {
-    setQuotationData(prev => ({ ...prev, projectType }));
   }, []);
 
   const updateMentionsVolume = useCallback((mentionsVolume: string) => {
@@ -265,13 +347,9 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
-      // Load quotation data
       const quotation: Quotation = await apiRequest(`/api/quotations/${quotationId}`);
-
-      // Load team members
       const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`);
 
-      // Convert team members to OptimizedTeamMember format
       const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any) => ({
         id: `member-${member.id}`,
         roleId: member.roleId,
@@ -281,18 +359,21 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         cost: member.hours * member.rate
       }));
 
-      // Update quotation data
       setQuotationData({
         client: quotation.client || null,
-        projectName: quotation.projectName || "",
+        project: {
+          name: quotation.projectName || "",
+          type: quotation.projectType || "one-time"
+        },
         analysisType: quotation.analysisType || "",
-        projectType: quotation.projectType || "",
         mentionsVolume: quotation.mentionsVolume || "",
         countriesCovered: quotation.countriesCovered || "",
         clientEngagement: quotation.clientEngagement || "",
         template: quotation.reportTemplate || null,
         complexity: (quotation.reportTemplate?.complexity as 'basic' | 'medium' | 'high') || 'basic',
         teamMembers: optimizedTeamMembers,
+        deliverables: [],
+        additionalDeliverableCost: 0,
         financials: {
           platformCost: quotation.platformCost || 0,
           deviationPercentage: quotation.deviationPercentage || 0,
@@ -300,16 +381,54 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
           marginFactor: quotation.marginFactor || 2.0
         }
       });
-
-      console.log("Quotation loaded successfully:", quotation);
     } catch (error) {
       console.error("Error loading quotation:", error);
     }
   }, []);
 
+  const saveQuotation = useCallback(async () => {
+    try {
+      const quotationPayload = {
+        clientId: quotationData.client?.id,
+        projectName: quotationData.project.name,
+        projectType: quotationData.project.type,
+        analysisType: quotationData.analysisType,
+        mentionsVolume: quotationData.mentionsVolume,
+        countriesCovered: quotationData.countriesCovered,
+        clientEngagement: quotationData.clientEngagement,
+        templateId: quotationData.template?.id,
+        baseCost,
+        complexityAdjustment,
+        markupAmount,
+        totalAmount,
+        platformCost: quotationData.financials.platformCost,
+        deviationPercentage: quotationData.financials.deviationPercentage,
+        discount: quotationData.financials.discount,
+        marginFactor: quotationData.financials.marginFactor,
+        status: 'draft'
+      };
+
+      const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
+      
+      // Save team members
+      for (const member of quotationData.teamMembers) {
+        await apiRequest('/api/quotation-team', 'POST', {
+          quotationId: savedQuotation.id,
+          roleId: member.roleId,
+          personnelId: member.personnelId,
+          hours: member.hours,
+          rate: member.rate
+        });
+      }
+
+      return savedQuotation;
+    } catch (error) {
+      console.error("Error saving quotation:", error);
+      throw error;
+    }
+  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
+
   const calculateTotalCost = useCallback(() => {
-    // This will be triggered by the useEffect hooks
-    // Just force a recalculation by updating the team members
     setQuotationData(prev => ({ ...prev, teamMembers: [...prev.teamMembers] }));
   }, []);
 
@@ -319,7 +438,16 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     setComplexityAdjustment(0);
     setMarkupAmount(0);
     setTotalAmount(0);
+    setCurrentStep(1);
   }, []);
+
+  const loadRoles = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+  }, [queryClient]);
+
+  const loadPersonnel = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+  }, [queryClient]);
 
   const value = {
     quotationData,
@@ -328,10 +456,17 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     markupAmount,
     totalAmount,
     complexityFactors,
+    availableRoles: roles,
+    availablePersonnel: personnel,
+    recommendedRoleIds,
+    currentStep,
+    nextStep,
+    previousStep,
+    goToStep,
     updateClient,
     updateProjectName,
-    updateAnalysisType,
     updateProjectType,
+    updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
     updateClientEngagement,
@@ -343,8 +478,11 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     removeTeamMember,
     updateFinancials,
     loadQuotation,
+    saveQuotation,
     calculateTotalCost,
-    resetQuotation
+    resetQuotation,
+    loadRoles,
+    loadPersonnel
   };
 
   return (
@@ -354,10 +492,10 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   );
 };
 
-export const useOptimizedQuote = () => {
+export function useOptimizedQuote() {
   const context = useContext(OptimizedQuoteContext);
   if (context === undefined) {
     throw new Error("useOptimizedQuote must be used within an OptimizedQuoteProvider");
   }
   return context;
-};
+}
