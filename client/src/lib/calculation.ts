@@ -14,20 +14,20 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 // Función para cargar multiplicadores desde la API
 export const loadCostMultipliers = async (forceReload = false): Promise<void> => {
   const now = Date.now();
-  
+
   // Si el caché es reciente y no se fuerza la recarga, usar caché
   if (!forceReload && (now - cacheTimestamp) < CACHE_DURATION && Object.keys(multiplierCache).length > 0) {
     return;
   }
-  
+
   try {
     const response = await fetch('/api/cost-multipliers');
     if (!response.ok) {
       throw new Error('Failed to fetch cost multipliers');
     }
-    
+
     const multipliers = await response.json();
-    
+
     // Organizar multiplicadores por categoría y subcategoría
     multiplierCache = {};
     multipliers.forEach((m: any) => {
@@ -38,7 +38,7 @@ export const loadCostMultipliers = async (forceReload = false): Promise<void> =>
         multiplierCache[m.category][m.subcategory] = m.multiplier;
       }
     });
-    
+
     cacheTimestamp = now;
   } catch (error) {
     console.error('Error loading cost multipliers:', error);
@@ -113,91 +113,30 @@ export const getTemplateFactor = (templateComplexity: string): number => {
   return multiplier - 1;
 };
 
-export const calculateComplexityAdjustment = (
-  baseCost: number,
-  factors: ComplexityFactors
-): number => {
-  // Verificar que el costo base sea un número válido
-  if (!baseCost || isNaN(baseCost)) {
-    baseCost = 0;
-  }
-  
-  // Asegurarse de que todos los factores sean números válidos
-  const analysisTypeFactor = isNaN(factors.analysisTypeFactor) ? 0 : factors.analysisTypeFactor;
-  const mentionsVolumeFactor = isNaN(factors.mentionsVolumeFactor) ? 0 : factors.mentionsVolumeFactor;
-  const countriesFactor = isNaN(factors.countriesFactor) ? 0 : factors.countriesFactor;
-  const clientEngagementFactor = isNaN(factors.clientEngagementFactor) ? 0 : factors.clientEngagementFactor;
-  const templateFactor = isNaN(factors.templateFactor) ? 0 : factors.templateFactor;
-  
-  // Calcular el factor total
-  const totalFactor =
-    analysisTypeFactor +
-    mentionsVolumeFactor +
-    countriesFactor +
-    clientEngagementFactor +
-    templateFactor;
+export function calculateComplexityAdjustment(baseCost: number, factors: ComplexityFactors): number {
+  if (!baseCost || baseCost <= 0) return 0;
 
-  // Aplicar el factor al costo base
-  return baseCost * totalFactor;
-};
+  const totalFactor = Object.values(factors).reduce((sum, factor) => sum + (factor || 0), 0);
+  return Math.round(baseCost * totalFactor * 100) / 100; // Round to 2 decimal places
+}
 
-export const calculateMarkup = (
-  adjustedBaseCost: number,
-  marginFactor: number = 1.0
-): number => {
-  // Mejorado para que siempre devuelva un valor numérico válido
-  if (isNaN(adjustedBaseCost) || adjustedBaseCost < 0) {
-    console.warn("Valor inválido para calcular markup:", adjustedBaseCost);
-    return 0;
-  }
-  
-  // Validar el factor de margen (1.0-10.0)
-  const factor = !isNaN(marginFactor) && marginFactor >= 1.0 && marginFactor <= 10.0 
-    ? marginFactor 
-    : 1.0;
-    
-  
-  // El margen se calcula como un porcentaje extra sobre el costo ajustado
-  // Un factor de 1.0x significa no agregar margen (100% del costo)
-  // Un factor de 2.0x significa agregar un 100% adicional (200% del costo)
-  // Así, el margen sería (factor - 1.0) * adjustedBaseCost
-  const markupPercentage = factor - 1.0;
-  const markup = adjustedBaseCost * markupPercentage;
-  
-  
-  return markup;
-};
+export function calculateMarkup(adjustedCost: number): number {
+  if (!adjustedCost || adjustedCost <= 0) return 0;
 
-export const calculateTotalAmount = (
-  baseCost: number,
-  complexityAdjustment: number,
-  markupAmount: number,
-  platformCost: number = 0,
+  // Standard 2x markup (100% markup means doubling the cost)
+  return Math.round(adjustedCost * 100) / 100; // Round to 2 decimal places
+}
+
+export function calculateTotalAmount(
+  baseCost: number, 
+  complexityAdjustment: number, 
+  markup: number, 
+  platformCost: number = 0, 
   deviationPercentage: number = 0
-): number => {
-  // Verificar y sanear valores de entrada
-  baseCost = isNaN(baseCost) ? 0 : baseCost;
-  complexityAdjustment = isNaN(complexityAdjustment) ? 0 : complexityAdjustment;
-  markupAmount = isNaN(markupAmount) ? 0 : markupAmount;
-  platformCost = isNaN(platformCost) ? 0 : platformCost;
-  deviationPercentage = isNaN(deviationPercentage) ? 0 : deviationPercentage;
-  
-  // Calcular el costo base ajustado (incluyendo complejidad)
-  const adjustedBaseCost = baseCost + complexityAdjustment;
-  
-  // Calcular el costo operativo total (costos operativos + plataforma)
-  const operativeCost = adjustedBaseCost + platformCost;
-  
-  // El markupAmount ahora representa el margen operativo calculado
-  
-  // Calcular el subtotal con operaciones
-  const operativeSubtotal = operativeCost;
-  
-  // Aplicar el porcentaje de desvío sobre el subtotal operativo (sin incluir el margen)
-  const deviationAmount = operativeSubtotal * (deviationPercentage / 100);
-  
-  // Calcular el subtotal incluyendo margen
-  const subtotal = operativeCost + markupAmount;
-  
-  return subtotal + deviationAmount;
-};
+): number {
+  if (!baseCost || baseCost <= 0) return 0;
+
+  const subtotal = (baseCost || 0) + (complexityAdjustment || 0) + (markup || 0) + (platformCost || 0);
+  const deviationAmount = subtotal * ((deviationPercentage || 0) / 100);
+  return Math.round((subtotal + deviationAmount) * 100) / 100; // Round to 2 decimal places
+}

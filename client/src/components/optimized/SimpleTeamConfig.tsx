@@ -39,17 +39,17 @@ const SimpleTeamConfig: React.FC = () => {
     // Cargar datos mediante llamada directa a la API
     const fetchData = async () => {
       try {
-        
+
         // Primero intentamos usar las funciones proporcionadas por el contexto
         loadRoles();
         loadPersonnel();
-        
+
         // Como respaldo, hacemos llamadas directas a la API
         const rolesResponse = await fetch('/api/roles');
         if (rolesResponse.ok) {
           const rolesData = await rolesResponse.json();
         }
-        
+
         const personnelResponse = await fetch('/api/personnel');
         if (personnelResponse.ok) {
           const personnelData = await personnelResponse.json();
@@ -58,16 +58,16 @@ const SimpleTeamConfig: React.FC = () => {
         console.error("Error al cargar datos:", error);
       }
     };
-    
+
     fetchData();
   }, [loadRoles, loadPersonnel]);
 
   // Verificar si hay datos cargados
   useEffect(() => {
-    
+
     if (availableRoles?.length) {
     }
-    
+
     if (availablePersonnel?.length) {
     }
   }, [availableRoles, availablePersonnel]);
@@ -92,7 +92,7 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Manejar la adición de nuevo miembro
   const handleAddMember = () => {
-    
+
     // Validación
     if (newMember.roleId <= 0 || newMember.hours <= 0 || newMember.rate <= 0) {
       console.error("❌ Validación fallida:", {
@@ -103,9 +103,9 @@ const SimpleTeamConfig: React.FC = () => {
       alert("Por favor completa todos los campos requeridos");
       return;
     }
-    
+
     try {
-      
+
       // Añadir miembro
       addTeamMember({
         roleId: newMember.roleId,
@@ -114,8 +114,8 @@ const SimpleTeamConfig: React.FC = () => {
         rate: newMember.rate,
         cost: newMember.hours * newMember.rate
       });
-      
-      
+
+
       // Limpiar formulario pero mantener el rol seleccionado
       setNewMember(prev => ({
         ...prev,
@@ -136,17 +136,17 @@ const SimpleTeamConfig: React.FC = () => {
     });
     setIsEditing({...isEditing, [memberId]: true});
   };
-  
+
   const cancelEditing = (memberId: string) => {
     setIsEditing({...isEditing, [memberId]: false});
   };
-  
+
   const saveEditing = (member: any) => {
     const memberId = String(member.id);
     if (editingMember[memberId]) {
       const hours = editingMember[memberId].hours;
       const rate = editingMember[memberId].rate;
-      
+
       // VALIDACIÓN AUTOMÁTICA: Verificar si la tarifa editada coincide con la oficial
       if (member.personnelId && availablePersonnel) {
         const personnel = availablePersonnel.find(p => p.id === member.personnelId);
@@ -157,14 +157,14 @@ const SimpleTeamConfig: React.FC = () => {
             `Pero estás intentando guardar $${rate}/hora\n\n` +
             `¿Deseas usar la tarifa oficial ($${personnel.hourlyRate}/hora)?`
           );
-          
+
           if (useOfficial) {
             // Actualizar con la tarifa oficial
             setEditingMember({
               ...editingMember,
               [memberId]: { hours, rate: personnel.hourlyRate }
             });
-            
+
             updateTeamMember(member.id, {
               ...member,
               hours,
@@ -176,7 +176,7 @@ const SimpleTeamConfig: React.FC = () => {
           }
         }
       }
-      
+
       // Proceder con la tarifa manual si el usuario lo confirma
       updateTeamMember(member.id, {
         ...member,
@@ -214,7 +214,7 @@ const SimpleTeamConfig: React.FC = () => {
               <p className="text-xs text-blue-600 mb-3">
                 Estos roles son los más adecuados para este tipo de proyecto según nuestra experiencia.
               </p>
-              
+
               <div className="flex flex-wrap gap-2 mb-3">
                 {recommendedRoleIds.map(roleId => {
                   const role = availableRoles?.find(r => r.id === roleId);
@@ -225,7 +225,7 @@ const SimpleTeamConfig: React.FC = () => {
                   ) : null;
                 })}
               </div>
-              
+
               <Button 
                 onClick={() => {
                   // Aplicar equipo recomendado - agregar cada rol recomendado
@@ -267,7 +267,7 @@ const SimpleTeamConfig: React.FC = () => {
                   value={newMember.roleId || ''}
                   onChange={(e) => {
                     const roleId = parseInt(e.target.value);
-                    
+
                     setNewMember(prev => ({
                       ...prev,
                       roleId: roleId,
@@ -295,7 +295,7 @@ const SimpleTeamConfig: React.FC = () => {
                   value={newMember.personnelId || ''}
                   onChange={(e) => {
                     const personnelId = parseInt(e.target.value);
-                    
+
                     if (isNaN(personnelId)) {
                       setNewMember(prev => ({
                         ...prev,
@@ -303,17 +303,17 @@ const SimpleTeamConfig: React.FC = () => {
                       }));
                       return;
                     }
-                    
-                    
+
+
                     const selectedPerson = availablePersonnel?.find(p => p.id === personnelId);
                     if (!selectedPerson) {
                       return;
                     }
-                    
-                    
+
+
                     // Solo actualizar personal y tarifa, NO cambiar el rol automáticamente
                     const officialRate = selectedPerson.hourlyRate || 0;
-                    
+
                     setNewMember(prev => ({
                       ...prev,
                       personnelId,
@@ -408,7 +408,7 @@ const SimpleTeamConfig: React.FC = () => {
             <Users className="h-4 w-4 mr-1.5" />
             Equipo del Proyecto
           </h3>
-          
+
           {quotationData.teamMembers.length === 0 ? (
             <div className="text-center py-6 bg-gray-50 rounded-md">
               <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -444,14 +444,14 @@ const SimpleTeamConfig: React.FC = () => {
                     const person = availablePersonnel?.find(p => p.id === member.personnelId);
                     const memberId = String(member.id);
                     const isCurrentlyEditing = isEditing[memberId];
-                    
+
                     return (
                       <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="p-2">
                           <div className="font-medium">{role?.name || 'Rol no especificado'}</div>
                           {person && <div className="text-gray-500 text-xs">{person.name}</div>}
                         </td>
-                        
+
                         {/* Horas - editable */}
                         <td className="p-2 text-center">
                           {isCurrentlyEditing ? (
@@ -477,7 +477,7 @@ const SimpleTeamConfig: React.FC = () => {
                             <span>{member.hours}</span>
                           )}
                         </td>
-                        
+
                         {/* Tarifa - editable */}
                         <td className="p-2 text-center">
                           {isCurrentlyEditing ? (
@@ -505,7 +505,7 @@ const SimpleTeamConfig: React.FC = () => {
                             <span>${member.rate}</span>
                           )}
                         </td>
-                        
+
                         {/* Costo calculado */}
                         <td className="p-2 text-right font-medium">
                           {isCurrentlyEditing ? (
@@ -517,7 +517,7 @@ const SimpleTeamConfig: React.FC = () => {
                             <span>${member.cost.toFixed(2)}</span>
                           )}
                         </td>
-                        
+
                         {/* Acciones */}
                         <td className="p-2 text-center">
                           <div className="flex items-center justify-center gap-1">
