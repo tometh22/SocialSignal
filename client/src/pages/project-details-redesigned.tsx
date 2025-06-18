@@ -234,19 +234,21 @@ export default function ProjectDetailsRedesigned() {
       {/* Header compacto */}
       <div className="bg-gradient-to-r from-white via-blue-50 to-purple-50 border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex flex-col gap-3">
-              {/* Título del proyecto arriba */}
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {projectName}
-              </h1>
-              
-              {/* Botón Proyectos alineado */}
+          {/* Título del proyecto */}
+          <div className="mb-3">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {projectName}
+            </h1>
+          </div>
+          
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              {/* Botón Proyectos alineado con los otros botones */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setLocation("/active-projects")}
-                className="hover:bg-gray-100 h-8 self-start"
+                className="hover:bg-gray-100 h-8"
               >
                 <ArrowLeft className="h-3 w-3 mr-1" />
                 Proyectos
