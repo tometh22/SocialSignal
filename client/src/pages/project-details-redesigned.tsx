@@ -281,44 +281,47 @@ export default function ProjectDetailsRedesigned() {
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs py-1`}
-                    >
-                      {metrics[3]?.value}
-                    </Badge>
-                    {projectData.isAlwaysOnMacro && (
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs py-1">
-                        Always-On
-                      </Badge>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setShowQuickRegister(!showQuickRegister)}
-                className="bg-blue-600 hover:bg-blue-700 h-8"
-              >
-                <Timer className="h-3 w-3 mr-1" />
-                Registrar Tiempo
-              </Button>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowQuickRegister(!showQuickRegister)}
+                  className="bg-blue-600 hover:bg-blue-700 h-8"
+                >
+                  <Timer className="h-3 w-3 mr-1" />
+                  Registrar Tiempo
+                </Button>
+                
+                <Button variant="outline" size="sm" onClick={() => setLocation(`/project-analytics/${projectId}`)} className="h-8">
+                  <BarChart3 className="h-3 w-3 mr-1" />
+                  Analíticas
+                </Button>
+                
+                <Button variant="outline" size="sm" className="h-8">
+                  <Settings className="h-3 w-3 mr-1" />
+                  Configurar
+                </Button>
+              </div>
               
-              <Button variant="outline" size="sm" onClick={() => setLocation(`/project-analytics/${projectId}`)} className="h-8">
-                <BarChart3 className="h-3 w-3 mr-1" />
-                Analíticas
-              </Button>
-              
-              <Button variant="outline" size="sm" className="h-8">
-                <Settings className="h-3 w-3 mr-1" />
-                Configurar
-              </Button>
+              {/* Badges de estado debajo de los botones */}
+              <div className="flex items-center gap-2">
+                <Badge 
+                  variant="outline" 
+                  className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs py-1`}
+                >
+                  {metrics[3]?.value}
+                </Badge>
+                {projectData.isAlwaysOnMacro && (
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs py-1">
+                    Always-On
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
