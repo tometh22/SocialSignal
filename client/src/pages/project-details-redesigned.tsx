@@ -234,55 +234,23 @@ export default function ProjectDetailsRedesigned() {
       {/* Header compacto */}
       <div className="bg-gradient-to-r from-white via-blue-50 to-purple-50 border-b border-gray-200 shadow-sm">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex flex-col gap-3">
+              {/* Título del proyecto arriba */}
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {projectName}
+              </h1>
+              
+              {/* Botón Proyectos alineado */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setLocation("/active-projects")}
-                className="hover:bg-gray-100 h-8"
+                className="hover:bg-gray-100 h-8 self-start"
               >
                 <ArrowLeft className="h-3 w-3 mr-1" />
                 Proyectos
               </Button>
-              
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  {projectName}
-                </h1>
-                <div className="flex items-center gap-3 mt-2">
-                  {/* Logo e información del cliente compacta */}
-                  <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-2 rounded-full border border-gray-200">
-                    {clientData?.logoUrl ? (
-                      <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
-                        <img 
-                          src={clientData.logoUrl} 
-                          alt={`${clientName} logo`} 
-                          className="h-full w-full object-contain"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">
-                          {clientName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm leading-tight">{clientName}</span>
-                      {clientData?.contactEmail && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-2 w-2 text-gray-400" />
-                          <span className="text-xs text-gray-500">{clientData.contactEmail}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className="flex flex-col items-end gap-2">
@@ -308,8 +276,8 @@ export default function ProjectDetailsRedesigned() {
                 </Button>
               </div>
               
-              {/* Badges de estado debajo de los botones */}
-              <div className="flex items-center gap-2">
+              {/* Badges de estado e información del cliente */}
+              <div className="flex items-center gap-3">
                 <Badge 
                   variant="outline" 
                   className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs py-1`}
@@ -321,6 +289,37 @@ export default function ProjectDetailsRedesigned() {
                     Always-On
                   </Badge>
                 )}
+                
+                {/* Logo e información del cliente compacta */}
+                <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-2 rounded-full border border-gray-200">
+                  {clientData?.logoUrl ? (
+                    <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0">
+                      <img 
+                        src={clientData.logoUrl} 
+                        alt={`${clientName} logo`} 
+                        className="h-full w-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">
+                        {clientName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm leading-tight">{clientName}</span>
+                    {clientData?.contactEmail && (
+                      <div className="flex items-center gap-1">
+                        <Mail className="h-2 w-2 text-gray-400" />
+                        <span className="text-xs text-gray-500">{clientData.contactEmail}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
