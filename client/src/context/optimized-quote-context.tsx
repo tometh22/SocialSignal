@@ -530,7 +530,6 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     resetQuotation,
     loadRoles,
     loadPersonnel,
-    updateProjectDuration,
     updateDeliverables,
     addDeliverable,
     updateDeliverable,
