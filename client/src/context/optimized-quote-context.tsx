@@ -72,6 +72,7 @@ interface OptimizedQuoteContextType {
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
+  updateProjectDuration: (duration: string) => void;
   updateAnalysisType: (type: string) => void;
   updateMentionsVolume: (volume: string) => void;
   updateCountriesCovered: (countries: string) => void;
@@ -91,6 +92,13 @@ interface OptimizedQuoteContextType {
   resetQuotation: () => void;
   loadRoles: () => void;
   loadPersonnel: () => void;
+  
+  // Deliverables
+  updateDeliverables: (deliverables: any[]) => void;
+  addDeliverable: (deliverable: any) => void;
+  updateDeliverable: (index: number, deliverable: any) => void;
+  removeDeliverable: (index: number) => void;
+  updateAdditionalDeliverableCost: (cost: number) => void;
 }
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
@@ -274,6 +282,13 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     }));
   }, []);
 
+  const updateProjectDuration = useCallback((duration: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, duration: duration }
+    }));
+  }, []);
+
   const updateAnalysisType = useCallback((analysisType: string) => {
     setQuotationData(prev => ({ ...prev, analysisType }));
   }, []);
@@ -441,6 +456,37 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     setCurrentStep(1);
   }, []);
 
+  const updateDeliverables = useCallback((deliverables: any[]) => {
+    setQuotationData(prev => ({ ...prev, deliverables }));
+  }, []);
+
+  const addDeliverable = useCallback((deliverable: any) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: [...(prev.deliverables || []), deliverable]
+    }));
+  }, []);
+
+  const updateDeliverable = useCallback((index: number, deliverable: any) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables?.map((item, i) => 
+        i === index ? deliverable : item
+      ) || []
+    }));
+  }, []);
+
+  const removeDeliverable = useCallback((index: number) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables?.filter((_, i) => i !== index) || []
+    }));
+  }, []);
+
+  const updateAdditionalDeliverableCost = useCallback((cost: number) => {
+    setQuotationData(prev => ({ ...prev, additionalDeliverableCost: cost }));
+  }, []);
+
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
   }, [queryClient]);
@@ -466,6 +512,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     updateClient,
     updateProjectName,
     updateProjectType,
+    updateProjectDuration,
     updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
@@ -482,7 +529,13 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     calculateTotalCost,
     resetQuotation,
     loadRoles,
-    loadPersonnel
+    loadPersonnel,
+    updateProjectDuration,
+    updateDeliverables,
+    addDeliverable,
+    updateDeliverable,
+    removeDeliverable,
+    updateAdditionalDeliverableCost
   };
 
   return (
