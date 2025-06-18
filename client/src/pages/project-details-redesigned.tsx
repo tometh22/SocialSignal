@@ -228,41 +228,46 @@ export default function ProjectDetailsRedesigned() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header moderno */}
+      {/* Header compacto */}
       <div className="bg-gradient-to-r from-white via-blue-50 to-purple-50 border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setLocation("/active-projects")}
-                className="hover:bg-gray-100"
+                className="hover:bg-gray-100 h-8"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-3 w-3 mr-1" />
                 Proyectos
               </Button>
               
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   {projectName}
                 </h1>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-2 mt-1">
+                  {/* Logo del cliente */}
                   <div className="flex items-center gap-2 text-gray-600">
-                    <Building className="h-4 w-4" />
-                    <span className="font-medium">{clientName}</span>
+                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">
+                        {clientName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="font-medium text-sm">{clientName}</span>
                   </div>
-                  <Separator orientation="vertical" className="h-4" />
+                  <Separator orientation="vertical" className="h-3" />
                   <Badge 
                     variant="outline" 
-                    className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current`}
+                    className={`${metrics[3]?.color} ${metrics[3]?.bgColor} border-current text-xs`}
                   >
                     {metrics[3]?.value}
                   </Badge>
                   {projectData.isAlwaysOnMacro && (
                     <>
-                      <Separator orientation="vertical" className="h-4" />
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                      <Separator orientation="vertical" className="h-3" />
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
                         Always-On
                       </Badge>
                     </>
@@ -274,48 +279,49 @@ export default function ProjectDetailsRedesigned() {
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
+                size="sm"
                 onClick={() => setShowQuickRegister(!showQuickRegister)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 h-8"
               >
-                <Timer className="h-4 w-4 mr-2" />
+                <Timer className="h-3 w-3 mr-1" />
                 Registrar Tiempo
               </Button>
               
-              <Button variant="outline" onClick={() => setLocation(`/project-analytics/${projectId}`)}>
-                <BarChart3 className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={() => setLocation(`/project-analytics/${projectId}`)} className="h-8">
+                <BarChart3 className="h-3 w-3 mr-1" />
                 Analíticas
               </Button>
               
-              <Button variant="outline">
-                <Settings className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-8">
+                <Settings className="h-3 w-3 mr-1" />
                 Configurar
               </Button>
             </div>
           </div>
 
-          {/* Métricas principales */}
-          <div className="grid grid-cols-4 gap-4">
+          {/* Métricas principales compactas */}
+          <div className="grid grid-cols-4 gap-3">
             {metrics.map((metric, index) => {
               const IconComponent = metric.icon;
               return (
                 <Card key={index} className={`${metric.bgColor} border-0 hover:shadow-md transition-all duration-200`}>
-                  <CardContent className="p-4">
+                  <CardContent className="p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">{metric.label}</p>
-                        <p className={`text-2xl font-bold ${metric.color}`}>{metric.value}</p>
+                        <p className="text-xs font-medium text-gray-600">{metric.label}</p>
+                        <p className={`text-lg font-bold ${metric.color}`}>{metric.value}</p>
                         {metric.subtitle && (
-                          <p className="text-xs text-gray-500 mt-1">{metric.subtitle}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{metric.subtitle}</p>
                         )}
                       </div>
-                      <div className={`p-3 rounded-full shadow-lg ${metric.color.replace('text-', 'bg-').replace('-700', '-500')}`}>
-                        <IconComponent className="h-5 w-5 text-white" />
+                      <div className={`p-2 rounded-full shadow-md ${metric.color.replace('text-', 'bg-').replace('-700', '-500')}`}>
+                        <IconComponent className="h-4 w-4 text-white" />
                       </div>
                     </div>
                     {metric.change !== undefined && (
-                      <div className="mt-2">
+                      <div className="mt-1">
                         <div className={`flex items-center text-xs ${metric.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          <TrendingUp className="h-3 w-3 mr-1" />
+                          <TrendingUp className="h-2 w-2 mr-1" />
                           {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(1)}%
                         </div>
                       </div>
@@ -347,38 +353,38 @@ export default function ProjectDetailsRedesigned() {
       )}
 
       {/* Contenido principal con tabs */}
-      <div className="px-6 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Eye className="h-4 w-4" />
+      <div className="px-6 py-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid grid-cols-4 w-full max-w-xl">
+            <TabsTrigger value="overview" className="flex items-center gap-2 text-sm">
+              <Eye className="h-3 w-3" />
               Resumen
             </TabsTrigger>
-            <TabsTrigger value="time" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
+            <TabsTrigger value="time" className="flex items-center gap-2 text-sm">
+              <Clock className="h-3 w-3" />
               Tiempo
             </TabsTrigger>
-            <TabsTrigger value="team" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
+            <TabsTrigger value="team" className="flex items-center gap-2 text-sm">
+              <Users className="h-3 w-3" />
               Equipo
             </TabsTrigger>
-            <TabsTrigger value="details" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
+            <TabsTrigger value="details" className="flex items-center gap-2 text-sm">
+              <FileText className="h-3 w-3" />
               Detalles
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               {/* Progreso del proyecto */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Gauge className="h-5 w-5 text-blue-600" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Gauge className="h-4 w-4 text-blue-600" />
                     Progreso del Proyecto
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span className="font-medium">Avance General</span>
@@ -414,9 +420,9 @@ export default function ProjectDetailsRedesigned() {
 
               {/* Actividad reciente */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-green-600" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Activity className="h-4 w-4 text-green-600" />
                     Actividad Reciente
                   </CardTitle>
                 </CardHeader>
@@ -458,36 +464,57 @@ export default function ProjectDetailsRedesigned() {
             {/* Información del cliente */}
             {client && (
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
-                    <Briefcase className="h-5 w-5 text-purple-600" />
+                    <Briefcase className="h-4 w-4 text-purple-600" />
                     Información del Cliente
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-6">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Nombre</p>
-                      <p className="font-semibold">{clientData?.name}</p>
+                  <div className="flex items-start gap-4">
+                    {/* Logo prominente del cliente */}
+                    <div className="flex-shrink-0">
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <span className="text-white text-2xl font-bold">
+                          {clientName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
                     </div>
-                    {clientData?.email && (
+                    
+                    {/* Información del cliente */}
+                    <div className="flex-1 grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Email</p>
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <p className="font-semibold">{clientData.email}</p>
-                        </div>
+                        <p className="text-xs text-gray-600 mb-1">Nombre del Cliente</p>
+                        <p className="font-semibold text-lg">{clientData?.name}</p>
                       </div>
-                    )}
-                    {clientData?.phone && (
+                      
+                      {clientData?.email && (
+                        <div>
+                          <p className="text-xs text-gray-600 mb-1">Email</p>
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-3 w-3 text-gray-400" />
+                            <p className="font-medium text-sm">{clientData.email}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {clientData?.phone && (
+                        <div>
+                          <p className="text-xs text-gray-600 mb-1">Teléfono</p>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-3 w-3 text-gray-400" />
+                            <p className="font-medium text-sm">{clientData.phone}</p>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Teléfono</p>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          <p className="font-semibold">{clientData.phone}</p>
-                        </div>
+                        <p className="text-xs text-gray-600 mb-1">Estado</p>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                          Cliente Activo
+                        </Badge>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
