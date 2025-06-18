@@ -242,6 +242,45 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   }, [quotationData.analysisType, quotationData.mentionsVolume, quotationData.countriesCovered, 
       quotationData.clientEngagement, quotationData.template, quotationData.complexity]);
 
+  // Calcular base cost desde los miembros del equipo
+  useEffect(() => {
+    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
+      return total + (member.cost || 0);
+    }, 0);
+    
+    const templateCost = quotationData.template?.baseCost || 0;
+    const totalBaseCost = teamBaseCost + templateCost;
+    
+    setBaseCost(totalBaseCost);
+  }, [quotationData.teamMembers, quotationData.template]);
+
+  // Calcular ajuste de complejidad
+  useEffect(() => {
+    const totalFactor = 
+      complexityFactors.analysisTypeFactor +
+      complexityFactors.mentionsVolumeFactor +
+      complexityFactors.countriesFactor +
+      complexityFactors.clientEngagementFactor +
+      complexityFactors.templateFactor;
+    
+    const adjustment = baseCost * totalFactor;
+    setComplexityAdjustment(adjustment);
+  }, [baseCost, complexityFactors]);
+
+  // Calcular markup basado en configuraciones financieras
+  useEffect(() => {
+    const baseWithComplexity = baseCost + complexityAdjustment;
+    const platformCostAmount = quotationData.financials.platformCost || 0;
+    const deviationAmount = baseWithComplexity * ((quotationData.financials.deviationPercentage || 0) / 100);
+    const marginMultiplier = quotationData.financials.marginFactor || 1.0;
+    
+    const grossAmount = (baseWithComplexity + platformCostAmount + deviationAmount) * marginMultiplier;
+    const discountAmount = grossAmount * ((quotationData.financials.discount || 0) / 100);
+    
+    setMarkupAmount(platformCostAmount + deviationAmount + (grossAmount * (marginMultiplier - 1)));
+    setTotalAmount(grossAmount - discountAmount);
+  }, [baseCost, complexityAdjustment, quotationData.financials]);
+
   // Context methods
   const updateClient = useCallback((client: Client | null) => {
     setQuotationData(prev => ({ ...prev, client }));
