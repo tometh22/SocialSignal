@@ -446,9 +446,9 @@ export default function ActiveProjectsRedesigned() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                🚀 Proyectos Rediseñados
+                Proyectos Activos
               </h1>
-              <p className="text-gray-600 mt-1 text-lg">Dashboard moderno con UX/UI de clase mundial</p>
+              <p className="text-gray-600 mt-1 text-lg">Gestión integral de proyectos y seguimiento en tiempo real</p>
             </div>
             
             <Button 
