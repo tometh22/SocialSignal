@@ -126,12 +126,13 @@ const initialQuotationData: QuotationData = {
 const getAnalysisTypeFactor = (type: string): number => {
   console.log('📊 Analysis Type Factor for:', type);
   const factors: Record<string, number> = {
-    'standard': 0.0,
-    'advanced': 0.15,
-    'basic': 0.0,
-    'Estándar': 0.0,
-    'Avanzado': 0.15,
-    'Básico': 0.0
+    'basic': 0.0,     // Básico: +0%
+    'standard': 0.10, // Estándar: +10%
+    'deep': 0.15,     // Avanzado: +15%
+    'advanced': 0.15, // Fallback para 'advanced'
+    'Básico': 0.0,
+    'Estándar': 0.10,
+    'Avanzado': 0.15
   };
   const factor = factors[type] || 0.0;
   console.log(`📊 Analysis Type "${type}" -> ${factor} (${factor * 100}%)`);
