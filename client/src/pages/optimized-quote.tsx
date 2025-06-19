@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText,
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
-import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
+import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
