@@ -396,7 +396,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = quotationData.project.type === 'always-on' ? 5 : 4;
+    const maxStep = quotationData.project.type === 'always-on' ? 6 : 5;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
@@ -409,7 +409,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
   }, [currentStep]);
 
   const goToStep = useCallback((step: number) => {
-    const maxStep = quotationData.project.type === 'always-on' ? 5 : 4;
+    const maxStep = quotationData.project.type === 'always-on' ? 6 : 5;
     if (step >= 1 && step <= maxStep) {
       setCurrentStep(step);
     }

@@ -8,11 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2 } from 'lucide-react';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
+import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
-// import { InflationAdjustmentCard } from '@/components/optimized/inflation-adjustment-card';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
@@ -67,16 +67,17 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   const getSteps = () => {
     const baseSteps = [
-      { num: 1, title: "Equipo" },
-      { num: 2, title: "Plantilla" },
-      { num: 3, title: "Info" },
+      { num: 1, title: "Info Básica" },
+      { num: 2, title: "Complejidad" },
+      { num: 3, title: "Plantilla" },
+      { num: 4, title: "Equipo" },
     ];
 
     if (quotationData.project?.type === 'always-on') {
-      baseSteps.push({ num: 4, title: "Entregables" });
-      baseSteps.push({ num: 5, title: "Revisión" });
+      baseSteps.push({ num: 5, title: "Entregables" });
+      baseSteps.push({ num: 6, title: "Revisión" });
     } else {
-      baseSteps.push({ num: 4, title: "Revisión" });
+      baseSteps.push({ num: 5, title: "Revisión" });
     }
 
     return baseSteps;
@@ -175,11 +176,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       <div className="space-y-6">
         <div className="standard-card">
           <div className="card-content">
-            {currentStep === 1 && <OptimizedTeamConfig />}
-            {currentStep === 2 && <OptimizedTemplateSelection />}
-            {currentStep === 3 && <OptimizedBasicInfo />}
+            {currentStep === 1 && <OptimizedBasicInfo />}
+            {currentStep === 2 && <ComplexityFactorsCard />}
+            {currentStep === 3 && <OptimizedTemplateSelection />}
+            {currentStep === 4 && <OptimizedTeamConfig />}
             
-            {currentStep === 4 && quotationData.project?.type === 'always-on' && (
+            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration 
                   isAlwaysOnProject={true}
@@ -192,8 +194,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
             
-            {((currentStep === 4 && quotationData.project?.type !== 'always-on') || 
-              (currentStep === 5 && quotationData.project?.type === 'always-on')) && (
+            {((currentStep === 5 && quotationData.project?.type !== 'always-on') || 
+              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
           </div>
