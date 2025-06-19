@@ -106,7 +106,7 @@ const SimpleTeamConfig: React.FC = () => {
       return;
     }
 
-    const rate = selectedPersonnel?.rate || selectedRole.rate || 0;
+    const rate = selectedPersonnel?.hourlyRate || selectedRole.defaultRate || 0;
     const hours = newMember.hours;
     const cost = hours * rate;
 
@@ -127,7 +127,7 @@ const SimpleTeamConfig: React.FC = () => {
     });
 
     // Reset form
-    setNewMember({ roleId: 0, personnelId: null, hours: 0 });
+    setNewMember({ roleId: 0, personnelId: null, hours: 10, rate: 0 });
 
     // Force recalculation
     setTimeout(() => {
@@ -207,7 +207,7 @@ const SimpleTeamConfig: React.FC = () => {
         if (field === 'personnelId') {
           const selectedPersonnel = value ? availablePersonnel.find(p => p.id === value) : null;
           const selectedRole = availableRoles.find(r => r.id === member.roleId);
-          rate = selectedPersonnel?.rate || selectedRole?.rate || 0;
+          rate = selectedPersonnel?.hourlyRate || selectedRole?.defaultRate || 0;
           updates.rate = rate;
         }
 
@@ -410,7 +410,7 @@ const SimpleTeamConfig: React.FC = () => {
                   <Input 
                     id="rate-input"
                     type="text" 
-                    value={newMember.rate.toString()}
+                    value={(newMember.rate || 0).toString()}
                     onChange={(e) => {
                       const value = parseDecimalInput(e.target.value);
                       setNewMember(prev => ({
