@@ -129,6 +129,12 @@ export const quotations = pgTable("quotations", {
   adjustmentReason: text("adjustment_reason"),
   additionalNotes: text("additional_notes"),
   status: text("status").notNull().default("draft"), // 'draft', 'pending', 'approved', 'rejected', 'in-negotiation'
+  // Campos para proyección inflacionaria
+  projectStartDate: timestamp("project_start_date"), // Fecha de inicio del proyecto
+  inflationRate: doublePrecision("inflation_rate").default(0), // Tasa de inflación anual (ej: 0.15 = 15%)
+  projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
+  usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
+  quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
@@ -194,6 +200,25 @@ export const insertCostMultiplierSchema = createInsertSchema(costMultipliers).om
 
 export type CostMultiplier = typeof costMultipliers.$inferSelect;
 export type InsertCostMultiplier = z.infer<typeof insertCostMultiplierSchema>;
+
+// ==================== CONFIGURACIÓN DEL SISTEMA ====================
+// System configuration for inflation rates and exchange rates
+export const systemConfig = pgTable("system_config", {
+  id: serial("id").primaryKey(),
+  configKey: text("config_key").notNull().unique(), // 'inflation_rate_ars', 'usd_exchange_rate', etc.
+  configValue: doublePrecision("config_value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
 
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
