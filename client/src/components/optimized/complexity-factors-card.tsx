@@ -13,7 +13,8 @@ const ComplexityFactorsCard: React.FC = () => {
     updateMentionsVolume,
     updateCountriesCovered,
     updateClientEngagement,
-    complexityFactors
+    complexityFactors,
+    availableRoles
   } = useOptimizedQuote();
 
   const analysisTypes = [
@@ -63,12 +64,35 @@ const ComplexityFactorsCard: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Factores de Complejidad</h3>
-          <p className="text-sm text-gray-600">Define las características del proyecto para calcular la complejidad</p>
+          <p className="text-sm text-gray-600">Define las características que ajustarán las horas del equipo configurado</p>
         </div>
         <Badge className={complexityLevel.color}>
           Factor Total: {(totalFactor * 100).toFixed(1)}% - {complexityLevel.level}
         </Badge>
       </div>
+
+      {/* Resumen del equipo configurado */}
+      {quotationData.teamMembers.length > 0 && (
+        <Card className="bg-blue-50">
+          <CardContent className="p-4">
+            <h4 className="font-medium text-gray-900 mb-3">Equipo Configurado</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {quotationData.teamMembers.map((member, index) => {
+                const role = availableRoles.find((r: any) => r.id === member.roleId);
+                return (
+                  <div key={member.id || index} className="flex justify-between items-center text-sm">
+                    <span className="font-medium">{role?.name || 'Rol desconocido'}</span>
+                    <span className="text-gray-600">{member.hours}h × ${member.rate}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t text-sm text-gray-600">
+              Los factores de complejidad se aplicarán a las horas según el tipo de rol
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Tipo de Análisis */}
@@ -180,21 +204,46 @@ const ComplexityFactorsCard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Resumen de Complejidad */}
+      {/* Impacto por Tipo de Rol */}
       <Card className="bg-gray-50">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-gray-900">Resumen de Complejidad</h4>
-              <p className="text-sm text-gray-600">
-                Los factores seleccionados afectarán las horas del equipo según sus roles
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary">
-                +{(totalFactor * 100).toFixed(1)}%
+          <h4 className="font-medium text-gray-900 mb-3">Impacto por Tipo de Rol</h4>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
+              <div>
+                <span className="font-medium text-blue-900">Roles de Análisis</span>
+                <div className="text-xs text-blue-700">Analistas, Especialistas, Tech Leads</div>
               </div>
-              <div className="text-xs text-gray-500">Factor total</div>
+              <div className="text-blue-900 font-mono">
+                +{((complexityFactors.analysisTypeFactor + complexityFactors.mentionsVolumeFactor + complexityFactors.countriesFactor) * 100).toFixed(1)}%
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+              <div>
+                <span className="font-medium text-green-900">Roles de Gestión</span>
+                <div className="text-xs text-green-700">Managers, Directores, Account</div>
+              </div>
+              <div className="text-green-900 font-mono">
+                +{((complexityFactors.clientEngagementFactor + complexityFactors.analysisTypeFactor * 0.5) * 100).toFixed(1)}%
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+              <div>
+                <span className="font-medium text-purple-900">Otros Roles</span>
+                <div className="text-xs text-purple-700">Diseñadores, etc.</div>
+              </div>
+              <div className="text-purple-900 font-mono">
+                +{(complexityFactors.analysisTypeFactor * 0.3 * 100).toFixed(1)}%
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-gray-900">Factor Promedio Ponderado</span>
+              <span className="text-xl font-bold text-primary">+{(totalFactor * 100).toFixed(1)}%</span>
             </div>
           </div>
         </CardContent>
