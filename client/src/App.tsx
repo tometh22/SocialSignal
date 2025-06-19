@@ -14,6 +14,7 @@ import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
 import Statistics from "@/pages/statistics-fixed";
 import Admin from "@/pages/admin-fixed";
+import AdminInflation from "@/pages/admin-inflation";
 import ActiveProjects from "@/pages/active-projects-redesigned";
 import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
 import ProjectSettings from "@/pages/project-settings";
@@ -123,6 +124,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/statistics" component={Statistics} />
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
                   <ProtectedRoute path="/admin" component={Admin} />
+                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
                   {/* Rutas para gestión de proyectos activos */}
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />

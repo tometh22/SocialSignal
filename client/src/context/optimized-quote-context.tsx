@@ -556,8 +556,15 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         financials: {
           platformCost: quotation.platformCost || 0,
           deviationPercentage: quotation.deviationPercentage || 0,
-          discount: quotation.discount || 0,
-          marginFactor: quotation.marginFactor || 2.0
+          discount: 0,
+          marginFactor: 2.0
+        },
+        inflation: {
+          applyInflationAdjustment: quotation.applyInflationAdjustment || false,
+          inflationMethod: quotation.inflationMethod || "automatic",
+          manualInflationRate: quotation.manualInflationRate || 0,
+          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
+          quotationCurrency: quotation.quotationCurrency || "ARS"
         }
       });
       
@@ -655,6 +662,14 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     forceRecalculate();
   }, [forceRecalculate]);
 
+  const updateInflation = useCallback((inflation: Partial<QuotationData['inflation']>) => {
+    setQuotationData(prev => ({
+      ...prev,
+      inflation: { ...prev.inflation, ...inflation }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
   }, [queryClient]);
@@ -692,6 +707,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     updateTeamMember,
     removeTeamMember,
     updateFinancials,
+    updateInflation,
     loadQuotation,
     saveQuotation,
     calculateTotalCost,
