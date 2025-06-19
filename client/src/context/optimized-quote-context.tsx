@@ -696,7 +696,13 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     forceRecalculate();
   }, [forceRecalculate]);
 
-
+  const updateInflation = useCallback((inflation: Partial<QuotationData['inflation']>) => {
+    setQuotationData(prev => ({
+      ...prev,
+      inflation: { ...prev.inflation, ...inflation }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
@@ -735,6 +741,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     updateTeamMember,
     removeTeamMember,
     updateFinancials,
+    updateInflation,
     loadQuotation,
     saveQuotation,
     calculateTotalCost,
