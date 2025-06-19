@@ -69,13 +69,10 @@ export default function AdminInflationPage() {
 
   // Mutación para actualizar tipo de cambio
   const exchangeRateMutation = useMutation({
-    mutationFn: (rate: number) => apiRequest('/api/admin/system-config', {
-      method: 'POST',
-      body: JSON.stringify({
-        configKey: 'usd_exchange_rate',
-        configValue: rate,
-        description: 'Tipo de cambio USD/ARS'
-      })
+    mutationFn: (rate: number) => apiRequest('/api/admin/system-config', 'POST', {
+      configKey: 'usd_exchange_rate',
+      configValue: rate,
+      description: 'Tipo de cambio USD/ARS'
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config'] });

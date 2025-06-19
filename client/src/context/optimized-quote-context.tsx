@@ -43,6 +43,13 @@ export interface QuotationData {
     discount: number;
     marginFactor: number;
   };
+  inflation: {
+    applyInflationAdjustment: boolean;
+    inflationMethod: string;
+    manualInflationRate: number;
+    projectStartDate: string;
+    quotationCurrency: string;
+  };
 }
 
 interface OptimizedQuoteContextType {
@@ -79,6 +86,7 @@ interface OptimizedQuoteContextType {
   updateTeamMember: (id: string, updates: Partial<OptimizedTeamMember>) => void;
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
+  updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
   
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
@@ -119,6 +127,13 @@ const initialQuotationData: QuotationData = {
     deviationPercentage: 0,
     discount: 0,
     marginFactor: 2.0
+  },
+  inflation: {
+    applyInflationAdjustment: false,
+    inflationMethod: "automatic",
+    manualInflationRate: 0,
+    projectStartDate: "",
+    quotationCurrency: "ARS"
   }
 };
 
