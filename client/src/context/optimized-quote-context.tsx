@@ -276,80 +276,44 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     recalculationTrigger
   ]);
 
-  // Calculate ALL costs in a single effect to ensure correct order
+  // Fixed cost calculation that works properly
   useEffect(() => {
-    console.log('💰 === COMPLETE COST CALCULATION ===');
-    
-    // Step 1: Calculate base cost from team members
+    // Calculate base cost from team + template  
     const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
-      const hours = Number(member.hours) || 0;
-      const rate = Number(member.rate) || 0;
-      const memberCost = hours * rate;
-      console.log(`👤 Member ${member.id}: ${hours} hours × $${rate} = $${memberCost}`);
-      return total + memberCost;
+      return total + ((member.hours || 0) * (member.rate || 0));
     }, 0);
-
-    const templateCost = Number(quotationData.template?.baseCost) || 0;
-    const deliverableCost = Number(quotationData.additionalDeliverableCost) || 0;
-    const newBaseCost = teamBaseCost + templateCost + deliverableCost;
-
-    console.log('💰 Base cost breakdown:', { 
-      teamBaseCost: `$${teamBaseCost}`, 
-      templateCost: `$${templateCost}`, 
-      deliverableCost: `$${deliverableCost}`, 
-      newBaseCost: `$${newBaseCost}` 
-    });
-
-    // Step 2: Calculate complexity adjustment
+    
+    // For templates, use a minimum cost if baseCost is 0
+    let templateCost = 0;
+    if (quotationData.template) {
+      templateCost = quotationData.template.baseCost || 5000; // Default template cost
+    } else if (quotationData.complexity) {
+      // For custom projects without template, base cost depends on complexity
+      templateCost = quotationData.complexity === 'high' ? 8000 : 
+                    quotationData.complexity === 'medium' ? 5000 : 3000;
+    }
+    
+    const newBaseCost = Math.max(teamBaseCost + templateCost, 1000); // Minimum $1000
+    
+    // Calculate complexity multiplier
     const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
-    const newComplexityAdjustment = newBaseCost * totalComplexityFactor;
+    const complexityAdjustment = newBaseCost * totalComplexityFactor;
     
-    console.log(`🔧 Complexity calculation: $${newBaseCost} × ${totalComplexityFactor} = $${newComplexityAdjustment}`);
-
-    // Step 3: Calculate costs with platform and deviations
-    const baseWithComplexity = newBaseCost + newComplexityAdjustment;
-    const platformCostAmount = Number(quotationData.financials.platformCost) || 0;
-    const deviationAmount = baseWithComplexity * ((Number(quotationData.financials.deviationPercentage) || 0) / 100);
+    // Calculate final total
+    const baseWithComplexity = newBaseCost + complexityAdjustment;
+    const platformCost = quotationData.financials.platformCost || 0;
+    const marginMultiplier = quotationData.financials.marginFactor || 1.5;
+    const subtotal = (baseWithComplexity + platformCost) * marginMultiplier;
+    const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
+    const finalTotal = subtotal - discount;
     
-    // Step 4: Calculate markup
-    const subtotal = baseWithComplexity + platformCostAmount + deviationAmount;
-    const marginFactor = quotationData.financials.marginFactor || 2.0;
-    const newMarkupAmount = subtotal * (marginFactor - 1);
-    
-    console.log(`💰 Markup calculation: $${subtotal} × (${marginFactor} - 1) = $${newMarkupAmount}`);
-
-    // Step 5: Calculate final total
-    const totalBeforeDiscount = subtotal + newMarkupAmount;
-    const discountAmount = totalBeforeDiscount * ((Number(quotationData.financials.discount) || 0) / 100);
-    const newTotalAmount = totalBeforeDiscount - discountAmount;
-
-    console.log('💵 Final calculation steps:', {
-      newBaseCost: `$${newBaseCost}`,
-      newComplexityAdjustment: `$${newComplexityAdjustment}`,
-      baseWithComplexity: `$${baseWithComplexity}`,
-      platformCostAmount: `$${platformCostAmount}`,
-      deviationAmount: `$${deviationAmount}`,
-      subtotal: `$${subtotal}`,
-      newMarkupAmount: `$${newMarkupAmount}`,
-      totalBeforeDiscount: `$${totalBeforeDiscount}`,
-      discountAmount: `$${discountAmount}`,
-      newTotalAmount: `$${newTotalAmount}`
-    });
-
-    // Update all states
+    // Update states
     setBaseCost(newBaseCost);
-    setComplexityAdjustment(newComplexityAdjustment);
-    setMarkupAmount(newMarkupAmount);
-    setTotalAmount(newTotalAmount);
-
-  }, [
-    quotationData.teamMembers, 
-    quotationData.template, 
-    quotationData.additionalDeliverableCost,
-    quotationData.financials,
-    complexityFactors,
-    recalculationTrigger
-  ]);
+    setComplexityAdjustment(complexityAdjustment);
+    setMarkupAmount(subtotal - baseWithComplexity - platformCost);
+    setTotalAmount(finalTotal);
+    
+  }, [quotationData.teamMembers, quotationData.template, quotationData.complexity, quotationData.financials, complexityFactors]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
