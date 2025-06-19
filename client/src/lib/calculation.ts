@@ -49,19 +49,19 @@ export async function loadCostMultipliers(forceReload = false): Promise<void> {
 
   // Use cache if not expired and not forcing reload
   if (!forceReload && cacheTimestamp && (now - cacheTimestamp < CACHE_EXPIRATION)) {
-    console.log('Using cached multipliers');
+    console.log('📋 Using cached multipliers:', multiplierCache);
     return;
   }
 
   try {
-    console.log('Loading cost multipliers from API...');
+    console.log('🔄 Loading cost multipliers from API...');
     const response = await fetch('/api/cost-multipliers');
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const multipliers = await response.json();
-    console.log('Raw multipliers from API:', multipliers);
+    console.log('📊 Raw multipliers from API:', multipliers);
 
     // Organize multipliers by category
     const organized: Record<string, Record<string, number>> = {};
@@ -72,21 +72,27 @@ export async function loadCostMultipliers(forceReload = false): Promise<void> {
       }
       if (m.isActive) {
         organized[m.category][m.subcategory] = m.multiplier;
+        console.log(`✅ Added multiplier: ${m.category}.${m.subcategory} = ${m.multiplier}`);
+      } else {
+        console.log(`❌ Skipped inactive multiplier: ${m.category}.${m.subcategory}`);
       }
     });
 
-    // Only update if we have valid data
-    if (Object.keys(organized).length > 0) {
-      multiplierCache = { ...DEFAULT_MULTIPLIERS, ...organized };
-      cacheTimestamp = now;
-      console.log('Updated multiplier cache:', multiplierCache);
-    } else {
-      console.warn('No valid multipliers received, keeping defaults');
-    }
+    // Always merge with defaults to ensure we have all required values
+    multiplierCache = { ...DEFAULT_MULTIPLIERS, ...organized };
+    cacheTimestamp = now;
+    console.log('💾 Final multiplier cache:', multiplierCache);
+    
+    // Log each category
+    Object.keys(multiplierCache).forEach(category => {
+      console.log(`📂 Category ${category}:`, multiplierCache[category]);
+    });
+    
   } catch (error) {
-    console.error('Error loading cost multipliers:', error);
-    console.log('Using default multipliers');
+    console.error('❌ Error loading cost multipliers:', error);
+    console.log('🔧 Using default multipliers:', DEFAULT_MULTIPLIERS);
     multiplierCache = DEFAULT_MULTIPLIERS;
+    cacheTimestamp = now;
   }
 }
 
@@ -97,7 +103,12 @@ export const invalidateCostMultipliersCache = (): void => {
 
 // Funciones de factor de cálculo mejoradas
 export const getAnalysisTypeFactor = (analysisType: string): number => {
-  if (!analysisType) return 0;
+  console.log(`🔍 Getting analysis type factor for: "${analysisType}"`);
+  
+  if (!analysisType) {
+    console.log('⚠️ Analysis type is empty, returning 0');
+    return 0;
+  }
 
   // Map UI values to database values
   const mapping: Record<string, string> = {
@@ -109,14 +120,27 @@ export const getAnalysisTypeFactor = (analysisType: string): number => {
     'deep': 'deep'
   };
 
-  const mappedType = mapping[analysisType] || analysisType;
-  const factor = multiplierCache.complexity?.[mappedType] ?? DEFAULT_MULTIPLIERS.complexity[mappedType as keyof typeof DEFAULT_MULTIPLIERS.complexity] ?? 0;
-  console.log(`Analysis type factor for ${analysisType} (mapped to ${mappedType}):`, factor);
+  const mappedType = mapping[analysisType] || analysisType.toLowerCase();
+  console.log(`🔄 Mapped "${analysisType}" to "${mappedType}"`);
+  
+  // Get factor from cache or default
+  const factor = multiplierCache.complexity?.[mappedType] ?? 
+                 DEFAULT_MULTIPLIERS.complexity[mappedType as keyof typeof DEFAULT_MULTIPLIERS.complexity] ?? 
+                 0.1; // Fallback to 10% if nothing found
+  
+  console.log(`📊 Analysis type factor result: ${factor} (${factor * 100}%)`);
+  console.log(`📂 Available complexity factors:`, multiplierCache.complexity);
+  
   return factor;
 };
 
 export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
-  if (!mentionsVolume) return 0;
+  console.log(`🔍 Getting mentions volume factor for: "${mentionsVolume}"`);
+  
+  if (!mentionsVolume) {
+    console.log('⚠️ Mentions volume is empty, returning 0');
+    return 0;
+  }
 
   // Map UI values to database values
   const mapping: Record<string, string> = {
@@ -130,9 +154,16 @@ export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
     'xlarge': 'xlarge'
   };
 
-  const mappedVolume = mapping[mentionsVolume] || mentionsVolume;
-  const factor = multiplierCache.mentions_volume?.[mappedVolume] ?? DEFAULT_MULTIPLIERS.mentions_volume[mappedVolume as keyof typeof DEFAULT_MULTIPLIERS.mentions_volume] ?? 0;
-  console.log(`Mentions volume factor for ${mentionsVolume} (mapped to ${mappedVolume}):`, factor);
+  const mappedVolume = mapping[mentionsVolume] || mentionsVolume.toLowerCase();
+  console.log(`🔄 Mapped "${mentionsVolume}" to "${mappedVolume}"`);
+  
+  const factor = multiplierCache.mentions_volume?.[mappedVolume] ?? 
+                 DEFAULT_MULTIPLIERS.mentions_volume[mappedVolume as keyof typeof DEFAULT_MULTIPLIERS.mentions_volume] ?? 
+                 0.05; // Fallback to 5%
+  
+  console.log(`📊 Mentions volume factor result: ${factor} (${factor * 100}%)`);
+  console.log(`📂 Available mentions_volume factors:`, multiplierCache.mentions_volume);
+  
   return factor;
 };
 
