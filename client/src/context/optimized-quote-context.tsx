@@ -283,17 +283,19 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       return total + ((member.hours || 0) * (member.rate || 0));
     }, 0);
     
-    // For templates, use a minimum cost if baseCost is 0
+    // For templates, use the template's base cost
     let templateCost = 0;
     if (quotationData.template) {
-      templateCost = quotationData.template.baseCost || 5000; // Default template cost
-    } else if (quotationData.complexity) {
-      // For custom projects without template, base cost depends on complexity
+      templateCost = quotationData.template.baseCost || 0;
+    }
+    // For custom projects without template, only add base cost if complexity is explicitly set and not default
+    else if (quotationData.complexity && quotationData.template === null) {
+      // Only add base cost for custom projects when explicitly configured
       templateCost = quotationData.complexity === 'high' ? 8000 : 
                     quotationData.complexity === 'medium' ? 5000 : 3000;
     }
     
-    const newBaseCost = Math.max(teamBaseCost + templateCost, 1000); // Minimum $1000
+    const newBaseCost = teamBaseCost + templateCost; // No minimum, let it be 0 if nothing is configured
     
     // Calculate complexity multiplier
     const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
