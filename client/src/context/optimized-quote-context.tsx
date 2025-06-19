@@ -86,7 +86,7 @@ interface OptimizedQuoteContextType {
   updateTeamMember: (id: string, updates: Partial<OptimizedTeamMember>) => void;
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
-  updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
+  // updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
   
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
@@ -127,13 +127,6 @@ const initialQuotationData: QuotationData = {
     deviationPercentage: 0,
     discount: 0,
     marginFactor: 2.0
-  },
-  inflation: {
-    applyInflationAdjustment: false,
-    inflationMethod: "automatic",
-    manualInflationRate: 0,
-    projectStartDate: "",
-    quotationCurrency: "ARS"
   }
 };
 
@@ -567,13 +560,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           deviationPercentage: quotation.deviationPercentage || 0,
           discount: 0,
           marginFactor: 2.0
-        },
-        inflation: {
-          applyInflationAdjustment: quotation.applyInflationAdjustment || false,
-          inflationMethod: quotation.inflationMethod || "automatic",
-          manualInflationRate: quotation.manualInflationRate || 0,
-          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
-          quotationCurrency: quotation.quotationCurrency || "ARS"
         }
       });
       
@@ -601,13 +587,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         platformCost: quotationData.financials.platformCost,
         deviationPercentage: quotationData.financials.deviationPercentage,
         discountPercentage: quotationData.financials.discount,
-        status: 'draft',
-        // Inflation fields
-        projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : null,
-        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment,
-        inflationMethod: quotationData.inflation.inflationMethod,
-        manualInflationRate: quotationData.inflation.manualInflationRate,
-        quotationCurrency: quotationData.inflation.quotationCurrency
+        status: 'draft'
       };
 
       const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
@@ -676,13 +656,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     forceRecalculate();
   }, [forceRecalculate]);
 
-  const updateInflation = useCallback((inflation: Partial<QuotationData['inflation']>) => {
-    setQuotationData(prev => ({
-      ...prev,
-      inflation: { ...prev.inflation, ...inflation }
-    }));
-    forceRecalculate();
-  }, [forceRecalculate]);
+
 
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
@@ -721,7 +695,6 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     updateTeamMember,
     removeTeamMember,
     updateFinancials,
-    updateInflation,
     loadQuotation,
     saveQuotation,
     calculateTotalCost,
