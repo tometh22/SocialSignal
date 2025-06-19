@@ -211,7 +211,13 @@ const getTemplateFactor = (complexity: string): number => {
   return factor;
 };
 
-export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface OptimizedQuoteProviderProps {
+  children: React.ReactNode;
+  quotationId?: number;
+  isRequote?: boolean;
+}
+
+export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ children, quotationId, isRequote }) => {
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   const [baseCost, setBaseCost] = useState(0);
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
@@ -526,8 +532,8 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
-      const quotation: Quotation = await apiRequest(`/api/quotations/${quotationId}`);
-      const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`);
+      const quotation: any = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
+      const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
 
       const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any) => ({
         id: `member-${member.id}`,
@@ -538,8 +544,11 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         cost: member.hours * member.rate
       }));
 
+      // Get client data separately
+      const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
+      
       setQuotationData({
-        client: quotation.client || null,
+        client: clientData,
         project: {
           name: quotation.projectName || "",
           type: quotation.projectType || "one-time"
@@ -548,8 +557,8 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         mentionsVolume: quotation.mentionsVolume || "medium",
         countriesCovered: quotation.countriesCovered || "1",
         clientEngagement: quotation.clientEngagement || "medium",
-        template: quotation.reportTemplate || null,
-        complexity: (quotation.reportTemplate?.complexity as 'basic' | 'medium' | 'high') || 'basic',
+        template: null, // Will be loaded separately if needed
+        complexity: 'basic',
         teamMembers: optimizedTeamMembers,
         deliverables: [],
         additionalDeliverableCost: 0,
@@ -591,9 +600,14 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         totalAmount,
         platformCost: quotationData.financials.platformCost,
         deviationPercentage: quotationData.financials.deviationPercentage,
-        discount: quotationData.financials.discount,
-        marginFactor: quotationData.financials.marginFactor,
-        status: 'draft'
+        discountPercentage: quotationData.financials.discount,
+        status: 'draft',
+        // Inflation fields
+        projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : null,
+        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment,
+        inflationMethod: quotationData.inflation.inflationMethod,
+        manualInflationRate: quotationData.inflation.manualInflationRate,
+        quotationCurrency: quotationData.inflation.quotationCurrency
       };
 
       const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
