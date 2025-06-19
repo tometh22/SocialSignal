@@ -23,7 +23,6 @@ export interface ComplexityFactors {
   mentionsVolumeFactor: number;
   countriesFactor: number;
   clientEngagementFactor: number;
-  templateFactor: number;
 }
 
 export interface QuotationData {
@@ -254,10 +253,8 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
       mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
       countriesFactor: getCountriesFactor(quotationData.countriesCovered),
-      clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
-      templateFactor: quotationData.template ? 
-                     getTemplateFactor(quotationData.template.complexity) :
-                     getTemplateFactor(quotationData.complexity)
+      clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement)
+      // Removed templateFactor - it doesn't make logical sense
     };
 
     console.log('📊 Calculated complexity factors:', factors);
@@ -276,29 +273,64 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     recalculationTrigger
   ]);
 
-  // Improved cost calculation: Team -> Complexity -> Template -> Final
+  // Intelligent complexity calculation: Apply factors to specific roles
   useEffect(() => {
-    // Step 1: Calculate team cost (base for complexity factors)
-    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
-      return total + ((member.hours || 0) * (member.rate || 0));
-    }, 0);
+    // Step 1: Calculate base team cost and apply role-specific complexity
+    let totalAdjustedCost = 0;
+    let totalComplexityAdjustment = 0;
     
-    // Step 2: Apply complexity factors ONLY to team cost (more logical)
-    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
-    const teamWithComplexity = teamBaseCost * (1 + totalComplexityFactor);
-    const complexityAdjustment = teamWithComplexity - teamBaseCost;
+    quotationData.teamMembers.forEach(member => {
+      const baseCost = (member.hours || 0) * (member.rate || 0);
+      let memberComplexityFactor = 0;
+      
+      // Get role information to determine which factors apply
+      const role = roles.find(r => r.id === member.roleId);
+      const roleName = role?.name?.toLowerCase() || '';
+      
+      // Apply complexity factors based on role type
+      if (roleName.includes('analyst') || roleName.includes('analista')) {
+        // Analysts affected by: countries, mentions volume, analysis type
+        memberComplexityFactor += complexityFactors.countriesFactor;
+        memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
+        memberComplexityFactor += complexityFactors.analysisTypeFactor;
+      }
+      else if (roleName.includes('manager') || roleName.includes('director') || roleName.includes('gerente')) {
+        // Managers/Directors affected by: client engagement, analysis type (reduced)
+        memberComplexityFactor += complexityFactors.clientEngagementFactor;
+        memberComplexityFactor += complexityFactors.analysisTypeFactor * 0.5;
+      }
+      else if (roleName.includes('data') || roleName.includes('scientist') || roleName.includes('datos')) {
+        // Data roles affected by: mentions volume, analysis type
+        memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
+        memberComplexityFactor += complexityFactors.analysisTypeFactor;
+      }
+      else {
+        // All other roles: only analysis type affects them
+        memberComplexityFactor = complexityFactors.analysisTypeFactor;
+      }
+      
+      const adjustedMemberCost = baseCost * (1 + memberComplexityFactor);
+      const memberAdjustment = adjustedMemberCost - baseCost;
+      
+      totalAdjustedCost += adjustedMemberCost;
+      totalComplexityAdjustment += memberAdjustment;
+    });
     
-    // Step 3: Add template cost (fixed, not affected by complexity)
+    // Step 2: Add template cost (fixed, not affected by complexity)
     let templateCost = 0;
     if (quotationData.template) {
       templateCost = quotationData.template.baseCost || 0;
     }
     
-    // Step 4: Calculate final base cost
-    const newBaseCost = teamBaseCost + templateCost;
-    const adjustedBaseCost = teamWithComplexity + templateCost;
+    // Step 3: Calculate costs
+    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
+      return total + ((member.hours || 0) * (member.rate || 0));
+    }, 0);
     
-    // Step 5: Apply business factors (platform cost, margin, discount)
+    const newBaseCost = teamBaseCost + templateCost;
+    const adjustedBaseCost = totalAdjustedCost + templateCost;
+    
+    // Step 4: Apply business factors
     const platformCost = quotationData.financials.platformCost || 0;
     const marginMultiplier = quotationData.financials.marginFactor || 1.5;
     const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
@@ -307,11 +339,11 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     
     // Update states
     setBaseCost(newBaseCost);
-    setComplexityAdjustment(complexityAdjustment);
+    setComplexityAdjustment(totalComplexityAdjustment);
     setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
     setTotalAmount(finalTotal);
     
-  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
