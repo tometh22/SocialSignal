@@ -2,18 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
-import {
-  getAnalysisTypeFactor,
-  getMentionsVolumeFactor,
-  getCountriesFactor,
-  getClientEngagementFactor,
-  getTemplateFactor,
-  calculateComplexityAdjustment,
-  calculateMarkup,
-  calculateTotalAmount,
-  ComplexityFactors,
-  loadCostMultipliers
-} from "@/lib/calculation";
 import { apiRequest } from "@/lib/queryClient";
 
 export interface OptimizedTeamMember {
@@ -28,6 +16,14 @@ export interface OptimizedTeamMember {
 export interface ProjectData {
   name: string;
   type: string;
+}
+
+export interface ComplexityFactors {
+  analysisTypeFactor: number;
+  mentionsVolumeFactor: number;
+  countriesFactor: number;
+  clientEngagementFactor: number;
+  templateFactor: number;
 }
 
 export interface QuotationData {
@@ -127,6 +123,79 @@ const initialQuotationData: QuotationData = {
   }
 };
 
+// Helper functions for complexity calculation
+const getAnalysisTypeFactor = (type: string): number => {
+  console.log('📊 Analysis Type Factor for:', type);
+  const factors: Record<string, number> = {
+    'standard': 0.0,
+    'advanced': 0.15,
+    'basic': 0.0,
+    'Estándar': 0.0,
+    'Avanzado': 0.15,
+    'Básico': 0.0
+  };
+  const factor = factors[type] || 0.0;
+  console.log(`📊 Analysis Type "${type}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getMentionsVolumeFactor = (volume: string): number => {
+  console.log('📊 Mentions Volume Factor for:', volume);
+  const factors: Record<string, number> = {
+    'low': 0.0,
+    'medium': 0.1,
+    'high': 0.2,
+    'Bajo': 0.0,
+    'Medio': 0.1,
+    'Alto': 0.2
+  };
+  const factor = factors[volume] || 0.0;
+  console.log(`📊 Mentions Volume "${volume}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getCountriesFactor = (countries: string): number => {
+  console.log('📊 Countries Factor for:', countries);
+  const factors: Record<string, number> = {
+    '1': 0.0,
+    '2-3 países': 0.1,
+    '4+ países': 0.15,
+    '2-3': 0.1,
+    '4+': 0.15
+  };
+  const factor = factors[countries] || 0.0;
+  console.log(`📊 Countries "${countries}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getClientEngagementFactor = (engagement: string): number => {
+  console.log('📊 Client Engagement Factor for:', engagement);
+  const factors: Record<string, number> = {
+    'low': 0.0,
+    'medium': 0.05,
+    'high': 0.1,
+    'Bajo': 0.0,
+    'Medio': 0.05,
+    'Alto': 0.1
+  };
+  const factor = factors[engagement] || 0.0;
+  console.log(`📊 Client Engagement "${engagement}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getTemplateFactor = (complexity: string): number => {
+  console.log('📊 Template Factor for:', complexity);
+  const factors: Record<string, number> = {
+    'basic': 0.0,
+    'medium': 0.1,
+    'high': 0.15,
+    'low': 0.0
+  };
+  const factor = factors[complexity] || 0.0;
+  console.log(`📊 Template "${complexity}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
 export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   const [baseCost, setBaseCost] = useState(0);
@@ -146,15 +215,6 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
   });
-
-  const { data: templates = [] } = useQuery<ReportTemplate[]>({
-    queryKey: ["/api/report-templates"],
-  });
-
-  // Load cost multipliers on mount
-  useEffect(() => {
-    loadCostMultipliers().catch(console.error);
-  }, []);
 
   // Force recalculation function
   const forceRecalculate = useCallback(() => {
@@ -216,86 +276,80 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     recalculationTrigger
   ]);
 
-  // Calculate base cost from team members with proper validation
+  // Calculate ALL costs in a single effect to ensure correct order
   useEffect(() => {
-    console.log('💰 === BASE COST CALCULATION ===');
-    console.log('🧑‍💼 Team members:', quotationData.teamMembers);
+    console.log('💰 === COMPLETE COST CALCULATION ===');
     
+    // Step 1: Calculate base cost from team members
     const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
       const hours = Number(member.hours) || 0;
       const rate = Number(member.rate) || 0;
       const memberCost = hours * rate;
-      
       console.log(`👤 Member ${member.id}: ${hours} hours × $${rate} = $${memberCost}`);
       return total + memberCost;
     }, 0);
 
     const templateCost = Number(quotationData.template?.baseCost) || 0;
     const deliverableCost = Number(quotationData.additionalDeliverableCost) || 0;
-    const totalBaseCost = teamBaseCost + templateCost + deliverableCost;
+    const newBaseCost = teamBaseCost + templateCost + deliverableCost;
 
     console.log('💰 Base cost breakdown:', { 
       teamBaseCost: `$${teamBaseCost}`, 
       templateCost: `$${templateCost}`, 
       deliverableCost: `$${deliverableCost}`, 
-      totalBaseCost: `$${totalBaseCost}` 
+      newBaseCost: `$${newBaseCost}` 
     });
+
+    // Step 2: Calculate complexity adjustment
+    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
+    const newComplexityAdjustment = newBaseCost * totalComplexityFactor;
     
-    setBaseCost(totalBaseCost);
-  }, [quotationData.teamMembers, quotationData.template, quotationData.additionalDeliverableCost, recalculationTrigger]);
+    console.log(`🔧 Complexity calculation: $${newBaseCost} × ${totalComplexityFactor} = $${newComplexityAdjustment}`);
 
-  // Calculate complexity adjustment
-  useEffect(() => {
-    console.log('🔧 === COMPLEXITY ADJUSTMENT CALCULATION ===');
-    console.log('📊 Base cost:', baseCost);
-    console.log('📊 Complexity factors:', complexityFactors);
+    // Step 3: Calculate costs with platform and deviations
+    const baseWithComplexity = newBaseCost + newComplexityAdjustment;
+    const platformCostAmount = Number(quotationData.financials.platformCost) || 0;
+    const deviationAmount = baseWithComplexity * ((Number(quotationData.financials.deviationPercentage) || 0) / 100);
     
-    if (baseCost > 0) {
-      const adjustment = calculateComplexityAdjustment(baseCost, complexityFactors);
-      console.log('📊 Complexity adjustment result:', adjustment);
-      setComplexityAdjustment(adjustment);
-    } else {
-      console.log('⚠️ Base cost is 0, setting complexity adjustment to 0');
-      setComplexityAdjustment(0);
-    }
-  }, [baseCost, complexityFactors]);
-
-  // Calculate markup and total
-  useEffect(() => {
-    console.log('💵 === MARKUP AND TOTAL CALCULATION ===');
-    console.log('📊 Base cost:', baseCost);
-    console.log('📊 Complexity adjustment:', complexityAdjustment);
+    // Step 4: Calculate markup
+    const subtotal = baseWithComplexity + platformCostAmount + deviationAmount;
+    const marginFactor = quotationData.financials.marginFactor || 2.0;
+    const newMarkupAmount = subtotal * (marginFactor - 1);
     
-    if (baseCost > 0) {
-      const baseWithComplexity = baseCost + complexityAdjustment;
-      const platformCostAmount = Number(quotationData.financials.platformCost) || 0;
-      const deviationAmount = baseWithComplexity * ((Number(quotationData.financials.deviationPercentage) || 0) / 100);
+    console.log(`💰 Markup calculation: $${subtotal} × (${marginFactor} - 1) = $${newMarkupAmount}`);
 
-      // Calculate markup
-      const markup = calculateMarkup(baseWithComplexity);
-      console.log('💰 Markup calculation:', markup);
-      setMarkupAmount(markup);
+    // Step 5: Calculate final total
+    const totalBeforeDiscount = subtotal + newMarkupAmount;
+    const discountAmount = totalBeforeDiscount * ((Number(quotationData.financials.discount) || 0) / 100);
+    const newTotalAmount = totalBeforeDiscount - discountAmount;
 
-      // Calculate total
-      const total = calculateTotalAmount(
-        baseCost,
-        complexityAdjustment,
-        markup,
-        platformCostAmount,
-        deviationAmount
-      );
+    console.log('💵 Final calculation steps:', {
+      newBaseCost: `$${newBaseCost}`,
+      newComplexityAdjustment: `$${newComplexityAdjustment}`,
+      baseWithComplexity: `$${baseWithComplexity}`,
+      platformCostAmount: `$${platformCostAmount}`,
+      deviationAmount: `$${deviationAmount}`,
+      subtotal: `$${subtotal}`,
+      newMarkupAmount: `$${newMarkupAmount}`,
+      totalBeforeDiscount: `$${totalBeforeDiscount}`,
+      discountAmount: `$${discountAmount}`,
+      newTotalAmount: `$${newTotalAmount}`
+    });
 
-      const discountAmount = total * ((Number(quotationData.financials.discount) || 0) / 100);
-      const finalTotal = total - discountAmount;
-      
-      console.log('💵 Final total:', finalTotal);
-      setTotalAmount(finalTotal);
-    } else {
-      console.log('⚠️ Base cost is 0, setting markup and total to 0');
-      setMarkupAmount(0);
-      setTotalAmount(0);
-    }
-  }, [baseCost, complexityAdjustment, quotationData.financials]);
+    // Update all states
+    setBaseCost(newBaseCost);
+    setComplexityAdjustment(newComplexityAdjustment);
+    setMarkupAmount(newMarkupAmount);
+    setTotalAmount(newTotalAmount);
+
+  }, [
+    quotationData.teamMembers, 
+    quotationData.template, 
+    quotationData.additionalDeliverableCost,
+    quotationData.financials,
+    complexityFactors,
+    recalculationTrigger
+  ]);
 
   // Navigation functions
   const nextStep = useCallback(() => {

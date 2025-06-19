@@ -33,9 +33,9 @@ export default function FinancialReviewFinal() {
   // Force recalculation when component mounts or data changes
   useEffect(() => {
     if (quotationData.teamMembers.length > 0) {
-      calculateTotalCost();
+      forceRecalculate();
     }
-  }, [quotationData.teamMembers, calculateTotalCost]);
+  }, [quotationData.teamMembers, forceRecalculate]);
 
   // Calculate total complexity factor for display
   const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
