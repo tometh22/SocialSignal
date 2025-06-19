@@ -141,14 +141,14 @@ const initialQuotationData: QuotationData = {
 const getAnalysisTypeFactor = (type: string): number => {
   console.log('📊 Analysis Type Factor for:', type);
   const factors: Record<string, number> = {
-    'basic': 0.0,     // Básico: +0%
-    'standard': 0.10, // Estándar: +10%
-    'deep': 0.15,     // Avanzado: +15%
+    'basic': -0.10,   // Básico: -10% (más simple que estándar)
+    'standard': 0.0,  // Estándar: +0% (base de referencia)
     'advanced': 0.15, // Avanzado: +15%
-    'premium': 0.20,  // Premium: +20%
-    'Básico': 0.0,
-    'Estándar': 0.10,
-    'Avanzado': 0.15
+    'premium': 0.25,  // Premium: +25%
+    'Básico': -0.10,
+    'Estándar': 0.0,
+    'Avanzado': 0.15,
+    'Premium': 0.25
   };
   const factor = factors[type] || 0.0;
   console.log(`📊 Analysis Type "${type}" -> ${factor} (${factor * 100}%)`);
@@ -158,14 +158,14 @@ const getAnalysisTypeFactor = (type: string): number => {
 const getMentionsVolumeFactor = (volume: string): number => {
   console.log('📊 Mentions Volume Factor for:', volume);
   const factors: Record<string, number> = {
-    'low': 0.0,
-    'medium': 0.1,
-    'high': 0.2,
-    'very-high': 0.25,
-    'Bajo': 0.0,
-    'Medio': 0.1,
-    'Alto': 0.2,
-    'Muy Alto': 0.25
+    'low': -0.05,     // Bajo: -5% (menos trabajo de análisis)
+    'medium': 0.0,    // Medio: +0% (base estándar 1K-10K)
+    'high': 0.15,     // Alto: +15% (más trabajo significativo)
+    'very-high': 0.30, // Muy Alto: +30% (complejidad exponencial)
+    'Bajo': -0.05,
+    'Medio': 0.0,
+    'Alto': 0.15,
+    'Muy Alto': 0.30
   };
   const factor = factors[volume] || 0.0;
   console.log(`📊 Mentions Volume "${volume}" -> ${factor} (${factor * 100}%)`);
@@ -175,14 +175,14 @@ const getMentionsVolumeFactor = (volume: string): number => {
 const getCountriesFactor = (countries: string): number => {
   console.log('📊 Countries Factor for:', countries);
   const factors: Record<string, number> = {
-    '1': 0.0,
-    '2-3': 0.1,
-    '4-6': 0.15,
-    '7+': 0.2,
-    '2-3 países': 0.1,
-    '4+ países': 0.15,
-    '4-6 países': 0.15,
-    '7+ países': 0.2
+    '1': 0.0,         // 1 país: +0% (base estándar)
+    '2-3': 0.08,      // 2-3 países: +8% (coordinación adicional)
+    '4-6': 0.18,      // 4-6 países: +18% (complejidad multicultural)
+    '7+': 0.30,       // 7+ países: +30% (gestión muy compleja)
+    '2-3 países': 0.08,
+    '4+ países': 0.18,
+    '4-6 países': 0.18,
+    '7+ países': 0.30
   };
   const factor = factors[countries] || 0.0;
   console.log(`📊 Countries "${countries}" -> ${factor} (${factor * 100}%)`);
@@ -192,14 +192,14 @@ const getCountriesFactor = (countries: string): number => {
 const getClientEngagementFactor = (engagement: string): number => {
   console.log('📊 Client Engagement Factor for:', engagement);
   const factors: Record<string, number> = {
-    'low': 0.0,
-    'medium': 0.05,
-    'high': 0.1,
-    'very-high': 0.15,
-    'Bajo': 0.0,
-    'Medio': 0.05,
-    'Alto': 0.1,
-    'Muy Alto': 0.15
+    'low': -0.05,     // Bajo: -5% (cliente autónomo, menos reuniones)
+    'medium': 0.0,    // Medio: +0% (engagement estándar)
+    'high': 0.12,     // Alto: +12% (más reuniones y seguimiento)
+    'very-high': 0.20, // Muy Alto: +20% (cliente muy demandante)
+    'Bajo': -0.05,
+    'Medio': 0.0,
+    'Alto': 0.12,
+    'Muy Alto': 0.20
   };
   const factor = factors[engagement] || 0.0;
   console.log(`📊 Client Engagement "${engagement}" -> ${factor} (${factor * 100}%)`);
