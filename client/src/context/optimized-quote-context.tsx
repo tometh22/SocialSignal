@@ -371,18 +371,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     const templateCost = quotationData.template?.baseCost || 0;
     console.log(`📋 Template cost: $${templateCost}`);
     
-    // Step 4: Add deliverables costs for always-on projects
-    const deliverablesTotal = quotationData.deliverables?.reduce((sum, deliverable) => 
-      sum + (deliverable.budget || 0), 0) || 0;
-    const additionalCost = quotationData.additionalDeliverableCost || 0;
-    const totalDeliverablesCost = deliverablesTotal + additionalCost;
-    
-    console.log(`📦 Deliverables cost: $${deliverablesTotal}`);
-    console.log(`➕ Additional cost: $${additionalCost}`);
-    console.log(`📋 Total deliverables: $${totalDeliverablesCost}`);
-    
-    // Step 5: Calculate final costs
-    const newBaseCost = teamBaseCost + templateCost + totalDeliverablesCost;
+    // Step 4: Calculate final costs
+    const newBaseCost = teamBaseCost + templateCost;
     const adjustedBaseCost = newBaseCost + totalComplexityAdjustment;
     
     console.log(`💵 Base cost: $${newBaseCost}`);
