@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
 
 export default function FinancialReviewFinal() {
   const {
@@ -15,7 +16,8 @@ export default function FinancialReviewFinal() {
     complexityFactors,
     availableRoles,
     availablePersonnel,
-    forceRecalculate
+    forceRecalculate,
+    updateInflation
   } = useOptimizedQuote();
 
   // Debug log para verificar valores
@@ -249,6 +251,21 @@ export default function FinancialReviewFinal() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Inflation Adjustment */}
+      <InflationAdjustmentCard
+        applyInflationAdjustment={quotationData.inflation.applyInflationAdjustment}
+        inflationMethod={quotationData.inflation.inflationMethod}
+        manualInflationRate={quotationData.inflation.manualInflationRate}
+        projectStartDate={quotationData.inflation.projectStartDate}
+        totalCost={totalAmount}
+        quotationCurrency={quotationData.inflation.quotationCurrency}
+        onApplyInflationChange={(value) => updateInflation({ applyInflationAdjustment: value })}
+        onInflationMethodChange={(value) => updateInflation({ inflationMethod: value })}
+        onManualInflationRateChange={(value) => updateInflation({ manualInflationRate: value })}
+        onProjectStartDateChange={(value) => updateInflation({ projectStartDate: value })}
+        onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
+      />
 
       {/* Debug Information (only in development) */}
       {process.env.NODE_ENV === 'development' && (
