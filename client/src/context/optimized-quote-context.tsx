@@ -289,26 +289,23 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       const role = roles.find(r => r.id === member.roleId);
       const roleName = role?.name?.toLowerCase() || '';
       
-      // Apply complexity factors based on role type
-      if (roleName.includes('analyst') || roleName.includes('analista')) {
-        // Analysts affected by: countries, mentions volume, analysis type
+      // Apply complexity factors based on specific role types
+      if (roleName.includes('analista') || roleName.includes('data specialist') || roleName.includes('tech lead')) {
+        // Analysis roles: affected by countries, mentions volume, analysis type
         memberComplexityFactor += complexityFactors.countriesFactor;
         memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
         memberComplexityFactor += complexityFactors.analysisTypeFactor;
       }
-      else if (roleName.includes('manager') || roleName.includes('director') || roleName.includes('gerente')) {
-        // Managers/Directors affected by: client engagement, analysis type (reduced)
+      else if (roleName.includes('manager') || roleName.includes('director') || 
+               roleName.includes('ceo') || roleName.includes('coo') || 
+               roleName.includes('operations lead') || roleName.includes('account')) {
+        // Management roles: affected by client engagement, analysis type (reduced impact)
         memberComplexityFactor += complexityFactors.clientEngagementFactor;
         memberComplexityFactor += complexityFactors.analysisTypeFactor * 0.5;
       }
-      else if (roleName.includes('data') || roleName.includes('scientist') || roleName.includes('datos')) {
-        // Data roles affected by: mentions volume, analysis type
-        memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
-        memberComplexityFactor += complexityFactors.analysisTypeFactor;
-      }
       else {
-        // All other roles: only analysis type affects them
-        memberComplexityFactor = complexityFactors.analysisTypeFactor;
+        // Other roles (designers, etc.): only analysis type affects them minimally
+        memberComplexityFactor = complexityFactors.analysisTypeFactor * 0.3;
       }
       
       // Apply complexity to HOURS, then calculate cost
