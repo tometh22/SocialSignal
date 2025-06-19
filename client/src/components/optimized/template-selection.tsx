@@ -4,35 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { ReportTemplate } from '@shared/schema';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Check, Search, FileText, BarChart } from 'lucide-react';
+import { Check, Search, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ComplexityFactorsCard } from './complexity-factors-card';
-import { FinancialSummary } from './financial-summary';
 
 const OptimizedTemplateSelection: React.FC = () => {
   const {
     quotationData,
-    updateTemplate,
-    updateComplexity,
-    updateCustomization,
-    updateAnalysisType,
-    updateMentionsVolume,
-    updateCountriesCovered,
-    updateClientEngagement,
-    baseCost,
-    complexityAdjustment,
-    totalAmount
+    updateTemplate
   } = useOptimizedQuote();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTab, setSelectedTab] = useState('list');
 
   // Consultar plantillas disponibles
   const { data: templates, isLoading } = useQuery<ReportTemplate[]>({
