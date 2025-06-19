@@ -131,7 +131,9 @@ export const quotations = pgTable("quotations", {
   status: text("status").notNull().default("draft"), // 'draft', 'pending', 'approved', 'rejected', 'in-negotiation'
   // Campos para proyección inflacionaria
   projectStartDate: timestamp("project_start_date"), // Fecha de inicio del proyecto
-  inflationRate: doublePrecision("inflation_rate").default(0), // Tasa de inflación anual (ej: 0.15 = 15%)
+  applyInflationAdjustment: boolean("apply_inflation_adjustment").default(false), // Si aplicar ajuste inflacionario
+  inflationMethod: text("inflation_method").default("automatic"), // 'automatic' o 'manual'
+  manualInflationRate: doublePrecision("manual_inflation_rate"), // Tasa manual si method = 'manual'
   projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
   usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
@@ -201,11 +203,33 @@ export const insertCostMultiplierSchema = createInsertSchema(costMultipliers).om
 export type CostMultiplier = typeof costMultipliers.$inferSelect;
 export type InsertCostMultiplier = z.infer<typeof insertCostMultiplierSchema>;
 
+// ==================== INFLACIÓN MENSUAL HISTÓRICA ====================
+// Historical monthly inflation data for Argentina
+export const monthlyInflation = pgTable("monthly_inflation", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  inflationRate: doublePrecision("inflation_rate").notNull(), // Tasa mensual (ej: 0.08 = 8%)
+  source: text("source"), // Fuente del dato (INDEC, etc.)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+export const insertMonthlyInflationSchema = createInsertSchema(monthlyInflation).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type MonthlyInflation = typeof monthlyInflation.$inferSelect;
+export type InsertMonthlyInflation = z.infer<typeof insertMonthlyInflationSchema>;
+
 // ==================== CONFIGURACIÓN DEL SISTEMA ====================
-// System configuration for inflation rates and exchange rates
+// System configuration for exchange rates and other settings
 export const systemConfig = pgTable("system_config", {
   id: serial("id").primaryKey(),
-  configKey: text("config_key").notNull().unique(), // 'inflation_rate_ars', 'usd_exchange_rate', etc.
+  configKey: text("config_key").notNull().unique(), // 'usd_exchange_rate', 'default_inflation_method', etc.
   configValue: doublePrecision("config_value").notNull(),
   description: text("description"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

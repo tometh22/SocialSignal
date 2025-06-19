@@ -23,6 +23,8 @@ import {
   insertProjectBaseTeamSchema,
   insertQuickTimeEntrySchema,
   insertQuickTimeEntryDetailSchema,
+  insertMonthlyInflationSchema,
+  insertSystemConfigSchema,
   projectStatusOptions,
   trackingFrequencyOptions,
   deliverables,
@@ -37,7 +39,9 @@ import {
   projectCycles,
   projectBaseTeam,
   quickTimeEntries,
-  quickTimeEntryDetails
+  quickTimeEntryDetails,
+  monthlyInflation,
+  systemConfig
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -2200,6 +2204,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reinitializing database:", error);
       res.status(500).json({ message: "Failed to reinitialize database" });
+    }
+  });
+
+  // =========== RUTAS PARA INFLACIÓN Y CONFIGURACIÓN ===========
+
+  // Obtener historial de inflación mensual
+  app.get("/api/admin/monthly-inflation", async (req, res) => {
+    try {
+      const inflation = await db.select().from(monthlyInflation).orderBy(desc(monthlyInflation.year), desc(monthlyInflation.month));
+      res.json(inflation);
+    } catch (error) {
+      console.error("Error fetching monthly inflation:", error);
+      res.status(500).json({ message: "Failed to fetch inflation data" });
+    }
+  });
+
+  // Crear/actualizar inflación mensual
+  app.post("/api/admin/monthly-inflation", async (req, res) => {
+    try {
+      const validatedData = insertMonthlyInflationSchema.parse(req.body);
+      
+      // Verificar si ya existe datos para ese año/mes
+      const existing = await db.select()
+        .from(monthlyInflation)
+        .where(and(
+          eq(monthlyInflation.year, validatedData.year),
+          eq(monthlyInflation.month, validatedData.month)
+        ));
+
+      if (existing.length > 0) {
+        // Actualizar existente
+        const updated = await db.update(monthlyInflation)
+          .set({
+            inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+            source: validatedData.source,
+            updatedAt: new Date(),
+            updatedBy: validatedData.updatedBy
+          })
+          .where(eq(monthlyInflation.id, existing[0].id))
+          .returning();
+        res.json(updated[0]);
+      } else {
+        // Crear nuevo
+        const created = await db.insert(monthlyInflation)
+          .values({
+            ...validatedData,
+            inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+          })
+          .returning();
+        res.status(201).json(created[0]);
+      }
+    } catch (error) {
+      console.error("Error creating/updating inflation:", error);
+      res.status(500).json({ message: "Failed to save inflation data" });
+    }
+  });
+
+  // Obtener configuración del sistema
+  app.get("/api/admin/system-config", async (req, res) => {
+    try {
+      const config = await db.select().from(systemConfig);
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching system config:", error);
+      res.status(500).json({ message: "Failed to fetch system configuration" });
+    }
+  });
+
+  // Crear/actualizar configuración del sistema
+  app.post("/api/admin/system-config", async (req, res) => {
+    try {
+      const validatedData = insertSystemConfigSchema.parse(req.body);
+      
+      // Verificar si ya existe la configuración
+      const existing = await db.select()
+        .from(systemConfig)
+        .where(eq(systemConfig.configKey, validatedData.configKey));
+
+      if (existing.length > 0) {
+        // Actualizar existente
+        const updated = await db.update(systemConfig)
+          .set({
+            configValue: validatedData.configValue,
+            description: validatedData.description,
+            updatedAt: new Date(),
+            updatedBy: validatedData.updatedBy
+          })
+          .where(eq(systemConfig.configKey, validatedData.configKey))
+          .returning();
+        res.json(updated[0]);
+      } else {
+        // Crear nuevo
+        const created = await db.insert(systemConfig)
+          .values(validatedData)
+          .returning();
+        res.status(201).json(created[0]);
+      }
+    } catch (error) {
+      console.error("Error creating/updating system config:", error);
+      res.status(500).json({ message: "Failed to save system configuration" });
     }
   });
 
