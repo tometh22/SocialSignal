@@ -460,7 +460,20 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
 
   const calculateTotalCost = useCallback(() => {
-    setQuotationData(prev => ({ ...prev, teamMembers: [...prev.teamMembers] }));
+    console.log('calculateTotalCost called');
+    setQuotationData(prev => {
+      const updatedMembers = prev.teamMembers.map(member => ({
+        ...member,
+        cost: (member.hours || 0) * (member.rate || 0)
+      }));
+      
+      console.log('Updated team members:', updatedMembers);
+      
+      return { 
+        ...prev, 
+        teamMembers: updatedMembers
+      };
+    });
   }, []);
 
   const resetQuotation = useCallback(() => {

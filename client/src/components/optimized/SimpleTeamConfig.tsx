@@ -90,42 +90,49 @@ const SimpleTeamConfig: React.FC = () => {
     return recommendedRoleIds.includes(roleId);
   };
 
-  // Manejar la adición de nuevo miembro
   const handleAddMember = () => {
+    const selectedRole = availableRoles.find(r => r.id === newMember.roleId);
+    const selectedPersonnel = newMember.personnelId 
+      ? availablePersonnel.find(p => p.id === newMember.personnelId)
+      : null;
 
-    // Validación
-    if (newMember.roleId <= 0 || newMember.hours <= 0 || newMember.rate <= 0) {
-      console.error("❌ Validación fallida:", {
-        roleId: newMember.roleId,
-        hours: newMember.hours,
-        rate: newMember.rate
-      });
-      alert("Por favor completa todos los campos requeridos");
+    if (!selectedRole) {
+      console.error('No role selected');
       return;
     }
 
-    try {
-
-      // Añadir miembro
-      addTeamMember({
-        roleId: newMember.roleId,
-        personnelId: newMember.personnelId,
-        hours: newMember.hours,
-        rate: newMember.rate,
-        cost: newMember.hours * newMember.rate
-      });
-
-
-      // Limpiar formulario pero mantener el rol seleccionado
-      setNewMember(prev => ({
-        ...prev,
-        personnelId: null,
-        hours: 10
-      }));
-    } catch (error) {
-      console.error("❌ Error al agregar miembro:", error);
-      alert("Error al agregar miembro. Revisa la consola para más detalles.");
+    if (!newMember.hours || newMember.hours <= 0) {
+      console.error('Hours must be greater than 0');
+      return;
     }
+
+    const rate = selectedPersonnel?.rate || selectedRole.rate || 0;
+    const hours = newMember.hours;
+    const cost = hours * rate;
+
+    console.log('Adding member with:', { 
+      roleId: newMember.roleId, 
+      personnelId: newMember.personnelId, 
+      hours, 
+      rate, 
+      cost 
+    });
+
+    addTeamMember({
+      roleId: newMember.roleId,
+      personnelId: newMember.personnelId,
+      hours: hours,
+      rate: rate,
+      cost: cost
+    });
+
+    // Reset form
+    setNewMember({ roleId: 0, personnelId: null, hours: 0 });
+
+    // Force recalculation
+    setTimeout(() => {
+      calculateTotalCost();
+    }, 100);
   };
 
   // Funciones para edición inline
@@ -186,6 +193,40 @@ const SimpleTeamConfig: React.FC = () => {
       });
       setIsEditing({...isEditing, [memberId]: false});
     }
+  };
+
+  const handleUpdateMember = (id: string, field: keyof any, value: any) => {
+    const updates: Partial<any> = { [field]: value };
+
+    // If updating hours or changing personnel, recalculate rate and cost
+    if (field === 'hours' || field === 'personnelId') {
+      const member = quotationData.teamMembers.find(m => m.id === id);
+      if (member) {
+        let rate = member.rate;
+
+        if (field === 'personnelId') {
+          const selectedPersonnel = value ? availablePersonnel.find(p => p.id === value) : null;
+          const selectedRole = availableRoles.find(r => r.id === member.roleId);
+          rate = selectedPersonnel?.rate || selectedRole?.rate || 0;
+          updates.rate = rate;
+        }
+
+        const hours = field === 'hours' ? value : member.hours;
+        updates.cost = hours * rate;
+      }
+    }
+
+    updateTeamMember(id, updates);
+
+    // Force recalculation after a short delay
+    setTimeout(() => {
+      calculateTotalCost();
+    }, 100);
+  };
+
+  const calculateTotalCost = () => {
+    // Trigger a re-render or force recalculation of the total cost in the parent component
+    // You might need to call a function from the context or update a state variable
   };
 
   return (
