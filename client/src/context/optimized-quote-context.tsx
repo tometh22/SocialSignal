@@ -276,46 +276,42 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     recalculationTrigger
   ]);
 
-  // Fixed cost calculation that works properly
+  // Improved cost calculation: Team -> Complexity -> Template -> Final
   useEffect(() => {
-    // Calculate base cost from team + template  
+    // Step 1: Calculate team cost (base for complexity factors)
     const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
       return total + ((member.hours || 0) * (member.rate || 0));
     }, 0);
     
-    // For templates, use the template's base cost
+    // Step 2: Apply complexity factors ONLY to team cost (more logical)
+    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
+    const teamWithComplexity = teamBaseCost * (1 + totalComplexityFactor);
+    const complexityAdjustment = teamWithComplexity - teamBaseCost;
+    
+    // Step 3: Add template cost (fixed, not affected by complexity)
     let templateCost = 0;
     if (quotationData.template) {
       templateCost = quotationData.template.baseCost || 0;
     }
-    // For custom projects without template, only add base cost if complexity is explicitly set and not default
-    else if (quotationData.complexity && quotationData.template === null) {
-      // Only add base cost for custom projects when explicitly configured
-      templateCost = quotationData.complexity === 'high' ? 8000 : 
-                    quotationData.complexity === 'medium' ? 5000 : 3000;
-    }
     
-    const newBaseCost = teamBaseCost + templateCost; // No minimum, let it be 0 if nothing is configured
+    // Step 4: Calculate final base cost
+    const newBaseCost = teamBaseCost + templateCost;
+    const adjustedBaseCost = teamWithComplexity + templateCost;
     
-    // Calculate complexity multiplier
-    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
-    const complexityAdjustment = newBaseCost * totalComplexityFactor;
-    
-    // Calculate final total
-    const baseWithComplexity = newBaseCost + complexityAdjustment;
+    // Step 5: Apply business factors (platform cost, margin, discount)
     const platformCost = quotationData.financials.platformCost || 0;
     const marginMultiplier = quotationData.financials.marginFactor || 1.5;
-    const subtotal = (baseWithComplexity + platformCost) * marginMultiplier;
+    const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
     const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
     const finalTotal = subtotal - discount;
     
     // Update states
     setBaseCost(newBaseCost);
     setComplexityAdjustment(complexityAdjustment);
-    setMarkupAmount(subtotal - baseWithComplexity - platformCost);
+    setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
     setTotalAmount(finalTotal);
     
-  }, [quotationData.teamMembers, quotationData.template, quotationData.complexity, quotationData.financials, complexityFactors]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
