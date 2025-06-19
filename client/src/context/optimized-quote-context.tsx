@@ -92,6 +92,7 @@ interface OptimizedQuoteContextType {
   resetQuotation: () => void;
   loadRoles: () => void;
   loadPersonnel: () => void;
+  forceRecalculate: () => void;
   
   // Deliverables
   updateDeliverables: (deliverables: any[]) => void;
@@ -133,6 +134,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [currentStep, setCurrentStep] = useState(1);
+  const [recalculationTrigger, setRecalculationTrigger] = useState(0);
 
   const queryClient = useQueryClient();
 
@@ -154,6 +156,12 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     loadCostMultipliers().catch(console.error);
   }, []);
 
+  // Force recalculation function
+  const forceRecalculate = useCallback(() => {
+    console.log('🔄 Force recalculation triggered');
+    setRecalculationTrigger(prev => prev + 1);
+  }, []);
+
   // Calculate recommended roles based on template
   const recommendedRoleIds = useMemo(() => {
     if (!quotationData.template) return [];
@@ -170,7 +178,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     return baseRoles;
   }, [quotationData.template]);
 
-  // Calculate complexity factors
+  // Calculate complexity factors with proper logging
   const complexityFactors = useMemo((): ComplexityFactors => {
     console.log('🔧 === COMPLEXITY FACTORS CALCULATION ===');
     console.log('🔍 Input data:', {
@@ -189,8 +197,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
       templateFactor: quotationData.template ? 
                      getTemplateFactor(quotationData.template.complexity) :
-                     (quotationData.complexity === 'high' ? 0.20 : 
-                      quotationData.complexity === 'medium' ? 0.10 : 0)
+                     getTemplateFactor(quotationData.complexity)
     };
 
     console.log('📊 Calculated complexity factors:', factors);
@@ -198,10 +205,6 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     const totalFactor = Object.values(factors).reduce((sum, factor) => sum + (factor || 0), 0);
     console.log(`🎯 Total complexity factor: ${totalFactor} (${(totalFactor * 100).toFixed(1)}%)`);
     
-    if (totalFactor === 0) {
-      console.warn('⚠️ WARNING: Total complexity factor is 0! This means no additional costs will be applied.');
-    }
-
     return factors;
   }, [
     quotationData.analysisType, 
@@ -209,24 +212,26 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     quotationData.countriesCovered, 
     quotationData.clientEngagement, 
     quotationData.template, 
-    quotationData.complexity
+    quotationData.complexity,
+    recalculationTrigger
   ]);
 
-  // Calculate base cost from team members
+  // Calculate base cost from team members with proper validation
   useEffect(() => {
     console.log('💰 === BASE COST CALCULATION ===');
     console.log('🧑‍💼 Team members:', quotationData.teamMembers);
-    console.log('📋 Template:', quotationData.template);
-    console.log('📦 Additional deliverable cost:', quotationData.additionalDeliverableCost);
     
     const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
-      const memberCost = (member.hours || 0) * (member.rate || 0);
-      console.log(`👤 Member ${member.id}: ${member.hours} hours × $${member.rate} = $${memberCost}`);
+      const hours = Number(member.hours) || 0;
+      const rate = Number(member.rate) || 0;
+      const memberCost = hours * rate;
+      
+      console.log(`👤 Member ${member.id}: ${hours} hours × $${rate} = $${memberCost}`);
       return total + memberCost;
     }, 0);
 
-    const templateCost = quotationData.template?.baseCost || 0;
-    const deliverableCost = quotationData.additionalDeliverableCost || 0;
+    const templateCost = Number(quotationData.template?.baseCost) || 0;
+    const deliverableCost = Number(quotationData.additionalDeliverableCost) || 0;
     const totalBaseCost = teamBaseCost + templateCost + deliverableCost;
 
     console.log('💰 Base cost breakdown:', { 
@@ -236,32 +241,39 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
       totalBaseCost: `$${totalBaseCost}` 
     });
     
-    if (totalBaseCost === 0) {
-      console.warn('⚠️ WARNING: Total base cost is $0! Check team members and template configuration.');
-    }
-    
     setBaseCost(totalBaseCost);
-  }, [quotationData.teamMembers, quotationData.template, quotationData.additionalDeliverableCost]);
+  }, [quotationData.teamMembers, quotationData.template, quotationData.additionalDeliverableCost, recalculationTrigger]);
 
   // Calculate complexity adjustment
   useEffect(() => {
+    console.log('🔧 === COMPLEXITY ADJUSTMENT CALCULATION ===');
+    console.log('📊 Base cost:', baseCost);
+    console.log('📊 Complexity factors:', complexityFactors);
+    
     if (baseCost > 0) {
       const adjustment = calculateComplexityAdjustment(baseCost, complexityFactors);
+      console.log('📊 Complexity adjustment result:', adjustment);
       setComplexityAdjustment(adjustment);
     } else {
+      console.log('⚠️ Base cost is 0, setting complexity adjustment to 0');
       setComplexityAdjustment(0);
     }
   }, [baseCost, complexityFactors]);
 
   // Calculate markup and total
   useEffect(() => {
+    console.log('💵 === MARKUP AND TOTAL CALCULATION ===');
+    console.log('📊 Base cost:', baseCost);
+    console.log('📊 Complexity adjustment:', complexityAdjustment);
+    
     if (baseCost > 0) {
       const baseWithComplexity = baseCost + complexityAdjustment;
-      const platformCostAmount = quotationData.financials.platformCost || 0;
-      const deviationAmount = baseWithComplexity * ((quotationData.financials.deviationPercentage || 0) / 100);
+      const platformCostAmount = Number(quotationData.financials.platformCost) || 0;
+      const deviationAmount = baseWithComplexity * ((Number(quotationData.financials.deviationPercentage) || 0) / 100);
 
       // Calculate markup
       const markup = calculateMarkup(baseWithComplexity);
+      console.log('💰 Markup calculation:', markup);
       setMarkupAmount(markup);
 
       // Calculate total
@@ -273,9 +285,13 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         deviationAmount
       );
 
-      const discountAmount = total * ((quotationData.financials.discount || 0) / 100);
-      setTotalAmount(total - discountAmount);
+      const discountAmount = total * ((Number(quotationData.financials.discount) || 0) / 100);
+      const finalTotal = total - discountAmount;
+      
+      console.log('💵 Final total:', finalTotal);
+      setTotalAmount(finalTotal);
     } else {
+      console.log('⚠️ Base cost is 0, setting markup and total to 0');
       setMarkupAmount(0);
       setTotalAmount(0);
     }
@@ -302,7 +318,7 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [quotationData.project.type]);
 
-  // Context methods
+  // Context methods with proper recalculation triggers
   const updateClient = useCallback((client: Client | null) => {
     setQuotationData(prev => ({ ...prev, client }));
   }, []);
@@ -329,22 +345,31 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   }, []);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
+    console.log('📝 Updating analysis type:', analysisType);
     setQuotationData(prev => ({ ...prev, analysisType }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateMentionsVolume = useCallback((mentionsVolume: string) => {
+    console.log('📝 Updating mentions volume:', mentionsVolume);
     setQuotationData(prev => ({ ...prev, mentionsVolume }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateCountriesCovered = useCallback((countriesCovered: string) => {
+    console.log('📝 Updating countries covered:', countriesCovered);
     setQuotationData(prev => ({ ...prev, countriesCovered }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateClientEngagement = useCallback((clientEngagement: string) => {
+    console.log('📝 Updating client engagement:', clientEngagement);
     setQuotationData(prev => ({ ...prev, clientEngagement }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateTemplate = useCallback((template: ReportTemplate | null) => {
+    console.log('📝 Updating template:', template);
     setQuotationData(prev => ({
       ...prev,
       template,
@@ -355,68 +380,84 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         deviationPercentage: template?.deviationPercentage || 0
       }
     }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateComplexity = useCallback((complexity: 'basic' | 'medium' | 'high') => {
+    console.log('📝 Updating complexity:', complexity);
     setQuotationData(prev => ({ ...prev, complexity }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateTeamMembers = useCallback((teamMembers: OptimizedTeamMember[]) => {
+    console.log('👥 Updating team members:', teamMembers);
     setQuotationData(prev => ({ ...prev, teamMembers }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const addTeamMember = useCallback((member: Omit<OptimizedTeamMember, "id">) => {
-    const hours = member.hours || 40; // Default to 40 hours if not specified
-    const rate = member.rate || 50; // Default to $50/hour if not specified
+    // Get default values from role if available
+    const role = roles.find(r => r.id === member.roleId);
+    const defaultHours = member.hours || 40;
+    const defaultRate = member.rate || role?.defaultRate || 50;
     
     const newMember: OptimizedTeamMember = {
       ...member,
       id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      hours,
-      rate,
-      cost: hours * rate
+      hours: defaultHours,
+      rate: defaultRate,
+      cost: defaultHours * defaultRate
     };
     
     console.log('➕ Adding new team member:', newMember);
-    console.log(`💵 Member cost: ${hours} hours × $${rate} = $${newMember.cost}`);
     
     setQuotationData(prev => ({
       ...prev,
       teamMembers: [...prev.teamMembers, newMember]
     }));
-  }, []);
+    
+    forceRecalculate();
+  }, [roles, forceRecalculate]);
 
   const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
+    console.log('📝 Updating team member:', id, updates);
+    
     setQuotationData(prev => ({
       ...prev,
       teamMembers: prev.teamMembers.map(member => {
         if (member.id === id) {
           const updatedMember = { ...member, ...updates };
-          // Recalcular el costo cuando se actualizan horas o rate
+          // Recalculate cost when hours or rate change
           if ('hours' in updates || 'rate' in updates) {
             updatedMember.cost = (updatedMember.hours || 0) * (updatedMember.rate || 0);
           }
-          console.log('Updated team member:', updatedMember);
+          console.log('✅ Updated team member:', updatedMember);
           return updatedMember;
         }
         return member;
       })
     }));
-  }, []);
+    
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const removeTeamMember = useCallback((id: string) => {
+    console.log('🗑️ Removing team member:', id);
     setQuotationData(prev => ({
       ...prev,
       teamMembers: prev.teamMembers.filter(member => member.id !== id)
     }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateFinancials = useCallback((financials: Partial<QuotationData['financials']>) => {
+    console.log('💰 Updating financials:', financials);
     setQuotationData(prev => ({
       ...prev,
       financials: { ...prev.financials, ...financials }
     }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
@@ -438,10 +479,10 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
           name: quotation.projectName || "",
           type: quotation.projectType || "one-time"
         },
-        analysisType: quotation.analysisType || "",
-        mentionsVolume: quotation.mentionsVolume || "",
-        countriesCovered: quotation.countriesCovered || "",
-        clientEngagement: quotation.clientEngagement || "",
+        analysisType: quotation.analysisType || "standard",
+        mentionsVolume: quotation.mentionsVolume || "medium",
+        countriesCovered: quotation.countriesCovered || "1",
+        clientEngagement: quotation.clientEngagement || "medium",
         template: quotation.reportTemplate || null,
         complexity: (quotation.reportTemplate?.complexity as 'basic' | 'medium' | 'high') || 'basic',
         teamMembers: optimizedTeamMembers,
@@ -454,10 +495,12 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
           marginFactor: quotation.marginFactor || 2.0
         }
       });
+      
+      forceRecalculate();
     } catch (error) {
       console.error("Error loading quotation:", error);
     }
-  }, []);
+  }, [forceRecalculate]);
 
   const saveQuotation = useCallback(async () => {
     try {
@@ -502,21 +545,9 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
 
   const calculateTotalCost = useCallback(() => {
-    console.log('calculateTotalCost called');
-    setQuotationData(prev => {
-      const updatedMembers = prev.teamMembers.map(member => ({
-        ...member,
-        cost: (member.hours || 0) * (member.rate || 0)
-      }));
-      
-      console.log('Updated team members:', updatedMembers);
-      
-      return { 
-        ...prev, 
-        teamMembers: updatedMembers
-      };
-    });
-  }, []);
+    console.log('🔄 Manual recalculation triggered');
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const resetQuotation = useCallback(() => {
     setQuotationData(initialQuotationData);
@@ -556,7 +587,8 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
 
   const updateAdditionalDeliverableCost = useCallback((cost: number) => {
     setQuotationData(prev => ({ ...prev, additionalDeliverableCost: cost }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
@@ -565,54 +597,6 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
   const loadPersonnel = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
   }, [queryClient]);
-
-  // Diagnostic function
-  const runDiagnostic = useCallback(() => {
-    console.log('🔍 === QUOTATION DIAGNOSTIC ===');
-    console.log('📊 Current quotation data:', quotationData);
-    console.log('💰 Financial summary:', {
-      baseCost: `$${baseCost}`,
-      complexityAdjustment: `$${complexityAdjustment}`,
-      markupAmount: `$${markupAmount}`,
-      totalAmount: `$${totalAmount}`
-    });
-    console.log('🧮 Complexity factors:', complexityFactors);
-    console.log('👥 Team members:', quotationData.teamMembers);
-    console.log('📋 Selected template:', quotationData.template);
-    console.log('🎯 Available roles:', roles.length);
-    console.log('👤 Available personnel:', personnel.length);
-    
-    // Check for potential issues
-    const issues = [];
-    if (quotationData.teamMembers.length === 0) issues.push('❌ No team members configured');
-    if (baseCost === 0) issues.push('❌ Base cost is $0');
-    if (Object.values(complexityFactors).every(f => f === 0)) issues.push('❌ All complexity factors are 0');
-    if (!quotationData.template) issues.push('⚠️ No template selected');
-    
-    if (issues.length > 0) {
-      console.warn('🚨 Issues found:', issues);
-    } else {
-      console.log('✅ All checks passed!');
-    }
-    
-    return {
-      quotationData,
-      baseCost,
-      complexityAdjustment,
-      markupAmount,
-      totalAmount,
-      complexityFactors,
-      issues
-    };
-  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount, complexityFactors, roles, personnel]);
-
-  // Expose diagnostic function globally for debugging
-  useEffect(() => {
-    (window as any).quotationDiagnostic = runDiagnostic;
-    return () => {
-      delete (window as any).quotationDiagnostic;
-    };
-  }, [runDiagnostic]);
 
   const value = {
     quotationData,
@@ -649,12 +633,12 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     resetQuotation,
     loadRoles,
     loadPersonnel,
+    forceRecalculate,
     updateDeliverables,
     addDeliverable,
     updateDeliverable,
     removeDeliverable,
-    updateAdditionalDeliverableCost,
-    runDiagnostic
+    updateAdditionalDeliverableCost
   };
 
   return (
