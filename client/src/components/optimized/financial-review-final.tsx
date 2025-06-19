@@ -1,17 +1,9 @@
+
 import React, { useEffect } from "react";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/formatters";
-
-// Removed duplicate formatCurrency declaration - using imported one
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-    console.log(`Formatting currency: ${amount} -> ${formatted}`);
-    return formatted;
-  };
 
 export default function FinancialReviewFinal() {
   const {
