@@ -144,7 +144,8 @@ const getAnalysisTypeFactor = (type: string): number => {
     'basic': 0.0,     // Básico: +0%
     'standard': 0.10, // Estándar: +10%
     'deep': 0.15,     // Avanzado: +15%
-    'advanced': 0.15, // Fallback para 'advanced'
+    'advanced': 0.15, // Avanzado: +15%
+    'premium': 0.20,  // Premium: +20%
     'Básico': 0.0,
     'Estándar': 0.10,
     'Avanzado': 0.15
@@ -160,9 +161,11 @@ const getMentionsVolumeFactor = (volume: string): number => {
     'low': 0.0,
     'medium': 0.1,
     'high': 0.2,
+    'very-high': 0.25,
     'Bajo': 0.0,
     'Medio': 0.1,
-    'Alto': 0.2
+    'Alto': 0.2,
+    'Muy Alto': 0.25
   };
   const factor = factors[volume] || 0.0;
   console.log(`📊 Mentions Volume "${volume}" -> ${factor} (${factor * 100}%)`);
@@ -173,10 +176,13 @@ const getCountriesFactor = (countries: string): number => {
   console.log('📊 Countries Factor for:', countries);
   const factors: Record<string, number> = {
     '1': 0.0,
+    '2-3': 0.1,
+    '4-6': 0.15,
+    '7+': 0.2,
     '2-3 países': 0.1,
     '4+ países': 0.15,
-    '2-3': 0.1,
-    '4+': 0.15
+    '4-6 países': 0.15,
+    '7+ países': 0.2
   };
   const factor = factors[countries] || 0.0;
   console.log(`📊 Countries "${countries}" -> ${factor} (${factor * 100}%)`);
@@ -189,9 +195,11 @@ const getClientEngagementFactor = (engagement: string): number => {
     'low': 0.0,
     'medium': 0.05,
     'high': 0.1,
+    'very-high': 0.15,
     'Bajo': 0.0,
     'Medio': 0.05,
-    'Alto': 0.1
+    'Alto': 0.1,
+    'Muy Alto': 0.15
   };
   const factor = factors[engagement] || 0.0;
   console.log(`📊 Client Engagement "${engagement}" -> ${factor} (${factor * 100}%)`);
