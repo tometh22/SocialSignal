@@ -12,7 +12,7 @@ import OptimizedTemplateSelection from '@/components/optimized/template-selectio
 import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
-import { InflationAdjustmentCard } from '@/components/optimized/inflation-adjustment-card';
+// import { InflationAdjustmentCard } from '@/components/optimized/inflation-adjustment-card';
 
 interface OptimizedQuoteProps {
   quotationId?: number;

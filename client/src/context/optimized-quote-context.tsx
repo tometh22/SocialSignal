@@ -43,13 +43,13 @@ export interface QuotationData {
     discount: number;
     marginFactor: number;
   };
-  inflation: {
-    applyInflationAdjustment: boolean;
-    inflationMethod: string;
-    manualInflationRate: number;
-    projectStartDate: string;
-    quotationCurrency: string;
-  };
+  // inflation: {
+  //   applyInflationAdjustment: boolean;
+  //   inflationMethod: string;
+  //   manualInflationRate: number;
+  //   projectStartDate: string;
+  //   quotationCurrency: string;
+  // };
 }
 
 interface OptimizedQuoteContextType {
