@@ -67,9 +67,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   const getSteps = () => {
     const baseSteps = [
-      { num: 1, title: "Info" },
+      { num: 1, title: "Equipo" },
       { num: 2, title: "Plantilla" },
-      { num: 3, title: "Equipo" },
+      { num: 3, title: "Info" },
     ];
 
     if (quotationData.project?.type === 'always-on') {
@@ -175,9 +175,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       <div className="space-y-6">
         <div className="standard-card">
           <div className="card-content">
-            {currentStep === 1 && <OptimizedBasicInfo />}
+            {currentStep === 1 && <OptimizedTeamConfig />}
             {currentStep === 2 && <OptimizedTemplateSelection />}
-            {currentStep === 3 && <OptimizedTeamConfig />}
+            {currentStep === 3 && <OptimizedBasicInfo />}
             
             {currentStep === 4 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">

@@ -43,13 +43,13 @@ export interface QuotationData {
     discount: number;
     marginFactor: number;
   };
-  // inflation: {
-  //   applyInflationAdjustment: boolean;
-  //   inflationMethod: string;
-  //   manualInflationRate: number;
-  //   projectStartDate: string;
-  //   quotationCurrency: string;
-  // };
+  inflation: {
+    applyInflationAdjustment: boolean;
+    inflationMethod: string;
+    manualInflationRate: number;
+    projectStartDate: string;
+    quotationCurrency: string;
+  };
 }
 
 interface OptimizedQuoteContextType {
@@ -86,7 +86,7 @@ interface OptimizedQuoteContextType {
   updateTeamMember: (id: string, updates: Partial<OptimizedTeamMember>) => void;
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
-  // updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
+  updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
   
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
@@ -127,6 +127,13 @@ const initialQuotationData: QuotationData = {
     deviationPercentage: 0,
     discount: 0,
     marginFactor: 2.0
+  },
+  inflation: {
+    applyInflationAdjustment: false,
+    inflationMethod: "automatic",
+    manualInflationRate: 0,
+    projectStartDate: "",
+    quotationCurrency: "ARS"
   }
 };
 
@@ -288,25 +295,48 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     recalculationTrigger
   ]);
 
-  // Intelligent complexity calculation: Apply factors to specific roles
+  // Calculate costs properly with debugging
   useEffect(() => {
-    // Step 1: Calculate base team cost and apply role-specific complexity
-    let totalAdjustedCost = 0;
-    let totalComplexityAdjustment = 0;
+    console.log('💰 === COST CALCULATION START ===');
+    console.log('📊 Input data:', {
+      teamMembers: quotationData.teamMembers.length,
+      template: quotationData.template?.name,
+      financials: quotationData.financials
+    });
+
+    // Don't calculate if no team members
+    if (!quotationData.teamMembers.length) {
+      console.log('⚠️ No team members, setting costs to 0');
+      setBaseCost(0);
+      setComplexityAdjustment(0);
+      setMarkupAmount(0);
+      setTotalAmount(0);
+      return;
+    }
+
+    // Step 1: Calculate base team cost
+    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
+      const memberCost = (member.hours || 0) * (member.rate || 0);
+      console.log(`👤 Member cost: ${member.hours}h × $${member.rate} = $${memberCost}`);
+      return total + memberCost;
+    }, 0);
     
+    console.log(`👥 Total team base cost: $${teamBaseCost}`);
+
+    // Step 2: Calculate complexity adjustments
+    let totalComplexityAdjustment = 0;
     quotationData.teamMembers.forEach(member => {
       const baseHours = member.hours || 0;
       const hourlyRate = member.rate || 0;
       const baseCost = baseHours * hourlyRate;
       let memberComplexityFactor = 0;
       
-      // Get role information to determine which factors apply
+      // Get role information
       const role = roles.find(r => r.id === member.roleId);
       const roleName = role?.name?.toLowerCase() || '';
       
-      // Apply complexity factors based on specific role types
+      // Apply complexity factors based on role types
       if (roleName.includes('analista') || roleName.includes('data specialist') || roleName.includes('tech lead')) {
-        // Analysis roles: affected by countries, mentions volume, analysis type
         memberComplexityFactor += complexityFactors.countriesFactor;
         memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
         memberComplexityFactor += complexityFactors.analysisTypeFactor;
@@ -314,44 +344,45 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       else if (roleName.includes('manager') || roleName.includes('director') || 
                roleName.includes('ceo') || roleName.includes('coo') || 
                roleName.includes('operations lead') || roleName.includes('account')) {
-        // Management roles: affected by client engagement, analysis type (reduced impact)
         memberComplexityFactor += complexityFactors.clientEngagementFactor;
         memberComplexityFactor += complexityFactors.analysisTypeFactor * 0.5;
       }
       else {
-        // Other roles (designers, etc.): only analysis type affects them minimally
         memberComplexityFactor = complexityFactors.analysisTypeFactor * 0.3;
       }
       
-      // Apply complexity to HOURS, then calculate cost
       const adjustedHours = baseHours * (1 + memberComplexityFactor);
       const adjustedMemberCost = adjustedHours * hourlyRate;
       const memberAdjustment = adjustedMemberCost - baseCost;
       
-      totalAdjustedCost += adjustedMemberCost;
       totalComplexityAdjustment += memberAdjustment;
+      console.log(`🔧 ${roleName}: factor ${memberComplexityFactor.toFixed(3)} → adjustment $${memberAdjustment.toFixed(2)}`);
     });
+
+    // Step 3: Add template cost
+    const templateCost = quotationData.template?.baseCost || 0;
+    console.log(`📋 Template cost: $${templateCost}`);
     
-    // Step 2: Add template cost (fixed, not affected by complexity)
-    let templateCost = 0;
-    if (quotationData.template) {
-      templateCost = quotationData.template.baseCost || 0;
-    }
-    
-    // Step 3: Calculate costs
-    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
-      return total + ((member.hours || 0) * (member.rate || 0));
-    }, 0);
-    
+    // Step 4: Calculate final costs
     const newBaseCost = teamBaseCost + templateCost;
-    const adjustedBaseCost = totalAdjustedCost + templateCost;
+    const adjustedBaseCost = newBaseCost + totalComplexityAdjustment;
     
-    // Step 4: Apply business factors
+    console.log(`💵 Base cost: $${newBaseCost}`);
+    console.log(`⚡ Complexity adjustment: $${totalComplexityAdjustment}`);
+    console.log(`📈 Adjusted base cost: $${adjustedBaseCost}`);
+    
+    // Step 5: Apply business factors
     const platformCost = quotationData.financials.platformCost || 0;
-    const marginMultiplier = quotationData.financials.marginFactor || 1.5;
+    const marginMultiplier = quotationData.financials.marginFactor || 2.0;
     const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
     const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
     const finalTotal = subtotal - discount;
+    
+    console.log(`🏢 Platform cost: $${platformCost}`);
+    console.log(`📊 Margin factor: ${marginMultiplier}x`);
+    console.log(`💰 Subtotal: $${subtotal}`);
+    console.log(`💸 Discount: $${discount}`);
+    console.log(`🎯 Final total: $${finalTotal}`);
     
     // Update states
     setBaseCost(newBaseCost);
@@ -359,7 +390,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
     setTotalAmount(finalTotal);
     
-  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles]);
+    console.log('💰 === COST CALCULATION END ===');
+    
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger]);
 
   // Navigation functions
   const nextStep = useCallback(() => {
@@ -560,6 +593,13 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           deviationPercentage: quotation.deviationPercentage || 0,
           discount: 0,
           marginFactor: 2.0
+        },
+        inflation: {
+          applyInflationAdjustment: quotation.applyInflationAdjustment || false,
+          inflationMethod: quotation.inflationMethod || "automatic",
+          manualInflationRate: quotation.manualInflationRate || 0,
+          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
+          quotationCurrency: quotation.quotationCurrency || "ARS"
         }
       });
       
