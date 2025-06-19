@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useOptimizedQuote } from '@/context/optimized-quote-context';
-import { useQuery } from '@tanstack/react-query';
-import { ReportTemplate } from '@shared/schema';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Check, Search, FileText } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useOptimizedQuote } from "@/context/optimized-quote-context";
+import { useQuery } from "@tanstack/react-query";
+import { ReportTemplate } from "@shared/schema";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, FileText, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const OptimizedTemplateSelection: React.FC = () => {
   const {
