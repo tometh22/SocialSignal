@@ -130,10 +130,10 @@ const initialQuotationData: QuotationData = {
   },
   inflation: {
     applyInflationAdjustment: false,
-    inflationMethod: "automatic",
-    manualInflationRate: 0,
+    inflationMethod: "manual",
+    manualInflationRate: 25,
     projectStartDate: "",
-    quotationCurrency: "ARS"
+    quotationCurrency: "USD"
   }
 };
 

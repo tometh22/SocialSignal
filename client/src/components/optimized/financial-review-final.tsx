@@ -267,22 +267,7 @@ export default function FinancialReviewFinal() {
         onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
       />
 
-      {/* Debug Information (only in development) */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="border-dashed border-gray-300">
-          <CardHeader>
-            <CardTitle className="text-sm text-gray-500">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-gray-500">
-            <div>Base Cost: {baseCost}</div>
-            <div>Complexity Adjustment: {complexityAdjustment}</div>
-            <div>Markup Amount: {markupAmount}</div>
-            <div>Total Amount: {totalAmount}</div>
-            <div>Team Members: {quotationData.teamMembers.length}</div>
-            <div>Complexity Factors: {JSON.stringify(complexityFactors, null, 2)}</div>
-          </CardContent>
-        </Card>
-      )}
+
     </div>
   );
 }
