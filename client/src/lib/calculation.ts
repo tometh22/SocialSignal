@@ -41,6 +41,60 @@ const DEFAULT_MULTIPLIERS = {
 // Cache para multiplicadores
 let multiplierCache: Record<string, Record<string, number>> = DEFAULT_MULTIPLIERS;
 let cacheTimestamp: number = 0;
+
+// Cache expiration time (5 minutes)
+const CACHE_EXPIRATION = 5 * 60 * 1000;
+
+export async function loadCostMultipliers(): Promise<void> {
+  const now = Date.now();
+  
+  // Use cache if not expired
+  if (cacheTimestamp && (now - cacheTimestamp < CACHE_EXPIRATION)) {
+    console.log('Using cached multipliers');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/cost-multipliers');
+    if (response.ok) {
+      const multipliers = await response.json();
+      
+      // Organize multipliers by category
+      const organized: Record<string, Record<string, number>> = {};
+      
+      multipliers.forEach((m: any) => {
+        if (!organized[m.category]) {
+          organized[m.category] = {};
+        }
+        organized[m.category][m.subcategory] = m.multiplier;
+      });
+      
+      multiplierCache = { ...DEFAULT_MULTIPLIERS, ...organized };
+      cacheTimestamp = now;
+      console.log('Loaded multipliers from API:', multiplierCache);
+    } else {
+      console.warn('Failed to load multipliers from API, using defaults');
+    }
+  } catch (error) {
+    console.error('Error loading cost multipliers:', error);
+    console.log('Using default multipliers');
+  }
+}
+
+export function calculateMarkup(baseWithComplexity: number): number {
+  // Simple 2x markup for now
+  return baseWithComplexity;
+}
+
+export function calculateTotalAmount(
+  baseCost: number,
+  complexityAdjustment: number,
+  markupAmount: number,
+  platformCost: number = 0,
+  deviationAmount: number = 0
+): number {
+  return baseCost + complexityAdjustment + markupAmount + platformCost + deviationAmount;
+}
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // Función para cargar multiplicadores desde la API
@@ -98,32 +152,80 @@ export const invalidateCostMultipliersCache = (): void => {
 export const getAnalysisTypeFactor = (analysisType: string): number => {
   if (!analysisType) return 0;
   
-  const factor = multiplierCache.complexity?.[analysisType] ?? DEFAULT_MULTIPLIERS.complexity[analysisType as keyof typeof DEFAULT_MULTIPLIERS.complexity] ?? 0;
-  console.log(`Analysis type factor for ${analysisType}:`, factor);
+  // Map UI values to database values
+  const mapping: Record<string, string> = {
+    'Básico': 'basic',
+    'basic': 'basic',
+    'Estándar': 'standard', 
+    'standard': 'standard',
+    'Avanzado': 'deep',
+    'deep': 'deep'
+  };
+  
+  const mappedType = mapping[analysisType] || analysisType;
+  const factor = multiplierCache.complexity?.[mappedType] ?? DEFAULT_MULTIPLIERS.complexity[mappedType as keyof typeof DEFAULT_MULTIPLIERS.complexity] ?? 0;
+  console.log(`Analysis type factor for ${analysisType} (mapped to ${mappedType}):`, factor);
   return factor;
 };
 
 export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
   if (!mentionsVolume) return 0;
   
-  const factor = multiplierCache.mentions_volume?.[mentionsVolume] ?? DEFAULT_MULTIPLIERS.mentions_volume[mentionsVolume as keyof typeof DEFAULT_MULTIPLIERS.mentions_volume] ?? 0;
-  console.log(`Mentions volume factor for ${mentionsVolume}:`, factor);
+  // Map UI values to database values
+  const mapping: Record<string, string> = {
+    'Pequeño': 'small',
+    'small': 'small',
+    'Medio': 'medium',
+    'medium': 'medium', 
+    'Grande': 'large',
+    'large': 'large',
+    'Extra grande': 'xlarge',
+    'xlarge': 'xlarge'
+  };
+  
+  const mappedVolume = mapping[mentionsVolume] || mentionsVolume;
+  const factor = multiplierCache.mentions_volume?.[mappedVolume] ?? DEFAULT_MULTIPLIERS.mentions_volume[mappedVolume as keyof typeof DEFAULT_MULTIPLIERS.mentions_volume] ?? 0;
+  console.log(`Mentions volume factor for ${mentionsVolume} (mapped to ${mappedVolume}):`, factor);
   return factor;
 };
 
 export const getCountriesFactor = (countriesCovered: string): number => {
   if (!countriesCovered) return 0;
   
-  const factor = multiplierCache.countries?.[countriesCovered] ?? DEFAULT_MULTIPLIERS.countries[countriesCovered as keyof typeof DEFAULT_MULTIPLIERS.countries] ?? 0;
-  console.log(`Countries factor for ${countriesCovered}:`, factor);
+  // Map UI values to database values
+  const mapping: Record<string, string> = {
+    '1 país': '1',
+    '1': '1',
+    '2-5 países': '2-5',
+    '2-5': '2-5',
+    '6-10 países': '6-10', 
+    '6-10': '6-10',
+    'Más de 10': '10+',
+    '10+': '10+'
+  };
+  
+  const mappedCountries = mapping[countriesCovered] || countriesCovered;
+  const factor = multiplierCache.countries?.[mappedCountries] ?? DEFAULT_MULTIPLIERS.countries[mappedCountries as keyof typeof DEFAULT_MULTIPLIERS.countries] ?? 0;
+  console.log(`Countries factor for ${countriesCovered} (mapped to ${mappedCountries}):`, factor);
   return factor;
 };
 
 export const getClientEngagementFactor = (clientEngagement: string): number => {
   if (!clientEngagement) return 0;
   
-  const factor = multiplierCache.urgency?.[clientEngagement] ?? DEFAULT_MULTIPLIERS.urgency[clientEngagement as keyof typeof DEFAULT_MULTIPLIERS.urgency] ?? 0;
-  console.log(`Client engagement factor for ${clientEngagement}:`, factor);
+  // Map UI values to database values  
+  const mapping: Record<string, string> = {
+    'Bajo': 'low',
+    'low': 'low',
+    'Medio': 'medium',
+    'medium': 'medium',
+    'Alto': 'high', 
+    'high': 'high'
+  };
+  
+  const mappedEngagement = mapping[clientEngagement] || clientEngagement;
+  const factor = multiplierCache.urgency?.[mappedEngagement] ?? DEFAULT_MULTIPLIERS.urgency[mappedEngagement as keyof typeof DEFAULT_MULTIPLIERS.urgency] ?? 0;
+  console.log(`Client engagement factor for ${clientEngagement} (mapped to ${mappedEngagement}):`, factor);
   return factor;
 };
 
@@ -139,6 +241,24 @@ export function calculateComplexityAdjustment(baseCost: number, factors: Complex
   if (!baseCost || baseCost <= 0) {
     console.log('Base cost is 0 or invalid:', baseCost);
     return 0;
+  }
+
+  const totalFactor = 
+    factors.analysisTypeFactor + 
+    factors.mentionsVolumeFactor + 
+    factors.countriesFactor + 
+    factors.clientEngagementFactor + 
+    factors.templateFactor;
+
+  const adjustment = baseCost * totalFactor;
+  console.log('Complexity adjustment calculation:', {
+    baseCost,
+    factors,
+    totalFactor,
+    adjustment
+  });
+  
+  return adjustment;rn 0;
   }
 
   console.log('Calculating complexity adjustment with:', { baseCost, factors });
