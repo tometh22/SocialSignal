@@ -27,52 +27,8 @@ const OptimizedTemplateSelection: React.FC = () => {
   );
 
   // Manejar la selección de una plantilla
-  const handleTemplateSelect = (template: ReportTemplate) => {
-    
-    // Asegurarse de que el costo base de la plantilla sea un número válido
-    
-    // Al seleccionar una plantilla, establecer también su nivel de complejidad
-    let templateComplexity: 'low' | 'medium' | 'high' = 'medium';
-    if (template.complexity === 'low' || template.complexity === 'medium' || template.complexity === 'high') {
-      templateComplexity = template.complexity;
-    }
-    
-    // Ahora actualizar la plantilla para que se considere el costo base
+  const handleTemplateSelect = (template: ReportTemplate | null) => {
     updateTemplate(template);
-    
-    // Luego establecer la complejidad y otros valores
-    updateComplexity(templateComplexity);
-    
-    // Si no se han establecido los factores de complejidad, poner valores por defecto
-    if (!quotationData.analysisType) {
-      updateAnalysisType('standard');
-    }
-    
-    if (!quotationData.mentionsVolume) {
-      updateMentionsVolume('medium');
-    }
-    
-    if (!quotationData.countriesCovered) {
-      updateCountriesCovered('1');
-    }
-    
-    if (!quotationData.clientEngagement) {
-      updateClientEngagement('medium');
-    }
-    
-    // Forzar recálculo de costos después de actualizar la plantilla
-    setTimeout(() => {
-        baseCost,
-        complexityAdjustment,
-        totalAmount,
-        template: template
-      });
-    }, 500);
-    
-    // Cambiar automáticamente a la pestaña "Detalles y Ajustes" después de seleccionar una plantilla
-    setTimeout(() => {
-      setSelectedTab('details');
-    }, 100);
   };
 
   // Obtener color para niveles de complejidad
@@ -132,16 +88,16 @@ const OptimizedTemplateSelection: React.FC = () => {
                 <span>{template.pageRange}</span>
               </div>
             )}
-            {template.baseCost !== null && template.baseCost !== undefined && (
+            {template.deliverableType && (
               <div className="flex justify-between">
-                <span className="text-neutral-500">Costo Base:</span>
-                <span>${template.baseCost.toFixed(2)}</span>
+                <span className="text-neutral-500">Tipo:</span>
+                <span className="capitalize">{template.deliverableType}</span>
               </div>
             )}
-            {template.platformCost !== null && (
+            {template.baseCost && (
               <div className="flex justify-between">
-                <span className="text-neutral-500">Costo Plataforma:</span>
-                <span>${template.platformCost.toFixed(2)}</span>
+                <span className="text-neutral-500">Costo base:</span>
+                <span className="font-medium">${template.baseCost}</span>
               </div>
             )}
           </div>
@@ -162,587 +118,96 @@ const OptimizedTemplateSelection: React.FC = () => {
     );
   };
 
-  // Datos para la visualización - forzar actualización inmediata del gráfico
-  const chartData = React.useMemo(() => [
-    { name: 'Costo Base', valor: baseCost || 0 },
-    { name: 'Ajuste', valor: complexityAdjustment || 0 },
-    { name: 'Total', valor: totalAmount || 0 }
-  ], [baseCost, complexityAdjustment, totalAmount]);
-
-  // Renderizar el contenido de detalles y configuración
-  const renderDetailsContent = () => {
-    if (quotationData.template === null) {
-      return (
-        // Vista para el caso de "Personalizado / Sin Plantilla"
-        <div className="space-y-6">
-          {/* Información para el caso personalizado */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Personalizado / Sin Plantilla</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-base">Configuración Personalizada</h3>
-                  <p className="text-sm text-neutral-600 mt-1">
-                    Has seleccionado crear un proyecto completamente personalizado sin usar una plantilla predefinida.
-                    Configura las opciones a continuación según tus necesidades específicas.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium text-neutral-700">Tipo:</p>
-                    <Badge className="mt-1 bg-blue-100 text-blue-800 border-blue-200">
-                      Personalizado
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="font-medium text-neutral-700">Ventajas:</p>
-                    <p className="mt-1">Flexibilidad total en la configuración</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Resumen de Factores de Complejidad */}
-          <ComplexityFactorsCard
-            analysisType={quotationData.analysisType}
-            mentionsVolume={quotationData.mentionsVolume}
-            countriesCovered={quotationData.countriesCovered}
-            clientEngagement={quotationData.clientEngagement}
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        {/* Búsqueda de plantillas */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
+          <Input
+            placeholder="Buscar plantillas..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
           />
-          
-          {/* Visualización de costos */}
-          <FinancialSummary 
-            baseCost={baseCost} 
-            complexityAdjustment={complexityAdjustment} 
-            totalAmount={totalAmount} 
-          />
-
-          {/* Selección de complejidad para el caso personalizado */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium flex items-center text-blue-700">
-              <span className="bg-blue-100 p-1 rounded-full mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="9" y1="3" x2="9" y2="21"></line>
-                </svg>
-              </span>
-              Nivel de Complejidad del Proyecto
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
-                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'low' ? 'border-blue-400 bg-blue-50' : ''}`} 
-                onClick={() => updateComplexity('low')}
-              >
-                <input 
-                  type="radio" 
-                  id="complejidad-baja" 
-                  name="complejidad" 
-                  checked={quotationData.complexity === 'low'} 
-                  onChange={() => updateComplexity('low')}
-                  className="h-4 w-4 text-blue-600 mr-2" 
-                />
-                <label htmlFor="complejidad-baja" className="cursor-pointer">
-                  <div className="font-medium">Baja</div>
-                  <div className="text-xs text-neutral-500">Proyecto simple con requisitos estándar</div>
-                  <div className="text-xs text-blue-600 mt-1">+0%</div>
-                </label>
-              </div>
-              <div 
-                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'medium' ? 'border-blue-400 bg-blue-50' : ''}`} 
-                onClick={() => updateComplexity('medium')}
-              >
-                <input 
-                  type="radio" 
-                  id="complejidad-media" 
-                  name="complejidad" 
-                  checked={quotationData.complexity === 'medium'} 
-                  onChange={() => updateComplexity('medium')}
-                  className="h-4 w-4 text-blue-600 mr-2" 
-                />
-                <label htmlFor="complejidad-media" className="cursor-pointer">
-                  <div className="font-medium">Media</div>
-                  <div className="text-xs text-neutral-500">Proyecto con algunas personalizaciones</div>
-                  <div className="text-xs text-blue-600 mt-1">+10%</div>
-                </label>
-              </div>
-              <div 
-                className={`flex items-center p-3 border rounded-md hover:bg-blue-50 transition-colors cursor-pointer ${quotationData.complexity === 'high' ? 'border-blue-400 bg-blue-50' : ''}`}
-                onClick={() => updateComplexity('high')}
-              >
-                <input 
-                  type="radio" 
-                  id="complejidad-alta" 
-                  name="complejidad" 
-                  checked={quotationData.complexity === 'high'} 
-                  onChange={() => updateComplexity('high')}
-                  className="h-4 w-4 text-blue-600 mr-2" 
-                />
-                <label htmlFor="complejidad-alta" className="cursor-pointer">
-                  <div className="font-medium">Alta</div>
-                  <div className="text-xs text-neutral-500">Proyecto complejo con muchas personalizaciones</div>
-                  <div className="text-xs text-blue-600 mt-1">+20%</div>
-                </label>
-              </div>
-            </div>
-          </div>
-          
-          {/* Notas de personalización */}
-          <div className="space-y-3">
-            <Label htmlFor="customization-custom">Notas de Personalización</Label>
-            <Textarea
-              id="customization-custom"
-              placeholder="Ingresa cualquier detalle adicional o requisitos específicos para la personalización del informe..."
-              value={quotationData.customization}
-              onChange={(e) => updateCustomization(e.target.value)}
-              rows={4}
-            />
-          </div>
         </div>
-      );
-    }
 
-    return (
-      <div className="space-y-6">
-        {/* Información de la plantilla seleccionada */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Plantilla Seleccionada: {quotationData.template.name}</CardTitle>
+        {/* Opción de personalizado siempre visible */}
+        <Card 
+          className={`cursor-pointer transition-all ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
+          onClick={() => handleTemplateSelect(null)}
+        >
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-start">
+              <CardTitle className="text-base">
+                <span className="bg-primary/5 p-2 rounded-sm mr-3 inline-block">
+                  <FileText className="h-4 w-4 text-primary" />
+                </span>
+                Configuración Personalizada
+              </CardTitle>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                Personalizado
+              </Badge>
+            </div>
+            <CardDescription className="line-clamp-2">
+              Mayor flexibilidad en la configuración del proyecto
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-neutral-600 mt-1">
-                  {quotationData.template.description || 'Sin descripción disponible'}
-                </p>
+          <CardContent className="pb-2 pt-0">
+            <div className="text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Tipo:</span>
+                <span>Completamente personalizado</span>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="font-medium text-neutral-700">Complejidad:</p>
-                  <Badge className={`mt-1 ${getComplexityColor(quotationData.template.complexity)}`}>
-                    {getComplexityLabel(quotationData.template.complexity)}
-                  </Badge>
-                </div>
-                {quotationData.template.pageRange && (
-                  <div>
-                    <p className="font-medium text-neutral-700">Rango de páginas:</p>
-                    <p className="mt-1">{quotationData.template.pageRange}</p>
-                  </div>
-                )}
-                {quotationData.template.baseCost !== null && quotationData.template.baseCost !== undefined && (
-                  <div>
-                    <p className="font-medium text-neutral-700">Costo Base:</p>
-                    <p className="mt-1">${quotationData.template.baseCost.toFixed(2)}</p>
-                  </div>
-                )}
-                {quotationData.template.features && (
-                  <div className="col-span-2">
-                    <p className="font-medium text-neutral-700">Características:</p>
-                    <p className="mt-1">{quotationData.template.features}</p>
-                  </div>
-                )}
+              <div className="flex justify-between">
+                <span className="text-neutral-500">Ventajas:</span>
+                <span>Máxima flexibilidad</span>
               </div>
             </div>
           </CardContent>
+          <CardFooter className="pt-2">
+            {quotationData.template === null ? (
+              <div className="w-full flex items-center justify-center py-1 bg-primary/10 text-primary font-medium rounded-md text-sm">
+                <Check className="h-4 w-4 mr-2" />
+                Seleccionada
+              </div>
+            ) : (
+              <div className="w-full flex items-center justify-center py-1 border border-dashed border-neutral-300 rounded-md text-neutral-500 text-sm">
+                Click para seleccionar
+              </div>
+            )}
+          </CardFooter>
         </Card>
-        
-        {/* Los factores de complejidad se muestran solo en la sección de abajo */}
-        
-        {/* Visualización de costos */}
-        <FinancialSummary 
-          baseCost={baseCost} 
-          complexityAdjustment={complexityAdjustment} 
-          totalAmount={totalAmount} 
-        />
 
-        {/* Eliminada la sección duplicada de Nivel de Complejidad */}
-        {/* Los factores de complejidad se manejarán solo con los componentes detallados más abajo */}
-        
-        {/* Tipo de análisis */}
-        <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
-          <div className="flex items-center mb-2">
-            <div className="bg-blue-100 p-1 rounded-full mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-              </svg>
-            </div>
-            <Label className="font-medium text-blue-800">Tipo de Análisis *</Label>
+        {/* Lista de plantillas disponibles */}
+        {isLoading ? (
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="h-4 bg-neutral-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-neutral-200 rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-3 bg-neutral-200 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-neutral-200 rounded w-2/3"></div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <RadioGroup 
-            value={quotationData.analysisType} 
-            onValueChange={(value) => updateAnalysisType(value)}
-            className="flex flex-col space-y-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="basic" id="analysis-basic" />
-              <Label htmlFor="analysis-basic" className="cursor-pointer">
-                <span className="font-medium">Básico</span> - Análisis general sin profundidad
-                <span className="ml-2 text-xs text-blue-600">(+0%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="standard" id="analysis-standard" />
-              <Label htmlFor="analysis-standard" className="cursor-pointer">
-                <span className="font-medium">Estándar</span> - Análisis detallado con métricas completas 
-                <span className="ml-2 text-xs text-blue-600">(+10%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="deep" id="analysis-deep" />
-              <Label htmlFor="analysis-deep" className="cursor-pointer">
-                <span className="font-medium">Avanzado</span> - Análisis profundo con metodologías especializadas
-                <span className="ml-2 text-xs text-blue-600">(+15%)</span>
-              </Label>
-            </div>
-          </RadioGroup>
-          <div className="text-xs text-blue-600 mt-2 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4"></path>
-              <path d="M12 8h.01"></path>
-            </svg>
-            El tipo de análisis determina la profundidad metodológica y afecta directamente al costo.
+        ) : (
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+            {filteredTemplates?.map(renderTemplateCard)}
           </div>
-        </div>
-        
-        {/* Volumen de menciones */}
-        <div className="space-y-3 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-          <div className="flex items-center mb-2">
-            <div className="bg-indigo-100 p-1 rounded-full mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-700">
-                <path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"></path>
-                <path d="m13 12-3 5h4l-3 5"></path>
-              </svg>
-            </div>
-            <Label className="font-medium text-indigo-800">Volumen de Menciones *</Label>
+        )}
+
+        {filteredTemplates?.length === 0 && !isLoading && (
+          <div className="text-center py-8 text-neutral-500">
+            <FileText className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
+            <p>No se encontraron plantillas que coincidan con tu búsqueda.</p>
           </div>
-          <RadioGroup 
-            value={quotationData.mentionsVolume} 
-            onValueChange={(value) => updateMentionsVolume(value)}
-            className="flex flex-col space-y-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="small" id="volume-small" />
-              <Label htmlFor="volume-small" className="cursor-pointer">
-                <span className="font-medium">Pequeño</span> - Menos de 1,000 menciones
-                <span className="ml-2 text-xs text-indigo-600">(+0%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="medium" id="volume-medium" />
-              <Label htmlFor="volume-medium" className="cursor-pointer">
-                <span className="font-medium">Medio</span> - Entre 1,000 y 10,000 menciones
-                <span className="ml-2 text-xs text-indigo-600">(+10%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="large" id="volume-large" />
-              <Label htmlFor="volume-large" className="cursor-pointer">
-                <span className="font-medium">Grande</span> - Entre 10,000 y 50,000 menciones
-                <span className="ml-2 text-xs text-indigo-600">(+20%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="xlarge" id="volume-xlarge" />
-              <Label htmlFor="volume-xlarge" className="cursor-pointer">
-                <span className="font-medium">Extra grande</span> - Más de 50,000 menciones
-                <span className="ml-2 text-xs text-indigo-600">(+30%)</span>
-              </Label>
-            </div>
-          </RadioGroup>
-          <div className="text-xs text-indigo-600 mt-2 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4"></path>
-              <path d="M12 8h.01"></path>
-            </svg>
-            El volumen de menciones determina la cantidad de datos que se procesarán.
-          </div>
-        </div>
-        
-        {/* Países cubiertos */}
-        <div className="space-y-3 bg-green-50 p-4 rounded-lg border border-green-100">
-          <div className="flex items-center mb-2">
-            <div className="bg-green-100 p-1 rounded-full mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-700">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="2" y1="12" x2="22" y2="12"></line>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-              </svg>
-            </div>
-            <Label className="font-medium text-green-800">Países Cubiertos *</Label>
-          </div>
-          <RadioGroup 
-            value={quotationData.countriesCovered} 
-            onValueChange={(value) => updateCountriesCovered(value)}
-            className="flex flex-col space-y-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="1" id="countries-1" />
-              <Label htmlFor="countries-1" className="cursor-pointer">
-                <span className="font-medium">1 país</span> - Cobertura de un solo país
-                <span className="ml-2 text-xs text-green-600">(+0%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="2-5" id="countries-2-5" />
-              <Label htmlFor="countries-2-5" className="cursor-pointer">
-                <span className="font-medium">2-5 países</span> - Cobertura regional limitada
-                <span className="ml-2 text-xs text-green-600">(+5%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="6-10" id="countries-6-10" />
-              <Label htmlFor="countries-6-10" className="cursor-pointer">
-                <span className="font-medium">6-10 países</span> - Cobertura regional amplia
-                <span className="ml-2 text-xs text-green-600">(+15%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="10+" id="countries-10+" />
-              <Label htmlFor="countries-10+" className="cursor-pointer">
-                <span className="font-medium">Más de 10 países</span> - Cobertura global
-                <span className="ml-2 text-xs text-green-600">(+25%)</span>
-              </Label>
-            </div>
-          </RadioGroup>
-          <div className="text-xs text-green-600 mt-2 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4"></path>
-              <path d="M12 8h.01"></path>
-            </svg>
-            El número de países afecta la complejidad y alcance del análisis.
-          </div>
-        </div>
-        
-        {/* Nivel de interacción con el cliente */}
-        <div className="space-y-3 bg-purple-50 p-4 rounded-lg border border-purple-100">
-          <div className="flex items-center mb-2">
-            <div className="bg-purple-100 p-1 rounded-full mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-700">
-                <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"></path>
-                <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path>
-              </svg>
-            </div>
-            <Label className="font-medium text-purple-800">Nivel de Interacción con el Cliente *</Label>
-          </div>
-          <RadioGroup 
-            value={quotationData.clientEngagement} 
-            onValueChange={(value) => updateClientEngagement(value)}
-            className="flex flex-col space-y-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="low" id="engagement-low" />
-              <Label htmlFor="engagement-low" className="cursor-pointer">
-                <span className="font-medium">Bajo</span> - Entrega del informe final sin reuniones adicionales
-                <span className="ml-2 text-xs text-purple-600">(+0%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="medium" id="engagement-medium" />
-              <Label htmlFor="engagement-medium" className="cursor-pointer">
-                <span className="font-medium">Medio</span> - Incluye reunión inicial y presentación de resultados
-                <span className="ml-2 text-xs text-purple-600">(+5%)</span>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="high" id="engagement-high" />
-              <Label htmlFor="engagement-high" className="cursor-pointer">
-                <span className="font-medium">Alto</span> - Colaboración continua con reuniones semanales
-                <span className="ml-2 text-xs text-purple-600">(+15%)</span>
-              </Label>
-            </div>
-          </RadioGroup>
-          <div className="text-xs text-purple-600 mt-2 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4"></path>
-              <path d="M12 8h.01"></path>
-            </svg>
-            El nivel de interacción determina la cantidad de reuniones y colaboración.
-          </div>
-        </div>
-        
-        {/* Notas de personalización */}
-        <div className="space-y-3">
-          <Label htmlFor="customization">Notas de Personalización</Label>
-          <Textarea
-            id="customization"
-            placeholder="Ingresa cualquier detalle adicional o requisitos específicos para la personalización del informe..."
-            value={quotationData.customization}
-            onChange={(e) => updateCustomization(e.target.value)}
-            rows={4}
-          />
-        </div>
+        )}
       </div>
-    );
-  };
-
-  return (
-    <div>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">Selección de Plantilla y Configuración</h2>
-        <p className="text-sm text-neutral-500">
-          Selecciona una plantilla de informe y configura la complejidad del proyecto.
-        </p>
-      </div>
-
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="list" className="flex items-center">
-            <FileText className="h-4 w-4 mr-2" />
-            Lista de Plantillas
-          </TabsTrigger>
-          <TabsTrigger value="details" className="flex items-center">
-            <BarChart className="h-4 w-4 mr-2" />
-            Detalles y Ajustes
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="list" className="space-y-4">
-          {/* Buscador */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-            <Input
-              placeholder="Buscar plantillas..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {/* Opción para usar personalizado / sin plantilla */}
-          <Card 
-            className={`cursor-pointer transition-all border-dashed mb-4 ${quotationData.template === null ? 'border-primary ring-2 ring-primary/20 bg-blue-50/30' : 'hover:border-gray-300'}`}
-            onClick={() => {
-              
-              // Establecer valores por defecto siempre para garantizar estado consistente
-              updateAnalysisType('standard');
-              updateMentionsVolume('medium');
-              updateCountriesCovered('1');
-              updateClientEngagement('medium');
-              
-              // Asignar complejidad media por defecto
-              updateComplexity('medium');
-              
-              // Cambiar a pestaña de detalles para mostrar opciones adicionales
-              setSelectedTab('details');
-              
-              // Marcar como personalizado (usar null para representar "Sin plantilla")
-              updateTemplate(null);
-              
-              // Ir siempre a la pestaña de detalles
-              setTimeout(() => setSelectedTab('details'), 50);
-            }}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-base">Personalizado / Sin Plantilla</CardTitle>
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                  Personalizado
-                </Badge>
-              </div>
-              <CardDescription className="line-clamp-2">
-                Configura tu proyecto manualmente sin usar una plantilla predefinida
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-2 pt-0">
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-neutral-500">Tipo:</span>
-                  <span>Completamente personalizado</span>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-2">
-              {quotationData.template === null ? (
-                <div className="w-full flex items-center justify-center py-1 bg-primary/10 text-primary font-medium rounded-md text-sm">
-                  <Check className="h-4 w-4 mr-2" />
-                  Seleccionada
-                </div>
-              ) : (
-                <div className="w-full flex items-center justify-center py-1 border border-dashed border-neutral-300 rounded-md text-neutral-500 text-sm">
-                  Click para seleccionar
-                </div>
-              )}
-            </CardFooter>
-          </Card>
-
-          {/* Lista de plantillas */}
-          {isLoading ? (
-            <div className="flex justify-center p-8">
-              <p>Cargando plantillas...</p>
-            </div>
-          ) : (
-            <>
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredTemplates?.map(renderTemplateCard)}
-                </div>
-                {filteredTemplates?.length === 0 && (
-                  <div className="flex flex-col items-center justify-center p-8 text-center">
-                    <Search className="h-8 w-8 text-neutral-400 mb-2" />
-                    <p className="text-neutral-600">No se encontraron plantillas que coincidan con tu búsqueda.</p>
-                    <Button 
-                      variant="link" 
-                      onClick={() => setSearchQuery('')}
-                      className="mt-2"
-                    >
-                      Limpiar búsqueda
-                    </Button>
-                  </div>
-                )}
-              </ScrollArea>
-              
-              {/* Mensaje guía después de seleccionar plantilla o personalizado */}
-              {(quotationData.template || quotationData.template === null) && (
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-                  <div className="text-blue-500 mt-0.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <path d="M12 16v-4"></path>
-                      <path d="M12 8h.01"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-blue-700">
-                      {quotationData.template ? '¡Plantilla seleccionada correctamente!' : '¡Opción "Personalizado" seleccionada!'}
-                    </h4>
-                    <p className="text-sm text-blue-600 mt-1">
-                      Ahora continúa con la configuración de parámetros adicionales en la pestaña "Detalles y Ajustes".
-                    </p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="mt-2 bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
-                      onClick={() => {
-                        // Asegurarse de que el usuario configure estas variables
-                        setSelectedTab('details');
-                      }}
-                    >
-                      Ir a Detalles y Ajustes
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="details" className="relative">
-          <div className="space-y-6">
-            {renderDetailsContent()}
-          </div>
-          
-
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
