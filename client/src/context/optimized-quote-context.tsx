@@ -280,7 +280,9 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
     let totalComplexityAdjustment = 0;
     
     quotationData.teamMembers.forEach(member => {
-      const baseCost = (member.hours || 0) * (member.rate || 0);
+      const baseHours = member.hours || 0;
+      const hourlyRate = member.rate || 0;
+      const baseCost = baseHours * hourlyRate;
       let memberComplexityFactor = 0;
       
       // Get role information to determine which factors apply
@@ -309,7 +311,9 @@ export const OptimizedQuoteProvider: React.FC<{ children: React.ReactNode }> = (
         memberComplexityFactor = complexityFactors.analysisTypeFactor;
       }
       
-      const adjustedMemberCost = baseCost * (1 + memberComplexityFactor);
+      // Apply complexity to HOURS, then calculate cost
+      const adjustedHours = baseHours * (1 + memberComplexityFactor);
+      const adjustedMemberCost = adjustedHours * hourlyRate;
       const memberAdjustment = adjustedMemberCost - baseCost;
       
       totalAdjustedCost += adjustedMemberCost;
