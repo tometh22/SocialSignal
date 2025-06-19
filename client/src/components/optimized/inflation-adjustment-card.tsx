@@ -82,20 +82,43 @@ export function InflationAdjustmentCard({
 
   // Calcular proyección de costo con inflación
   const calculateInflationProjection = () => {
-    if (!applyInflationAdjustment || !projectStartDate) return totalCost;
+    console.log('🏦 === INFLATION CALCULATION START ===');
+    console.log('Applied:', applyInflationAdjustment, 'Date:', projectStartDate);
+    
+    if (!applyInflationAdjustment || !projectStartDate) {
+      console.log('❌ Not applying inflation - missing data');
+      return totalCost;
+    }
 
     const startDate = new Date(projectStartDate);
     const currentDate = new Date();
     const monthsDifference = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
                            (startDate.getMonth() - currentDate.getMonth());
 
-    if (monthsDifference <= 0) return totalCost;
+    console.log('📅 Current date:', currentDate.toISOString());
+    console.log('📅 Start date:', startDate.toISOString());
+    console.log('📅 Months difference:', monthsDifference);
+
+    if (monthsDifference <= 0) {
+      console.log('❌ Project starts in past or now - no inflation');
+      return totalCost;
+    }
 
     const inflationRate = inflationMethod === 'manual' ? manualInflationRate : averageInflation;
     const monthlyInflation = inflationRate / 100 / 12;
     const inflationFactor = Math.pow(1 + monthlyInflation, monthsDifference);
     
-    return totalCost * inflationFactor;
+    console.log('💰 Total cost:', totalCost);
+    console.log('📊 Method:', inflationMethod);
+    console.log('📊 Annual rate:', inflationRate + '%');
+    console.log('📊 Monthly rate:', (monthlyInflation * 100).toFixed(4) + '%');
+    console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
+    
+    const projectedCost = totalCost * inflationFactor;
+    console.log('💵 Projected cost:', projectedCost.toFixed(2));
+    console.log('🏦 === INFLATION CALCULATION END ===');
+    
+    return projectedCost;
   };
 
   React.useEffect(() => {
