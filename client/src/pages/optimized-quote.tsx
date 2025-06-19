@@ -29,7 +29,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     goToStep,
     quotationData,
     saveQuotation,
-    loadQuotation
+    loadQuotation,
+    updateDeliverables,
+    updateAdditionalDeliverableCost
   } = useOptimizedQuote();
 
   const isEditing = Boolean(quotationId);
@@ -187,9 +189,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   isAlwaysOnProject={true}
                   onIsAlwaysOnProjectChange={() => {}}
                   deliverables={quotationData.deliverables || []}
-                  onDeliverablesChange={() => {}}
+                  onDeliverablesChange={updateDeliverables}
                   additionalCost={quotationData.additionalDeliverableCost || 0}
-                  onAdditionalCostChange={() => {}}
+                  onAdditionalCostChange={updateAdditionalDeliverableCost}
                 />
               </div>
             )}
