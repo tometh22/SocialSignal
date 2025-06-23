@@ -526,6 +526,8 @@ export default function Admin() {
 
   // Funciones para actualizar inflación (patrón del cotizador)
   const addInflationData = (newData: InflationFormValues) => {
+    setIsCreating(true);
+    
     // Actualización inmediata del estado local
     const newInflation: MonthlyInflation = {
       id: Date.now(), // ID temporal
@@ -553,10 +555,15 @@ export default function Admin() {
         // Revertir en caso de error
         setInflationData(prev => prev.filter(item => item.id !== newInflation.id));
         toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
+      })
+      .finally(() => {
+        setIsCreating(false);
       });
   };
 
   const updateInflationData = (id: number, updates: Partial<InflationFormValues>) => {
+    setIsUpdating(true);
+    
     // Actualización inmediata del estado local
     setInflationData(prev => prev.map(item => 
       item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
@@ -576,10 +583,15 @@ export default function Admin() {
         // Refrescar datos desde servidor en caso de error
         apiRequest('/api/admin/monthly-inflation', 'GET').then(setInflationData);
         toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
+      })
+      .finally(() => {
+        setIsUpdating(false);
       });
   };
 
   const deleteInflationData = (id: number) => {
+    setIsDeleting(true);
+    
     // Guardar referencia para posible rollback
     const originalData = [...inflationData];
     
@@ -595,6 +607,9 @@ export default function Admin() {
         // Revertir en caso de error
         setInflationData(originalData);
         toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
+      })
+      .finally(() => {
+        setIsDeleting(false);
       });
   };
 
@@ -798,14 +813,7 @@ export default function Admin() {
 
   const handleDeleteInflation = async (id: number) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este dato de inflación?')) {
-      try {
-        await deleteInflationMutation.mutateAsync(id);
-        // Forzar actualización inmediata después de eliminar
-        await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-        await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      } catch (error) {
-        console.error('Error deleting inflation data:', error);
-      }
+      deleteInflationData(id);
     }
   };
 
@@ -1287,9 +1295,9 @@ export default function Admin() {
                                   variant="ghost" 
                                   size="sm"
                                   onClick={() => openEditInflationDialog(data)}
-                                  disabled={updateInflationMutation.isPending}
+                                  disabled={isUpdating}
                                 >
-                                  {updateInflationMutation.isPending ? (
+                                  {isUpdating ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Pencil className="h-4 w-4" />
@@ -1299,9 +1307,9 @@ export default function Admin() {
                                   variant="ghost" 
                                   size="sm"
                                   onClick={() => handleDeleteInflation(data.id)}
-                                  disabled={deleteInflationMutation.isPending}
+                                  disabled={isDeleting}
                                 >
-                                  {deleteInflationMutation.isPending ? (
+                                  {isDeleting ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Trash className="h-4 w-4" />
@@ -1917,9 +1925,9 @@ export default function Admin() {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={inflationMutation.isPending || updateInflationMutation.isPending}
+                  disabled={isCreating || isUpdating}
                 >
-                  {(inflationMutation.isPending || updateInflationMutation.isPending) && (
+                  {(isCreating || isUpdating) && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   {isEditingInflation ? "Actualizar" : "Guardar"}
