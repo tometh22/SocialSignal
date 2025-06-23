@@ -1470,7 +1470,7 @@ export default function Admin() {
                     <FormLabel>Rol</FormLabel>
                     <Select 
                       onValueChange={(value) => field.onChange(parseInt(value))} 
-                      value={field.value ? field.value.toString() : ""}
+                      value={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -1743,7 +1743,7 @@ export default function Admin() {
                     <FormLabel>Rol</FormLabel>
                     <Select 
                       onValueChange={(value) => field.onChange(parseInt(value))} 
-                      value={field.value ? field.value.toString() : ""}
+                      value={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger>

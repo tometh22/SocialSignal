@@ -1,0 +1,110 @@
+# Project Management & Social Listening Platform
+
+## Overview
+
+This is a comprehensive internal project management platform built for Epical Digital, designed to handle quotations, active project tracking, time entries, client communication, and social listening analysis. The application provides a complete workflow from initial client quotations through project execution and completion.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Routing**: Wouter for client-side routing
+- **State Management**: TanStack Query (React Query) for server state management
+- **UI Components**: Radix UI primitives with custom Tailwind CSS styling
+- **Forms**: React Hook Form with Zod validation
+- **Build Tool**: Vite for development and production builds
+
+### Backend Architecture
+- **Runtime**: Node.js with Express.js server
+- **Language**: TypeScript
+- **Database ORM**: Drizzle ORM for type-safe database operations
+- **Authentication**: Session-based authentication with express-session
+- **File Uploads**: Multer for handling file uploads (client logos, etc.)
+- **Real-time Communication**: WebSocket implementation for chat functionality
+
+### Database Architecture
+- **Database**: PostgreSQL (Neon serverless)
+- **Schema Management**: Drizzle Kit for migrations
+- **Connection Pooling**: Neon serverless connection pooling
+
+## Key Components
+
+### Core Modules
+1. **User Management**: Authentication system with role-based access
+2. **Client Management**: Client information, contacts, and logo management
+3. **Quotation System**: Comprehensive quotation creation with team assignments and cost multipliers
+4. **Project Management**: Active project tracking with subproject support
+5. **Time Tracking**: Time entry system supporting both hourly and cost-based entries
+6. **Deliverable Management**: MODO-style deliverable tracking with quality metrics
+7. **Chat System**: Internal communication with project-based conversations
+8. **Analytics Dashboard**: Executive and operational dashboards
+
+### Business Logic Components
+- **Cost Calculation Engine**: Handles complex pricing calculations with multipliers
+- **Template System**: Role assignments and recurring project templates
+- **Quality Metrics**: Comprehensive scoring system for deliverable quality
+- **Inflation Management**: Monthly inflation tracking for cost adjustments
+
+## Data Flow
+
+### Quotation to Project Flow
+1. Create quotation with client details and team assignments
+2. Apply cost multipliers based on project complexity
+3. Approve quotation to automatically generate active project
+4. Track project progress through deliverables and time entries
+5. Generate reports and analytics for client communication
+
+### Time Tracking Flow
+1. Personnel log time entries against specific projects
+2. Support for both hourly tracking and direct cost entry
+3. Integration with quotation budgets for cost monitoring
+4. Real-time budget vs. actual cost analysis
+
+### Quality Management Flow
+1. Create deliverables for active projects
+2. Track quality metrics (narrative quality, graphics effectiveness, etc.)
+3. Record client feedback and operational feedback
+4. Generate quality reports for continuous improvement
+
+## External Dependencies
+
+### Core Dependencies
+- **@neondatabase/serverless**: PostgreSQL serverless database connection
+- **drizzle-orm**: Type-safe database ORM
+- **express**: Web application framework
+- **react**: Frontend framework
+- **@tanstack/react-query**: Server state management
+- **zod**: Runtime type validation
+- **@radix-ui/***: Accessible UI component primitives
+
+### Development Dependencies
+- **vite**: Build tool and development server
+- **typescript**: Type checking and compilation
+- **tailwindcss**: Utility-first CSS framework
+- **drizzle-kit**: Database schema management and migrations
+
+## Deployment Strategy
+
+### Environment Configuration
+- **Development**: Local development with hot reloading via Vite
+- **Production**: Built with Vite and served through Express static middleware
+- **Database**: Neon PostgreSQL with environment-based connection strings
+
+### Build Process
+1. Frontend build: `vite build` outputs to `dist/public`
+2. Backend build: `esbuild` bundles server code to `dist/index.js`
+3. Database migrations: `drizzle-kit push` for schema updates
+
+### Security Measures
+- Session-based authentication with PostgreSQL session store
+- Input sanitization middleware for XSS and SQL injection prevention
+- File upload restrictions and validation
+- Role-based access control for sensitive operations
+
+## Changelog
+
+- June 23, 2025. Initial setup
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
