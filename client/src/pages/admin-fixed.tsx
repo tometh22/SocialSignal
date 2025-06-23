@@ -586,10 +586,34 @@ export default function Admin() {
   const updateInflationMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InflationFormValues> }) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      const previousData = queryClient.getQueryData(['/api/admin/monthly-inflation']);
+      
+      // Actualización optimista - actualizar inmediatamente
+      queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+        return old.map(item => 
+          item.id === id 
+            ? { 
+                ...item, 
+                ...data,
+                updatedAt: new Date().toISOString()
+              }
+            : item
+        );
+      });
+      
+      return { previousData };
+    },
     onSuccess: async () => {
       toast({ title: 'Dato de inflación actualizado exitosamente' });
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
     },
-    onError: () => {
+    onError: (err, variables, context) => {
+      // Revertir en caso de error
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], context.previousData);
+      }
       toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
     }
   });
@@ -597,12 +621,27 @@ export default function Admin() {
   const deleteInflationMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE'),
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      const previousData = queryClient.getQueryData(['/api/admin/monthly-inflation']);
+      
+      // Actualización optimista - remover inmediatamente
+      queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+        return old.filter(item => item.id !== deletedId);
+      });
+      
+      return { previousData };
+    },
     onSuccess: async () => {
       toast({ title: 'Dato de inflación eliminado exitosamente' });
+      // Invalidar para asegurar sincronización
       await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
     },
-    onError: () => {
+    onError: (err, variables, context) => {
+      // Revertir en caso de error
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], context.previousData);
+      }
       toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
     }
   });
