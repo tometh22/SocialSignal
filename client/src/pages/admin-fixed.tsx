@@ -517,9 +517,30 @@ export default function Admin() {
   const inflationMutation = useMutation({
     mutationFn: (data: InflationFormValues) => 
       apiRequest('/api/admin/monthly-inflation', 'POST', data),
+    onMutate: async (newData) => {
+      // Cancelar consultas en curso
+      await queryClient.cancelQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      
+      // Snapshot del estado anterior
+      const previousData = queryClient.getQueryData(['/api/admin/monthly-inflation']);
+      
+      // Actualización optimista
+      queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+        const optimisticData: MonthlyInflation = {
+          id: Date.now(), // ID temporal
+          year: newData.year,
+          month: newData.month,
+          inflationRate: newData.inflationRate,
+          source: newData.source,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return [optimisticData, ...old];
+      });
+      
+      return { previousData };
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación guardado exitosamente' });
       if (!isEditingInflation) {
         inflationForm.reset({
@@ -530,8 +551,14 @@ export default function Admin() {
         });
         setInflationDialogOpen(false);
       }
+      // Refetch para obtener los datos reales del servidor
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
     },
-    onError: () => {
+    onError: (err, newData, context) => {
+      // Revertir en caso de error
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], context.previousData);
+      }
       toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
     }
   });
@@ -539,14 +566,31 @@ export default function Admin() {
   const updateInflationMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InflationFormValues> }) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      const previousData = queryClient.getQueryData(['/api/admin/monthly-inflation']);
+      
+      // Actualización optimista
+      queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+        return old.map(item => 
+          item.id === id 
+            ? { ...item, ...data, updatedAt: new Date().toISOString() }
+            : item
+        );
+      });
+      
+      return { previousData };
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación actualizado exitosamente' });
       setCurrentInflationData(null);
       setInflationDialogOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
     },
-    onError: () => {
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], context.previousData);
+      }
       toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
     }
   });
@@ -554,12 +598,25 @@ export default function Admin() {
   const deleteInflationMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE'),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      toast({ title: 'Dato de inflación eliminado exitosamente' });
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      const previousData = queryClient.getQueryData(['/api/admin/monthly-inflation']);
+      
+      // Actualización optimista - remover inmediatamente
+      queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+        return old.filter(item => item.id !== id);
+      });
+      
+      return { previousData };
     },
-    onError: () => {
+    onSuccess: async () => {
+      toast({ title: 'Dato de inflación eliminado exitosamente' });
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+    },
+    onError: (err, id, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], context.previousData);
+      }
       toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
     }
   });
@@ -1174,9 +1231,11 @@ export default function Admin() {
               </CardDescription>
             </CardHeader>
             <CardContent className="card-content">
-              {inflationLoading ? (
+              {(inflationLoading || inflationMutation.isPending) ? (
                 <div className="flex justify-center py-8">
-                  <Loader variant="dots" size="md" text="Cargando datos de inflación" />
+                  <Loader variant="dots" size="md" text={
+                    inflationMutation.isPending ? "Guardando dato..." : "Cargando datos de inflación"
+                  } />
                 </div>
               ) : inflationData && inflationData.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -1193,43 +1252,63 @@ export default function Admin() {
                     <TableBody>
                       {inflationData
                         .sort((a, b) => b.year - a.year || b.month - a.month)
-                        .map((data) => (
-                          <TableRow key={data.id}>
-                            <TableCell className="font-medium">
-                              {months[data.month - 1]} {data.year}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className="font-mono">
-                                {data.inflationRate.toFixed(2)}%
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {data.source || "No especificada"}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {new Date(data.createdAt).toLocaleDateString('es-AR')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => openEditInflationDialog(data)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleDeleteInflation(data.id)}
-                                  disabled={deleteInflationMutation.isPending}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        .map((data) => {
+                          const isDeleting = deleteInflationMutation.isPending && deleteInflationMutation.variables === data.id;
+                          const isUpdating = updateInflationMutation.isPending && updateInflationMutation.variables?.id === data.id;
+                          
+                          return (
+                            <TableRow 
+                              key={data.id}
+                              className={cn(
+                                "transition-opacity duration-200",
+                                (isDeleting || isUpdating) && "opacity-50"
+                              )}
+                            >
+                              <TableCell className="font-medium">
+                                {months[data.month - 1]} {data.year}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="font-mono">
+                                  {data.inflationRate.toFixed(2)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {data.source || "No especificada"}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {new Date(data.createdAt).toLocaleDateString('es-AR')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => openEditInflationDialog(data)}
+                                    disabled={isDeleting || isUpdating}
+                                  >
+                                    {isUpdating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Pencil className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDeleteInflation(data.id)}
+                                    disabled={isDeleting || isUpdating}
+                                  >
+                                    {isDeleting ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>
