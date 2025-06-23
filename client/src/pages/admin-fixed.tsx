@@ -517,15 +517,19 @@ export default function Admin() {
   const inflationMutation = useMutation({
     mutationFn: (data: InflationFormValues) => 
       apiRequest('/api/admin/monthly-inflation', 'POST', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación guardado exitosamente' });
-      inflationForm.reset({
-        year: new Date().getFullYear(),
-        month: new Date().getMonth() + 1,
-        inflationRate: 0,
-        source: 'INDEC'
-      });
+      if (!isEditingInflation) {
+        inflationForm.reset({
+          year: new Date().getFullYear(),
+          month: new Date().getMonth() + 1,
+          inflationRate: 0,
+          source: 'INDEC'
+        });
+        setInflationDialogOpen(false);
+      }
     },
     onError: () => {
       toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
@@ -535,8 +539,9 @@ export default function Admin() {
   const updateInflationMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<InflationFormValues> }) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación actualizado exitosamente' });
       setCurrentInflationData(null);
       setInflationDialogOpen(false);
@@ -549,8 +554,9 @@ export default function Admin() {
   const deleteInflationMutation = useMutation({
     mutationFn: (id: number) => 
       apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
       toast({ title: 'Dato de inflación eliminado exitosamente' });
     },
     onError: () => {
