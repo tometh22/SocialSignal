@@ -63,7 +63,9 @@ import {
   PlusCircle,
   RefreshCw,
   Settings, 
+  Save,
   Trash,
+  TrendingUp,
   User2, 
   UserCog, 
   UserPlus,
@@ -118,11 +120,38 @@ const templateRoleSchema = z.object({
   hours: z.coerce.number().min(0.5, "Las horas deben ser al menos 0.5")
 });
 
+// Schema para inflación
+const inflationSchema = z.object({
+  year: z.coerce.number().min(2020).max(2030),
+  month: z.coerce.number().min(1).max(12),
+  inflationRate: z.coerce.number().min(0),
+  source: z.string().min(1, "La fuente es requerida")
+});
+
 // Tipos derivados para nuestros formularios
 type RoleFormValues = z.infer<typeof roleSchema>;
 type PersonnelFormValues = z.infer<typeof personnelSchema>;
 type TemplateFormValues = z.infer<typeof templateSchema>;
 type TemplateRoleFormValues = z.infer<typeof templateRoleSchema>;
+type InflationFormValues = z.infer<typeof inflationSchema>;
+
+// Interfaces para inflación
+interface MonthlyInflation {
+  id: number;
+  year: number;
+  month: number;
+  inflationRate: number;
+  source?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SystemConfig {
+  id: number;
+  configKey: string;
+  configValue: number;
+  description?: string;
+}
 
 export default function Admin() {
   // Estado para manejar tabs 
@@ -169,6 +198,15 @@ export default function Admin() {
   const { data: templateRoleAssignments, isLoading: templateRoleAssignmentsLoading } = useQuery<(TemplateRoleAssignment & { role: Role })[]>({
     queryKey: [`/api/template-roles/${currentTemplate?.id}/with-roles`],
     enabled: !!currentTemplate?.id,
+  });
+
+  // Consultas para inflación
+  const { data: inflationData = [], isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
+    queryKey: ['/api/admin/monthly-inflation'],
+  });
+
+  const { data: systemConfig = [] } = useQuery<SystemConfig[]>({
+    queryKey: ['/api/admin/system-config'],
   });
 
   // Configurar formularios con react-hook-form
@@ -604,7 +642,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -620,6 +658,10 @@ export default function Admin() {
           <TabsTrigger value="multipliers" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Multiplicadores
+          </TabsTrigger>
+          <TabsTrigger value="inflation" className="flex items-center gap-2">
+            <BadgeDollarSign className="h-4 w-4" />
+            Inflación
           </TabsTrigger>
         </TabsList>
 
