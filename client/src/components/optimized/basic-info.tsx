@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
-import { Client } from '@shared/schema';
+import { Client, projectDurationOptions } from '@shared/schema';
 import { Card, CardContent } from '@/components/ui/card';
 import { User, Calendar, FolderOpen } from 'lucide-react';
 
@@ -152,25 +152,46 @@ const OptimizedBasicInfo: React.FC = () => {
                 </div>
 
                 {/* Duración del Proyecto */}
-                <div className="space-y-2">
-                  <Label htmlFor="project-duration" className="text-sm font-medium text-gray-700 flex items-center">
-                    <Calendar className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
-                    Duración
-                  </Label>
-                  <Select
-                    value={quotationData.project.duration}
-                    onValueChange={(value) => updateProjectDuration(value as any)}
-                  >
-                    <SelectTrigger id="project-duration" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
-                      <SelectValue placeholder="Seleccionar duración" />
-                    </SelectTrigger>
-                    <SelectContent className="border border-neutral-200 bg-white">
-                      <SelectItem value="short" className="hover:bg-neutral-50">Corto (1-3 meses)</SelectItem>
-                      <SelectItem value="medium" className="hover:bg-neutral-50">Medio (3-6 meses)</SelectItem>
-                      <SelectItem value="long" className="hover:bg-neutral-50">Largo (6+ meses)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {quotationData.project.type && (
+                  <div className="space-y-2">
+                    <Label htmlFor="project-duration" className="text-sm font-medium text-gray-700 flex items-center">
+                      <Calendar className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
+                      Duración
+                    </Label>
+                    <Select
+                      value={quotationData.project.duration}
+                      onValueChange={updateProjectDuration}
+                    >
+                      <SelectTrigger id="project-duration" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                        <SelectValue placeholder="Seleccionar duración" />
+                      </SelectTrigger>
+                      <SelectContent className="border border-neutral-200 bg-white">
+                        {quotationData.project.type === 'on-demand' && 
+                          projectDurationOptions["on-demand"].map((duration) => (
+                            <SelectItem 
+                              key={duration.value} 
+                              value={duration.value}
+                              className="hover:bg-neutral-50"
+                            >
+                              {duration.label}
+                            </SelectItem>
+                          ))
+                        }
+                        {quotationData.project.type === 'fee-mensual' && 
+                          projectDurationOptions["fee-mensual"].map((duration) => (
+                            <SelectItem 
+                              key={duration.value} 
+                              value={duration.value}
+                              className="hover:bg-neutral-50"
+                            >
+                              {duration.label}
+                            </SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
 

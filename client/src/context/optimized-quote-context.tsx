@@ -112,7 +112,8 @@ const initialQuotationData: QuotationData = {
   client: null,
   project: {
     name: "",
-    type: "one-time"
+    type: "",
+    duration: ""
   },
   analysisType: "standard",
   mentionsVolume: "medium",
@@ -586,7 +587,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         client: clientData,
         project: {
           name: quotation.projectName || "",
-          type: quotation.projectType || "one-time"
+          type: quotation.projectType || "",
+          duration: quotation.projectDuration || ""
         },
         analysisType: quotation.analysisType || "standard",
         mentionsVolume: quotation.mentionsVolume || "medium",

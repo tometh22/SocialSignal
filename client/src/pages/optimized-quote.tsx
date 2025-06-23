@@ -75,7 +75,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 4, title: "Complejidad" },
     ];
 
-    if (quotationData.project?.type === 'always-on') {
+    if (quotationData.project?.type === 'fee-mensual') {
       baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
     } else {
@@ -217,7 +217,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-neutral-600">
-                  Define si es un proyecto único o "Always-On" (retainer mensual).
+                  <strong>On Demand:</strong> Proyecto único con duración específica (3 semanas a 4+ meses).<br/>
+                  <strong>Fee Mensual:</strong> Contrato recurrente mínimo 6 meses o 1 año.
                 </p>
               </CardContent>
             </Card>
