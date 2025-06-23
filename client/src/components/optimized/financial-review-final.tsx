@@ -260,6 +260,8 @@ export default function FinancialReviewFinal() {
         projectStartDate={quotationData.inflation.projectStartDate}
         totalCost={totalAmount}
         quotationCurrency={quotationData.inflation.quotationCurrency}
+        projectType={quotationData.project.type}
+        projectDuration={quotationData.project.duration}
         onApplyInflationChange={(value) => updateInflation({ applyInflationAdjustment: value })}
         onInflationMethodChange={(value) => updateInflation({ inflationMethod: value })}
         onManualInflationRateChange={(value) => updateInflation({ manualInflationRate: value })}
@@ -267,6 +269,44 @@ export default function FinancialReviewFinal() {
         onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
       />
 
+      {/* Project Information Summary */}
+      <Card className="border-slate-200 bg-slate-50/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center text-lg text-slate-800">
+            Resumen del Proyecto
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <span className="text-sm font-medium text-slate-600">Cliente:</span>
+                <div className="text-base font-semibold">{quotationData.client?.name || 'No seleccionado'}</div>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-slate-600">Proyecto:</span>
+                <div className="text-base font-semibold">{quotationData.project.name || 'Sin nombre'}</div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <span className="text-sm font-medium text-slate-600">Tipo de Proyecto:</span>
+                <div className="text-base font-semibold">
+                  {quotationData.project.type === 'on-demand' ? 'On Demand (Proyecto Único)' : 
+                   quotationData.project.type === 'fee-mensual' ? 'Fee Mensual (Contrato Recurrente)' : 
+                   'No especificado'}
+                </div>
+              </div>
+              <div>
+                <span className="text-sm font-medium text-slate-600">Duración:</span>
+                <div className="text-base font-semibold">
+                  {quotationData.project.duration || 'No especificada'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
     </div>
   );
