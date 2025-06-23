@@ -210,6 +210,10 @@ export default function Admin() {
   // Consultas para inflación
   const { data: inflationData = [], isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
     queryKey: ['/api/admin/monthly-inflation'],
+    staleTime: 0, // Siempre considerar los datos como obsoletos
+    gcTime: 0, // No mantener en cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: systemConfig = [] } = useQuery<SystemConfig[]>({
@@ -1137,10 +1141,22 @@ export default function Admin() {
                     Administra datos históricos de inflación y tipo de cambio
                   </CardDescription>
                 </div>
-                <Button onClick={openNewInflationDialog}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Agregar Dato
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+                      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+                    }}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Actualizar
+                  </Button>
+                  <Button onClick={openNewInflationDialog}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar Dato
+                  </Button>
+                </div>
               </div>
             </CardHeader>
           </Card>
@@ -1740,7 +1756,19 @@ export default function Admin() {
       </Dialog>
 
       {/* Diálogo para crear/editar datos de inflación */}
-      <Dialog open={inflationDialogOpen} onOpenChange={setInflationDialogOpen}>
+      <Dialog 
+        open={inflationDialogOpen} 
+        onOpenChange={(open) => {
+          setInflationDialogOpen(open);
+          if (!open) {
+            // Cuando se cierre el modal, forzar actualización
+            setTimeout(async () => {
+              await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+              await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+            }, 100);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
