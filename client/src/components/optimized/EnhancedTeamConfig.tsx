@@ -122,7 +122,7 @@ const EnhancedTeamConfig: React.FC = () => {
         personnelId: null,
         hours,
         rate,
-        cost: hours * rate
+        cost: 0 // Will be recalculated by the context
       });
     }
     setQuickAddMode(false);
@@ -133,7 +133,7 @@ const EnhancedTeamConfig: React.FC = () => {
     if (newMember.roleId > 0) {
       addTeamMember({
         ...newMember,
-        cost: newMember.hours * newMember.rate
+        cost: 0 // Will be recalculated by the context
       });
       setNewMember({
         roleId: 0,
