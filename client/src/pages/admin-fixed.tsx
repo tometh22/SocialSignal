@@ -171,6 +171,9 @@ export default function Admin() {
   const [newRoleId, setNewRoleId] = useState("");
   const [newRoleHours, setNewRoleHours] = useState(0);
   
+  // Estados para inflación
+  const [exchangeRate, setExchangeRate] = useState(1100);
+  
   // Estado para controlar animaciones de eliminación
   const [deletingTemplates, setDeletingTemplates] = useState<Set<number>>(new Set());
   const [hiddenTemplates, setHiddenTemplates] = useState<Set<number>>(new Set());
@@ -246,6 +249,16 @@ export default function Admin() {
     defaultValues: {
       roleId: 0,
       hours: 0
+    }
+  });
+
+  const inflationForm = useForm<InflationFormValues>({
+    resolver: zodResolver(inflationSchema),
+    defaultValues: {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+      inflationRate: 0,
+      source: 'INDEC'
     }
   });
   
@@ -497,6 +510,41 @@ export default function Admin() {
     },
   });
 
+  // Mutaciones para inflación
+  const inflationMutation = useMutation({
+    mutationFn: (data: InflationFormValues) => 
+      apiRequest('/api/admin/monthly-inflation', 'POST', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      toast({ title: 'Dato de inflación guardado exitosamente' });
+      inflationForm.reset({
+        year: new Date().getFullYear(),
+        month: new Date().getMonth() + 1,
+        inflationRate: 0,
+        source: 'INDEC'
+      });
+    },
+    onError: () => {
+      toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
+    }
+  });
+
+  const exchangeRateMutation = useMutation({
+    mutationFn: (rate: number) => 
+      apiRequest('/api/admin/system-config', 'POST', {
+        configKey: 'usd_exchange_rate',
+        configValue: rate,
+        description: 'Tipo de cambio USD/ARS'
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config'] });
+      toast({ title: 'Tipo de cambio actualizado exitosamente' });
+    },
+    onError: () => {
+      toast({ title: 'Error al actualizar tipo de cambio', variant: 'destructive' });
+    }
+  });
+
   // Funciones para manejar diálogos de roles
   const openNewRoleDialog = () => {
     roleForm.reset({
@@ -623,6 +671,30 @@ export default function Admin() {
     const role = roles?.find(r => r.id === roleId);
     return role ? role.name : "Rol no encontrado";
   };
+
+  // Funciones para manejar inflación
+  const onInflationSubmit = (values: InflationFormValues) => {
+    if (values.inflationRate <= 0) {
+      toast({ title: 'La tasa de inflación debe ser mayor a 0', variant: 'destructive' });
+      return;
+    }
+    inflationMutation.mutate(values);
+  };
+
+  const handleUpdateExchangeRate = () => {
+    if (exchangeRate <= 0) {
+      toast({ title: 'El tipo de cambio debe ser mayor a 0', variant: 'destructive' });
+      return;
+    }
+    exchangeRateMutation.mutate(exchangeRate);
+  };
+
+  const months = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+
+  const currentExchangeRate = systemConfig.find(c => c.configKey === 'usd_exchange_rate')?.configValue || 1100;
 
   return (
     <div className="page-container">
@@ -966,6 +1038,214 @@ export default function Admin() {
             </CardHeader>
             <CardContent className="card-content">
               <CostMultipliersManager />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inflation">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Formulario para agregar datos de inflación */}
+            <Card className="standard-card">
+              <CardHeader>
+                <CardTitle className="heading-card">Cargar Dato de Inflación</CardTitle>
+                <CardDescription>
+                  Agrega datos históricos de inflación mensual para cálculos precisos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="card-content">
+                <Form {...inflationForm}>
+                  <form onSubmit={inflationForm.handleSubmit(onInflationSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={inflationForm.control}
+                        name="year"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Año</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="2024"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={inflationForm.control}
+                        name="month"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mes</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar mes" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {months.map((month, index) => (
+                                  <SelectItem key={index + 1} value={(index + 1).toString()}>
+                                    {month}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={inflationForm.control}
+                      name="inflationRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tasa de Inflación (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              placeholder="5.25"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Tasa mensual de inflación (ejemplo: 5.25 para 5.25%)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={inflationForm.control}
+                      name="source"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Fuente</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="INDEC, BCRA, etc."
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={inflationMutation.isPending}
+                    >
+                      {inflationMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Guardar Dato
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
+            {/* Configuración del tipo de cambio */}
+            <Card className="standard-card">
+              <CardHeader>
+                <CardTitle className="heading-card">Tipo de Cambio USD/ARS</CardTitle>
+                <CardDescription>
+                  Configura el tipo de cambio actual para conversiones
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="card-content space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Input
+                    type="number"
+                    value={exchangeRate}
+                    onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                    placeholder="1100"
+                    className="flex-1"
+                  />
+                  <Button 
+                    onClick={handleUpdateExchangeRate}
+                    disabled={exchangeRateMutation.isPending}
+                  >
+                    {exchangeRateMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Actualizar
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tipo de cambio actual: <span className="font-mono">${currentExchangeRate}</span>
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tabla de datos históricos */}
+          <Card className="standard-card mt-6">
+            <CardHeader>
+              <CardTitle className="heading-card">Datos Históricos de Inflación</CardTitle>
+              <CardDescription>
+                Historial de datos de inflación mensual cargados en el sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="card-content">
+              {inflationLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader variant="dots" size="md" text="Cargando datos de inflación" />
+                </div>
+              ) : inflationData && inflationData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Período</TableHead>
+                        <TableHead>Tasa (%)</TableHead>
+                        <TableHead>Fuente</TableHead>
+                        <TableHead>Fecha de Carga</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inflationData
+                        .sort((a, b) => b.year - a.year || b.month - a.month)
+                        .map((data) => (
+                          <TableRow key={data.id}>
+                            <TableCell className="font-medium">
+                              {months[data.month - 1]} {data.year}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-mono">
+                                {data.inflationRate.toFixed(2)}%
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {data.source || "No especificada"}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(data.createdAt).toLocaleDateString('es-AR')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    No hay datos de inflación cargados
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Utiliza el formulario de arriba para cargar el primer dato
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
