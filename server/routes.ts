@@ -2293,6 +2293,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Actualizar dato de inflación específico
+  app.patch("/api/admin/monthly-inflation/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertMonthlyInflationSchema.parse(req.body);
+      
+      const updated = await db.update(monthlyInflation)
+        .set({
+          year: validatedData.year,
+          month: validatedData.month,
+          inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+          source: validatedData.source,
+          updatedAt: new Date(),
+          updatedBy: validatedData.updatedBy
+        })
+        .where(eq(monthlyInflation.id, id))
+        .returning();
+      
+      if (updated.length === 0) {
+        return res.status(404).json({ message: "Inflation data not found" });
+      }
+      
+      res.json(updated[0]);
+    } catch (error) {
+      console.error("Error updating inflation:", error);
+      res.status(500).json({ message: "Failed to update inflation data" });
+    }
+  });
+
+  // Eliminar dato de inflación
+  app.delete("/api/admin/monthly-inflation/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      const deleted = await db.delete(monthlyInflation)
+        .where(eq(monthlyInflation.id, id))
+        .returning();
+      
+      if (deleted.length === 0) {
+        return res.status(404).json({ message: "Inflation data not found" });
+      }
+      
+      res.json({ message: "Inflation data deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting inflation:", error);
+      res.status(500).json({ message: "Failed to delete inflation data" });
+    }
+  });
+
   // Obtener configuración del sistema
   app.get("/api/admin/system-config", async (req, res) => {
     try {

@@ -173,6 +173,9 @@ export default function Admin() {
   
   // Estados para inflación
   const [exchangeRate, setExchangeRate] = useState(1100);
+  const [inflationDialogOpen, setInflationDialogOpen] = useState(false);
+  const [currentInflationData, setCurrentInflationData] = useState<MonthlyInflation | null>(null);
+  const [isEditingInflation, setIsEditingInflation] = useState(false);
   
   // Estado para controlar animaciones de eliminación
   const [deletingTemplates, setDeletingTemplates] = useState<Set<number>>(new Set());
@@ -529,6 +532,32 @@ export default function Admin() {
     }
   });
 
+  const updateInflationMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<InflationFormValues> }) => 
+      apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      toast({ title: 'Dato de inflación actualizado exitosamente' });
+      setCurrentInflationData(null);
+      setInflationDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
+    }
+  });
+
+  const deleteInflationMutation = useMutation({
+    mutationFn: (id: number) => 
+      apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      toast({ title: 'Dato de inflación eliminado exitosamente' });
+    },
+    onError: () => {
+      toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
+    }
+  });
+
   const exchangeRateMutation = useMutation({
     mutationFn: (rate: number) => 
       apiRequest('/api/admin/system-config', 'POST', {
@@ -678,7 +707,42 @@ export default function Admin() {
       toast({ title: 'La tasa de inflación debe ser mayor a 0', variant: 'destructive' });
       return;
     }
-    inflationMutation.mutate(values);
+    
+    if (isEditingInflation && currentInflationData) {
+      updateInflationMutation.mutate({ id: currentInflationData.id, data: values });
+    } else {
+      inflationMutation.mutate(values);
+    }
+  };
+
+  const openEditInflationDialog = (data: MonthlyInflation) => {
+    inflationForm.reset({
+      year: data.year,
+      month: data.month,
+      inflationRate: data.inflationRate,
+      source: data.source || 'INDEC'
+    });
+    setCurrentInflationData(data);
+    setIsEditingInflation(true);
+    setInflationDialogOpen(true);
+  };
+
+  const openNewInflationDialog = () => {
+    inflationForm.reset({
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+      inflationRate: 0,
+      source: 'INDEC'
+    });
+    setCurrentInflationData(null);
+    setIsEditingInflation(false);
+    setInflationDialogOpen(true);
+  };
+
+  const handleDeleteInflation = (id: number) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este dato de inflación?')) {
+      deleteInflationMutation.mutate(id);
+    }
   };
 
   const handleUpdateExchangeRate = () => {
@@ -1043,117 +1107,24 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="inflation">
+          <Card className="standard-card mb-6">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="heading-card">Gestión de Inflación</CardTitle>
+                  <CardDescription>
+                    Administra datos históricos de inflación y tipo de cambio
+                  </CardDescription>
+                </div>
+                <Button onClick={openNewInflationDialog}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar Dato
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Formulario para agregar datos de inflación */}
-            <Card className="standard-card">
-              <CardHeader>
-                <CardTitle className="heading-card">Cargar Dato de Inflación</CardTitle>
-                <CardDescription>
-                  Agrega datos históricos de inflación mensual para cálculos precisos
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="card-content">
-                <Form {...inflationForm}>
-                  <form onSubmit={inflationForm.handleSubmit(onInflationSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={inflationForm.control}
-                        name="year"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Año</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="2024"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={inflationForm.control}
-                        name="month"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mes</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar mes" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {months.map((month, index) => (
-                                  <SelectItem key={index + 1} value={(index + 1).toString()}>
-                                    {month}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={inflationForm.control}
-                      name="inflationRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tasa de Inflación (%)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01"
-                              placeholder="5.25"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Tasa mensual de inflación (ejemplo: 5.25 para 5.25%)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={inflationForm.control}
-                      name="source"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fuente</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="INDEC, BCRA, etc."
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button 
-                      type="submit" 
-                      className="w-full"
-                      disabled={inflationMutation.isPending}
-                    >
-                      {inflationMutation.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Guardar Dato
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-
             {/* Configuración del tipo de cambio */}
             <Card className="standard-card">
               <CardHeader>
@@ -1210,6 +1181,7 @@ export default function Admin() {
                         <TableHead>Tasa (%)</TableHead>
                         <TableHead>Fuente</TableHead>
                         <TableHead>Fecha de Carga</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1230,6 +1202,25 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               {new Date(data.createdAt).toLocaleDateString('es-AR')}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => openEditInflationDialog(data)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleDeleteInflation(data.id)}
+                                  disabled={deleteInflationMutation.isPending}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1709,6 +1700,130 @@ export default function Admin() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   Asignar Rol
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para crear/editar datos de inflación */}
+      <Dialog open={inflationDialogOpen} onOpenChange={setInflationDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingInflation ? "Editar Dato de Inflación" : "Agregar Dato de Inflación"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditingInflation ? 
+                "Actualiza la información del dato de inflación." : 
+                "Completa los detalles para agregar un nuevo dato de inflación mensual."
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...inflationForm}>
+            <form onSubmit={inflationForm.handleSubmit(onInflationSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={inflationForm.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Año</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="2024"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={inflationForm.control}
+                  name="month"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mes</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar mes" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {months.map((month, index) => (
+                            <SelectItem key={index + 1} value={(index + 1).toString()}>
+                              {month}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={inflationForm.control}
+                name="inflationRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tasa de Inflación (%)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="5.25"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Tasa mensual de inflación (ejemplo: 5.25 para 5.25%)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={inflationForm.control}
+                name="source"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fuente</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="INDEC, BCRA, etc."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setInflationDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={inflationMutation.isPending || updateInflationMutation.isPending}
+                >
+                  {(inflationMutation.isPending || updateInflationMutation.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isEditingInflation ? "Actualizar" : "Guardar"}
                 </Button>
               </DialogFooter>
             </form>
