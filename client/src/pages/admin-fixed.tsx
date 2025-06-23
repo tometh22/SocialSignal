@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useGlobalCacheInvalidation } from "@/hooks/use-global-cache-invalidation";
+import { cn } from "@/lib/utils";
 import { 
   Dialog, 
   DialogContent, 
