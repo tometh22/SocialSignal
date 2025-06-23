@@ -82,7 +82,6 @@ export default function SidebarFixed() {
     { href: "/statistics", title: "Análisis", icon: BarChart3 },
     { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const },
     { href: "/admin", title: "Configuración", icon: Settings },
-    { href: "/admin/inflation", title: "Inflación", icon: TrendingUp },
   ];
 
   // Renderizar enlace de navegación compacto
