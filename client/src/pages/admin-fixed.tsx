@@ -240,7 +240,7 @@ export default function Admin() {
     resolver: zodResolver(personnelSchema),
     defaultValues: {
       name: "",
-      roleId: 0,
+      roleId: undefined,
       hourlyRate: 0
     }
   });
@@ -261,7 +261,7 @@ export default function Admin() {
   const templateRoleForm = useForm<TemplateRoleFormValues>({
     resolver: zodResolver(templateRoleSchema),
     defaultValues: {
-      roleId: 0,
+      roleId: undefined,
       hours: 0
     }
   });
@@ -1468,7 +1468,10 @@ export default function Admin() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rol</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      value={field.value ? field.value.toString() : ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un rol" />
@@ -1738,7 +1741,10 @@ export default function Admin() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rol</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      value={field.value ? field.value.toString() : ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un rol" />
