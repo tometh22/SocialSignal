@@ -1252,10 +1252,10 @@ export default function Admin() {
               </CardDescription>
             </CardHeader>
             <CardContent className="card-content">
-              {(inflationLoading || inflationMutation.isPending) ? (
+              {(inflationLoading || isCreating) ? (
                 <div className="flex justify-center py-8">
                   <Loader variant="dots" size="md" text={
-                    inflationMutation.isPending ? "Guardando dato..." : "Cargando datos de inflación"
+                    isCreating ? "Guardando dato..." : "Cargando datos de inflación"
                   } />
                 </div>
               ) : inflationData && inflationData.length > 0 ? (
