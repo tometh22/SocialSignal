@@ -87,6 +87,7 @@ export interface IStorage {
   // Option lists
   getAnalysisTypes(): Promise<typeof analysisTypes>;
   getProjectTypes(): Promise<typeof projectTypes>;
+  getProjectDurationOptions(projectType: string): Promise<{value: string, label: string}[]>;
   getMentionsVolumeOptions(): Promise<typeof mentionsVolumeOptions>;
   getCountriesCoveredOptions(): Promise<typeof countriesCoveredOptions>;
   getClientEngagementOptions(): Promise<typeof clientEngagementOptions>;
@@ -644,6 +645,16 @@ export class DatabaseStorage implements IStorage {
 
   async getProjectTypes() {
     return projectTypes;
+  }
+
+  async getProjectDurationOptions(projectType: string): Promise<{value: string, label: string}[]> {
+    const { projectDurationOptions } = await import("@shared/schema");
+    if (projectType === 'on-demand') {
+      return projectDurationOptions["on-demand"];
+    } else if (projectType === 'fee-mensual') {
+      return projectDurationOptions["fee-mensual"];
+    }
+    return [];
   }
 
   async getMentionsVolumeOptions() {
@@ -2210,6 +2221,8 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+
+
 }
 
 // Exportar solo la implementación de base de datos

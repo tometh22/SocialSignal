@@ -879,6 +879,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(types);
   });
 
+  app.get("/api/options/project-duration/:projectType", async (req, res) => {
+    const projectType = req.params.projectType;
+    const options = await storage.getProjectDurationOptions(projectType);
+    res.json(options);
+  });
+
   app.get("/api/options/mentions-volume", async (_, res) => {
     const options = await storage.getMentionsVolumeOptions();
     res.json(options);
