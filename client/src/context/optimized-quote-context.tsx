@@ -16,6 +16,7 @@ export interface OptimizedTeamMember {
 export interface ProjectData {
   name: string;
   type: string;
+  duration: string;
 }
 
 export interface ComplexityFactors {

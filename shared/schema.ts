@@ -702,14 +702,30 @@ export const analysisTypes = [
   { value: "deep", label: "Metodología Avanzada" },
 ];
 
-// Opciones de tipo de proyecto
+// Opciones de tipo de proyecto (modalidad de negocio)
 export const projectTypes = [
-  { value: "demo", label: "Informe Demo" },
-  { value: "executive", label: "Informe Ejecutivo" },
-  { value: "comprehensive", label: "Informe Exhaustivo" },
-  { value: "always-on", label: "Always On" },
-  { value: "monitoring", label: "Servicio de Monitoreo" },
+  { value: "on-demand", label: "On Demand (Proyecto Único)" },
+  { value: "fee-mensual", label: "Fee Mensual (Contrato Recurrente)" },
 ];
+
+// Opciones de duración según tipo de proyecto
+export const projectDurationOptions = {
+  "on-demand": [
+    { value: "3-weeks", label: "3 semanas" },
+    { value: "1-month", label: "1 mes" },
+    { value: "2-months", label: "2 meses" },
+    { value: "3-months", label: "3 meses" },
+    { value: "4-months", label: "4 meses" },
+    { value: "custom", label: "Personalizada" },
+  ],
+  "fee-mensual": [
+    { value: "6-months", label: "6 meses (mínimo)" },
+    { value: "1-year", label: "1 año" },
+    { value: "18-months", label: "18 meses" },
+    { value: "2-years", label: "2 años" },
+    { value: "custom", label: "Personalizada" },
+  ],
+};
 
 // Opciones de volumen de menciones
 export const mentionsVolumeOptions = [
