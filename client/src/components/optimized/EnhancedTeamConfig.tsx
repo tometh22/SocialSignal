@@ -296,9 +296,9 @@ const EnhancedTeamConfig: React.FC = () => {
                   <div className="space-y-2">
                     <Label htmlFor="role">Rol *</Label>
                     <Select 
-                      value={newMember.roleId.toString()} 
+                      value={newMember.roleId > 0 ? newMember.roleId.toString() : ""} 
                       onValueChange={(value) => {
-                        const roleId = parseInt(value);
+                        const roleId = parseInt(value) || 0;
                         const role = getRoleInfo(roleId);
                         setNewMember(prev => ({
                           ...prev,
@@ -331,7 +331,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       value={newMember.personnelId?.toString() || ""} 
                       onValueChange={(value) => setNewMember(prev => ({
                         ...prev,
-                        personnelId: value ? parseInt(value) : null
+                        personnelId: value && value !== "" ? parseInt(value) : null
                       }))}
                     >
                       <SelectTrigger>
