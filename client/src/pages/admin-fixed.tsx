@@ -1,6 +1,6 @@
 // Panel de Administración Completo - Restaurado
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -207,14 +207,20 @@ export default function Admin() {
     enabled: !!currentTemplate?.id,
   });
 
-  // Consultas para inflación
-  const { data: inflationData = [], isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
+  // Estado local para inflación (patrón del cotizador)
+  const [inflationData, setInflationData] = useState<MonthlyInflation[]>([]);
+  
+  // Query para cargar datos inicialmente
+  const { data: queryInflationData, isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
     queryKey: ['/api/admin/monthly-inflation'],
-    staleTime: 0, // Siempre considerar los datos como obsoletos
-    gcTime: 0, // No mantener en cache
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
   });
+  
+  // Effect para sincronizar con la query inicial
+  useEffect(() => {
+    if (queryInflationData) {
+      setInflationData(queryInflationData);
+    }
+  }, [queryInflationData]);
 
   const { data: systemConfig = [] } = useQuery<SystemConfig[]>({
     queryKey: ['/api/admin/system-config'],
@@ -518,66 +524,84 @@ export default function Admin() {
     },
   });
 
-  // Mutaciones para inflación
-  const inflationMutation = useMutation({
-    mutationFn: (data: InflationFormValues) => 
-      apiRequest('/api/admin/monthly-inflation', 'POST', data),
-    onSuccess: async () => {
-      toast({ title: 'Dato de inflación guardado exitosamente' });
-      // Invalidación inmediata y múltiple
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      
-      // Forzar actualización adicional
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-        queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      }, 200);
-    },
-    onError: () => {
-      toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
-    }
-  });
+  // Funciones para actualizar inflación (patrón del cotizador)
+  const addInflationData = (newData: InflationFormValues) => {
+    // Actualización inmediata del estado local
+    const newInflation: MonthlyInflation = {
+      id: Date.now(), // ID temporal
+      year: newData.year,
+      month: newData.month,
+      inflationRate: newData.inflationRate,
+      source: newData.source,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    setInflationData(prev => [newInflation, ...prev].sort((a, b) => b.year - a.year || b.month - a.month));
+    
+    // Llamada a la API en segundo plano
+    apiRequest('/api/admin/monthly-inflation', 'POST', newData)
+      .then(() => {
+        toast({ title: 'Dato de inflación guardado exitosamente' });
+        // Refrescar datos desde servidor
+        return apiRequest('/api/admin/monthly-inflation', 'GET');
+      })
+      .then((serverData) => {
+        setInflationData(serverData);
+      })
+      .catch(() => {
+        // Revertir en caso de error
+        setInflationData(prev => prev.filter(item => item.id !== newInflation.id));
+        toast({ title: 'Error al guardar dato de inflación', variant: 'destructive' });
+      });
+  };
 
-  const updateInflationMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<InflationFormValues> }) => 
-      apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', data),
-    onSuccess: async () => {
-      toast({ title: 'Dato de inflación actualizado exitosamente' });
-      // Invalidación inmediata y múltiple
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      
-      // Forzar actualización adicional
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-        queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      }, 200);
-    },
-    onError: () => {
-      toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
-    }
-  });
+  const updateInflationData = (id: number, updates: Partial<InflationFormValues>) => {
+    // Actualización inmediata del estado local
+    setInflationData(prev => prev.map(item => 
+      item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
+    ));
+    
+    // Llamada a la API en segundo plano
+    apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', updates)
+      .then(() => {
+        toast({ title: 'Dato de inflación actualizado exitosamente' });
+        // Refrescar datos desde servidor
+        return apiRequest('/api/admin/monthly-inflation', 'GET');
+      })
+      .then((serverData) => {
+        setInflationData(serverData);
+      })
+      .catch(() => {
+        // Refrescar datos desde servidor en caso de error
+        apiRequest('/api/admin/monthly-inflation', 'GET').then(setInflationData);
+        toast({ title: 'Error al actualizar dato de inflación', variant: 'destructive' });
+      });
+  };
 
-  const deleteInflationMutation = useMutation({
-    mutationFn: (id: number) => 
-      apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE'),
-    onSuccess: async () => {
-      toast({ title: 'Dato de inflación eliminado exitosamente' });
-      // Invalidación inmediata y múltiple
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      
-      // Forzar actualización adicional
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-        queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
-      }, 200);
-    },
-    onError: () => {
-      toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
-    }
-  });
+  const deleteInflationData = (id: number) => {
+    // Guardar referencia para posible rollback
+    const originalData = [...inflationData];
+    
+    // Actualización inmediata del estado local
+    setInflationData(prev => prev.filter(item => item.id !== id));
+    
+    // Llamada a la API en segundo plano
+    apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE')
+      .then(() => {
+        toast({ title: 'Dato de inflación eliminado exitosamente' });
+      })
+      .catch(() => {
+        // Revertir en caso de error
+        setInflationData(originalData);
+        toast({ title: 'Error al eliminar dato de inflación', variant: 'destructive' });
+      });
+  };
+
+  // Estados de carga para las operaciones
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const exchangeRateMutation = useMutation({
     mutationFn: (rate: number) => 
@@ -729,26 +753,22 @@ export default function Admin() {
       return;
     }
     
-    try {
-      if (isEditingInflation && currentInflationData) {
-        await updateInflationMutation.mutateAsync({ id: currentInflationData.id, data: values });
-      } else {
-        await inflationMutation.mutateAsync(values);
-        // Reset form para nuevo registro
-        inflationForm.reset({
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
-          inflationRate: 0,
-          source: 'INDEC'
-        });
-      }
-      
-      // Cerrar modal después de éxito
-      setInflationDialogOpen(false);
-      setCurrentInflationData(null);
-      setIsEditingInflation(false);
-    } catch (error) {
-      console.error('Error submitting inflation data:', error);
+    // Cerrar modal inmediatamente
+    setInflationDialogOpen(false);
+    setCurrentInflationData(null);
+    setIsEditingInflation(false);
+    
+    if (isEditingInflation && currentInflationData) {
+      updateInflationData(currentInflationData.id, values);
+    } else {
+      addInflationData(values);
+      // Reset form para nuevo registro
+      inflationForm.reset({
+        year: new Date().getFullYear(),
+        month: new Date().getMonth() + 1,
+        inflationRate: 0,
+        source: 'INDEC'
+      });
     }
   };
 
