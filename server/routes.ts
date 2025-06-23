@@ -2269,7 +2269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Actualizar existente
         const updated = await db.update(monthlyInflation)
           .set({
-            inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+            inflationRate: validatedData.inflationRate, // Guardar como porcentaje
             source: validatedData.source,
             updatedAt: new Date(),
             updatedBy: validatedData.updatedBy
@@ -2282,7 +2282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const created = await db.insert(monthlyInflation)
           .values({
             ...validatedData,
-            inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+            inflationRate: validatedData.inflationRate, // Guardar como porcentaje
           })
           .returning();
         res.status(201).json(created[0]);
@@ -2303,7 +2303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({
           year: validatedData.year,
           month: validatedData.month,
-          inflationRate: validatedData.inflationRate / 100, // Convertir porcentaje a decimal
+          inflationRate: validatedData.inflationRate, // Guardar como porcentaje
           source: validatedData.source,
           updatedAt: new Date(),
           updatedBy: validatedData.updatedBy
