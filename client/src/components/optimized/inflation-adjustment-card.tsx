@@ -32,6 +32,8 @@ interface InflationAdjustmentCardProps {
   projectStartDate: string;
   totalCost: number;
   quotationCurrency: string;
+  projectType: string;
+  projectDuration: string;
   onApplyInflationChange: (value: boolean) => void;
   onInflationMethodChange: (value: string) => void;
   onManualInflationRateChange: (value: number) => void;
@@ -46,6 +48,8 @@ export function InflationAdjustmentCard({
   projectStartDate,
   totalCost,
   quotationCurrency,
+  projectType,
+  projectDuration,
   onApplyInflationChange,
   onInflationMethodChange,
   onManualInflationRateChange,

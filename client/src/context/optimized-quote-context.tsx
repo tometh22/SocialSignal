@@ -381,14 +381,47 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     console.log(`⚡ Complexity adjustment: $${totalComplexityAdjustment}`);
     console.log(`📈 Adjusted base cost: $${adjustedBaseCost}`);
     
-    // Step 5: Apply business factors
+    // Step 5: Apply project type and duration factors
+    let projectTypeMultiplier = 1.0;
+    let durationMultiplier = 1.0;
+    
+    // Project type adjustments
+    if (quotationData.project.type === 'fee-mensual') {
+      projectTypeMultiplier = 0.85; // 15% discount for monthly retainer commitment
+      console.log('💼 Fee Mensual: 15% discount applied');
+    } else if (quotationData.project.type === 'on-demand') {
+      projectTypeMultiplier = 1.0; // Standard pricing
+      console.log('⚡ On Demand: Standard pricing');
+    }
+    
+    // Duration adjustments for contract commitment
+    if (quotationData.project.type === 'fee-mensual' && quotationData.project.duration) {
+      switch (quotationData.project.duration) {
+        case '1-year':
+        case '18-months':
+        case '2-years':
+          durationMultiplier = 0.95; // Additional 5% discount for longer commitments
+          console.log('📅 Long-term commitment: Additional 5% discount');
+          break;
+        case '6-months':
+          durationMultiplier = 1.0; // No additional discount
+          break;
+      }
+    }
+    
+    // Apply project type and duration factors
+    const projectAdjustedCost = adjustedBaseCost * projectTypeMultiplier * durationMultiplier;
+    
+    // Step 6: Apply business factors
     const platformCost = quotationData.financials.platformCost || 0;
     const marginMultiplier = quotationData.financials.marginFactor || 2.0;
-    const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
+    const subtotal = (projectAdjustedCost + platformCost) * marginMultiplier;
     const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
     const finalTotal = subtotal - discount;
     
     console.log(`🏢 Platform cost: $${platformCost}`);
+    console.log(`💼 Project type multiplier: ${projectTypeMultiplier}x`);
+    console.log(`📅 Duration multiplier: ${durationMultiplier}x`);
     console.log(`📊 Margin factor: ${marginMultiplier}x`);
     console.log(`💰 Subtotal: $${subtotal}`);
     console.log(`💸 Discount: $${discount}`);
@@ -397,7 +430,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     // Update states
     setBaseCost(newBaseCost);
     setComplexityAdjustment(totalComplexityAdjustment);
-    setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
+    setMarkupAmount(subtotal - projectAdjustedCost - platformCost);
     setTotalAmount(finalTotal);
     
     console.log('💰 === COST CALCULATION END ===');
