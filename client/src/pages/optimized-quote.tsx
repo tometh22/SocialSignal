@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText,
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
-import OptimizedTeamConfig from '@/components/optimized/SimpleTeamConfig';
+import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 
@@ -180,7 +180,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           <div className="card-content">
             {currentStep === 1 && <OptimizedBasicInfo />}
             {currentStep === 2 && <OptimizedTemplateSelection />}
-            {currentStep === 3 && <OptimizedTeamConfig />}
+            {currentStep === 3 && <EnhancedTeamConfig />}
             {currentStep === 4 && <ComplexityFactorsCard />}
             
             {currentStep === 5 && quotationData.project?.type === 'always-on' && (
