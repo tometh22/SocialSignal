@@ -2226,6 +2226,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ruta pública para datos de inflación (usada en cotizaciones)
+  app.get("/api/inflation/data", async (req, res) => {
+    try {
+      const inflation = await db.select().from(monthlyInflation).orderBy(desc(monthlyInflation.year), desc(monthlyInflation.month));
+      res.json(inflation);
+    } catch (error) {
+      console.error("Error fetching inflation data:", error);
+      res.status(500).json({ message: "Failed to fetch inflation data" });
+    }
+  });
+
+  // Ruta para obtener tipo de cambio
+  app.get("/api/exchange-rate", async (req, res) => {
+    try {
+      const exchangeRateConfig = await db.select()
+        .from(systemConfig)
+        .where(eq(systemConfig.configKey, 'usd_exchange_rate'));
+      
+      const rate = exchangeRateConfig.length > 0 ? exchangeRateConfig[0].configValue : 1100;
+      res.json({ rate });
+    } catch (error) {
+      console.error("Error fetching exchange rate:", error);
+      res.status(500).json({ message: "Failed to fetch exchange rate" });
+    }
+  });
+
   // Crear/actualizar inflación mensual
   app.post("/api/admin/monthly-inflation", async (req, res) => {
     try {
