@@ -607,7 +607,14 @@ export default function Admin() {
     },
     onSuccess: async () => {
       toast({ title: 'Dato de inflación actualizado exitosamente' });
+      // Forzar múltiples actualizaciones para asegurar que se vea el cambio
       await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      // Forzar una segunda actualización para casos donde la primera no se refleja
+      setTimeout(async () => {
+        await queryClient.invalidateQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/admin/monthly-inflation'] });
+      }, 100);
     },
     onError: (err, variables, context) => {
       // Revertir en caso de error
@@ -796,14 +803,30 @@ export default function Admin() {
       return;
     }
     
+    // Guardar el ID para edición antes de cerrar modal
+    const editingId = isEditingInflation && currentInflationData ? currentInflationData.id : null;
+    
     // Cerrar modal inmediatamente para mostrar actualización optimista
     setInflationDialogOpen(false);
     setCurrentInflationData(null);
     setIsEditingInflation(false);
     
     try {
-      if (isEditingInflation && currentInflationData) {
-        await updateInflationMutation.mutateAsync({ id: currentInflationData.id, data: values });
+      if (editingId) {
+        // Para edición: actualizar cache inmediatamente antes de enviar al servidor
+        queryClient.setQueryData(['/api/admin/monthly-inflation'], (old: MonthlyInflation[] = []) => {
+          return old.map(item => 
+            item.id === editingId 
+              ? { 
+                  ...item, 
+                  ...values,
+                  updatedAt: new Date().toISOString()
+                }
+              : item
+          );
+        });
+        
+        await updateInflationMutation.mutateAsync({ id: editingId, data: values });
       } else {
         // Reset form para nuevo registro
         inflationForm.reset({
