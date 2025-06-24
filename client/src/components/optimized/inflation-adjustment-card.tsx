@@ -94,7 +94,7 @@ export function InflationAdjustmentCard({
   const calculateInflationProjection = () => {
     console.log('🏦 === INFLATION CALCULATION START ===');
     console.log('Applied:', applyInflationAdjustment, 'Date:', projectStartDate);
-    console.log('💰 Total cost received:', totalCost);
+    console.log('💰 Total cost received (ARS):', totalCost);
     
     if (!applyInflationAdjustment || !projectStartDate) {
       console.log('❌ Not applying inflation - missing data');
@@ -111,8 +111,8 @@ export function InflationAdjustmentCard({
     const monthsDifference = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
                            (startDate.getMonth() - currentDate.getMonth());
 
-    console.log('📅 Current date:', currentDate.toISOString());
-    console.log('📅 Start date:', startDate.toISOString());
+    console.log('📅 Current date:', currentDate.toISOString().split('T')[0]);
+    console.log('📅 Start date:', startDate.toISOString().split('T')[0]);
     console.log('📅 Months difference:', monthsDifference);
 
     if (monthsDifference <= 0) {
@@ -120,20 +120,32 @@ export function InflationAdjustmentCard({
       return totalCost;
     }
 
-    const inflationRate = inflationMethod === 'manual' ? manualInflationRate : averageInflation;
-    const annualRate = inflationRate / 100;
-    const monthlyRate = annualRate / 12;
-    const inflationFactor = Math.pow(1 + monthlyRate, monthsDifference);
+    // Usar la tasa de inflación apropiada
+    let inflationRate;
+    if (inflationMethod === 'manual') {
+      inflationRate = manualInflationRate; // Ya viene como porcentaje
+    } else {
+      inflationRate = averageInflation; // Ya viene como porcentaje
+    }
     
-    console.log('💰 Base cost for calculation:', totalCost);
+    // Convertir a decimal y calcular factor mensual
+    const annualRateDecimal = inflationRate / 100;
+    const monthlyRateDecimal = annualRateDecimal / 12;
+    const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsDifference);
+    
     console.log('📊 Method:', inflationMethod);
-    console.log('📊 Annual rate:', inflationRate + '%');
-    console.log('📊 Monthly rate:', (monthlyRate * 100).toFixed(4) + '%');
+    console.log('📊 Annual rate:', inflationRate.toFixed(2) + '%');
+    console.log('📊 Monthly rate:', (monthlyRateDecimal * 100).toFixed(4) + '%');
     console.log('📊 Inflation factor:', inflationFactor.toFixed(6));
+    console.log('📊 Months to project:', monthsDifference);
     
     const projectedCost = totalCost * inflationFactor;
-    console.log('💵 Projected cost:', projectedCost.toFixed(2));
-    console.log('💵 Inflation adjustment:', (projectedCost - totalCost).toFixed(2));
+    const adjustment = projectedCost - totalCost;
+    
+    console.log('💰 Base cost (ARS):', totalCost.toLocaleString('es-AR'));
+    console.log('💵 Projected cost (ARS):', projectedCost.toLocaleString('es-AR'));
+    console.log('💵 Inflation adjustment (ARS):', adjustment.toLocaleString('es-AR'));
+    console.log('💵 Inflation percentage:', ((adjustment / totalCost) * 100).toFixed(2) + '%');
     console.log('🏦 === INFLATION CALCULATION END ===');
     
     return projectedCost;
@@ -256,38 +268,53 @@ export function InflationAdjustmentCard({
           {/* Resumen de proyección */}
           {applyInflationAdjustment && projectStartDate && (
             <div className="bg-white p-4 rounded-lg border space-y-3">
+              {/* Información del cálculo */}
+              <div className="text-xs text-gray-500 mb-3">
+                Proyección desde {new Date().toLocaleDateString('es-AR')} hasta {new Date(projectStartDate).toLocaleDateString('es-AR')} 
+                ({Math.max(0, (new Date(projectStartDate).getFullYear() - new Date().getFullYear()) * 12 + 
+                (new Date(projectStartDate).getMonth() - new Date().getMonth()))} meses)
+              </div>
+              
               <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-700">Costo base</span>
-                <span className="font-mono">
-                  {quotationCurrency === 'USD' 
-                    ? `$${(totalCost / exchangeRate).toFixed(2)} USD`
-                    : formatCurrency(totalCost)
-                  }
+                <span className="font-medium text-gray-700">Costo base (ARS)</span>
+                <span className="font-mono text-base">
+                  {formatCurrency(totalCost)}
                 </span>
               </div>
+              
+              {quotationCurrency === 'USD' && (
+                <div className="flex items-center justify-between text-gray-600">
+                  <span className="text-sm">Equivalente en USD</span>
+                  <span className="font-mono text-sm">
+                    ${(totalCost / exchangeRate).toFixed(2)} USD
+                  </span>
+                </div>
+              )}
               
               {inflationAdjustment > 0 && (
                 <>
                   <div className="flex items-center justify-between text-orange-600">
                     <span className="font-medium">Ajuste por inflación</span>
                     <span className="font-mono">
-                      +{quotationCurrency === 'USD' 
-                        ? `$${(inflationAdjustment / exchangeRate).toFixed(2)} USD`
-                        : formatCurrency(inflationAdjustment)
-                      } (+{inflationPercentage.toFixed(1)}%)
+                      +{formatCurrency(inflationAdjustment)} (+{inflationPercentage.toFixed(1)}%)
                     </span>
                   </div>
                   
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between font-semibold text-lg">
-                      <span>Costo proyectado</span>
+                      <span>Costo proyectado (ARS)</span>
                       <span className="text-primary font-mono">
-                        {quotationCurrency === 'USD' 
-                          ? `$${(projectedCost / exchangeRate).toFixed(2)} USD`
-                          : formatCurrency(projectedCost)
-                        }
+                        {formatCurrency(projectedCost)}
                       </span>
                     </div>
+                    {quotationCurrency === 'USD' && (
+                      <div className="flex items-center justify-between text-blue-600 mt-1">
+                        <span className="text-sm">Equivalente en USD</span>
+                        <span className="font-mono text-lg font-semibold">
+                          ${(projectedCost / exchangeRate).toFixed(2)} USD
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
