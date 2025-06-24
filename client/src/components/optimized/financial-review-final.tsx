@@ -245,7 +245,20 @@ export default function FinancialReviewFinal() {
                 <div className="text-sm text-blue-600">Cotización final</div>
               </div>
               <span className="text-2xl font-mono font-bold text-blue-900">
-                {formatCurrency(totalAmount)}
+                {quotationData.inflation.quotationCurrency === 'USD' 
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(totalAmount)
+                  : new Intl.NumberFormat('es-AR', {
+                      style: 'currency',
+                      currency: 'ARS',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(totalAmount)
+                }
               </span>
             </div>
           </div>

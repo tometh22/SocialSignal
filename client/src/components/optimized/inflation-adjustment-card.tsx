@@ -189,17 +189,37 @@ export function InflationAdjustmentCard({
   // Formatear valores - todo en ARS, opcionalmente mostrar equivalente en USD
   const formatInflationAmount = (amountInARS: number) => {
     if (displayCurrency === 'ARS') {
-      return formatCurrency(amountInARS);
+      return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amountInARS);
     } else {
-      return `US$ ${getUSDEquivalent(amountInARS).toFixed(2)}`;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(getUSDEquivalent(amountInARS));
     }
   };
 
   const formatBaseCostDisplay = (amountInARS: number) => {
     if (displayCurrency === 'ARS') {
-      return formatCurrency(amountInARS);
+      return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amountInARS);
     } else {
-      return `US$ ${getUSDEquivalent(amountInARS).toFixed(2)}`;
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(getUSDEquivalent(amountInARS));
     }
   };
 
@@ -353,7 +373,12 @@ export function InflationAdjustmentCard({
                     </div>
                     {quotationCurrency === 'USD' && displayCurrency === 'ARS' && (
                       <div className="text-xs text-gray-500">
-                        (Equivale a US$ {originalBaseCost.toFixed(2)})
+                        (Equivale a {new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }).format(originalBaseCost)})
                       </div>
                     )}
                   </div>
@@ -385,7 +410,12 @@ export function InflationAdjustmentCard({
                         </div>
                         {displayCurrency === 'ARS' && (
                           <div className="text-xs font-normal text-gray-500">
-                            (≈ US$ {getUSDEquivalent(projectedCostDisplay).toFixed(2)})
+                            (≈ {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            }).format(getUSDEquivalent(projectedCostDisplay))})
                           </div>
                         )}
                       </div>
