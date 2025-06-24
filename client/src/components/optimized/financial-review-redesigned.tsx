@@ -18,10 +18,10 @@ import { apiRequest } from '@/lib/queryClient';
 // Componente para agregar miembros de equipo inline
 const TeamMemberQuickAdd: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedRole, setSelectedRole] = useState('');
-  const [selectedPersonnel, setSelectedPersonnel] = useState('');
+  const [selectedRole, setSelectedRole] = useState('0');
+  const [selectedPersonnel, setSelectedPersonnel] = useState('0');
   const [hours, setHours] = useState('10');
-  const [rate, setRate] = useState('');
+  const [rate, setRate] = useState('0');
   
   const { addTeamMember, availableRoles: contextRoles, availablePersonnel: contextPersonnel } = useOptimizedQuote();
   
@@ -30,7 +30,7 @@ const TeamMemberQuickAdd: React.FC = () => {
   const personnel = contextPersonnel || [];
   
   const handleAddMember = () => {
-    if (!selectedRole || !hours || !rate) return;
+    if (!selectedRole || selectedRole === '0' || !hours || !rate || rate === '0') return;
     
     const hoursNum = parseFloat(hours);
     const rateNum = parseFloat(rate);
@@ -44,10 +44,10 @@ const TeamMemberQuickAdd: React.FC = () => {
     });
     
     // Resetear form
-    setSelectedRole('');
-    setSelectedPersonnel('');
+    setSelectedRole('0');
+    setSelectedPersonnel('0');
     setHours('10');
-    setRate('');
+    setRate('0');
     setShowAddForm(false);
   };
   
@@ -63,7 +63,7 @@ const TeamMemberQuickAdd: React.FC = () => {
   };
 
   // Filtrar personal disponible basado en el rol seleccionado
-  const availablePersonnelForRole = selectedRole 
+  const availablePersonnelForRole = selectedRole && selectedRole !== '0'
     ? personnel.filter(person => person.roleId === parseInt(selectedRole))
     : [];
 
@@ -106,6 +106,7 @@ const TeamMemberQuickAdd: React.FC = () => {
               <SelectValue placeholder="Seleccionar rol" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="0">Seleccionar rol</SelectItem>
               {roles.map(role => (
                 <SelectItem key={role.id} value={role.id.toString()}>
                   {role.name}
@@ -117,13 +118,13 @@ const TeamMemberQuickAdd: React.FC = () => {
         
         <div>
           <Label className="text-xs text-blue-700">
-            Persona {selectedRole && availablePersonnelForRole.length === 0 && (
+            Persona {selectedRole && selectedRole !== '0' && availablePersonnelForRole.length === 0 && (
               <span className="text-orange-600">(Sin personal disponible)</span>
             )}
           </Label>
-          <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel} disabled={!selectedRole}>
+          <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel} disabled={!selectedRole || selectedRole === '0'}>
             <SelectTrigger className="h-7 text-xs">
-              <SelectValue placeholder={selectedRole ? "Seleccionar persona" : "Primero selecciona un rol"} />
+              <SelectValue placeholder={selectedRole && selectedRole !== '0' ? "Seleccionar persona" : "Primero selecciona un rol"} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0">Sin asignar</SelectItem>
@@ -185,7 +186,7 @@ const TeamMemberQuickAdd: React.FC = () => {
           size="sm"
           className="h-7 text-xs"
           onClick={handleAddMember}
-          disabled={!selectedRole || !hours || !rate}
+          disabled={!selectedRole || selectedRole === '0' || !hours || !rate || rate === '0'}
         >
           Agregar
         </Button>

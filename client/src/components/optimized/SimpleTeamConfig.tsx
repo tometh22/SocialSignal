@@ -305,7 +305,7 @@ const SimpleTeamConfig: React.FC = () => {
                 <select 
                   id="role-selector"
                   className="w-full h-9 text-xs border border-gray-300 rounded-md px-2 py-1 appearance-none bg-white"
-                  value={newMember.roleId || ''}
+                  value={newMember.roleId || 0}
                   onChange={(e) => {
                     const roleId = parseInt(e.target.value);
 
@@ -316,7 +316,7 @@ const SimpleTeamConfig: React.FC = () => {
                     }));
                   }}
                 >
-                  <option value="">Seleccionar rol</option>
+                  <option value="0">Seleccionar rol</option>
                   {availableRoles && availableRoles.map(role => (
                     <option key={role.id} value={role.id}>
                       {role.name} {isRoleRecommended(role.id) ? '(Recomendado)' : ''}
@@ -333,11 +333,11 @@ const SimpleTeamConfig: React.FC = () => {
                 <select 
                   id="personal-selector"
                   className="w-full h-9 text-xs border border-gray-300 rounded-md px-2 py-1 appearance-none bg-white"
-                  value={newMember.personnelId || ''}
+                  value={newMember.personnelId || 0}
                   onChange={(e) => {
                     const personnelId = parseInt(e.target.value);
 
-                    if (isNaN(personnelId)) {
+                    if (isNaN(personnelId) || personnelId === 0) {
                       setNewMember(prev => ({
                         ...prev,
                         personnelId: null
