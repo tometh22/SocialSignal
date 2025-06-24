@@ -94,7 +94,8 @@ export function InflationAdjustmentCard({
   const calculateInflationProjection = () => {
     console.log('🏦 === INFLATION CALCULATION START ===');
     console.log('Applied:', applyInflationAdjustment, 'Date:', projectStartDate);
-    console.log('💰 Total cost received (ARS):', totalCost);
+    console.log('💰 Total cost received:', totalCost);
+    console.log('💱 Currency:', quotationCurrency, 'Exchange rate:', exchangeRate);
     
     if (!applyInflationAdjustment || !projectStartDate) {
       console.log('❌ Not applying inflation - missing data');
@@ -120,7 +121,14 @@ export function InflationAdjustmentCard({
       return totalCost;
     }
 
-    // Usar la tasa de inflación apropiada
+    // PASO 1: Convertir el costo base a ARS si está en USD
+    let baseCostInARS = totalCost;
+    if (quotationCurrency === 'USD') {
+      baseCostInARS = totalCost * exchangeRate;
+      console.log('💱 Converting USD to ARS:', totalCost, 'USD =', baseCostInARS, 'ARS');
+    }
+
+    // PASO 2: Aplicar inflación argentina sobre el monto en ARS
     let inflationRate;
     if (inflationMethod === 'manual') {
       inflationRate = manualInflationRate; // Ya viene como porcentaje
@@ -139,16 +147,24 @@ export function InflationAdjustmentCard({
     console.log('📊 Inflation factor:', inflationFactor.toFixed(6));
     console.log('📊 Months to project:', monthsDifference);
     
-    const projectedCost = totalCost * inflationFactor;
-    const adjustment = projectedCost - totalCost;
+    const projectedCostInARS = baseCostInARS * inflationFactor;
+    const adjustmentInARS = projectedCostInARS - baseCostInARS;
     
-    console.log('💰 Base cost (ARS):', totalCost.toLocaleString('es-AR'));
-    console.log('💵 Projected cost (ARS):', projectedCost.toLocaleString('es-AR'));
-    console.log('💵 Inflation adjustment (ARS):', adjustment.toLocaleString('es-AR'));
-    console.log('💵 Inflation percentage:', ((adjustment / totalCost) * 100).toFixed(2) + '%');
+    console.log('💰 Base cost (ARS):', baseCostInARS.toLocaleString('es-AR'));
+    console.log('💵 Projected cost (ARS):', projectedCostInARS.toLocaleString('es-AR'));
+    console.log('💵 Inflation adjustment (ARS):', adjustmentInARS.toLocaleString('es-AR'));
+    console.log('💵 Inflation percentage:', ((adjustmentInARS / baseCostInARS) * 100).toFixed(2) + '%');
+
+    // PASO 3: Convertir de vuelta a la moneda de cotización si es necesario
+    let finalProjectedCost = projectedCostInARS;
+    if (quotationCurrency === 'USD') {
+      finalProjectedCost = projectedCostInARS / exchangeRate;
+      console.log('💱 Converting back to USD:', projectedCostInARS, 'ARS =', finalProjectedCost, 'USD');
+    }
+    
     console.log('🏦 === INFLATION CALCULATION END ===');
     
-    return projectedCost;
+    return finalProjectedCost;
   };
 
   React.useEffect(() => {
@@ -158,17 +174,15 @@ export function InflationAdjustmentCard({
   const inflationAdjustment = projectedCost - totalCost;
   const inflationPercentage = totalCost > 0 ? (inflationAdjustment / totalCost) * 100 : 0;
 
-  // Calcular valores en la moneda de cotización seleccionada
-  const getDisplayCurrency = (amountInARS: number) => {
-    if (quotationCurrency === 'USD') {
-      return amountInARS / exchangeRate;
-    }
-    return amountInARS;
-  };
+  // Los valores ya están en la moneda correcta después del cálculo
+  const baseCostDisplay = totalCost;
+  const projectedCostDisplay = projectedCost;
+  const inflationAdjustmentDisplay = inflationAdjustment;
 
-  const baseCostDisplay = getDisplayCurrency(totalCost);
-  const projectedCostDisplay = getDisplayCurrency(projectedCost);
-  const inflationAdjustmentDisplay = getDisplayCurrency(inflationAdjustment);
+  // Para mostrar equivalencias en ARS cuando se cotiza en USD
+  const getARSEquivalent = (usdAmount: number) => {
+    return usdAmount * exchangeRate;
+  };
 
   return (
     <Card className="border-orange-200 bg-orange-50/30">
@@ -293,7 +307,7 @@ export function InflationAdjustmentCard({
                 </span>
                 <span className="font-mono text-base">
                   {quotationCurrency === 'USD' 
-                    ? `$${baseCostDisplay.toFixed(2)} USD`
+                    ? `US$ ${baseCostDisplay.toFixed(2)}`
                     : formatCurrency(baseCostDisplay)
                   }
                 </span>
@@ -303,7 +317,7 @@ export function InflationAdjustmentCard({
                 <div className="flex items-center justify-between text-gray-600">
                   <span className="text-sm">Equivalente en ARS</span>
                   <span className="font-mono text-sm">
-                    {formatCurrency(totalCost)}
+                    {formatCurrency(getARSEquivalent(baseCostDisplay))}
                   </span>
                 </div>
               )}
@@ -314,7 +328,7 @@ export function InflationAdjustmentCard({
                     <span className="font-medium">Ajuste por inflación</span>
                     <span className="font-mono">
                       +{quotationCurrency === 'USD' 
-                        ? `$${inflationAdjustmentDisplay.toFixed(2)} USD`
+                        ? `US$ ${inflationAdjustmentDisplay.toFixed(2)}`
                         : formatCurrency(inflationAdjustment)
                       } (+{inflationPercentage.toFixed(1)}%)
                     </span>
@@ -325,7 +339,7 @@ export function InflationAdjustmentCard({
                       <span>Costo proyectado ({quotationCurrency})</span>
                       <span className="text-primary font-mono">
                         {quotationCurrency === 'USD' 
-                          ? `$${projectedCostDisplay.toFixed(2)} USD`
+                          ? `US$ ${projectedCostDisplay.toFixed(2)}`
                           : formatCurrency(projectedCost)
                         }
                       </span>
@@ -334,7 +348,7 @@ export function InflationAdjustmentCard({
                       <div className="flex items-center justify-between text-blue-600 mt-1">
                         <span className="text-sm">Equivalente en ARS</span>
                         <span className="font-mono text-lg font-semibold">
-                          {formatCurrency(projectedCost)}
+                          {formatCurrency(getARSEquivalent(projectedCostDisplay))}
                         </span>
                       </div>
                     )}
