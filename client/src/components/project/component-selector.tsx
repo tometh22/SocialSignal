@@ -37,7 +37,7 @@ const ComponentSelector: React.FC<ComponentSelectorProps> = ({
   onChange,
   disabled = false,
 }) => {
-  const [selectedValue, setSelectedValue] = useState<string>(value ? value.toString() : "");
+  const [selectedValue, setSelectedValue] = useState<string>(value ? value.toString() : "0");
 
   // Consulta para obtener los componentes del proyecto
   const {
@@ -56,7 +56,7 @@ const ComponentSelector: React.FC<ComponentSelectorProps> = ({
 
   // Actualizar el valor seleccionado cuando cambie externamente
   useEffect(() => {
-    setSelectedValue(value ? value.toString() : "");
+    setSelectedValue(value ? value.toString() : "0");
   }, [value]);
 
   // Si no hay componentes o hay un error, no mostrar el selector
@@ -66,7 +66,7 @@ const ComponentSelector: React.FC<ComponentSelectorProps> = ({
 
   const handleChange = (newValue: string) => {
     setSelectedValue(newValue);
-    onChange(newValue === "" ? null : parseInt(newValue));
+    onChange(newValue === "0" || newValue === "" ? null : parseInt(newValue));
   };
 
   return (
@@ -87,7 +87,7 @@ const ComponentSelector: React.FC<ComponentSelectorProps> = ({
             </div>
           ) : (
             <SelectGroup>
-              <SelectItem value="">Sin componente específico</SelectItem>
+              <SelectItem value="0">Sin componente específico</SelectItem>
               {components?.map((component) => (
                 <SelectItem key={component.id} value={component.id.toString()}>
                   <div className="flex items-center gap-2">

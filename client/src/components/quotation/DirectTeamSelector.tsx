@@ -182,7 +182,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
               <select
                 id="direct-role-selector"
                 className="w-full h-9 text-sm border border-gray-300 rounded-md px-2 py-1"
-                value={newMember.roleId || ''}
+                value={newMember.roleId || 0}
                 onChange={(e) => {
                   const roleId = parseInt(e.target.value);
                   setNewMember(prev => ({
@@ -192,7 +192,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
                   }));
                 }}
               >
-                <option value="">Seleccionar rol</option>
+                <option value="0">Seleccionar rol</option>
                 {roles.map(role => (
                   <option key={role.id} value={role.id}>
                     {role.name}
@@ -207,16 +207,16 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
               <select
                 id="direct-personnel-selector"
                 className="w-full h-9 text-sm border border-gray-300 rounded-md px-2 py-1"
-                value={newMember.personnelId || ''}
+                value={newMember.personnelId || 0}
                 onChange={(e) => {
                   const personnelId = parseInt(e.target.value);
                   setNewMember(prev => ({
                     ...prev,
-                    personnelId: isNaN(personnelId) ? null : personnelId
+                    personnelId: isNaN(personnelId) || personnelId === 0 ? null : personnelId
                   }));
                 }}
               >
-                <option value="">Seleccionar personal</option>
+                <option value="0">Seleccionar personal</option>
                 {filteredPersonnel.map(person => {
                   const role = roles.find(r => r.id === person.roleId);
                   return (

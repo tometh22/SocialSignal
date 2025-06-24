@@ -362,7 +362,7 @@ const SimpleTeamConfig: React.FC = () => {
                     }));
                   }}
                 >
-                  <option value="">Seleccionar personal</option>
+                  <option value="0">Seleccionar personal</option>
                   {availablePersonnel && availablePersonnel
                     .filter(person => !newMember.roleId || person.roleId === newMember.roleId)
                     .map(person => {
