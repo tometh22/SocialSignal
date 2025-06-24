@@ -73,6 +73,94 @@ export default function FinancialReviewFinal() {
     return person ? person.name : `Personal #${personnelId}`;
   };
 
+    const calculateBaseCost = () => {
+        let cost = 0;
+        quotationData.teamMembers.forEach(member => {
+            cost += member.cost;
+        });
+        return cost;
+    };
+
+    const calculateComplexityAdjustment = (baseCost) => {
+        let adjustment = 0;
+        adjustment += baseCost * complexityFactors.analysisTypeFactor;
+        adjustment += baseCost * complexityFactors.mentionsVolumeFactor;
+        adjustment += baseCost * complexityFactors.countriesFactor;
+        adjustment += baseCost * complexityFactors.clientEngagementFactor;
+        return adjustment;
+    };
+
+    const getComplexityPercentage = (level) => {
+        if (level === 'low') return 0;
+        if (level === 'medium') return 10;
+        return 25;
+    };
+    
+    // Calculate values
+  const baseCost = calculateBaseCost();
+  const complexityAdjustment = calculateComplexityAdjustment(baseCost);
+  const subtotalWithComplexity = baseCost + complexityAdjustment;
+
+  // Calculate inflation if applicable
+  const baseForInflation = subtotalWithComplexity; // Base cost + complexity, BEFORE markup
+  let inflationAdjustment = 0;
+  let inflationProjectedCost = baseForInflation;
+
+  if (quotationData.inflation.applyInflationAdjustment && quotationData.inflation.projectStartDate) {
+    const startDate = new Date(quotationData.inflation.projectStartDate);
+    const currentDate = new Date();
+    const monthsDifference = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
+                           (startDate.getMonth() - currentDate.getMonth());
+
+    if (monthsDifference > 0) {
+      // Convert to ARS if needed
+      const exchangeRate = 1100; // This should come from API
+      let baseCostInARS = quotationData.inflation.quotationCurrency === 'USD' ? 
+                         baseForInflation * exchangeRate : baseForInflation;
+
+      // Calculate inflation
+      let inflationRate;
+      if (quotationData.inflation.inflationMethod === 'manual') {
+        inflationRate = quotationData.inflation.manualInflationRate || 25;
+      } else {
+        inflationRate = 25; // This should come from API average
+      }
+
+      const annualRateDecimal = inflationRate / 100;
+      const monthlyRateDecimal = annualRateDecimal / 12;
+      const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsDifference);
+
+      inflationProjectedCost = baseCostInARS * inflationFactor;
+      inflationAdjustment = inflationProjectedCost - baseCostInARS;
+    }
+  }
+
+  // Continue with markup calculation using inflated base
+  const markupAmount = inflationProjectedCost; // 2x markup on inflated cost
+  const subtotalWithMarkup = inflationProjectedCost + markupAmount;
+
+  // Platform cost and adjustments
+  const platformCost = quotationData.financials.platformCost || 0;
+  const deviationPercentage = quotationData.financials.deviationPercentage || 0;
+  const discountPercentage = quotationData.financials.discountPercentage || 0;
+
+  const subtotalWithPlatform = subtotalWithMarkup + platformCost;
+  const deviationAmount = subtotalWithPlatform * (deviationPercentage / 100);
+  const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
+  const discountAmount = subtotalWithDeviation * (discountPercentage / 100);
+  const finalTotal = subtotalWithDeviation - discountAmount;
+
+  // Update totals
+  React.useEffect(() => {
+    updateFinancials({
+      baseCost,
+      totalCost: finalTotal,
+      complexityAdjustment,
+      markupAmount,
+      inflationAdjustment, // Include inflation adjustment
+    });
+  }, [baseCost, finalTotal, complexityAdjustment, markupAmount, inflationAdjustment, updateFinancials]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -177,6 +265,26 @@ export default function FinancialReviewFinal() {
                   <span className="font-mono">{formatCurrency(baseCost)}</span>
                 </div>
               </div>
+              <div className="border-t pt-3 mt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-gray-700">Subtotal (sin margen):</span>
+                  <span className="font-mono">{formatCurrency(subtotalWithComplexity)}</span>
+                </div>
+
+                {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                  <div className="flex justify-between text-sm text-orange-700 bg-orange-50 px-2 py-1 rounded">
+                    <span className="font-medium">+ Ajuste por inflación:</span>
+                    <span className="font-mono">{formatCurrency(inflationAdjustment)}</span>
+                  </div>
+                )}
+
+                {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span className="font-medium text-gray-700">Subtotal proyectado:</span>
+                    <span className="font-mono font-semibold">{formatCurrency(inflationProjectedCost)}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -237,95 +345,118 @@ export default function FinancialReviewFinal() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Base Cost */}
-            <div className="flex justify-between items-center py-3 border-b">
-              <div>
-                <span className="text-sm font-medium">Costo Base</span>
-                <div className="text-xs text-gray-500">Equipo + Plantilla</div>
+            <div className="bg-white p-4 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">Costo Base (Equipo)</span>
+                <span className="text-lg font-mono font-semibold text-gray-900">
+                  {formatCurrency(baseCost)}
+                </span>
               </div>
-              <span className="text-lg font-mono font-semibold">
-                {formatCurrency(baseCost)}
-              </span>
             </div>
 
-            {/* Complexity Adjustment */}
-            {complexityAdjustment > 0 && (
-              <div className="flex justify-between items-center py-3 border-b">
-                <div>
-                  <span className="text-sm font-medium">Ajuste por Complejidad</span>
-                  <div className="text-xs text-gray-500">
-                    Total: +{(totalComplexityFactor * 100).toFixed(1)}%
-                  </div>
-                </div>
-                <span className="text-lg font-mono font-semibold text-blue-600">
-                  +{formatCurrency(complexityAdjustment)}
+            <div className="bg-white p-4 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">
+                  Ajuste por Complejidad ({getComplexityPercentage(quotationData.complexity.level)}%)
+                </span>
+                <span className="text-lg font-mono font-semibold text-gray-900">
+                  {formatCurrency(complexityAdjustment)}
                 </span>
               </div>
-            )}
-
-            {/* Platform Costs */}
-            {quotationData.financials.platformCost > 0 && (
-              <div className="flex justify-between items-center py-3 border-b">
-                <div>
-                  <span className="text-sm font-medium">Costo de Plataforma</span>
-                  <div className="text-xs text-gray-500">Herramientas y licencias</div>
-                </div>
-                <span className="text-lg font-mono font-semibold text-orange-600">
-                  +{formatCurrency(quotationData.financials.platformCost)}
-                </span>
-              </div>
-            )}
-
-            {/* Markup */}
-            <div className="flex justify-between items-center py-3 border-b">
-              <div>
-                <span className="text-sm font-medium">Margen</span>
-                <div className="text-xs text-gray-500">
-                  Factor: x{quotationData.financials.marginFactor.toFixed(1)}
-                </div>
-              </div>
-              <span className="text-lg font-mono font-semibold text-green-600">
-                +{formatCurrency(markupAmount)}
-              </span>
             </div>
 
-            {/* Discount */}
-            {quotationData.financials.discount > 0 && (
-              <div className="flex justify-between items-center py-3 border-b">
-                <div>
-                  <span className="text-sm font-medium">Descuento</span>
-                  <div className="text-xs text-gray-500">
-                    -{quotationData.financials.discount}%
+            {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-orange-800">Ajuste por Inflación</span>
+                    <span className="text-xs text-orange-600">
+                      {quotationData.inflation.inflationMethod === 'manual' 
+                        ? `${quotationData.inflation.manualInflationRate}% anual` 
+                        : 'Promedio 12 meses'}
+                    </span>
                   </div>
+                  <span className="text-lg font-mono font-semibold text-orange-800">
+                    +{formatCurrency(inflationAdjustment)}
+                  </span>
                 </div>
-                <span className="text-lg font-mono font-semibold text-red-600">
-                  -{formatCurrency(totalAmount * (quotationData.financials.discount / 100))}
-                </span>
               </div>
             )}
 
-            {/* Total */}
-            <div className="flex justify-between items-center py-4 bg-blue-50 rounded-lg px-4">
-              <div>
-                <span className="text-lg font-semibold text-blue-900">Total</span>
-                <div className="text-sm text-blue-600">Cotización final</div>
+            <div className="bg-white p-4 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">
+                  Margen Estándar (100%)
+                  {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                    <span className="text-xs text-orange-600 block">Aplicado sobre costo con inflación</span>
+                  )}
+                </span>
+                <span className="text-lg font-mono font-semibold text-gray-900">
+                  {formatCurrency(markupAmount)}
+                </span>
               </div>
-              <span className="text-2xl font-mono font-bold text-blue-900">
-                {quotationData.inflation.quotationCurrency === 'USD' 
+            </div>
+
+            {platformCost > 0 && (
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">Costo de Plataforma</span>
+                  <span className="text-lg font-mono font-semibold text-gray-900">
+                    {formatCurrency(platformCost)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {deviationPercentage !== 0 && (
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">
+                    Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
+                  </span>
+                  <span className={`text-lg font-mono font-semibold ${deviationPercentage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {discountPercentage > 0 && (
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">Descuento ({discountPercentage}%)</span>
+                  <span className="text-lg font-mono font-semibold text-green-600">
+                    -{formatCurrency(discountAmount)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-primary">Total Final</span>
+                  {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                    <span className="text-xs text-primary/70">Incluye ajuste por inflación</span>
+                  )}
+                </div>
+                <span className="text-2xl font-mono font-bold text-primary">
+                  {quotationData.inflation.quotationCurrency === 'USD' 
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
-                    }).format(totalAmount)
+                    }).format(finalTotal)
                   : new Intl.NumberFormat('es-AR', {
                       style: 'currency',
                       currency: 'ARS',
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0,
-                    }).format(totalAmount)
+                    }).format(finalTotal)
                 }
-              </span>
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>

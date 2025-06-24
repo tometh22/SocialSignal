@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
@@ -64,13 +63,13 @@ interface OptimizedQuoteContextType {
   availableRoles: Role[];
   availablePersonnel: Personnel[];
   recommendedRoleIds: number[];
-  
+
   // Navigation
   currentStep: number;
   nextStep: () => void;
   previousStep: () => void;
   goToStep: (step: number) => void;
-  
+
   // Update functions
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
@@ -88,7 +87,7 @@ interface OptimizedQuoteContextType {
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
   updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
-  
+
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
   saveQuotation: () => Promise<void>;
@@ -97,7 +96,7 @@ interface OptimizedQuoteContextType {
   loadRoles: () => void;
   loadPersonnel: () => void;
   forceRecalculate: () => void;
-  
+
   // Deliverables
   updateDeliverables: (deliverables: any[]) => void;
   addDeliverable: (deliverable: any) => void;
@@ -256,16 +255,16 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
   // Calculate recommended roles based on template
   const recommendedRoleIds = useMemo(() => {
     if (!quotationData.template) return [];
-    
+
     // Basic role recommendations based on template complexity
     const baseRoles = [1, 2]; // Analyst and Project Manager
-    
+
     if (quotationData.template.complexity === 'medium') {
       baseRoles.push(3); // Senior Analyst
     } else if (quotationData.template.complexity === 'high') {
       baseRoles.push(3, 4); // Senior Analyst and Director
     }
-    
+
     return baseRoles;
   }, [quotationData.template]);
 
@@ -290,10 +289,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     };
 
     console.log('📊 Calculated complexity factors:', factors);
-    
+
     const totalFactor = Object.values(factors).reduce((sum, factor) => sum + (factor || 0), 0);
     console.log(`🎯 Total complexity factor: ${totalFactor} (${(totalFactor * 100).toFixed(1)}%)`);
-    
+
     return factors;
   }, [
     quotationData.analysisType, 
@@ -330,7 +329,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       console.log(`👤 Member cost: ${member.hours}h × $${member.rate} = $${memberCost}`);
       return total + memberCost;
     }, 0);
-    
+
     console.log(`👥 Total team base cost: $${teamBaseCost}`);
 
     // Step 2: Calculate complexity adjustments
@@ -340,11 +339,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       const hourlyRate = member.rate || 0;
       const baseCost = baseHours * hourlyRate;
       let memberComplexityFactor = 0;
-      
+
       // Get role information
       const role = roles.find(r => r.id === member.roleId);
       const roleName = role?.name?.toLowerCase() || '';
-      
+
       // Apply complexity factors based on role types
       if (roleName.includes('analista') || roleName.includes('data specialist') || roleName.includes('tech lead')) {
         memberComplexityFactor += complexityFactors.countriesFactor;
@@ -360,11 +359,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       else {
         memberComplexityFactor = complexityFactors.analysisTypeFactor * 0.3;
       }
-      
+
       const adjustedHours = baseHours * (1 + memberComplexityFactor);
       const adjustedMemberCost = adjustedHours * hourlyRate;
       const memberAdjustment = adjustedMemberCost - baseCost;
-      
+
       totalComplexityAdjustment += memberAdjustment;
       console.log(`🔧 ${roleName}: factor ${memberComplexityFactor.toFixed(3)} → adjustment $${memberAdjustment.toFixed(2)}`);
     });
@@ -372,36 +371,36 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     // Step 3: Add template cost
     const templateCost = quotationData.template?.baseCost || 0;
     console.log(`📋 Template cost: $${templateCost}`);
-    
+
     // Step 4: Calculate final costs
     const newBaseCost = teamBaseCost + templateCost;
     const adjustedBaseCost = newBaseCost + totalComplexityAdjustment;
-    
+
     console.log(`💵 Base cost: $${newBaseCost}`);
     console.log(`⚡ Complexity adjustment: $${totalComplexityAdjustment}`);
     console.log(`📈 Adjusted base cost: $${adjustedBaseCost}`);
-    
+
     // Step 5: Apply business factors
     const platformCost = quotationData.financials.platformCost || 0;
     const marginMultiplier = quotationData.financials.marginFactor || 2.0;
     const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
     const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
     const finalTotal = subtotal - discount;
-    
+
     console.log(`🏢 Platform cost: $${platformCost}`);
     console.log(`📊 Margin factor: ${marginMultiplier}x`);
     console.log(`💰 Subtotal: $${subtotal}`);
     console.log(`💸 Discount: $${discount}`);
     console.log(`🎯 Final total: $${finalTotal}`);
-    
+
     // Update states
     setBaseCost(newBaseCost);
     setComplexityAdjustment(totalComplexityAdjustment);
     setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
     setTotalAmount(finalTotal);
-    
+
     console.log('💰 === COST CALCULATION END ===');
-    
+
   }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger]);
 
   // Navigation functions
@@ -507,7 +506,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     const role = roles.find(r => r.id === member.roleId);
     const defaultHours = member.hours || 40;
     const defaultRate = member.rate || role?.defaultRate || 50;
-    
+
     const newMember: OptimizedTeamMember = {
       ...member,
       id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -515,20 +514,20 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       rate: defaultRate,
       cost: defaultHours * defaultRate
     };
-    
+
     console.log('➕ Adding new team member:', newMember);
-    
+
     setQuotationData(prev => ({
       ...prev,
       teamMembers: [...prev.teamMembers, newMember]
     }));
-    
+
     forceRecalculate();
   }, [roles, forceRecalculate]);
 
   const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
     console.log('📝 Updating team member:', id, updates);
-    
+
     setQuotationData(prev => ({
       ...prev,
       teamMembers: prev.teamMembers.map(member => {
@@ -544,7 +543,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         return member;
       })
     }));
-    
+
     forceRecalculate();
   }, [forceRecalculate]);
 
@@ -582,7 +581,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
       // Get client data separately
       const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
-      
+
       setQuotationData({
         client: clientData,
         project: {
@@ -613,7 +612,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           quotationCurrency: quotation.quotationCurrency || "ARS"
         }
       });
-      
+
       forceRecalculate();
     } catch (error) {
       console.error("Error loading quotation:", error);
@@ -642,7 +641,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       };
 
       const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
-      
+
       // Save team members
       for (const member of quotationData.teamMembers) {
         await apiRequest('/api/quotation-team', 'POST', {
