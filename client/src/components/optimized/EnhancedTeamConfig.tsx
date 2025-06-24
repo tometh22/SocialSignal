@@ -296,7 +296,7 @@ const EnhancedTeamConfig: React.FC = () => {
                   <div className="space-y-2">
                     <Label htmlFor="role">Rol *</Label>
                     <Select 
-                      value={newMember.roleId > 0 ? newMember.roleId.toString() : ""} 
+                      value={newMember.roleId > 0 ? newMember.roleId.toString() : "0"} 
                       onValueChange={(value) => {
                         const roleId = parseInt(value) || 0;
                         const role = getRoleInfo(roleId);
@@ -311,6 +311,7 @@ const EnhancedTeamConfig: React.FC = () => {
                         <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="0">Seleccionar rol</SelectItem>
                         {availableRoles.map(role => (
                           <SelectItem key={role.id} value={role.id.toString()}>
                             <div className="flex items-center justify-between w-full">
@@ -328,17 +329,17 @@ const EnhancedTeamConfig: React.FC = () => {
                   <div className="space-y-2">
                     <Label htmlFor="personnel">Personal (opcional)</Label>
                     <Select 
-                      value={newMember.personnelId?.toString() || ""} 
+                      value={newMember.personnelId?.toString() || "0"} 
                       onValueChange={(value) => setNewMember(prev => ({
                         ...prev,
-                        personnelId: value && value !== "" ? parseInt(value) : null
+                        personnelId: value && value !== "0" ? parseInt(value) : null
                       }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar persona" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin asignar</SelectItem>
+                        <SelectItem value="0">Sin asignar</SelectItem>
                         {availablePersonnel.map(person => (
                           <SelectItem key={person.id} value={person.id.toString()}>
                             {person.name}
