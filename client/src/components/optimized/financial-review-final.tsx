@@ -73,7 +73,7 @@ export default function FinancialReviewFinal() {
     return person ? person.name : `Personal #${personnelId}`;
   };
 
-    const calculateBaseCost = () => {
+    const calculateTeamBaseCost = () => {
         let cost = 0;
         quotationData.teamMembers.forEach(member => {
             cost += member.cost;
@@ -81,12 +81,12 @@ export default function FinancialReviewFinal() {
         return cost;
     };
 
-    const calculateComplexityAdjustment = (baseCost) => {
+    const calculateComplexityAdjustment = (teamBaseCost) => {
         let adjustment = 0;
-        adjustment += baseCost * complexityFactors.analysisTypeFactor;
-        adjustment += baseCost * complexityFactors.mentionsVolumeFactor;
-        adjustment += baseCost * complexityFactors.countriesFactor;
-        adjustment += baseCost * complexityFactors.clientEngagementFactor;
+        adjustment += teamBaseCost * complexityFactors.analysisTypeFactor;
+        adjustment += teamBaseCost * complexityFactors.mentionsVolumeFactor;
+        adjustment += teamBaseCost * complexityFactors.countriesFactor;
+        adjustment += teamBaseCost * complexityFactors.clientEngagementFactor;
         return adjustment;
     };
 
@@ -97,9 +97,9 @@ export default function FinancialReviewFinal() {
     };
     
     // Calculate values
-  const baseCost = calculateBaseCost();
-  const complexityAdjustment = calculateComplexityAdjustment(baseCost);
-  const subtotalWithComplexity = baseCost + complexityAdjustment;
+  const teamBaseCost = calculateTeamBaseCost();
+  const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
+  const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
 
   // Calculate inflation if applicable
   const baseForInflation = subtotalWithComplexity; // Base cost + complexity, BEFORE markup
@@ -136,8 +136,8 @@ export default function FinancialReviewFinal() {
   }
 
   // Continue with markup calculation using inflated base
-  const markupAmount = inflationProjectedCost; // 2x markup on inflated cost
-  const subtotalWithMarkup = inflationProjectedCost + markupAmount;
+  const teamMarkupAmount = inflationProjectedCost; // 2x markup on inflated cost
+  const subtotalWithMarkup = inflationProjectedCost + teamMarkupAmount;
 
   // Platform cost and adjustments
   const platformCost = quotationData.financials.platformCost || 0;
@@ -153,13 +153,13 @@ export default function FinancialReviewFinal() {
   // Update totals
   React.useEffect(() => {
     updateFinancials({
-      baseCost,
+      baseCost: teamBaseCost,
       totalCost: finalTotal,
-      complexityAdjustment,
-      markupAmount,
+      complexityAdjustment: teamComplexityAdjustment,
+      markupAmount: teamMarkupAmount,
       inflationAdjustment, // Include inflation adjustment
     });
-  }, [baseCost, finalTotal, complexityAdjustment, markupAmount, inflationAdjustment, updateFinancials]);
+  }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
 
   return (
     <div className="space-y-6">
@@ -262,7 +262,7 @@ export default function FinancialReviewFinal() {
               <div className="border-t pt-2 mt-3">
                 <div className="flex justify-between items-center font-medium">
                   <span>Costo Base del Equipo</span>
-                  <span className="font-mono">{formatCurrency(baseCost)}</span>
+                  <span className="font-mono">{formatCurrency(teamBaseCost)}</span>
                 </div>
               </div>
               <div className="border-t pt-3 mt-3 space-y-2">
@@ -349,7 +349,7 @@ export default function FinancialReviewFinal() {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700">Costo Base (Equipo)</span>
                 <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(baseCost)}
+                  {formatCurrency(teamBaseCost)}
                 </span>
               </div>
             </div>
@@ -360,7 +360,7 @@ export default function FinancialReviewFinal() {
                   Ajuste por Complejidad ({getComplexityPercentage(quotationData.complexity.level)}%)
                 </span>
                 <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(complexityAdjustment)}
+                  {formatCurrency(teamComplexityAdjustment)}
                 </span>
               </div>
             </div>
@@ -392,7 +392,7 @@ export default function FinancialReviewFinal() {
                   )}
                 </span>
                 <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(markupAmount)}
+                  {formatCurrency(teamMarkupAmount)}
                 </span>
               </div>
             </div>
@@ -468,7 +468,7 @@ export default function FinancialReviewFinal() {
         inflationMethod={quotationData.inflation.inflationMethod}
         manualInflationRate={quotationData.inflation.manualInflationRate}
         projectStartDate={quotationData.inflation.projectStartDate}
-        totalCost={baseCost + complexityAdjustment + quotationData.financials.platformCost} // Costo SIN margen para inflación
+        totalCost={teamBaseCost + teamComplexityAdjustment + quotationData.financials.platformCost} // Costo SIN margen para inflación
         quotationCurrency={quotationData.inflation.quotationCurrency}
         projectType={quotationData.project.type}
         projectDuration={quotationData.project.duration}
