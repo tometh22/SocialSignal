@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 export default function FinancialReviewFinal() {
   const {
@@ -17,7 +19,8 @@ export default function FinancialReviewFinal() {
     availableRoles,
     availablePersonnel,
     forceRecalculate,
-    updateInflation
+    updateInflation,
+    updateFinancials
   } = useOptimizedQuote();
 
   // Debug log para verificar valores
@@ -163,6 +166,54 @@ export default function FinancialReviewFinal() {
           </CardContent>
         </Card>
       )}
+
+      {/* Markup Control */}
+      <Card className="border-blue-200 bg-blue-50/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center text-lg text-blue-800">
+            Configuración de Margen
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Factor de Margen</Label>
+                <span className="text-sm font-mono bg-blue-100 px-2 py-1 rounded">
+                  {quotationData.financials.marginFactor.toFixed(1)}x
+                </span>
+              </div>
+              <Slider
+                value={[quotationData.financials.marginFactor]}
+                onValueChange={([value]) => 
+                  updateFinancials({ marginFactor: value })
+                }
+                min={1.0}
+                max={4.0}
+                step={0.1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>1.0x (Sin margen)</span>
+                <span>2.0x (100% margen)</span>
+                <span>4.0x (300% margen)</span>
+              </div>
+            </div>
+            
+            <div className="bg-white p-3 rounded-lg border">
+              <div className="flex justify-between items-center text-sm">
+                <span>Margen aplicado:</span>
+                <span className="font-mono font-medium text-blue-600">
+                  +{formatCurrency(markupAmount)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Factor {quotationData.financials.marginFactor.toFixed(1)}x sobre costo base + plataforma
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Financial Summary */}
       <Card>

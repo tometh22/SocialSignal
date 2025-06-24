@@ -440,5 +440,3 @@ export function InflationAdjustmentCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
