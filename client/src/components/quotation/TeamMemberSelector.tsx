@@ -59,8 +59,8 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   }, [selectionMode]);
   
   // Formulario de nuevo miembro
-  const [selectedRole, setSelectedRole] = useState<number | string>('');
-  const [selectedPerson, setSelectedPerson] = useState<number | string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [selectedPerson, setSelectedPerson] = useState<string>('');
   const [hours, setHours] = useState<string>("10");
   const [rate, setRate] = useState<string>("0");
   
@@ -191,12 +191,12 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   // Manejar envío del formulario
   const handleAddMember = () => {
     // Validaciones según el modo de selección
-    if (selectionMode === 'role' && !selectedRole) {
+    if (selectionMode === 'role' && (!selectedRole || selectedRole === '')) {
       alert('Por favor, selecciona un rol');
       return;
     }
     
-    if (selectionMode === 'personnel' && !selectedPerson) {
+    if (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '')) {
       alert('Por favor, selecciona un miembro del personal');
       return;
     }
@@ -361,7 +361,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   /* Selector de Rol - Visible en modo 'por roles' */
                   <div>
                     <Label className="block text-sm font-medium mb-1">Rol</Label>
-                    <Select value={selectedRole.toString()} onValueChange={handleRoleChange}>
+                    <Select value={selectedRole || undefined} onValueChange={handleRoleChange}>
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
@@ -379,7 +379,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   <div className="col-span-2">
                     <Label className="block text-sm font-medium mb-1">Personal</Label>
                     <Select 
-                      value={selectedPerson.toString()} 
+                      value={selectedPerson || undefined} 
                       onValueChange={handlePersonnelChange}
                     >
                       <SelectTrigger className="w-full h-10">
@@ -453,8 +453,8 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                 <Button 
                   onClick={handleAddMember} 
                   disabled={
-                    (selectionMode === 'role' && !selectedRole) || 
-                    (selectionMode === 'personnel' && !selectedPerson) ||
+                    (selectionMode === 'role' && (!selectedRole || selectedRole === '')) || 
+                    (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '')) ||
                     hours === "" || 
                     Number(hours) <= 0 || 
                     rate === "" || 
