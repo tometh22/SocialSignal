@@ -158,6 +158,18 @@ export function InflationAdjustmentCard({
   const inflationAdjustment = projectedCost - totalCost;
   const inflationPercentage = totalCost > 0 ? (inflationAdjustment / totalCost) * 100 : 0;
 
+  // Calcular valores en la moneda de cotización seleccionada
+  const getDisplayCurrency = (amountInARS: number) => {
+    if (quotationCurrency === 'USD') {
+      return amountInARS / exchangeRate;
+    }
+    return amountInARS;
+  };
+
+  const baseCostDisplay = getDisplayCurrency(totalCost);
+  const projectedCostDisplay = getDisplayCurrency(projectedCost);
+  const inflationAdjustmentDisplay = getDisplayCurrency(inflationAdjustment);
+
   return (
     <Card className="border-orange-200 bg-orange-50/30">
       <CardHeader className="pb-4">
@@ -276,17 +288,22 @@ export function InflationAdjustmentCard({
               </div>
               
               <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-700">Costo base (ARS)</span>
+                <span className="font-medium text-gray-700">
+                  Costo base ({quotationCurrency})
+                </span>
                 <span className="font-mono text-base">
-                  {formatCurrency(totalCost)}
+                  {quotationCurrency === 'USD' 
+                    ? `$${baseCostDisplay.toFixed(2)} USD`
+                    : formatCurrency(baseCostDisplay)
+                  }
                 </span>
               </div>
               
               {quotationCurrency === 'USD' && (
                 <div className="flex items-center justify-between text-gray-600">
-                  <span className="text-sm">Equivalente en USD</span>
+                  <span className="text-sm">Equivalente en ARS</span>
                   <span className="font-mono text-sm">
-                    ${(totalCost / exchangeRate).toFixed(2)} USD
+                    {formatCurrency(totalCost)}
                   </span>
                 </div>
               )}
@@ -296,22 +313,28 @@ export function InflationAdjustmentCard({
                   <div className="flex items-center justify-between text-orange-600">
                     <span className="font-medium">Ajuste por inflación</span>
                     <span className="font-mono">
-                      +{formatCurrency(inflationAdjustment)} (+{inflationPercentage.toFixed(1)}%)
+                      +{quotationCurrency === 'USD' 
+                        ? `$${inflationAdjustmentDisplay.toFixed(2)} USD`
+                        : formatCurrency(inflationAdjustment)
+                      } (+{inflationPercentage.toFixed(1)}%)
                     </span>
                   </div>
                   
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between font-semibold text-lg">
-                      <span>Costo proyectado (ARS)</span>
+                      <span>Costo proyectado ({quotationCurrency})</span>
                       <span className="text-primary font-mono">
-                        {formatCurrency(projectedCost)}
+                        {quotationCurrency === 'USD' 
+                          ? `$${projectedCostDisplay.toFixed(2)} USD`
+                          : formatCurrency(projectedCost)
+                        }
                       </span>
                     </div>
                     {quotationCurrency === 'USD' && (
                       <div className="flex items-center justify-between text-blue-600 mt-1">
-                        <span className="text-sm">Equivalente en USD</span>
+                        <span className="text-sm">Equivalente en ARS</span>
                         <span className="font-mono text-lg font-semibold">
-                          ${(projectedCost / exchangeRate).toFixed(2)} USD
+                          {formatCurrency(projectedCost)}
                         </span>
                       </div>
                     )}
