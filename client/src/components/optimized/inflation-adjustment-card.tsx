@@ -57,6 +57,7 @@ export function InflationAdjustmentCard({
   onQuotationCurrencyChange,
 }: InflationAdjustmentCardProps) {
   const [projectedCost, setProjectedCost] = useState(totalCost);
+  const [displayCurrency, setDisplayCurrency] = useState<'ARS' | 'USD'>('ARS');
 
   // Fetch inflation data
   const { data: inflationData = [] } = useQuery<MonthlyInflation[]>({
@@ -179,21 +180,61 @@ export function InflationAdjustmentCard({
   const projectedCostDisplay = projectedCost;
   const inflationAdjustmentDisplay = inflationAdjustment;
 
-  // Para mostrar equivalencias en ARS cuando se cotiza en USD
+  // Funciones para convertir entre monedas
   const getARSEquivalent = (usdAmount: number) => {
     return usdAmount * exchangeRate;
+  };
+
+  const getUSDEquivalent = (arsAmount: number) => {
+    return arsAmount / exchangeRate;
+  };
+
+  // Formatear valores según la moneda de visualización seleccionada
+  const formatDisplayAmount = (amount: number, originalCurrency: string) => {
+    if (displayCurrency === 'ARS') {
+      // Mostrar en ARS
+      if (originalCurrency === 'USD') {
+        return formatCurrency(getARSEquivalent(amount));
+      } else {
+        return formatCurrency(amount);
+      }
+    } else {
+      // Mostrar en USD
+      if (originalCurrency === 'ARS') {
+        return `US$ ${getUSDEquivalent(amount).toFixed(2)}`;
+      } else {
+        return `US$ ${amount.toFixed(2)}`;
+      }
+    }
   };
 
   return (
     <Card className="border-orange-200 bg-orange-50/30">
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center text-lg text-orange-800">
-          <TrendingUp className="mr-2 h-5 w-5" />
-          Configuración de Inflación
-          <Badge variant="secondary" className="ml-3 bg-orange-100 text-orange-700">
-            {applyInflationAdjustment ? 'Activado' : 'Desactivado'}
-          </Badge>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center text-lg text-orange-800">
+            <TrendingUp className="mr-2 h-5 w-5" />
+            Configuración de Inflación
+            <Badge variant="secondary" className="ml-3 bg-orange-100 text-orange-700">
+              {applyInflationAdjustment ? 'Activado' : 'Desactivado'}
+            </Badge>
+          </CardTitle>
+          
+          {/* Toggle para alternar moneda de visualización */}
+          <div className="flex items-center space-x-2">
+            <DollarSign className="h-4 w-4 text-gray-500" />
+            <Label className="text-sm text-gray-600">Ver precios en:</Label>
+            <Select value={displayCurrency} onValueChange={(value: 'ARS' | 'USD') => setDisplayCurrency(value)}>
+              <SelectTrigger className="w-20 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ARS">ARS</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Toggle principal - más prominente */}
@@ -302,56 +343,50 @@ export function InflationAdjustmentCard({
               </div>
               
               <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-700">
-                  Costo base ({quotationCurrency})
-                </span>
-                <span className="font-mono text-base">
-                  {quotationCurrency === 'USD' 
-                    ? `US$ ${baseCostDisplay.toFixed(2)}`
-                    : formatCurrency(baseCostDisplay)
-                  }
-                </span>
-              </div>
-              
-              {quotationCurrency === 'USD' && (
-                <div className="flex items-center justify-between text-gray-600">
-                  <span className="text-sm">Equivalente en ARS</span>
-                  <span className="font-mono text-sm">
-                    {formatCurrency(getARSEquivalent(baseCostDisplay))}
+                <div className="flex flex-col">
+                  <span className="font-medium text-gray-700">
+                    Costo base
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Cotizado en {quotationCurrency}
                   </span>
                 </div>
-              )}
+                <div className="text-right">
+                  <div className="font-mono text-base">
+                    {formatDisplayAmount(baseCostDisplay, quotationCurrency)}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Mostrando en {displayCurrency}
+                  </div>
+                </div>
+              </div>
               
               {inflationAdjustment > 0 && (
                 <>
                   <div className="flex items-center justify-between text-orange-600">
                     <span className="font-medium">Ajuste por inflación</span>
                     <span className="font-mono">
-                      +{quotationCurrency === 'USD' 
-                        ? `US$ ${inflationAdjustmentDisplay.toFixed(2)}`
-                        : formatCurrency(inflationAdjustment)
-                      } (+{inflationPercentage.toFixed(1)}%)
+                      +{formatDisplayAmount(inflationAdjustmentDisplay, quotationCurrency)} (+{inflationPercentage.toFixed(1)}%)
                     </span>
                   </div>
                   
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between font-semibold text-lg">
-                      <span>Costo proyectado ({quotationCurrency})</span>
-                      <span className="text-primary font-mono">
-                        {quotationCurrency === 'USD' 
-                          ? `US$ ${projectedCostDisplay.toFixed(2)}`
-                          : formatCurrency(projectedCost)
-                        }
-                      </span>
-                    </div>
-                    {quotationCurrency === 'USD' && (
-                      <div className="flex items-center justify-between text-blue-600 mt-1">
-                        <span className="text-sm">Equivalente en ARS</span>
-                        <span className="font-mono text-lg font-semibold">
-                          {formatCurrency(getARSEquivalent(projectedCostDisplay))}
+                      <div className="flex flex-col">
+                        <span>Costo proyectado</span>
+                        <span className="text-xs font-normal text-gray-500">
+                          Cotizado en {quotationCurrency}
                         </span>
                       </div>
-                    )}
+                      <div className="text-right">
+                        <div className="text-primary font-mono">
+                          {formatDisplayAmount(projectedCostDisplay, quotationCurrency)}
+                        </div>
+                        <div className="text-xs font-normal text-gray-500">
+                          Mostrando en {displayCurrency}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
