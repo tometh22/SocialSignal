@@ -94,9 +94,15 @@ export function InflationAdjustmentCard({
   const calculateInflationProjection = () => {
     console.log('🏦 === INFLATION CALCULATION START ===');
     console.log('Applied:', applyInflationAdjustment, 'Date:', projectStartDate);
+    console.log('💰 Total cost received:', totalCost);
     
     if (!applyInflationAdjustment || !projectStartDate) {
       console.log('❌ Not applying inflation - missing data');
+      return totalCost;
+    }
+
+    if (totalCost <= 0) {
+      console.log('❌ Invalid total cost:', totalCost);
       return totalCost;
     }
 
@@ -115,17 +121,19 @@ export function InflationAdjustmentCard({
     }
 
     const inflationRate = inflationMethod === 'manual' ? manualInflationRate : averageInflation;
-    const monthlyInflation = inflationRate / 100 / 12;
-    const inflationFactor = Math.pow(1 + monthlyInflation, monthsDifference);
+    const annualRate = inflationRate / 100;
+    const monthlyRate = annualRate / 12;
+    const inflationFactor = Math.pow(1 + monthlyRate, monthsDifference);
     
-    console.log('💰 Total cost:', totalCost);
+    console.log('💰 Base cost for calculation:', totalCost);
     console.log('📊 Method:', inflationMethod);
     console.log('📊 Annual rate:', inflationRate + '%');
-    console.log('📊 Monthly rate:', (monthlyInflation * 100).toFixed(4) + '%');
-    console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
+    console.log('📊 Monthly rate:', (monthlyRate * 100).toFixed(4) + '%');
+    console.log('📊 Inflation factor:', inflationFactor.toFixed(6));
     
     const projectedCost = totalCost * inflationFactor;
     console.log('💵 Projected cost:', projectedCost.toFixed(2));
+    console.log('💵 Inflation adjustment:', (projectedCost - totalCost).toFixed(2));
     console.log('🏦 === INFLATION CALCULATION END ===');
     
     return projectedCost;
