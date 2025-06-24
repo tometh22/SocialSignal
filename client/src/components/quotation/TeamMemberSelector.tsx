@@ -337,7 +337,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   className="flex-1"
                   size="sm"
                 >
-                  Por Roles (Tarifas Estándar)
+                  Agregar por Rol rápido
                 </Button>
                 <Button
                   type="button"
@@ -346,7 +346,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   className="flex-1"
                   size="sm"
                 >
-                  Por Miembros Específicos
+                  Agregar por Colaborador
                 </Button>
               </div>
             </div>
