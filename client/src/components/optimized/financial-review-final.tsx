@@ -61,6 +61,18 @@ export default function FinancialReviewFinal() {
     forceRecalculate();
   };
 
+  // Helper function to get role name
+  const getRoleName = (roleId) => {
+    const role = availableRoles.find((r) => r.id === roleId);
+    return role ? role.name : `Rol #${roleId}`;
+  };
+
+  // Helper function to get personnel name
+  const getPersonnelName = (personnelId) => {
+    const person = availablePersonnel.find((p) => p.id === personnelId);
+    return person ? person.name : `Personal #${personnelId}`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -141,11 +153,14 @@ export default function FinancialReviewFinal() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {quotationData.teamMembers.map((member) => (
-                <div key={member.id} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-md">
+              {quotationData.teamMembers.map((member, index) => (
+                <div key={member.id || index} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-md">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium">
-                      {member.personnelId ? `Personal #${member.personnelId}` : `Rol #${member.roleId}`}
+                      {member.personnelId 
+                        ? getPersonnelName(member.personnelId) 
+                        : getRoleName(member.roleId)
+                      }
                     </span>
                     <span className="text-xs text-gray-500">
                       {member.hours}h × ${member.rate}/h
@@ -199,7 +214,7 @@ export default function FinancialReviewFinal() {
                 <span>4.0x (300% margen)</span>
               </div>
             </div>
-            
+
             <div className="bg-white p-3 rounded-lg border">
               <div className="flex justify-between items-center text-sm">
                 <span>Margen aplicado:</span>
