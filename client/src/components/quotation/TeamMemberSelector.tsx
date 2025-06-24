@@ -191,12 +191,12 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
   // Manejar envío del formulario
   const handleAddMember = () => {
     // Validaciones según el modo de selección
-    if (selectionMode === 'role' && (!selectedRole || selectedRole === '')) {
+    if (selectionMode === 'role' && (!selectedRole || selectedRole === '' || selectedRole === '0')) {
       alert('Por favor, selecciona un rol');
       return;
     }
     
-    if (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '')) {
+    if (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '' || selectedPerson === '0' || selectedPerson === 'no-personnel')) {
       alert('Por favor, selecciona un miembro del personal');
       return;
     }
@@ -361,7 +361,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   /* Selector de Rol - Visible en modo 'por roles' */
                   <div>
                     <Label className="block text-sm font-medium mb-1">Rol</Label>
-                    <Select value={selectedRole || undefined} onValueChange={handleRoleChange}>
+                    <Select value={selectedRole || ""} onValueChange={handleRoleChange}>
                       <SelectTrigger className="w-full h-10">
                         <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
@@ -379,7 +379,7 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                   <div className="col-span-2">
                     <Label className="block text-sm font-medium mb-1">Personal</Label>
                     <Select 
-                      value={selectedPerson || undefined} 
+                      value={selectedPerson || ""} 
                       onValueChange={handlePersonnelChange}
                     >
                       <SelectTrigger className="w-full h-10">
@@ -393,9 +393,9 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                             </SelectItem>
                           ))
                         ) : (
-                          <div className="text-center py-2 text-sm text-gray-500">
+                          <SelectItem value="no-personnel" disabled>
                             No hay personal disponible
-                          </div>
+                          </SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -453,8 +453,8 @@ const TeamMemberSelector: React.FC<TeamMemberSelectorProps> = ({
                 <Button 
                   onClick={handleAddMember} 
                   disabled={
-                    (selectionMode === 'role' && (!selectedRole || selectedRole === '')) || 
-                    (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '')) ||
+                    (selectionMode === 'role' && (!selectedRole || selectedRole === '' || selectedRole === '0')) || 
+                    (selectionMode === 'personnel' && (!selectedPerson || selectedPerson === '' || selectedPerson === '0' || selectedPerson === 'no-personnel')) ||
                     hours === "" || 
                     Number(hours) <= 0 || 
                     rate === "" || 
