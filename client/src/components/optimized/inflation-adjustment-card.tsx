@@ -173,7 +173,7 @@ export function InflationAdjustmentCard({
 
   // Para mostrar: siempre mostrar los valores de inflación en ARS
   const baseCostDisplay = baseCostInARS;
-    const baseCost = totalCost; // save the original base cost for display
+  const originalBaseCost = totalCost; // Guardar el costo original para referencia
   const projectedCostDisplay = projectedCost;
   const inflationAdjustmentDisplay = inflationAdjustmentInARS;
 
@@ -186,7 +186,7 @@ export function InflationAdjustmentCard({
     return arsAmount / exchangeRate;
   };
 
-  // Formatear valores - inflación siempre en ARS, costo original en su moneda
+  // Formatear valores - todo en ARS, opcionalmente mostrar equivalente en USD
   const formatInflationAmount = (amountInARS: number) => {
     if (displayCurrency === 'ARS') {
       return formatCurrency(amountInARS);
@@ -195,19 +195,11 @@ export function InflationAdjustmentCard({
     }
   };
 
-  const formatOriginalAmount = (amount: number, currency: string) => {
+  const formatBaseCostDisplay = (amountInARS: number) => {
     if (displayCurrency === 'ARS') {
-      if (currency === 'USD') {
-        return formatCurrency(getARSEquivalent(amount));
-      } else {
-        return formatCurrency(amount);
-      }
+      return formatCurrency(amountInARS);
     } else {
-      if (currency === 'ARS') {
-        return `US$ ${getUSDEquivalent(amount).toFixed(2)}`;
-      } else {
-        return `US$ ${amount.toFixed(2)}`;
-      }
+      return `US$ ${getUSDEquivalent(amountInARS).toFixed(2)}`;
     }
   };
 
@@ -357,11 +349,11 @@ export function InflationAdjustmentCard({
                   </div>
                 <div className="text-right">
                     <div className="font-mono text-base">
-                      {formatInflationAmount(baseCostDisplay)} ARS
+                      {formatBaseCostDisplay(baseCostDisplay)}
                     </div>
-                    {quotationCurrency === 'USD' && (
+                    {quotationCurrency === 'USD' && displayCurrency === 'ARS' && (
                       <div className="text-xs text-gray-500">
-                        (Equivale a US$ {baseCost.toFixed(2)})
+                        (Equivale a US$ {originalBaseCost.toFixed(2)})
                       </div>
                     )}
                   </div>
@@ -375,7 +367,7 @@ export function InflationAdjustmentCard({
                       <span className="text-xs text-orange-500">Calculado en ARS</span>
                     </div>
                     <span className="font-mono">
-                      +{formatInflationAmount(inflationAdjustmentDisplay)} ARS (+{inflationPercentage.toFixed(1)}%)
+                      +{formatInflationAmount(inflationAdjustmentDisplay)} (+{inflationPercentage.toFixed(1)}%)
                     </span>
                   </div>
 
@@ -384,14 +376,14 @@ export function InflationAdjustmentCard({
                       <div className="flex flex-col">
                         <span>Costo proyectado (con inflación)</span>
                         <span className="text-xs font-normal text-gray-500">
-                          En pesos argentinos (ARS)
+                          Cálculo en pesos argentinos
                         </span>
                       </div>
                       <div className="text-right">
                         <div className="text-primary font-mono">
-                          {formatInflationAmount(projectedCostDisplay)} ARS
+                          {formatInflationAmount(projectedCostDisplay)}
                         </div>
-                        {quotationCurrency === 'USD' && displayCurrency === 'ARS' && (
+                        {displayCurrency === 'ARS' && (
                           <div className="text-xs font-normal text-gray-500">
                             (≈ US$ {getUSDEquivalent(projectedCostDisplay).toFixed(2)})
                           </div>

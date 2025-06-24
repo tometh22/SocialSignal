@@ -258,8 +258,7 @@ export default function FinancialReviewFinal() {
         inflationMethod={quotationData.inflation.inflationMethod}
         manualInflationRate={quotationData.inflation.manualInflationRate}
         projectStartDate={quotationData.inflation.projectStartDate}
-        totalCost={totalAmount}
-        baseCost={baseCost + complexityAdjustment} // Costo base + ajustes de complejidad, SIN margen
+        totalCost={baseCost + complexityAdjustment + quotationData.financials.platformCost} // Costo SIN margen para inflación
         quotationCurrency={quotationData.inflation.quotationCurrency}
         projectType={quotationData.project.type}
         projectDuration={quotationData.project.duration}
