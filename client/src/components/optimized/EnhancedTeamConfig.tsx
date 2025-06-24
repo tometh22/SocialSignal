@@ -235,7 +235,7 @@ const EnhancedTeamConfig: React.FC = () => {
           className="flex items-center gap-2"
         >
           <UserPlus className="h-4 w-4" />
-          Agregar Miembro Completo
+          Configurar Miembro
         </Button>
       </div>
 
@@ -289,7 +289,7 @@ const EnhancedTeamConfig: React.FC = () => {
           >
             <Card className="border-blue-200 bg-blue-50/30">
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Añadir Miembro al Equipo</CardTitle>
+                <CardTitle className="text-lg">Configurar Nuevo Miembro</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -385,7 +385,7 @@ const EnhancedTeamConfig: React.FC = () => {
                   </Button>
                   <Button onClick={handleAddMember} disabled={newMember.roleId === 0}>
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Añadir
+                    Agregar al Equipo
                   </Button>
                 </div>
               </CardContent>

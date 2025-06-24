@@ -101,9 +101,11 @@ This is a comprehensive internal project management platform built for Epical Di
 - File upload restrictions and validation
 - Role-based access control for sensitive operations
 
-## Changelog
+## Recent Changes
 
-- June 23, 2025. Initial setup
+- June 24, 2025: Fixed critical Select component crashes when adding team members
+- June 24, 2025: Updated "Agregar Miembro Completo" button to more professional "Configurar Miembro"
+- June 23, 2025: Initial setup
 
 ## User Preferences
 
