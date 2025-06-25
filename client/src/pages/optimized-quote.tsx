@@ -11,7 +11,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
+import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 
@@ -107,7 +107,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         return;
       }
 
-      if (!quotationData.projectName?.trim()) {
+      if (!quotationData.project.name?.trim()) {
         toast({
           title: "Nombre de proyecto requerido",
           description: "Debe ingresar el nombre del proyecto antes de guardar.",
@@ -130,7 +130,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       
       toast({
         title: "Cotización guardada",
-        description: `La cotización "${quotationData.projectName}" se ha guardado correctamente.`,
+        description: `La cotización "${quotationData.project.name}" se ha guardado correctamente.`,
       });
       
       console.log('🎉 Cotización guardada exitosamente, redirigiendo...');
@@ -156,7 +156,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 4, title: "Complejidad" },
     ];
 
-    if (quotationData.projectType === 'fee-mensual') {
+    if (quotationData.project?.type === 'fee-mensual') {
       baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
     } else {
@@ -264,7 +264,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 3 && <EnhancedTeamConfig />}
             {currentStep === 4 && <ComplexityFactorsCard />}
 
-            {currentStep === 5 && quotationData.projectType === 'always-on' && (
+            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration 
                   isAlwaysOnProject={true}
@@ -277,8 +277,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
 
-            {((currentStep === 5 && quotationData.projectType !== 'always-on') || 
-              (currentStep === 6 && quotationData.projectType === 'always-on')) && (
+            {((currentStep === 5 && quotationData.project?.type !== 'always-on') || 
+              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
           </div>

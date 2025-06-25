@@ -141,7 +141,10 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   });
 
   // Log para debugging
-  console.log('Debug data:', {
+    clientId,
+    summaryLoading,
+    deliverablesLoading, 
+    projectsLoading,
     clientSummaryData,
     deliverablesData,
     projectsData,
@@ -159,11 +162,11 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
 
   // Preparar los datos para las gráficas
   const qualityScoresData = clientSummary ? [
-    { name: 'Narrativa', value: clientSummary.averageScores?.narrativeQuality || 0 },
-    { name: 'Gráficos', value: clientSummary.averageScores?.graphicsEffectiveness || 0 },
-    { name: 'Formato', value: clientSummary.averageScores?.formatDesign || 0 },
-    { name: 'Insights', value: clientSummary.averageScores?.relevantInsights || 0 },
-    { name: 'Operaciones', value: clientSummary.averageScores?.operationsFeedback || 0 },
+    { name: 'Narrativa', value: clientSummary.averageScores.narrativeQuality },
+    { name: 'Gráficos', value: clientSummary.averageScores.graphicsEffectiveness },
+    { name: 'Formato', value: clientSummary.averageScores.formatDesign },
+    { name: 'Insights', value: clientSummary.averageScores.relevantInsights },
+    { name: 'Operaciones', value: clientSummary.averageScores.operationsFeedback },
   ] : [];
 
   // Calcular métricas por proyecto
@@ -353,27 +356,26 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Entregables Totales</span>
-                        <span className="font-semibold">{clientSummary?.totalDeliverables || 0}</span>
+                        <span className="font-semibold">{clientSummary.totalDeliverables}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Entregas a Tiempo</span>
-                        <span className="font-semibold">{formatPercent(clientSummary?.onTimePercentage || 0)}</span>
+                        <span className="font-semibold">{formatPercent(clientSummary.onTimePercentage)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Puntuación General</span>
                         <span className="font-semibold">
                           {formatScore(
-                            clientSummary?.averageScores ? 
-                            Object.values(clientSummary.averageScores).reduce((a: number, b: number) => a + b, 0) / 
-                            Object.values(clientSummary.averageScores).length : 0
+                            Object.values(clientSummary.averageScores).reduce((a, b) => a + b, 0) / 
+                            Object.values(clientSummary.averageScores).length
                           )}
                         </span>
                       </div>
-                      {clientSummary?.averageHours && (
+                      {clientSummary.averageHours && (
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Cumplimiento de Horas</span>
                           <span className="font-semibold">
-                            {formatPercent((clientSummary?.averageHours?.compliance || 0) * 100)}
+                            {formatPercent(clientSummary.averageHours.compliance * 100)}
                           </span>
                         </div>
                       )}
@@ -387,7 +389,7 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
                           <YAxis domain={[0, 5]} />
-                          <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}`, 'Puntuación']} />
+                          <Tooltip formatter={(value) => [`${value.toFixed(2)}`, 'Puntuación']} />
                           <Bar dataKey="value" fill="#8884d8" />
                         </BarChart>
                       </ResponsiveContainer>

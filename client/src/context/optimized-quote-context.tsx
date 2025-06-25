@@ -1,550 +1,882 @@
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-
-// Types
-interface Client {
-  id: number;
-  name: string;
-  email?: string;
-  phone?: string;
-  industry?: string;
-  logo?: string;
-  logoUrl?: string | null;
-  contactName?: string | null;
-  contactEmail?: string | null;
-  contactPhone?: string | null;
-  createdBy?: number | null;
-}
-
-interface ReportTemplate {
-  id: number;
-  name: string;
-  description?: string;
-  basePrice: number;
-  durationWeeks: number;
-  recommendedRoles: number[];
-}
-
-interface Role {
-  id: number;
-  name: string;
-  hourlyRate: number;
-  description?: string;
-}
-
-interface Personnel {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  roleId: number;
-  hourlyRate: number;
-  isActive: boolean;
-  name?: string;
-}
-
-interface TeamMember {
-  id: string | number;
-  roleId: number;
-  personnelId?: number;
-  hoursPerWeek: number;
-  weeksCovered: number;
-  totalCost: number;
-  hours?: number;
-  rate?: number;
-  cost?: number;
-}
-
-interface QuoteDeliverable {
+export interface OptimizedTeamMember {
   id: string;
-  name: string;
-  description: string;
+  roleId: number;
+  personnelId: number | null;
+  hours: number;
+  rate: number;
   cost: number;
-  isIncluded: boolean;
 }
 
-interface ProjectDuration {
-  weeks: number;
-  isAlwaysOn: boolean;
-  monthsForAlwaysOn?: number;
-  value?: string;
+export interface ProjectData {
+  name: string;
+  type: string;
+  duration: string;
 }
 
-interface QuotationData {
+export interface ComplexityFactors {
+  analysisTypeFactor: number;
+  mentionsVolumeFactor: number;
+  countriesFactor: number;
+  clientEngagementFactor: number;
+}
+
+export interface QuotationData {
   client: Client | null;
-  projectName: string;
-  projectType: string;
-  projectDuration: ProjectDuration;
-  template: ReportTemplate | null;
-  complexity: 'low' | 'medium' | 'high';
-  customization: string;
+  project: ProjectData;
   analysisType: string;
   mentionsVolume: string;
   countriesCovered: string;
   clientEngagement: string;
-  teamOption: 'auto' | 'manual';
-  teamMembers: TeamMember[];
-  deliverables: QuoteDeliverable[];
+  template: ReportTemplate | null;
+  complexity: 'basic' | 'medium' | 'high';
+  teamMembers: OptimizedTeamMember[];
+  deliverables: any[];
   additionalDeliverableCost: number;
-  markupPercentage: number;
-  discountPercentage: number;
-  notes: string;
-  financials?: {
-    baseCost: number;
-    complexityAdjustment: number;
-    markupAmount: number;
-    discountAmount: number;
-    totalAmount: number;
+  financials: {
+    platformCost: number;
+    deviationPercentage: number;
+    discount: number;
+    marginFactor: number;
+  };
+  inflation: {
+    applyInflationAdjustment: boolean;
+    inflationMethod: string;
+    manualInflationRate: number;
+    projectStartDate: string;
+    quotationCurrency: string;
   };
 }
 
 interface OptimizedQuoteContextType {
+  // Data
   quotationData: QuotationData;
   baseCost: number;
   complexityAdjustment: number;
   markupAmount: number;
   totalAmount: number;
+  complexityFactors: ComplexityFactors;
+  availableRoles: Role[];
+  availablePersonnel: Personnel[];
   recommendedRoleIds: number[];
-  isSavingInProgress: boolean;
-  isEditing: boolean;
-  isRecotizacion: boolean;
-  quotationId: number | null;
-  complexityFactors: any;
+
+  // Navigation
+  currentStep: number;
+  nextStep: () => void;
+  previousStep: () => void;
+  goToStep: (step: number) => void;
+
+  // Update functions
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
-  updateProjectDuration: (duration: string | ProjectDuration) => void;
-  updateTemplate: (template: ReportTemplate | null) => void;
-  updateComplexity: (complexity: 'low' | 'medium' | 'high') => void;
-  updateCustomization: (customization: string) => void;
+  updateProjectDuration: (duration: string) => void;
   updateAnalysisType: (type: string) => void;
   updateMentionsVolume: (volume: string) => void;
   updateCountriesCovered: (countries: string) => void;
   updateClientEngagement: (engagement: string) => void;
-  setTeamOption: (option: 'auto' | 'manual') => void;
-  addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
-  updateTeamMember: (id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => void;
-  updateTeamMembers: (members: TeamMember[]) => void;
-  removeTeamMember: (id: string | number) => void;
-  applyRecommendedTeam: () => void;
-  setIsAlwaysOnProject: (isAlwaysOn: boolean) => void;
-  updateDeliverables: (deliverables: QuoteDeliverable[]) => void;
-  addDeliverable: (deliverable: QuoteDeliverable) => void;
-  updateDeliverable: (id: string, updates: Partial<Omit<QuoteDeliverable, 'id'>>) => void;
-  removeDeliverable: (id: string) => void;
-  updateAdditionalDeliverableCost: (cost: number) => void;
-  updateFinancials: (markup: number, discount: number) => void;
-  saveQuotation: () => Promise<void>;
-  loadQuotation: (id: number) => Promise<void>;
-  currentStep: number;
-  goToStep: (step: number) => void;
-  nextStep: () => void;
-  previousStep: () => void;
-  availableRoles: Role[] | null;
-  availablePersonnel: Personnel[] | null;
-  loadRoles: () => Promise<void>;
-  loadPersonnel: () => Promise<void>;
-  refreshData: () => void;
-  isRefreshing: boolean;
-}
+  updateTemplate: (template: ReportTemplate | null) => void;
+  updateComplexity: (complexity: 'basic' | 'medium' | 'high') => void;
+  updateTeamMembers: (members: OptimizedTeamMember[]) => void;
+  addTeamMember: (member: Omit<OptimizedTeamMember, "id">) => void;
+  updateTeamMember: (id: string, updates: Partial<OptimizedTeamMember>) => void;
+  removeTeamMember: (id: string) => void;
+  updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
+  updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
 
-const initialQuotationData: QuotationData = {
-  client: null,
-  projectName: '',
-  projectType: '',
-  projectDuration: { weeks: 4, isAlwaysOn: false },
-  template: null,
-  complexity: 'medium',
-  customization: '',
-  analysisType: '',
-  mentionsVolume: '',
-  countriesCovered: '',
-  clientEngagement: '',
-  teamOption: 'auto',
-  teamMembers: [],
-  deliverables: [],
-  additionalDeliverableCost: 0,
-  markupPercentage: 30,
-  discountPercentage: 0,
-  notes: ''
-};
+  // Actions
+  loadQuotation: (quotationId: number) => Promise<void>;
+  saveQuotation: () => Promise<void>;
+  calculateTotalCost: () => void;
+  resetQuotation: () => void;
+  loadRoles: () => void;
+  loadPersonnel: () => void;
+  forceRecalculate: () => void;
+
+  // Deliverables
+  updateDeliverables: (deliverables: any[]) => void;
+  addDeliverable: (deliverable: any) => void;
+  updateDeliverable: (index: number, deliverable: any) => void;
+  removeDeliverable: (index: number) => void;
+  updateAdditionalDeliverableCost: (cost: number) => void;
+}
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
 
-export interface OptimizedQuoteProviderProps {
-  children: ReactNode;
+const initialQuotationData: QuotationData = {
+  client: null,
+  project: {
+    name: "",
+    type: "",
+    duration: ""
+  },
+  analysisType: "standard",
+  mentionsVolume: "medium",
+  countriesCovered: "1",
+  clientEngagement: "medium",
+  template: null,
+  complexity: 'basic',
+  teamMembers: [],
+  deliverables: [],
+  additionalDeliverableCost: 0,
+  financials: {
+    platformCost: 0,
+    deviationPercentage: 0,
+    discount: 0,
+    marginFactor: 2.0
+  },
+  inflation: {
+    applyInflationAdjustment: false,
+    inflationMethod: "manual",
+    manualInflationRate: 25,
+    projectStartDate: "",
+    quotationCurrency: "USD"
+  }
+};
+
+// Helper functions for complexity calculation
+const getAnalysisTypeFactor = (type: string): number => {
+  console.log('📊 Analysis Type Factor for:', type);
+  const factors: Record<string, number> = {
+    'basic': -0.10,   // Básico: -10% (más simple que estándar)
+    'standard': 0.0,  // Estándar: +0% (base de referencia)
+    'advanced': 0.15, // Avanzado: +15%
+    'premium': 0.25,  // Premium: +25%
+    'Básico': -0.10,
+    'Estándar': 0.0,
+    'Avanzado': 0.15,
+    'Premium': 0.25
+  };
+  const factor = factors[type] || 0.0;
+  console.log(`📊 Analysis Type "${type}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getMentionsVolumeFactor = (volume: string): number => {
+  console.log('📊 Mentions Volume Factor for:', volume);
+  const factors: Record<string, number> = {
+    'low': -0.05,     // Bajo: -5% (menos trabajo de análisis)
+    'medium': 0.0,    // Medio: +0% (base estándar 1K-10K)
+    'high': 0.15,     // Alto: +15% (más trabajo significativo)
+    'very-high': 0.30, // Muy Alto: +30% (complejidad exponencial)
+    'Bajo': -0.05,
+    'Medio': 0.0,
+    'Alto': 0.15,
+    'Muy Alto': 0.30
+  };
+  const factor = factors[volume] || 0.0;
+  console.log(`📊 Mentions Volume "${volume}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getCountriesFactor = (countries: string): number => {
+  console.log('📊 Countries Factor for:', countries);
+  const factors: Record<string, number> = {
+    '1': 0.0,         // 1 país: +0% (base estándar)
+    '2-3': 0.08,      // 2-3 países: +8% (coordinación adicional)
+    '4-6': 0.18,      // 4-6 países: +18% (complejidad multicultural)
+    '7+': 0.30,       // 7+ países: +30% (gestión muy compleja)
+    '2-3 países': 0.08,
+    '4+ países': 0.18,
+    '4-6 países': 0.18,
+    '7+ países': 0.30
+  };
+  const factor = factors[countries] || 0.0;
+  console.log(`📊 Countries "${countries}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getClientEngagementFactor = (engagement: string): number => {
+  console.log('📊 Client Engagement Factor for:', engagement);
+  const factors: Record<string, number> = {
+    'low': -0.05,     // Bajo: -5% (cliente autónomo, menos reuniones)
+    'medium': 0.0,    // Medio: +0% (engagement estándar)
+    'high': 0.12,     // Alto: +12% (más reuniones y seguimiento)
+    'very-high': 0.20, // Muy Alto: +20% (cliente muy demandante)
+    'Bajo': -0.05,
+    'Medio': 0.0,
+    'Alto': 0.12,
+    'Muy Alto': 0.20
+  };
+  const factor = factors[engagement] || 0.0;
+  console.log(`📊 Client Engagement "${engagement}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+const getTemplateFactor = (complexity: string): number => {
+  console.log('📊 Template Factor for:', complexity);
+  const factors: Record<string, number> = {
+    'basic': 0.0,
+    'medium': 0.1,
+    'high': 0.15,
+    'low': 0.0
+  };
+  const factor = factors[complexity] || 0.0;
+  console.log(`📊 Template "${complexity}" -> ${factor} (${factor * 100}%)`);
+  return factor;
+};
+
+interface OptimizedQuoteProviderProps {
+  children: React.ReactNode;
   quotationId?: number;
   isRequote?: boolean;
 }
 
-export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
-  children, 
-  quotationId, 
-  isRequote = false 
-}) => {
+export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ children, quotationId, isRequote }) => {
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   const [baseCost, setBaseCost] = useState(0);
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
   const [markupAmount, setMarkupAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
-  const [recommendedRoleIds, setRecommendedRoleIds] = useState<number[]>([]);
-  const [isSavingInProgress, setIsSavingInProgress] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [availableRoles, setAvailableRoles] = useState<Role[] | null>(null);
-  const [availablePersonnel, setAvailablePersonnel] = useState<Personnel[] | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [complexityFactors, setComplexityFactors] = useState({});
-  
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const [recalculationTrigger, setRecalculationTrigger] = useState(0);
 
-  // Calcular factores de complejidad cuando cambien los valores
+  const queryClient = useQueryClient();
+
+  // Get data from queries
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ["/api/roles"],
+  });
+
+  const { data: personnel = [] } = useQuery<Personnel[]>({
+    queryKey: ["/api/personnel"],
+  });
+
+  // Force recalculation function with debouncing
+  const forceRecalculate = useCallback(() => {
+    console.log('🔄 Force recalculation triggered');
+
+    // Debounce rapid consecutive calls
+    const now = Date.now();
+    const lastRecalc = localStorage.getItem('last-recalc-time');
+
+    if (lastRecalc && (now - parseInt(lastRecalc)) < 100) {
+      console.log('🔄 Recalculation debounced');
+      return;
+    }
+
+    localStorage.setItem('last-recalc-time', now.toString());
+    setRecalculationTrigger(prev => prev + 1);
+  }, []);
+
+  // Auto-save draft to localStorage with error handling
   useEffect(() => {
-    const calculateComplexityFactors = async () => {
-      const { 
-        getAnalysisTypeFactor, 
-        getMentionsVolumeFactor, 
-        getCountriesFactor, 
-        getClientEngagementFactor,
-        loadCostMultipliers 
-      } = await import('@/lib/calculation');
-      
-      // Cargar multiplicadores primero
-      await loadCostMultipliers();
-      
-      const factors = {
-        analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
-        mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
-        countriesFactor: getCountriesFactor(quotationData.countriesCovered),
-        clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
-        templateFactor: 0 // Por ahora 0, puede ajustarse según template
-      };
-      
-      setComplexityFactors(factors);
+    const saveInterval = setInterval(() => {
+      if (quotationData.project.name || quotationData.teamMembers.length > 0) {
+        try {
+          const draftData = {
+            quotationData,
+            timestamp: Date.now(),
+            version: '1.0'
+          };
+
+          localStorage.setItem('draft-quotation', JSON.stringify(draftData));
+          localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
+          console.log('📝 Draft auto-saved at', new Date().toLocaleTimeString());
+        } catch (error) {
+          console.error('❌ Error saving draft:', error);
+          // Try to clear some space
+          try {
+            localStorage.removeItem('draft-quotation-backup');
+            localStorage.setItem('draft-quotation', JSON.stringify({
+              quotationData,
+              timestamp: Date.now()
+            }));
+            console.log('📝 Draft saved after cleanup');
+          } catch (secondError) {
+            console.error('❌ Critical: Cannot save draft data');
+          }
+        }
+      }
+    }, 15000); // Save every 15 seconds (more frequent)
+
+    return () => clearInterval(saveInterval);
+  }, [quotationData]);
+
+  // Load draft on mount
+  useEffect(() => {
+    const draft = localStorage.getItem('draft-quotation');
+    if (draft) {
+      try {
+        const { quotationData: savedData, timestamp } = JSON.parse(draft);
+        const isRecent = Date.now() - timestamp < 24 * 60 * 60 * 1000; // 24 hours
+
+        if (isRecent && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
+          setQuotationData(savedData);
+          console.log('📋 Draft restored from auto-save');
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    }
+  }, []);
+
+  // Calculate recommended roles based on template
+  const recommendedRoleIds = useMemo(() => {
+    if (!quotationData.template) return [];
+
+    // Basic role recommendations based on template complexity
+    const baseRoles = [1, 2]; // Analyst and Project Manager
+
+    if (quotationData.template.complexity === 'medium') {
+      baseRoles.push(3); // Senior Analyst
+    } else if (quotationData.template.complexity === 'high') {
+      baseRoles.push(3, 4); // Senior Analyst and Director
+    }
+
+    return baseRoles;
+  }, [quotationData.template]);
+
+  // Calculate complexity factors with proper logging
+  const complexityFactors = useMemo((): ComplexityFactors => {
+    console.log('🔧 === COMPLEXITY FACTORS CALCULATION ===');
+    console.log('🔍 Input data:', {
+      analysisType: quotationData.analysisType,
+      mentionsVolume: quotationData.mentionsVolume,
+      countriesCovered: quotationData.countriesCovered,
+      clientEngagement: quotationData.clientEngagement,
+      template: quotationData.template?.name || 'None',
+      complexity: quotationData.complexity
+    });
+
+    const factors = {
+      analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
+      mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
+      countriesFactor: getCountriesFactor(quotationData.countriesCovered),
+      clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement)
+      // Removed templateFactor - it doesn't make logical sense
     };
 
-    // Solo calcular si hay datos suficientes
-    if (quotationData.analysisType || quotationData.mentionsVolume || 
-        quotationData.countriesCovered || quotationData.clientEngagement) {
-      calculateComplexityFactors();
-    }
+    console.log('📊 Calculated complexity factors:', factors);
+
+    const totalFactor = Object.values(factors).reduce((sum, factor) => sum + (factor || 0), 0);
+    console.log(`🎯 Total complexity factor: ${totalFactor} (${(totalFactor * 100).toFixed(1)}%)`);
+
+    return factors;
   }, [
-    quotationData.analysisType,
+    quotationData.analysisType, 
     quotationData.mentionsVolume, 
-    quotationData.countriesCovered,
-    quotationData.clientEngagement
+    quotationData.countriesCovered, 
+    quotationData.clientEngagement, 
+    quotationData.template, 
+    quotationData.complexity,
+    recalculationTrigger
   ]);
 
-  const refreshData = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [queryClient]);
+  // Calculate costs properly with debugging
+  useEffect(() => {
+    console.log('💰 === COST CALCULATION START ===');
+    console.log('📊 Input data:', {
+      teamMembers: quotationData.teamMembers.length,
+      template: quotationData.template?.name,
+      financials: quotationData.financials
+    });
 
-  // Basic update functions
+    // Don't calculate if no team members
+    if (!quotationData.teamMembers.length) {
+      console.log('⚠️ No team members, setting costs to 0');
+      setBaseCost(0);
+      setComplexityAdjustment(0);
+      setMarkupAmount(0);
+      setTotalAmount(0);
+      return;
+    }
+
+    // Step 1: Calculate base team cost
+    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
+      const memberCost = (member.hours || 0) * (member.rate || 0);
+      console.log(`👤 Member cost: ${member.hours}h × $${member.rate} = $${memberCost}`);
+      return total + memberCost;
+    }, 0);
+
+    console.log(`👥 Total team base cost: $${teamBaseCost}`);
+
+    // Step 2: Calculate complexity adjustments
+    let totalComplexityAdjustment = 0;
+    quotationData.teamMembers.forEach(member => {
+      const baseHours = member.hours || 0;
+      const hourlyRate = member.rate || 0;
+      const baseCost = baseHours * hourlyRate;
+      let memberComplexityFactor = 0;
+
+      // Get role information
+      const role = roles.find(r => r.id === member.roleId);
+      const roleName = role?.name?.toLowerCase() || '';
+
+      // Apply complexity factors based on role types
+      if (roleName.includes('analista') || roleName.includes('data specialist') || roleName.includes('tech lead')) {
+        memberComplexityFactor += complexityFactors.countriesFactor;
+        memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
+        memberComplexityFactor += complexityFactors.analysisTypeFactor;
+      }
+      else if (roleName.includes('manager') || roleName.includes('director') || 
+               roleName.includes('ceo') || roleName.includes('coo') || 
+               roleName.includes('operations lead') || roleName.includes('account')) {
+        memberComplexityFactor += complexityFactors.clientEngagementFactor;
+        memberComplexityFactor += complexityFactors.analysisTypeFactor * 0.5;
+      }
+      else {
+        memberComplexityFactor = complexityFactors.analysisTypeFactor * 0.3;
+      }
+
+      const adjustedHours = baseHours * (1 + memberComplexityFactor);
+      const adjustedMemberCost = adjustedHours * hourlyRate;
+      const memberAdjustment = adjustedMemberCost - baseCost;
+
+      totalComplexityAdjustment += memberAdjustment;
+      console.log(`🔧 ${roleName}: factor ${memberComplexityFactor.toFixed(3)} → adjustment $${memberAdjustment.toFixed(2)}`);
+    });
+
+    // Step 3: Add template cost
+    const templateCost = quotationData.template?.baseCost || 0;
+    console.log(`📋 Template cost: $${templateCost}`);
+
+    // Step 4: Calculate final costs
+    const newBaseCost = teamBaseCost + templateCost;
+    const adjustedBaseCost = newBaseCost + totalComplexityAdjustment;
+
+    console.log(`💵 Base cost: $${newBaseCost}`);
+    console.log(`⚡ Complexity adjustment: $${totalComplexityAdjustment}`);
+    console.log(`📈 Adjusted base cost: $${adjustedBaseCost}`);
+
+    // Step 5: Apply business factors
+    const platformCost = quotationData.financials.platformCost || 0;
+    const marginMultiplier = quotationData.financials.marginFactor || 2.0;
+    const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
+    const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
+    const finalTotal = subtotal - discount;
+
+    console.log(`🏢 Platform cost: $${platformCost}`);
+    console.log(`📊 Margin factor: ${marginMultiplier}x`);
+    console.log(`💰 Subtotal: $${subtotal}`);
+    console.log(`💸 Discount: $${discount}`);
+    console.log(`🎯 Final total: $${finalTotal}`);
+
+    // Update states
+    setBaseCost(newBaseCost);
+    setComplexityAdjustment(totalComplexityAdjustment);
+    setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
+    setTotalAmount(finalTotal);
+
+    console.log('💰 === COST CALCULATION END ===');
+
+  }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger]);
+
+  // Navigation functions
+  const nextStep = useCallback(() => {
+    const maxStep = quotationData.project.type === 'always-on' ? 6 : 5;
+    if (currentStep < maxStep) {
+      setCurrentStep(currentStep + 1);
+    }
+  }, [currentStep, quotationData.project.type]);
+
+  const previousStep = useCallback(() => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
+
+  const goToStep = useCallback((step: number) => {
+    const maxStep = quotationData.project.type === 'always-on' ? 6 : 5;
+    if (step >= 1 && step <= maxStep) {
+      setCurrentStep(step);
+    }
+  }, [quotationData.project.type]);
+
+  // Context methods with proper recalculation triggers
   const updateClient = useCallback((client: Client | null) => {
     setQuotationData(prev => ({ ...prev, client }));
   }, []);
 
-  const updateProjectName = useCallback((projectName: string) => {
-    setQuotationData(prev => ({ ...prev, projectName }));
+  const updateProjectName = useCallback((name: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, name }
+    }));
   }, []);
 
-  const updateProjectType = useCallback((projectType: string) => {
-    setQuotationData(prev => ({ ...prev, projectType }));
+  const updateProjectType = useCallback((type: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, type }
+    }));
   }, []);
 
-  const updateProjectDuration = useCallback((value: string | ProjectDuration) => {
-    if (typeof value === 'string') {
-      // Mapear los valores del select a semanas
-      const durationMap: Record<string, number> = {
-        '3-weeks': 3,
-        '1-month': 4,
-        '2-months': 8,
-        '3-months': 12,
-        '4-months': 16,
-        '6-months': 24,
-        '12-months': 48,
-        'custom': 4
-      };
-      
-      const weeks = durationMap[value] || 4;
-      setQuotationData(prev => ({ 
-        ...prev, 
-        projectDuration: { 
-          ...prev.projectDuration, 
-          weeks,
-          value
-        } 
-      }));
-    } else {
-      setQuotationData(prev => ({ ...prev, projectDuration: value }));
-    }
-  }, []);
-
-  const updateTemplate = useCallback((template: ReportTemplate | null) => {
-    setQuotationData(prev => ({ ...prev, template }));
-    if (template) {
-      setRecommendedRoleIds(template.recommendedRoles || []);
-    }
-  }, []);
-
-  const updateComplexity = useCallback((complexity: 'low' | 'medium' | 'high') => {
-    setQuotationData(prev => ({ ...prev, complexity }));
-  }, []);
-
-  const updateCustomization = useCallback((customization: string) => {
-    setQuotationData(prev => ({ ...prev, customization }));
+  const updateProjectDuration = useCallback((duration: string) => {
+    setQuotationData(prev => ({ 
+      ...prev, 
+      project: { ...prev.project, duration: duration }
+    }));
   }, []);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
+    console.log('📝 Updating analysis type:', analysisType);
     setQuotationData(prev => ({ ...prev, analysisType }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateMentionsVolume = useCallback((mentionsVolume: string) => {
+    console.log('📝 Updating mentions volume:', mentionsVolume);
     setQuotationData(prev => ({ ...prev, mentionsVolume }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateCountriesCovered = useCallback((countriesCovered: string) => {
+    console.log('📝 Updating countries covered:', countriesCovered);
     setQuotationData(prev => ({ ...prev, countriesCovered }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateClientEngagement = useCallback((clientEngagement: string) => {
+    console.log('📝 Updating client engagement:', clientEngagement);
     setQuotationData(prev => ({ ...prev, clientEngagement }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
-  // Team management functions
-  const setTeamOption = useCallback((teamOption: 'auto' | 'manual') => {
-    setQuotationData(prev => ({ ...prev, teamOption }));
-  }, []);
+  const updateTemplate = useCallback((template: ReportTemplate | null) => {
+    console.log('📝 Updating template:', template);
+    setQuotationData(prev => ({
+      ...prev,
+      template,
+      complexity: template ? template.complexity as 'basic' | 'medium' | 'high' : 'basic',
+      financials: {
+        ...prev.financials,
+        platformCost: template?.platformCost || 0,
+        deviationPercentage: template?.deviationPercentage || 0
+      }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
 
-  const addTeamMember = useCallback((member: Omit<TeamMember, 'id'>) => {
-    const newMember: TeamMember = {
+  const updateComplexity = useCallback((complexity: 'basic' | 'medium' | 'high') => {
+    console.log('📝 Updating complexity:', complexity);
+    setQuotationData(prev => ({ ...prev, complexity }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const updateTeamMembers = useCallback((teamMembers: OptimizedTeamMember[]) => {
+    console.log('👥 Updating team members:', teamMembers);
+    setQuotationData(prev => ({ ...prev, teamMembers }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const addTeamMember = useCallback((member: Omit<OptimizedTeamMember, "id">) => {
+    // Get default values from role if available
+    const role = roles.find(r => r.id === member.roleId);
+    const defaultHours = member.hours || 40;
+    const defaultRate = member.rate || role?.defaultRate || 50;
+
+    const newMember: OptimizedTeamMember = {
       ...member,
-      id: Date.now().toString()
+      id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      roleId: member.roleId,
+      personnelId: member.personnelId || null, // Ensure null instead of undefined
+      hours: defaultHours,
+      rate: defaultRate,
+      cost: defaultHours * defaultRate
     };
+
+    console.log('➕ Adding new team member:', newMember);
+
     setQuotationData(prev => ({
       ...prev,
       teamMembers: [...prev.teamMembers, newMember]
     }));
-  }, []);
 
-  const updateTeamMember = useCallback((id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => {
+    forceRecalculate();
+  }, [roles, forceRecalculate]);
+
+  const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
+    console.log('📝 Updating team member:', id, updates);
+
     setQuotationData(prev => ({
       ...prev,
-      teamMembers: prev.teamMembers.map(member =>
-        member.id === id ? { ...member, ...updates } : member
-      )
+      teamMembers: prev.teamMembers.map(member => {
+        if (member.id === id) {
+          const updatedMember = { ...member, ...updates };
+          // Recalculate cost when hours or rate change
+          if ('hours' in updates || 'rate' in updates) {
+            updatedMember.cost = (updatedMember.hours || 0) * (updatedMember.rate || 0);
+          }
+          console.log('✅ Updated team member:', updatedMember);
+          return updatedMember;
+        }
+        return member;
+      })
     }));
-  }, []);
 
-  const removeTeamMember = useCallback((id: string | number) => {
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const removeTeamMember = useCallback((id: string) => {
+    console.log('🗑️ Removing team member:', id);
     setQuotationData(prev => ({
       ...prev,
       teamMembers: prev.teamMembers.filter(member => member.id !== id)
     }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
-  const applyRecommendedTeam = useCallback(() => {
-    // Implementation for applying recommended team
-  }, []);
-
-  const setIsAlwaysOnProject = useCallback((isAlwaysOn: boolean) => {
+  const updateFinancials = useCallback((financials: Partial<QuotationData['financials']>) => {
+    console.log('💰 Updating financials:', financials);
     setQuotationData(prev => ({
       ...prev,
-      projectDuration: { ...prev.projectDuration, isAlwaysOn }
+      financials: { ...prev.financials, ...financials }
     }));
-  }, []);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
-  // Deliverable functions
-  const updateDeliverables = useCallback((deliverables: QuoteDeliverable[]) => {
-    setQuotationData(prev => ({ ...prev, deliverables }));
-  }, []);
-
-  const addDeliverable = useCallback((deliverable: QuoteDeliverable) => {
-    setQuotationData(prev => ({
-      ...prev,
-      deliverables: [...prev.deliverables, deliverable]
-    }));
-  }, []);
-
-  const updateDeliverable = useCallback((id: string, updates: Partial<Omit<QuoteDeliverable, 'id'>>) => {
-    setQuotationData(prev => ({
-      ...prev,
-      deliverables: prev.deliverables.map(deliverable =>
-        deliverable.id === id ? { ...deliverable, ...updates } : deliverable
-      )
-    }));
-  }, []);
-
-  const removeDeliverable = useCallback((id: string) => {
-    setQuotationData(prev => ({
-      ...prev,
-      deliverables: prev.deliverables.filter(deliverable => deliverable.id !== id)
-    }));
-  }, []);
-
-  const updateAdditionalDeliverableCost = useCallback((additionalDeliverableCost: number) => {
-    setQuotationData(prev => ({ ...prev, additionalDeliverableCost }));
-  }, []);
-
-  const updateFinancials = useCallback((markupPercentage: number, discountPercentage: number) => {
-    setQuotationData(prev => ({ ...prev, markupPercentage, discountPercentage }));
-  }, []);
-
-  // Navigation functions
-  const goToStep = useCallback((step: number) => {
-    setCurrentStep(step);
-  }, []);
-
-  const nextStep = useCallback(() => {
-    setCurrentStep(prev => prev + 1);
-  }, []);
-
-  const previousStep = useCallback(() => {
-    setCurrentStep(prev => Math.max(1, prev - 1));
-  }, []);
-
-  // Data loading functions
-  const loadRoles = useCallback(async () => {
+  const loadQuotation = useCallback(async (quotationId: number) => {
     try {
-      const response = await fetch('/api/roles');
-      if (response.ok) {
-        const roles = await response.json();
-        setAvailableRoles(roles);
-      }
-    } catch (error) {
-      console.error("Error loading roles:", error);
-    }
-  }, []);
+      const quotation: any = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
+      const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
 
-  const loadPersonnel = useCallback(async () => {
-    try {
-      const response = await fetch('/api/personnel');
-      if (response.ok) {
-        const personnel = await response.json();
-        setAvailablePersonnel(personnel);
-      }
-    } catch (error) {
-      console.error("Error loading personnel:", error);
-    }
-  }, []);
+      const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any) => ({
+        id: `member-${member.id}`,
+        roleId: member.roleId,
+        personnelId: member.personnelId,
+        hours: member.hours,
+        rate: member.rate,
+        cost: member.hours * member.rate
+      }));
 
-  const saveQuotation = useCallback(async () => {
-    setIsSavingInProgress(true);
-    try {
-      const response = await fetch('/api/quotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quotationData)
+      // Get client data separately
+      const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
+
+      setQuotationData({
+        client: clientData,
+        project: {
+          name: quotation.projectName || "",
+          type: quotation.projectType || "",
+          duration: quotation.projectDuration || ""
+        },
+        analysisType: quotation.analysisType || "standard",
+        mentionsVolume: quotation.mentionsVolume || "medium",
+        countriesCovered: quotation.countriesCovered || "1",
+        clientEngagement: quotation.clientEngagement || "medium",
+        template: null, // Will be loaded separately if needed
+        complexity: 'basic',
+        teamMembers: optimizedTeamMembers,
+        deliverables: [],
+        additionalDeliverableCost: 0,
+        financials: {
+          platformCost: quotation.platformCost || 0,
+          deviationPercentage: quotation.deviationPercentage || 0,
+          discount: 0,
+          marginFactor: 2.0
+        },
+        inflation: {
+          applyInflationAdjustment: quotation.applyInflationAdjustment || false,
+          inflationMethod: quotation.inflationMethod || "automatic",
+          manualInflationRate: quotation.manualInflationRate || 0,
+          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
+          quotationCurrency: quotation.quotationCurrency || "ARS"
+        }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save quotation');
-      }
-      
-      toast({
-        title: "Cotización guardada",
-        description: "La cotización se ha guardado correctamente."
-      });
-    } catch (error) {
-      console.error("Error saving quotation:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la cotización.",
-        variant: "destructive"
-      });
-      throw error;
-    } finally {
-      setIsSavingInProgress(false);
-    }
-  }, [quotationData, toast]);
 
-  const loadQuotation = useCallback(async (id: number) => {
-    try {
-      const response = await fetch(`/api/quotations/${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setQuotationData(data);
-      }
+      forceRecalculate();
     } catch (error) {
       console.error("Error loading quotation:", error);
     }
+  }, [forceRecalculate]);
+
+  const saveQuotation = useCallback(async () => {
+    try {
+      // Validar datos requeridos
+      if (!quotationData.client?.id) {
+        throw new Error("Debe seleccionar un cliente");
+      }
+      
+      if (!quotationData.project.name?.trim()) {
+        throw new Error("Debe ingresar el nombre del proyecto");
+      }
+
+      if (quotationData.teamMembers.length === 0) {
+        throw new Error("Debe agregar al menos un miembro al equipo");
+      }
+
+      const quotationPayload = {
+        clientId: quotationData.client.id,
+        projectName: quotationData.project.name,
+        projectType: quotationData.project.type || 'on-demand',
+        projectDuration: quotationData.project.duration || '',
+        analysisType: quotationData.analysisType || 'standard',
+        mentionsVolume: quotationData.mentionsVolume || 'medium',
+        countriesCovered: quotationData.countriesCovered || '1',
+        clientEngagement: quotationData.clientEngagement || 'medium',
+        templateId: quotationData.template?.id || null,
+        baseCost: baseCost || 0,
+        complexityAdjustment: complexityAdjustment || 0,
+        markupAmount: markupAmount || 0,
+        totalAmount: totalAmount || 0,
+        platformCost: quotationData.financials.platformCost || 0,
+        deviationPercentage: quotationData.financials.deviationPercentage || 0,
+        discountPercentage: quotationData.financials.discount || 0,
+        marginFactor: quotationData.financials.marginFactor || 2.0,
+        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
+        inflationMethod: quotationData.inflation.inflationMethod || 'manual',
+        manualInflationRate: quotationData.inflation.manualInflationRate || 0,
+        projectStartDate: quotationData.inflation.projectStartDate || null,
+        quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
+        status: 'draft'
+      };
+
+      console.log('📤 Saving quotation with payload:', quotationPayload);
+
+      const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
+      console.log('✅ Quotation saved:', savedQuotation);
+
+      // Save team members with proper validation
+      console.log('👥 Saving team members:', quotationData.teamMembers);
+      
+      for (const member of quotationData.teamMembers) {
+        const teamMemberPayload = {
+          quotationId: savedQuotation.id,
+          roleId: member.roleId,
+          personnelId: member.personnelId || null, // Allow null for role-only assignments
+          hours: member.hours || 0,
+          rate: member.rate || 0
+        };
+
+        console.log('👤 Saving team member:', teamMemberPayload);
+        
+        try {
+          await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
+        } catch (memberError) {
+          console.error('Error saving team member:', memberError);
+          // Continue saving other members even if one fails
+        }
+      }
+
+      console.log('🎉 Quotation and team saved successfully');
+      return savedQuotation;
+    } catch (error) {
+      console.error("❌ Error saving quotation:", error);
+      throw error;
+    }
+  }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);
+
+  const calculateTotalCost = useCallback(() => {
+    console.log('🔄 Manual recalculation triggered');
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const resetQuotation = useCallback(() => {
+    setQuotationData(initialQuotationData);
+    setBaseCost(0);
+    setComplexityAdjustment(0);
+    setMarkupAmount(0);
+    setTotalAmount(0);
+    setCurrentStep(1);
   }, []);
 
-  // Funciones de cálculo financiero
-  const updateTeamMembers = useCallback((members: TeamMember[]) => {
-    setQuotationData(prev => ({ ...prev, teamMembers: members }));
+  const updateDeliverables = useCallback((deliverables: any[]) => {
+    setQuotationData(prev => ({ ...prev, deliverables }));
   }, []);
 
-  const contextValue: OptimizedQuoteContextType = {
+  const addDeliverable = useCallback((deliverable: any) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: [...(prev.deliverables || []), deliverable]
+    }));
+  }, []);
+
+  const updateDeliverable = useCallback((index: number, deliverable: any) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables?.map((item, i) => 
+        i === index ? deliverable : item
+      ) || []
+    }));
+  }, []);
+
+  const removeDeliverable = useCallback((index: number) => {
+    setQuotationData(prev => ({
+      ...prev,
+      deliverables: prev.deliverables?.filter((_, i) => i !== index) || []
+    }));
+  }, []);
+
+  const updateAdditionalDeliverableCost = useCallback((cost: number) => {
+    setQuotationData(prev => ({ ...prev, additionalDeliverableCost: cost }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const updateInflation = useCallback((inflation: Partial<QuotationData['inflation']>) => {
+    setQuotationData(prev => ({
+      ...prev,
+      inflation: { ...prev.inflation, ...inflation }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const loadRoles = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+  }, [queryClient]);
+
+  const loadPersonnel = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+  }, [queryClient]);
+
+  const value = {
     quotationData,
     baseCost,
     complexityAdjustment,
     markupAmount,
     totalAmount,
-    recommendedRoleIds,
-    isSavingInProgress,
-    isEditing: !!quotationId && !isRequote,
-    isRecotizacion: !!isRequote,
-    quotationId: quotationId || null,
     complexityFactors,
+    availableRoles: roles,
+    availablePersonnel: personnel,
+    recommendedRoleIds,
+    currentStep,
+    nextStep,
+    previousStep,
+    goToStep,
     updateClient,
     updateProjectName,
     updateProjectType,
     updateProjectDuration,
-    updateTemplate,
-    updateComplexity,
-    updateCustomization,
     updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
     updateClientEngagement,
-    setTeamOption,
+    updateTemplate,
+    updateComplexity,
+    updateTeamMembers,
     addTeamMember,
     updateTeamMember,
-    updateTeamMembers,
     removeTeamMember,
-    applyRecommendedTeam,
-    setIsAlwaysOnProject,
+    updateFinancials,
+    updateInflation,
+    loadQuotation,
+    saveQuotation,
+    calculateTotalCost,
+    resetQuotation,
+    loadRoles,
+    loadPersonnel,
+    forceRecalculate,
     updateDeliverables,
     addDeliverable,
     updateDeliverable,
     removeDeliverable,
-    updateAdditionalDeliverableCost,
-    updateFinancials,
-    saveQuotation,
-    loadQuotation,
-    currentStep,
-    goToStep,
-    nextStep,
-    previousStep,
-    availableRoles,
-    availablePersonnel,
-    loadRoles,
-    loadPersonnel,
-    refreshData,
-    isRefreshing
+    updateAdditionalDeliverableCost
   };
 
   return (
-    <OptimizedQuoteContext.Provider value={contextValue}>
+    <OptimizedQuoteContext.Provider value={value}>
       {children}
     </OptimizedQuoteContext.Provider>
   );
 };
 
-export const useOptimizedQuote = () => {
+export function useOptimizedQuote() {
   const context = useContext(OptimizedQuoteContext);
   if (context === undefined) {
-    throw new Error('useOptimizedQuote must be used within an OptimizedQuoteProvider');
+    throw new Error("useOptimizedQuote must be used within an OptimizedQuoteProvider");
   }
   return context;
-};
+}

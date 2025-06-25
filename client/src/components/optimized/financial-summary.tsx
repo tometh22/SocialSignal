@@ -20,7 +20,6 @@ export function FinancialSummary({
   
   // Forzar la actualización de valores cuando cambian las props
   useEffect(() => {
-    console.log('Financial summary values:', {
       baseCost,
       complexityAdjustment,
       totalAmount

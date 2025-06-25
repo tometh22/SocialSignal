@@ -276,7 +276,6 @@ const NewActiveProject: React.FC = () => {
   const isLoading = isLoadingQuotations;
   const isSubmitting = createProjectMutation.isPending;
 
-  console.log('Debug data:', {
     isLoadingQuotations,
     isLoading,
     quotationsLength: Array.isArray(quotations) ? quotations.length : 0,

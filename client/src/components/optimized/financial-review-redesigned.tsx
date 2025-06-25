@@ -37,10 +37,7 @@ const TeamMemberQuickAdd: React.FC = () => {
     
     addTeamMember({
       roleId: parseInt(selectedRole),
-      personnelId: selectedPersonnel && selectedPersonnel !== "0" ? parseInt(selectedPersonnel) : undefined,
-      hoursPerWeek: hoursNum,
-      weeksCovered: 4,
-      totalCost: hoursNum * rateNum,
+      personnelId: selectedPersonnel && selectedPersonnel !== "0" ? parseInt(selectedPersonnel) : null,
       hours: hoursNum,
       rate: rateNum,
       cost: hoursNum * rateNum
