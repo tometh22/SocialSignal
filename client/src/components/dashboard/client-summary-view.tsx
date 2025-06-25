@@ -387,7 +387,7 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="name" />
                           <YAxis domain={[0, 5]} />
-                          <Tooltip formatter={(value) => [`${value.toFixed(2)}`, 'Puntuación']} />
+                          <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}`, 'Puntuación']} />
                           <Bar dataKey="value" fill="#8884d8" />
                         </BarChart>
                       </ResponsiveContainer>
