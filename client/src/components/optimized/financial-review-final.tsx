@@ -388,95 +388,174 @@ export default function FinancialReviewFinal() {
           </Card>
         </div>
 
-        {/* Center: Inflation Configuration - CRITICAL SECTION */}
+        {/* Center: Inflation Configuration - SIMPLIFIED */}
         <div className="space-y-4 lg:space-y-6">
-          <div className={`relative w-full ${
-            quotationData.inflation.applyInflationAdjustment 
-              ? 'ring-2 ring-orange-200 ring-offset-1 lg:ring-offset-2 ring-offset-white' 
-              : 'ring-1 ring-gray-200'
-          } rounded-xl transition-all duration-200`}>
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-orange-50/30 w-full h-fit">
-              <CardHeader className="pb-4 border-b border-orange-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                      quotationData.inflation.applyInflationAdjustment 
-                        ? 'bg-orange-100' 
-                        : 'bg-gray-100'
-                    }`}>
-                      <Shield className={`h-4 w-4 ${
-                        quotationData.inflation.applyInflationAdjustment 
-                          ? 'text-orange-600' 
-                          : 'text-gray-600'
-                      }`} />
-                    </div>
-                    Protección Inflacionaria
-                    {quotationData.inflation.applyInflationAdjustment && (
-                      <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                        <Zap className="h-3 w-3 mr-1" />
-                        Activa
-                      </Badge>
-                    )}
-                  </CardTitle>
+          <Card className="shadow-sm border-0 bg-white">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-orange-600" />
+                  Protección Inflacionaria
                 </div>
-                <p className="text-sm text-gray-600">
-                  {quotationData.inflation.applyInflationAdjustment 
-                    ? 'Cotización protegida contra inflación argentina'
-                    : 'Configurar protección para proyectos futuros'
+                <Button
+                  variant={quotationData.inflation.applyInflationAdjustment ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => updateInflation({ 
+                    applyInflationAdjustment: !quotationData.inflation.applyInflationAdjustment 
+                  })}
+                  className={quotationData.inflation.applyInflationAdjustment 
+                    ? "bg-orange-600 hover:bg-orange-700" 
+                    : "border-orange-200 text-orange-600 hover:bg-orange-50"
                   }
-                </p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <InflationAdjustmentCard
-                  applyInflationAdjustment={quotationData.inflation.applyInflationAdjustment}
-                  inflationMethod={quotationData.inflation.inflationMethod}
-                  manualInflationRate={quotationData.inflation.manualInflationRate}
-                  projectStartDate={quotationData.inflation.projectStartDate}
-                  totalCost={subtotalWithComplexity}
-                  quotationCurrency={quotationData.inflation.quotationCurrency}
-                  projectType={quotationData.project.type}
-                  projectDuration={quotationData.project.duration}
-                  onApplyInflationChange={(value) => updateInflation({ applyInflationAdjustment: value })}
-                  onInflationMethodChange={(value) => updateInflation({ inflationMethod: value })}
-                  onManualInflationRateChange={(value) => updateInflation({ manualInflationRate: value })}
-                  onProjectStartDateChange={(value) => updateInflation({ projectStartDate: value })}
-                  onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
-                />
-
-                {/* Impact Summary */}
-                <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-t border-orange-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Info className="h-4 w-4 text-orange-600" />
-                      <span className="text-sm font-medium text-orange-900">
-                        {quotationData.inflation.applyInflationAdjustment 
-                          ? 'Impacto en cotización:' 
-                          : 'Sin protección inflacionaria'
-                        }
-                      </span>
+                >
+                  {quotationData.inflation.applyInflationAdjustment ? (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Activada
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-4 w-4 mr-2" />
+                      Activar
+                    </>
+                  )}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            
+            <CardContent className="p-4">
+              {!quotationData.inflation.applyInflationAdjustment ? (
+                // Estado desactivado - Simple
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Shield className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Sin Protección Inflacionaria
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    La cotización se mantiene en valores actuales sin proyección inflacionaria
+                  </p>
+                  <Button
+                    onClick={() => updateInflation({ applyInflationAdjustment: true })}
+                    className="bg-orange-600 hover:bg-orange-700"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Activar Protección
+                  </Button>
+                </div>
+              ) : (
+                // Estado activado - Configuración expandida
+                <div className="space-y-6">
+                  {/* Header con badge */}
+                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Zap className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-orange-900">Protección Activada</h3>
+                        <p className="text-sm text-orange-700">
+                          Cotización protegida contra inflación argentina
+                        </p>
+                      </div>
                     </div>
-                    <Badge variant={quotationData.inflation.applyInflationAdjustment ? "default" : "secondary"} className="text-sm">
-                      {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0
-                        ? `+${formatCurrency(inflationAdjustment)}`
-                        : 'No aplicada'
-                      }
+                    <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                      {inflationAdjustment > 0 ? `+${formatCurrency(inflationAdjustment)}` : 'Configurando...'}
                     </Badge>
                   </div>
-                  
-                  {quotationData.inflation.applyInflationAdjustment && (
-                    <div className="mt-3 p-2 bg-white/50 rounded-lg">
-                      <p className="text-xs text-orange-700">
-                        ✅ Cotización protegida hasta {quotationData.inflation.projectStartDate ? 
-                          new Date(quotationData.inflation.projectStartDate).toLocaleDateString('es-AR') : 
-                          'fecha del proyecto'
-                        }
+
+                  {/* Configuración en grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Fecha de inicio */}
+                    <div className="space-y-2">
+                      <Label className="font-medium">Fecha de inicio del proyecto</Label>
+                      <Input
+                        type="date"
+                        value={quotationData.inflation.projectStartDate}
+                        onChange={(e) => updateInflation({ projectStartDate: e.target.value })}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="border-orange-200 focus:border-orange-400"
+                      />
+                    </div>
+
+                    {/* Moneda */}
+                    <div className="space-y-2">
+                      <Label className="font-medium">Moneda de cotización</Label>
+                      <Select 
+                        value={quotationData.inflation.quotationCurrency} 
+                        onValueChange={(value) => updateInflation({ quotationCurrency: value })}
+                      >
+                        <SelectTrigger className="border-orange-200 focus:border-orange-400">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ARS">Pesos Argentinos (ARS)</SelectItem>
+                          <SelectItem value="USD">Dólares Estadounidenses (USD)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Método de inflación */}
+                    <div className="space-y-2">
+                      <Label className="font-medium">Método de cálculo</Label>
+                      <Select 
+                        value={quotationData.inflation.inflationMethod} 
+                        onValueChange={(value) => updateInflation({ inflationMethod: value })}
+                      >
+                        <SelectTrigger className="border-orange-200 focus:border-orange-400">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="automatic">Automático (Promedio 12 meses)</SelectItem>
+                          <SelectItem value="manual">Manual (Tasa personalizada)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Tasa manual (si aplica) */}
+                    {quotationData.inflation.inflationMethod === 'manual' && (
+                      <div className="space-y-2">
+                        <Label className="font-medium">Tasa inflación anual (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={quotationData.inflation.manualInflationRate || 0}
+                          onChange={(e) => updateInflation({ manualInflationRate: Number(e.target.value) })}
+                          placeholder="Ej: 25.5"
+                          className="border-orange-200 focus:border-orange-400"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Resumen de impacto */}
+                  {quotationData.inflation.projectStartDate && inflationAdjustment > 0 && (
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-green-900">Impacto Proyectado:</span>
+                        <span className="text-lg font-bold text-green-900">
+                          +{formatCurrency(inflationAdjustment)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-green-700">
+                        Proyección desde {new Date().toLocaleDateString('es-AR')} hasta{' '}
+                        {new Date(quotationData.inflation.projectStartDate).toLocaleDateString('es-AR')}
                       </p>
                     </div>
                   )}
+
+                  {/* Warning */}
+                  <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-yellow-800">
+                      Las proyecciones son estimativas basadas en datos históricos
+                    </p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right: Financial Waterfall */}
