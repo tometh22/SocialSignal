@@ -175,6 +175,7 @@ export default function ActiveProjects() {
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
       console.log('Eliminando proyecto con ID:', projectId);
+      
       const response = await fetch(`/api/active-projects/${projectId}`, {
         method: 'DELETE',
         headers: {
@@ -186,13 +187,16 @@ export default function ActiveProjects() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Error del servidor:', errorText);
-        let errorData;
+        
+        let errorMessage = 'Error al eliminar el proyecto';
         try {
-          errorData = JSON.parse(errorText);
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
         } catch {
-          errorData = { message: `Error ${response.status}: ${errorText || 'Error desconocido'}` };
+          errorMessage = `Error ${response.status}: ${errorText || 'Error desconocido'}`;
         }
-        throw new Error(errorData.message || 'Error al eliminar el proyecto');
+        
+        throw new Error(errorMessage);
       }
       
       const result = await response.json();
@@ -201,6 +205,7 @@ export default function ActiveProjects() {
     },
     onMutate: async (projectId) => {
       console.log('Iniciando eliminación del proyecto:', projectId);
+      
       // Cancelar consultas pendientes
       await queryClient.cancelQueries({ queryKey: ['/api/active-projects'] });
       
@@ -224,17 +229,14 @@ export default function ActiveProjects() {
         description: "El proyecto ha sido eliminado correctamente.",
       });
       
-      // Invalidar y refrescar datos inmediatamente
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      
       // Cerrar el diálogo
       setDeleteProjectId(null);
       setDeleteConfirmationText("");
       
-      // Forzar recarga de la página para asegurar consistencia
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // Invalidar y refrescar datos
+      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      await refetchProjects();
+      await refetchSubprojects();
     },
     onError: (error, projectId) => {
       console.error('Error al eliminar el proyecto:', error);
@@ -362,8 +364,8 @@ export default function ActiveProjects() {
       console.log('No hay ID de proyecto para eliminar');
       return;
     }
+    
     console.log('Confirmando eliminación del proyecto:', deleteProjectId);
-    setDeleteConfirmationText("");
     deleteProjectMutation.mutate(deleteProjectId);
   };
 
@@ -833,7 +835,12 @@ export default function ActiveProjects() {
       </div>
 
       {/* Diálogo de confirmación para eliminar */}
-      <Dialog open={deleteProjectId !== null} onOpenChange={() => setDeleteProjectId(null)}>
+      <Dialog open={deleteProjectId !== null} onOpenChange={(open) => {
+        if (!open && !deleteProjectMutation.isPending) {
+          setDeleteProjectId(null);
+          setDeleteConfirmationText("");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmar eliminación</DialogTitle>
@@ -855,10 +862,7 @@ export default function ActiveProjects() {
             </Button>
             <Button 
               variant="destructive" 
-              onClick={() => {
-                console.log('Confirmando eliminación desde diálogo');
-                confirmDelete();
-              }}
+              onClick={confirmDelete}
               disabled={deleteProjectMutation.isPending}
             >
               {deleteProjectMutation.isPending ? (

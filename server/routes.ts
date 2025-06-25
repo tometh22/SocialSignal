@@ -1221,14 +1221,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Eliminar proyecto activo
   app.delete("/api/active-projects/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+    if (isNaN(id)) {
+      console.log('ID de proyecto inválido:', req.params.id);
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    console.log(`Iniciando eliminación del proyecto ${id}`);
 
     try {
       // Verificar que el proyecto existe
       const project = await storage.getActiveProject(id);
       if (!project) {
+        console.log(`Proyecto ${id} no encontrado`);
         return res.status(404).json({ message: "Project not found" });
       }
+
+      console.log(`Proyecto encontrado: ${project.quotation?.projectName || 'Sin nombre'}`);
 
       // Si es un proyecto macro, verificar si tiene subproyectos
       if (project.isAlwaysOnMacro) {
@@ -1240,13 +1248,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const deleted = await storage.deleteActiveProject(id);
 
       if (!deleted) {
+        console.log(`Falló la eliminación del proyecto ${id}`);
         return res.status(500).json({ message: "Failed to delete project" });
       }
 
-      res.json({ message: "Project deleted successfully", projectId: id });
+      console.log(`Proyecto ${id} eliminado exitosamente`);
+      res.json({ 
+        success: true,
+        message: "Project deleted successfully", 
+        projectId: id 
+      });
     } catch (error) {
       console.error("Error deleting active project:", error);
-      res.status(500).json({ message: "Failed to delete project" });
+      res.status(500).json({ 
+        message: "Failed to delete project",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
