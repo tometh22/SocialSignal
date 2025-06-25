@@ -11,7 +11,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
+import OptimizedFinancialReview from '@/components/optimized/financial-review-redesigned';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 
