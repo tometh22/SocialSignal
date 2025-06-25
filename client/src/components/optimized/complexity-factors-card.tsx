@@ -20,29 +20,27 @@ const ComplexityFactorsCard: React.FC = () => {
   const analysisTypes = [
     { value: 'basic', label: 'Análisis Básico' },
     { value: 'standard', label: 'Análisis Estándar' },
-    { value: 'advanced', label: 'Análisis Avanzado' },
-    { value: 'premium', label: 'Análisis Premium' }
+    { value: 'deep', label: 'Análisis Avanzado' }
   ];
 
   const mentionsVolumeOptions = [
-    { value: 'low', label: 'Bajo (< 1K menciones)' },
+    { value: 'small', label: 'Pequeño (< 1K menciones)' },
     { value: 'medium', label: 'Medio (1K - 10K menciones)' },
-    { value: 'high', label: 'Alto (10K - 100K menciones)' },
-    { value: 'very-high', label: 'Muy Alto (> 100K menciones)' }
+    { value: 'large', label: 'Grande (10K - 100K menciones)' },
+    { value: 'xlarge', label: 'Extra Grande (> 100K menciones)' }
   ];
 
   const countriesOptions = [
     { value: '1', label: '1 país' },
-    { value: '2-3', label: '2-3 países' },
-    { value: '4-6', label: '4-6 países' },
-    { value: '7+', label: '7+ países' }
+    { value: '2-5', label: '2-5 países' },
+    { value: '6-10', label: '6-10 países' },
+    { value: '10+', label: 'Más de 10 países' }
   ];
 
   const engagementOptions = [
     { value: 'low', label: 'Bajo' },
     { value: 'medium', label: 'Medio' },
-    { value: 'high', label: 'Alto' },
-    { value: 'very-high', label: 'Muy Alto' }
+    { value: 'high', label: 'Alto' }
   ];
 
   const getTotalComplexityFactor = (): number => {
@@ -79,11 +77,11 @@ const ComplexityFactorsCard: React.FC = () => {
             <h4 className="font-medium text-gray-900 mb-3">Equipo Configurado</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {quotationData.teamMembers.map((member, index) => {
-                const role = availableRoles.find((r: any) => r.id === member.roleId);
+                const role = availableRoles?.find((r: any) => r.id === member.roleId);
                 return (
                   <div key={member.id || index} className="flex justify-between items-center text-sm">
                     <span className="font-medium">{role?.name || 'Rol desconocido'}</span>
-                    <span className="text-gray-600">{member.hours}h × ${member.rate}</span>
+                    <span className="text-gray-600">{member.hoursPerWeek}h × ${member.totalCost}</span>
                   </div>
                 );
               })}
@@ -118,7 +116,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.analysisTypeFactor * 100).toFixed(1)}%
+              Factor: +{((complexityFactors?.analysisTypeFactor || 0) * 100).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -145,7 +143,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
+              Factor: +{((complexityFactors?.mentionsVolumeFactor || 0) * 100).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -172,7 +170,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
+              Factor: +{((complexityFactors?.countriesFactor || 0) * 100).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -199,7 +197,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors.clientEngagementFactor * 100).toFixed(1)}%
+              Factor: +{((complexityFactors?.clientEngagementFactor || 0) * 100).toFixed(1)}%
             </div>
           </CardContent>
         </Card>

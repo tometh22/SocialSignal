@@ -183,6 +183,43 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Calcular factores de complejidad cuando cambien los valores
+  useEffect(() => {
+    const calculateComplexityFactors = async () => {
+      const { 
+        getAnalysisTypeFactor, 
+        getMentionsVolumeFactor, 
+        getCountriesFactor, 
+        getClientEngagementFactor,
+        loadCostMultipliers 
+      } = await import('@/lib/calculation');
+      
+      // Cargar multiplicadores primero
+      await loadCostMultipliers();
+      
+      const factors = {
+        analysisTypeFactor: getAnalysisTypeFactor(quotationData.analysisType),
+        mentionsVolumeFactor: getMentionsVolumeFactor(quotationData.mentionsVolume),
+        countriesFactor: getCountriesFactor(quotationData.countriesCovered),
+        clientEngagementFactor: getClientEngagementFactor(quotationData.clientEngagement),
+        templateFactor: 0 // Por ahora 0, puede ajustarse según template
+      };
+      
+      setComplexityFactors(factors);
+    };
+
+    // Solo calcular si hay datos suficientes
+    if (quotationData.analysisType || quotationData.mentionsVolume || 
+        quotationData.countriesCovered || quotationData.clientEngagement) {
+      calculateComplexityFactors();
+    }
+  }, [
+    quotationData.analysisType,
+    quotationData.mentionsVolume, 
+    quotationData.countriesCovered,
+    quotationData.clientEngagement
+  ]);
+
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
