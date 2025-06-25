@@ -728,10 +728,23 @@ export default function FinancialReviewFinal() {
 
       {/* Level 4: Action Buttons */}
       <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-4 lg:pt-6 border-t border-gray-200 mt-4 lg:mt-6">
-        <Button size="lg" className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 px-12 shadow-lg" onClick={handleSaveQuotation}
-              disabled={isSaving}>
-          <CheckCircle className="h-4 w-4 mr-2" />
-          Finalizar Cotización
+        <Button 
+          size="lg" 
+          className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 px-12 shadow-lg" 
+          onClick={handleSaveQuotation}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Guardar Cotización
+            </>
+          )}
         </Button>
       </div>
     </div>
