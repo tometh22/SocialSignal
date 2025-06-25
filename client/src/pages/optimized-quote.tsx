@@ -5,7 +5,8 @@ import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-q
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
@@ -13,6 +14,7 @@ import OptimizedTemplateSelection from '@/components/optimized/template-selectio
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
+import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
@@ -22,6 +24,7 @@ interface OptimizedQuoteProps {
 const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote = false }) => {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const {
     currentStep,
     nextStep,
@@ -36,6 +39,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   const isEditing = Boolean(quotationId);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   // Load quotation if editing
   useEffect(() => {
@@ -45,6 +49,50 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       });
     }
   }, [quotationId, isRequote, loadQuotation, goToStep]);
+
+  // Monitor user session and show warnings
+  useEffect(() => {
+    if (!user) {
+      toast({
+        title: "⚠️ Sesión perdida",
+        description: "Tu sesión ha expirado. Redirigiendo al login...",
+        variant: "destructive",
+      });
+      setTimeout(() => setLocation('/auth'), 2000);
+      return;
+    }
+
+    // Track user activity
+    const handleActivity = () => {
+      setLastActivity(Date.now());
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    // Warning for session expiry
+    const checkSession = setInterval(() => {
+      const timeSinceActivity = Date.now() - lastActivity;
+      const thirtyMinutes = 30 * 60 * 1000;
+      
+      if (timeSinceActivity > thirtyMinutes) {
+        toast({
+          title: "⏰ Sesión inactiva",
+          description: "Has estado inactivo por mucho tiempo. Tu sesión podría expirar pronto.",
+          variant: "destructive",
+        });
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      clearInterval(checkSession);
+    };
+  }, [user, lastActivity, setLocation, toast]);
 
   const handleSave = async () => {
     try {
@@ -306,9 +354,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
 const OptimizedQuote: React.FC<OptimizedQuoteProps> = (props) => {
   return (
-    <OptimizedQuoteProvider>
-      <OptimizedQuoteContent {...props} />
-    </OptimizedQuoteProvider>
+    <QuotationErrorBoundary>
+      <OptimizedQuoteProvider>
+        <OptimizedQuoteContent {...props} />
+      </OptimizedQuoteProvider>
+    </QuotationErrorBoundary>
   );
 };
 

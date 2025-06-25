@@ -37,10 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       try {
         const response = await fetch("/api/current-user", {
-          credentials: "include"
+          credentials: "include",
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
         });
         
         if (response.status === 401) {
+          // Clear any draft data on session expiry
+          localStorage.removeItem('draft-quotation');
           return null;
         }
         
@@ -51,11 +56,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await response.json();
       } catch (error) {
         console.error("Error al obtener sesión:", error);
+        // Try to recover from network errors
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          console.log("🔄 Network error detected, attempting recovery...");
+          return null;
+        }
         return null;
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    refetchInterval: 2 * 60 * 1000, // Refrescar cada 2 minutos
+    staleTime: 2 * 60 * 1000, // 2 minutos
+    refetchInterval: 1 * 60 * 1000, // Refrescar cada minuto para detectar pérdida de sesión más rápido
+    retry: (failureCount, error) => {
+      // Don't retry on 401 (unauthorized)
+      if (error && 'status' in error && error.status === 401) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   // Mutación para el inicio de sesión

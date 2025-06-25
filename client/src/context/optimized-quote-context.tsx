@@ -246,23 +246,53 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     queryKey: ["/api/personnel"],
   });
 
-  // Force recalculation function
+  // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
     console.log('🔄 Force recalculation triggered');
+    
+    // Debounce rapid consecutive calls
+    const now = Date.now();
+    const lastRecalc = localStorage.getItem('last-recalc-time');
+    
+    if (lastRecalc && (now - parseInt(lastRecalc)) < 100) {
+      console.log('🔄 Recalculation debounced');
+      return;
+    }
+    
+    localStorage.setItem('last-recalc-time', now.toString());
     setRecalculationTrigger(prev => prev + 1);
   }, []);
 
-  // Auto-save draft to localStorage
+  // Auto-save draft to localStorage with error handling
   useEffect(() => {
     const saveInterval = setInterval(() => {
       if (quotationData.project.name || quotationData.teamMembers.length > 0) {
-        localStorage.setItem('draft-quotation', JSON.stringify({
-          quotationData,
-          timestamp: Date.now()
-        }));
-        console.log('📝 Draft auto-saved');
+        try {
+          const draftData = {
+            quotationData,
+            timestamp: Date.now(),
+            version: '1.0'
+          };
+          
+          localStorage.setItem('draft-quotation', JSON.stringify(draftData));
+          localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
+          console.log('📝 Draft auto-saved at', new Date().toLocaleTimeString());
+        } catch (error) {
+          console.error('❌ Error saving draft:', error);
+          // Try to clear some space
+          try {
+            localStorage.removeItem('draft-quotation-backup');
+            localStorage.setItem('draft-quotation', JSON.stringify({
+              quotationData,
+              timestamp: Date.now()
+            }));
+            console.log('📝 Draft saved after cleanup');
+          } catch (secondError) {
+            console.error('❌ Critical: Cannot save draft data');
+          }
+        }
       }
-    }, 30000); // Save every 30 seconds
+    }, 15000); // Save every 15 seconds (more frequent)
 
     return () => clearInterval(saveInterval);
   }, [quotationData]);
