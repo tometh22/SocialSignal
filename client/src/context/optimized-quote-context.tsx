@@ -218,8 +218,6 @@ const getTemplateFactor = (complexity: string): number => {
   const factor = factors[complexity] || 0.0;
   console.log(`📊 Template "${complexity}" -> ${factor} (${factor * 100}%)`);
   return factor;
-};> ${factor} (${factor * 100}%)`);
-  return factor;
 };
 
 interface OptimizedQuoteProviderProps {
