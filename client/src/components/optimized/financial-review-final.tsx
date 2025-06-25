@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
@@ -124,7 +123,7 @@ export default function FinancialReviewFinal() {
 
   // Calculate final base after inflation (if any)
   const finalBaseAfterInflation = inflationProjectedCost;
-  
+
   // Continue with markup calculation using the final base
   const teamMarkupAmount = finalBaseAfterInflation;
   const subtotalWithMarkup = finalBaseAfterInflation + teamMarkupAmount;
@@ -169,7 +168,7 @@ export default function FinancialReviewFinal() {
               Completa
             </Badge>
           </div>
-          
+
           <div className="text-right">
             <p className="text-sm text-gray-600 mb-1">Total Proyecto</p>
             <p className="text-3xl font-bold text-gray-900">
@@ -288,7 +287,7 @@ export default function FinancialReviewFinal() {
 
       {/* Level 3: Main Content - Responsive Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-        
+
         {/* Left: Team Breakdown */}
         <div className="space-y-4 lg:space-y-6">
           <Card className="shadow-sm border-0 bg-white">
@@ -329,7 +328,7 @@ export default function FinancialReviewFinal() {
                   </div>
                 ))}
               </div>
-              
+
               <div className="p-4 bg-blue-50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-blue-900">Subtotal Base</span>
@@ -377,9 +376,9 @@ export default function FinancialReviewFinal() {
                   </Badge>
                 </div>
               </div>
-              
+
               <Separator className="my-4" />
-              
+
               <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <span className="font-semibold text-amber-900">Total Ajuste Complejidad</span>
                 <span className="text-lg font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
@@ -422,7 +421,7 @@ export default function FinancialReviewFinal() {
                 </Button>
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="p-4">
               {!quotationData.inflation.applyInflationAdjustment ? (
                 // Estado desactivado - Simple
