@@ -111,7 +111,7 @@ const OptimizedBasicInfo: React.FC = () => {
                   <Input
                     id="project-name"
                     placeholder="Ej. Análisis de Mercado Q2 2023"
-                    value={quotationData.project.name}
+                    value={quotationData.projectName}
                     onChange={(e) => updateProjectName(e.target.value)}
                     className="bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800"
                   />

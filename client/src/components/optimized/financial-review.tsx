@@ -149,7 +149,7 @@ const OptimizedFinancialReview: React.FC = () => {
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Nombre del Proyecto:</p>
-              <p className="text-sm text-neutral-600">{quotationData.project.name || 'Sin nombre'}</p>
+              <p className="text-sm text-neutral-600">{quotationData.projectName || 'Sin nombre'}</p>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">Plantilla:</p>

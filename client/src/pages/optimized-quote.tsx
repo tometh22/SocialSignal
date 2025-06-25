@@ -107,7 +107,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         return;
       }
 
-      if (!quotationData.project.name?.trim()) {
+      if (!quotationData.projectName?.trim()) {
         toast({
           title: "Nombre de proyecto requerido",
           description: "Debe ingresar el nombre del proyecto antes de guardar.",
@@ -130,7 +130,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       
       toast({
         title: "Cotización guardada",
-        description: `La cotización "${quotationData.project.name}" se ha guardado correctamente.`,
+        description: `La cotización "${quotationData.projectName}" se ha guardado correctamente.`,
       });
       
       console.log('🎉 Cotización guardada exitosamente, redirigiendo...');
@@ -156,7 +156,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 4, title: "Complejidad" },
     ];
 
-    if (quotationData.project?.type === 'fee-mensual') {
+    if (quotationData.projectType === 'fee-mensual') {
       baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
     } else {
@@ -264,7 +264,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 3 && <EnhancedTeamConfig />}
             {currentStep === 4 && <ComplexityFactorsCard />}
 
-            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
+            {currentStep === 5 && quotationData.projectType === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration 
                   isAlwaysOnProject={true}
@@ -277,8 +277,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
 
-            {((currentStep === 5 && quotationData.project?.type !== 'always-on') || 
-              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
+            {((currentStep === 5 && quotationData.projectType !== 'always-on') || 
+              (currentStep === 6 && quotationData.projectType === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
           </div>
