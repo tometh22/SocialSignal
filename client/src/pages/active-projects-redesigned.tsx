@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   Building2, 
@@ -56,6 +57,7 @@ interface ProjectCardProps {
   onToggleExpand: () => void;
   onNavigate: (path: string) => void;
   getProjectHours: (id: number) => number;
+  onDeleteProject: (id: number) => void;
 }
 
 function ProjectCard({ 
@@ -65,7 +67,8 @@ function ProjectCard({
   isExpanded, 
   onToggleExpand, 
   onNavigate,
-  getProjectHours 
+  getProjectHours,
+  onDeleteProject
 }: ProjectCardProps) {
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
   const clientName = client?.name || "Cliente desconocido";
@@ -254,7 +257,7 @@ function ProjectCard({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  onClick={() => handleDeleteProject(project.id)}
+                  onClick={() => onDeleteProject(project.id)}
                   className="text-red-600 cursor-pointer hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -348,14 +351,8 @@ export default function ActiveProjectsRedesigned() {
 
   // Mutación para eliminar proyecto
   const deleteProjectMutation = useMutation({
-    mutationFn: async (projectId: number) => {
-      const response = await fetch(`/api/active-projects/${projectId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to delete project");
-      }
-      return response.json();
+    mutationFn: (projectId: number) => {
+      return apiRequest(`/api/active-projects/${projectId}`, "DELETE");
     },
     onSuccess: () => {
       toast({
@@ -683,6 +680,7 @@ export default function ActiveProjectsRedesigned() {
                   onToggleExpand={() => toggleExpanded(project.id)}
                   onNavigate={setLocation}
                   getProjectHours={getProjectHours}
+                  onDeleteProject={handleDeleteProject}
                 />
               );
             })}
