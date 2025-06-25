@@ -6,34 +6,34 @@ export interface ComplexityFactors {
   templateFactor: number;
 }
 
-// Multiplicadores fijos basados en el panel de administración
+// Multiplicadores fijos basados en el panel de administración real
 const DEFAULT_MULTIPLIERS = {
   complexity: {
-    basic: 0,
-    standard: 115.0, // +115.0%
-    deep: 1.5
+    basic: 0, // Metodología Básica: 1x (0%)
+    standard: 15, // Metodología Estándar: 1.15x (+15%)
+    deep: 35 // Metodología Avanzada: 1.35x (+35%)
   },
   mentions_volume: {
-    small: 0,
-    medium: 100.0, // +100.0% (1K-10K menciones)
-    large: 1.25,
-    xlarge: 1.5
+    small: 0, // 10k - 50k menciones: 1x (0%)
+    medium: 15, // 50k - 200k menciones: 1.15x (+15%)
+    large: 15,
+    xlarge: 15
   },
   countries: {
-    "1": 0,
-    "2-5": 110.0, // +110.0% (2-5 países)
-    "6-10": 1.25,
-    "10+": 1.5
+    "1": 0, // Un solo país: 1x (0%)
+    "2-5": 10, // 2-5 países: 1.1x (+10%)
+    "6-10": 20, // 6-10 países: 1.2x (+20%)
+    "10+": 35 // 10+ países: 1.35x (+35%)
   },
   urgency: {
-    low: 0.0, // +0.0% (Bajo)
-    medium: 0.25,
-    high: 0.5
+    low: 0, // +0.0% (Bajo)
+    medium: 0,
+    high: 0
   },
   project_type: {
     basic: 0,
-    medium: 0.1,
-    high: 0.2
+    medium: 0,
+    high: 0
   }
 };
 

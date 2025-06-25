@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Users, Globe, MessageSquare } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import type { CostMultiplier } from '@shared/schema';
 
 const ComplexityFactorsCard: React.FC = () => {
   const {
@@ -17,31 +19,28 @@ const ComplexityFactorsCard: React.FC = () => {
     availableRoles
   } = useOptimizedQuote();
 
-  const analysisTypes = [
-    { value: 'basic', label: 'Análisis Básico' },
-    { value: 'standard', label: 'Análisis Estándar' },
-    { value: 'deep', label: 'Análisis Avanzado' }
-  ];
+  // Cargar multiplicadores desde la API
+  const { data: allMultipliers = [] } = useQuery<CostMultiplier[]>({
+    queryKey: ["/api/cost-multipliers"],
+  });
 
-  const mentionsVolumeOptions = [
-    { value: 'small', label: 'Pequeño (< 1K menciones)' },
-    { value: 'medium', label: 'Medio (1K - 10K menciones)' },
-    { value: 'large', label: 'Grande (10K - 100K menciones)' },
-    { value: 'xlarge', label: 'Extra Grande (> 100K menciones)' }
-  ];
+  // Organizar multiplicadores por categoría
+  const getMultipliersByCategory = (category: string) => {
+    return allMultipliers
+      .filter(m => m.category === category && m.isActive)
+      .map(m => ({
+        value: m.subcategory,
+        label: m.label,
+        factor: m.multiplier
+      }));
+  };
 
-  const countriesOptions = [
-    { value: '1', label: '1 país' },
-    { value: '2-5', label: '2-5 países' },
-    { value: '6-10', label: '6-10 países' },
-    { value: '10+', label: 'Más de 10 países' }
-  ];
+  const analysisTypes = getMultipliersByCategory('complexity');
+  const mentionsVolumeOptions = getMultipliersByCategory('mentions_volume');
+  const countriesOptions = getMultipliersByCategory('countries');
+  const urgencyOptions = getMultipliersByCategory('urgency');
 
-  const engagementOptions = [
-    { value: 'low', label: 'Bajo' },
-    { value: 'medium', label: 'Medio' },
-    { value: 'high', label: 'Alto' }
-  ];
+
 
   const getTotalComplexityFactor = (): number => {
     if (!complexityFactors) return 0;
@@ -175,32 +174,34 @@ const ComplexityFactorsCard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Compromiso del Cliente */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Users className="h-4 w-4 mr-2 text-orange-600" />
-              Compromiso del Cliente
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={quotationData.clientEngagement} onValueChange={updateClientEngagement}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar nivel" />
-              </SelectTrigger>
-              <SelectContent>
-                {engagementOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-gray-500">
-              Factor: +{(complexityFactors?.clientEngagementFactor || 0).toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
+        {/* Mostrar categorías adicionales dinámicamente */}
+        {urgencyOptions.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center">
+                <Users className="h-4 w-4 mr-2 text-orange-600" />
+                Urgencia/Interacción
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={quotationData.clientEngagement} onValueChange={updateClientEngagement}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar nivel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {urgencyOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-gray-500">
+                Factor: +{(complexityFactors?.clientEngagementFactor || 0).toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Impacto por Tipo de Rol */}
