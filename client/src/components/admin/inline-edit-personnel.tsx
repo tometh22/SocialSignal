@@ -176,10 +176,11 @@ export function InlineEditPersonnel({ person, roles, onUpdate, onDelete }: Inlin
         rateValue = Math.round(rateValue * 100) / 100;
       }
       
+      const updatedData = {
         name: editName,
         roleId: editRoleId,
         hourlyRate: rateValue
-      });
+      };
       
       // Intenta hacer la petición directamente con fetch en lugar de la mutación
       try {

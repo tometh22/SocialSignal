@@ -118,6 +118,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       const cost = newMember.hours * newMember.rate;
       
       // Para propósitos de depuración
+      console.log('Adding member:', {
         roleId: newMember.roleId,
         personnelId: newMember.personnelId,
         hours: newMember.hours,
