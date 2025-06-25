@@ -53,7 +53,11 @@ const EnhancedTeamConfig: React.FC = () => {
   const [draggedMembers, setDraggedMembers] = useState<DragDropTeamMember[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMember, setEditingMember] = useState<string | null>(null);
+
+  // Estados para agregar miembros rápidamente
   const [quickAddMode, setQuickAddMode] = useState(false);
+  const [showRoleDetails, setShowRoleDetails] = useState(false);
+  const [selectedQuickRoles, setSelectedQuickRoles] = useState<Set<number>>(new Set());
 
   // Estado para el formulario de nuevo miembro
   const [newMember, setNewMember] = useState({
@@ -112,21 +116,55 @@ const EnhancedTeamConfig: React.FC = () => {
   };
 
   // Agregar miembro rápido (solo rol)
-  const handleQuickAdd = (roleId: number) => {
-    const role = getRoleInfo(roleId);
-    if (role) {
-      const hours = 40;
-      const rate = role.defaultRate || 50;
-      addTeamMember({
-        roleId,
-        personnelId: null,
-        hours,
-        rate,
-        cost: 0 // Will be recalculated by the context
-      });
-    }
-    setQuickAddMode(false);
+  // const handleQuickAdd = (roleId: number) => {
+  //   const role = getRoleInfo(roleId);
+  //   if (role) {
+  //     const hours = 40;
+  //     const rate = role.defaultRate || 50;
+  //     addTeamMember({
+  //       roleId,
+  //       personnelId: null,
+  //       hours,
+  //       rate,
+  //       cost: 0 // Will be recalculated by the context
+  //     });
+  //   }
+  //   setQuickAddMode(false);
+  // };
+
+  // Función para manejar el toggle de selección rápida de roles
+  const handleQuickRoleToggle = (roleId: number) => {
+    setSelectedQuickRoles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(roleId)) {
+        newSet.delete(roleId);
+      } else {
+        newSet.add(roleId);
+      }
+      return newSet;
+    });
   };
+
+  // Función para agregar los roles seleccionados
+  const handleQuickAddSelected = () => {
+    selectedQuickRoles.forEach(roleId => {
+      const role = getRoleInfo(roleId);
+      if (role) {
+        const hours = 40;
+        const rate = role.defaultRate || 50;
+        addTeamMember({
+          roleId,
+          personnelId: null,
+          hours,
+          rate,
+          cost: 0 // Will be recalculated by the context
+        });
+      }
+    });
+    setQuickAddMode(false);
+    setSelectedQuickRoles(new Set());
+  };
+
 
   // Agregar miembro completo
   const handleAddMember = () => {
@@ -239,45 +277,82 @@ const EnhancedTeamConfig: React.FC = () => {
         </Button>
       </div>
 
-      {/* Quick Add Mode */}
-      <AnimatePresence>
+      {/* Modo de agregado rápido */}
         {quickAddMode && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <Card className="border-dashed border-primary/50 bg-primary/5">
-              <CardContent className="pt-6">
-                <div className="text-sm font-medium mb-3">Selecciona un rol para agregar rápidamente:</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {availableRoles.map(role => (
-                    <Button
-                      key={role.id}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickAdd(role.id)}
-                      className={`justify-start h-auto p-3 ${
-                        recommendedRoleIds.includes(role.id) ? 'border-yellow-400 bg-yellow-50' : ''
-                      }`}
-                    >
-                      <div className="text-left">
-                        <div className="font-medium text-xs">{role.name}</div>
-                        <div className="text-xs text-muted-foreground">
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="text-sm font-medium text-blue-900">Selecciona roles para agregar rápidamente:</h4>
+                <p className="text-xs text-blue-600 mt-1">
+                  {selectedQuickRoles.size > 0 
+                    ? `${selectedQuickRoles.size} rol${selectedQuickRoles.size > 1 ? 'es' : ''} seleccionado${selectedQuickRoles.size > 1 ? 's' : ''}`
+                    : 'Haz clic en los roles que deseas agregar'
+                  }
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {selectedQuickRoles.size > 0 && (
+                  <Button 
+                    size="sm"
+                    onClick={handleQuickAddSelected}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs"
+                  >
+                    Agregar {selectedQuickRoles.size} rol{selectedQuickRoles.size > 1 ? 'es' : ''}
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setQuickAddMode(false);
+                    setSelectedQuickRoles(new Set());
+                  }}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {availableRoles.map(role => {
+                const isSelected = selectedQuickRoles.has(role.id);
+                const isAlreadyInTeam = quotationData.teamMembers.some(member => member.roleId === role.id);
+
+                return (
+                  <Button
+                    key={role.id}
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleQuickRoleToggle(role.id)}
+                    disabled={isAlreadyInTeam}
+                    className={`text-xs p-2 h-auto text-left justify-start transition-all ${
+                      isSelected 
+                        ? 'bg-blue-600 text-white border-blue-600' 
+                        : isAlreadyInTeam
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                        : 'bg-white hover:bg-blue-100 border-blue-200'
+                    }`}
+                  >
+                    <div className="flex items-center w-full">
+                      <div className="flex-grow">
+                        <div className="font-medium">{role.name}</div>
+                        <div className={`${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
                           ${role.defaultRate}/h
                         </div>
-                        {recommendedRoleIds.includes(role.id) && (
-                          <Star className="h-3 w-3 text-yellow-500 inline ml-1" />
-                        )}
                       </div>
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                      {isSelected && (
+                        <div className="ml-2 text-white">✓</div>
+                      )}
+                      {isAlreadyInTeam && (
+                        <div className="ml-2 text-gray-400 text-xs">Ya agregado</div>
+                      )}
+                    </div>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* Formulario completo */}
       <AnimatePresence>
@@ -432,7 +507,7 @@ const EnhancedTeamConfig: React.FC = () => {
                 const role = getRoleInfo(member.roleId);
                 const personnel = getPersonnelInfo(member.personnelId);
                 const isEditing = editingMember === member.id;
-                
+
                 return (
                   <Reorder.Item 
                     key={member.id} 
@@ -517,7 +592,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                   </div>
                                 </>
                               )}
-                              
+
                               {/* Cost */}
                               <div className="text-center">
                                 <div className="font-bold text-lg text-primary">
