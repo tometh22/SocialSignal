@@ -43,8 +43,13 @@ export default function FinancialReviewFinal() {
     availablePersonnel,
     forceRecalculate,
     updateInflation,
-    updateFinancials
+    updateFinancials,
+    saveQuotation
   } = useOptimizedQuote();
+  const navigate = "";
+  const toast = (props) => {console.log(props)};
+
+  const [isSaving, setIsSaving] = useState(false);
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {
@@ -152,6 +157,32 @@ export default function FinancialReviewFinal() {
       inflationAdjustment,
     });
   }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
+
+  const handleSaveQuotation = async () => {
+    try {
+      setIsSaving(true);
+      console.log('💾 Guardando cotización...');
+
+      // Usar la función de guardado del contexto
+      await saveQuotation();
+
+      toast({
+        title: "Cotización guardada",
+        description: "La cotización se ha guardado correctamente.",
+      });
+
+      navigate('/manage-quotes');
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      toast({
+        title: "Error al guardar",
+        description: "No se pudo guardar la cotización. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
@@ -697,13 +728,10 @@ export default function FinancialReviewFinal() {
 
       {/* Level 4: Action Buttons */}
       <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-4 lg:pt-6 border-t border-gray-200 mt-4 lg:mt-6">
-        <Button variant="outline" size="lg" className="px-8 shadow-sm">
-          <FileText className="h-4 w-4 mr-2" />
-          Exportar PDF
-        </Button>
-        <Button size="lg" className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 px-12 shadow-lg">
+        <Button size="lg" className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 px-12 shadow-lg" onClick={handleSaveQuotation}
+              disabled={isSaving}>
           <CheckCircle className="h-4 w-4 mr-2" />
-          Guardar Cotización
+          Finalizar Cotización
         </Button>
       </div>
     </div>
