@@ -142,24 +142,24 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
 
   // Log para debugging
   console.log('Debug data:', {
-    clientSummary: clientSummary.data,
-    deliverables: deliverables.data,
-    projects: projects.data,
-    summaryError: clientSummary.error,
-    deliverablesError: deliverables.error,
-    projectsError: projects.error
+    clientSummaryData,
+    deliverablesData,
+    projectsData,
+    summaryError,
+    deliverablesError,
+    projectsError
   });
 
   // Confirmar el tipo para TypeScript con validación segura
-  const clientSummaryData: ClientSummary | undefined = clientSummary.data && typeof clientSummary.data === 'object' 
-    ? clientSummary.data as ClientSummary 
+  const clientSummary: ClientSummary | undefined = clientSummaryData && typeof clientSummaryData === 'object' 
+    ? clientSummaryData as ClientSummary 
     : undefined;
-  const deliverablesData: DeliverableData[] = Array.isArray(deliverables.data) ? deliverables.data : [];
-  const projectsData: Project[] = Array.isArray(projects.data) ? projects.data : [];
+  const deliverables: DeliverableData[] = Array.isArray(deliverablesData) ? deliverablesData : [];
+  const projects: Project[] = Array.isArray(projectsData) ? projectsData : [];
 
   // Preparar los datos para las gráficas
-  const qualityScoresData = clientSummaryData ? [
-    { name: 'Narrativa', value: clientSummaryData.averageScores.narrativeQuality },
+  const qualityScoresData = clientSummary ? [
+    { name: 'Narrativa', value: clientSummary.averageScores.narrativeQuality },
     { name: 'Gráficos', value: clientSummary.averageScores.graphicsEffectiveness },
     { name: 'Formato', value: clientSummary.averageScores.formatDesign },
     { name: 'Insights', value: clientSummary.averageScores.relevantInsights },

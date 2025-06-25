@@ -736,8 +736,11 @@ export default function RecurringTemplatesPage() {
       )}
     </div>
   );
+
 }
-                      <div className="space-y-2">
+
+// Export the main component
+export default RecurringTemplatesPage;
                         <div className="flex items-center gap-1">
                           <Label htmlFor="templateName" className="text-sm font-medium">Nombre de Plantilla</Label>
                           <Tooltip>
@@ -1250,4 +1253,3 @@ export default function RecurringTemplatesPage() {
       </Tabs>
     </div>
   );
-}
