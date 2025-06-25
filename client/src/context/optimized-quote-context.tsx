@@ -94,6 +94,7 @@ interface OptimizedQuoteContextType {
   isEditing: boolean;
   isRecotizacion: boolean;
   quotationId: number | null;
+  complexityFactors: any;
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
@@ -176,6 +177,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
   const [availableRoles, setAvailableRoles] = useState<Role[] | null>(null);
   const [availablePersonnel, setAvailablePersonnel] = useState<Personnel[] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [complexityFactors, setComplexityFactors] = useState({});
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -420,6 +422,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     isEditing: !!quotationId && !isRequote,
     isRecotizacion: !!isRequote,
     quotationId: quotationId || null,
+    complexityFactors,
     updateClient,
     updateProjectName,
     updateProjectType,

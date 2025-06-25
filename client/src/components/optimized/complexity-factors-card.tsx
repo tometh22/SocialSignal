@@ -45,8 +45,9 @@ const ComplexityFactorsCard: React.FC = () => {
     { value: 'very-high', label: 'Muy Alto' }
   ];
 
-  const getTotalComplexityFactor = () => {
-    return Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
+  const getTotalComplexityFactor = (): number => {
+    if (!complexityFactors) return 0;
+    return Object.values(complexityFactors).reduce((sum: number, factor: any) => sum + (factor || 0), 0);
   };
 
   const getComplexityLevel = (factor: number) => {
