@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Calculator, AlertTriangle, DollarSign } from 'lucide-react';
+import { TrendingUp, Calculator, AlertTriangle, DollarSign, Shield } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 
