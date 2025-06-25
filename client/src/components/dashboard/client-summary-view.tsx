@@ -159,11 +159,11 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
 
   // Preparar los datos para las gráficas
   const qualityScoresData = clientSummary ? [
-    { name: 'Narrativa', value: clientSummary.averageScores.narrativeQuality },
-    { name: 'Gráficos', value: clientSummary.averageScores.graphicsEffectiveness },
-    { name: 'Formato', value: clientSummary.averageScores.formatDesign },
-    { name: 'Insights', value: clientSummary.averageScores.relevantInsights },
-    { name: 'Operaciones', value: clientSummary.averageScores.operationsFeedback },
+    { name: 'Narrativa', value: clientSummary.averageScores?.narrativeQuality || 0 },
+    { name: 'Gráficos', value: clientSummary.averageScores?.graphicsEffectiveness || 0 },
+    { name: 'Formato', value: clientSummary.averageScores?.formatDesign || 0 },
+    { name: 'Insights', value: clientSummary.averageScores?.relevantInsights || 0 },
+    { name: 'Operaciones', value: clientSummary.averageScores?.operationsFeedback || 0 },
   ] : [];
 
   // Calcular métricas por proyecto
@@ -353,26 +353,27 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Entregables Totales</span>
-                        <span className="font-semibold">{clientSummary.totalDeliverables}</span>
+                        <span className="font-semibold">{clientSummary?.totalDeliverables || 0}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Entregas a Tiempo</span>
-                        <span className="font-semibold">{formatPercent(clientSummary.onTimePercentage)}</span>
+                        <span className="font-semibold">{formatPercent(clientSummary?.onTimePercentage || 0)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Puntuación General</span>
                         <span className="font-semibold">
                           {formatScore(
-                            Object.values(clientSummary.averageScores).reduce((a, b) => a + b, 0) / 
-                            Object.values(clientSummary.averageScores).length
+                            clientSummary?.averageScores ? 
+                            Object.values(clientSummary.averageScores).reduce((a: number, b: number) => a + b, 0) / 
+                            Object.values(clientSummary.averageScores).length : 0
                           )}
                         </span>
                       </div>
-                      {clientSummary.averageHours && (
+                      {clientSummary?.averageHours && (
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Cumplimiento de Horas</span>
                           <span className="font-semibold">
-                            {formatPercent(clientSummary.averageHours.compliance * 100)}
+                            {formatPercent((clientSummary?.averageHours?.compliance || 0) * 100)}
                           </span>
                         </div>
                       )}
