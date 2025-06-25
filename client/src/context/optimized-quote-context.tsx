@@ -97,7 +97,7 @@ interface OptimizedQuoteContextType {
   updateClient: (client: Client | null) => void;
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
-  updateProjectDuration: (duration: ProjectDuration) => void;
+  updateProjectDuration: (duration: string | ProjectDuration) => void;
   updateTemplate: (template: ReportTemplate | null) => void;
   updateComplexity: (complexity: 'low' | 'medium' | 'high') => void;
   updateCustomization: (customization: string) => void;
@@ -204,8 +204,19 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     setQuotationData(prev => ({ ...prev, projectType }));
   }, []);
 
-  const updateProjectDuration = useCallback((projectDuration: ProjectDuration) => {
-    setQuotationData(prev => ({ ...prev, projectDuration }));
+  const updateProjectDuration = useCallback((value: string | ProjectDuration) => {
+    if (typeof value === 'string') {
+      const weeks = parseInt(value);
+      setQuotationData(prev => ({ 
+        ...prev, 
+        projectDuration: { 
+          ...prev.projectDuration, 
+          weeks: isNaN(weeks) ? 4 : weeks 
+        } 
+      }));
+    } else {
+      setQuotationData(prev => ({ ...prev, projectDuration: value }));
+    }
   }, []);
 
   const updateTemplate = useCallback((template: ReportTemplate | null) => {

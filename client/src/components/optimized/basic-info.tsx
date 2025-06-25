@@ -159,7 +159,7 @@ const OptimizedBasicInfo: React.FC = () => {
                       Duración
                     </Label>
                     <Select
-                      value={quotationData.projectDuration.weeks.toString()}
+                      value={quotationData.projectDuration?.weeks?.toString() || '4'}
                       onValueChange={updateProjectDuration}
                     >
                       <SelectTrigger id="project-duration" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
