@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
@@ -76,7 +75,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     const checkSession = setInterval(() => {
       const timeSinceActivity = Date.now() - lastActivity;
       const thirtyMinutes = 30 * 60 * 1000;
-      
+
       if (timeSinceActivity > thirtyMinutes) {
         toast({
           title: "⏰ Sesión inactiva",
@@ -147,7 +146,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           <span>/</span>
           <span className="text-foreground font-medium">{isEditing ? 'Editar Cotización' : 'Nueva Cotización'}</span>
         </nav>
-        
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="heading-page">{isEditing ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
@@ -162,7 +161,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <ArrowLeft className="h-4 w-4 mr-1" />
               Volver
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -230,7 +229,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 2 && <OptimizedTemplateSelection />}
             {currentStep === 3 && <EnhancedTeamConfig />}
             {currentStep === 4 && <ComplexityFactorsCard />}
-            
+
             {currentStep === 5 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration 
@@ -243,14 +242,14 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 />
               </div>
             )}
-            
+
             {((currentStep === 5 && quotationData.project?.type !== 'always-on') || 
               (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
           </div>
         </div>
-        
+
         {/* Tips section only on first step */}
         {currentStep === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -270,7 +269,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-white border border-neutral-100 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center text-base">
@@ -286,7 +285,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-white border border-neutral-100 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center text-base">
@@ -316,7 +315,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             <ChevronLeft className="h-4 w-4 mr-1" />
             Anterior
           </Button>
-          
+
           <div className="flex gap-3">
             {isLastStep ? (
               <Button

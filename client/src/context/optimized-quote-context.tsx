@@ -249,16 +249,16 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
     console.log('🔄 Force recalculation triggered');
-    
+
     // Debounce rapid consecutive calls
     const now = Date.now();
     const lastRecalc = localStorage.getItem('last-recalc-time');
-    
+
     if (lastRecalc && (now - parseInt(lastRecalc)) < 100) {
       console.log('🔄 Recalculation debounced');
       return;
     }
-    
+
     localStorage.setItem('last-recalc-time', now.toString());
     setRecalculationTrigger(prev => prev + 1);
   }, []);
@@ -273,7 +273,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
             timestamp: Date.now(),
             version: '1.0'
           };
-          
+
           localStorage.setItem('draft-quotation', JSON.stringify(draftData));
           localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
           console.log('📝 Draft auto-saved at', new Date().toLocaleTimeString());
@@ -304,7 +304,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       try {
         const { quotationData: savedData, timestamp } = JSON.parse(draft);
         const isRecent = Date.now() - timestamp < 24 * 60 * 60 * 1000; // 24 hours
-        
+
         if (isRecent && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
           setQuotationData(savedData);
           console.log('📋 Draft restored from auto-save');
