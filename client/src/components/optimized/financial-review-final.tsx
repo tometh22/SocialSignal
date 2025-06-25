@@ -684,11 +684,10 @@ export default function FinancialReviewFinal() {
                   deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
                 }`}>
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                    <span className={`text-sm font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-9000'}`}>
                       Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
                     </span>
-                    <span```python
-className={`font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                    <span className={`font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
                       {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
                     </span>
                   </div>
