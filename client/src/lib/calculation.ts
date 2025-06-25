@@ -6,29 +6,29 @@ export interface ComplexityFactors {
   templateFactor: number;
 }
 
-// Multiplicadores fijos (fallback si falla la API)
+// Multiplicadores fijos basados en el panel de administración
 const DEFAULT_MULTIPLIERS = {
   complexity: {
     basic: 0,
-    standard: 0.1,
-    deep: 0.15
+    standard: 1.15, // +115.0%
+    deep: 1.5
   },
   mentions_volume: {
     small: 0,
-    medium: 0.1,
-    large: 0.2,
-    xlarge: 0.3
+    medium: 1.0, // +100.0% (1K-10K menciones)
+    large: 1.25,
+    xlarge: 1.5
   },
   countries: {
     "1": 0,
-    "2-5": 0.05,
-    "6-10": 0.15,
-    "10+": 0.25
+    "2-5": 1.1, // +110.0% (2-5 países)
+    "6-10": 1.25,
+    "10+": 1.5
   },
   urgency: {
-    low: 0,
-    medium: 0.05,
-    high: 0.15
+    low: 0.0, // +0.0% (Bajo)
+    medium: 0.25,
+    high: 0.5
   },
   project_type: {
     basic: 0,
@@ -126,7 +126,7 @@ export const getAnalysisTypeFactor = (analysisType: string): number => {
   // Get factor from cache or default
   const factor = multiplierCache.complexity?.[mappedType] ?? 
                  DEFAULT_MULTIPLIERS.complexity[mappedType as keyof typeof DEFAULT_MULTIPLIERS.complexity] ?? 
-                 0.1; // Fallback to 10% if nothing found
+                 0;
   
   console.log(`📊 Analysis type factor result: ${factor} (${factor * 100}%)`);
   console.log(`📂 Available complexity factors:`, multiplierCache.complexity);
@@ -159,7 +159,7 @@ export const getMentionsVolumeFactor = (mentionsVolume: string): number => {
   
   const factor = multiplierCache.mentions_volume?.[mappedVolume] ?? 
                  DEFAULT_MULTIPLIERS.mentions_volume[mappedVolume as keyof typeof DEFAULT_MULTIPLIERS.mentions_volume] ?? 
-                 0.05; // Fallback to 5%
+                 0;
   
   console.log(`📊 Mentions volume factor result: ${factor} (${factor * 100}%)`);
   console.log(`📂 Available mentions_volume factors:`, multiplierCache.mentions_volume);
