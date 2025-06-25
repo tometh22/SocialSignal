@@ -121,9 +121,12 @@ export default function FinancialReviewFinal() {
     }
   }
 
-  // Continue with markup calculation using inflated base
-  const teamMarkupAmount = inflationProjectedCost;
-  const subtotalWithMarkup = inflationProjectedCost + teamMarkupAmount;
+  // Calculate final base after inflation (if any)
+  const finalBaseAfterInflation = inflationProjectedCost;
+  
+  // Continue with markup calculation using the final base
+  const teamMarkupAmount = finalBaseAfterInflation;
+  const subtotalWithMarkup = finalBaseAfterInflation + teamMarkupAmount;
 
   // Platform cost and adjustments
   const platformCost = quotationData.financials.platformCost || 0;
@@ -206,7 +209,22 @@ export default function FinancialReviewFinal() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">Total</p>
-              <p className="text-lg font-bold text-green-600">{formatCurrency(finalTotal)}</p>
+              <p className="text-lg font-bold text-green-600">
+                {quotationData.inflation.quotationCurrency === 'USD' 
+                  ? new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(finalTotal)
+                  : new Intl.NumberFormat('es-AR', {
+                      style: 'currency',
+                      currency: 'ARS',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(finalTotal)
+                }
+              </p>
             </div>
           </div>
         </div>
@@ -329,25 +347,38 @@ export default function FinancialReviewFinal() {
               {/* Financial Steps */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <span className="text-sm font-medium text-blue-900">Costo Base</span>
+                  <span className="text-sm font-medium text-blue-900">1. Costo Base del Equipo</span>
                   <span className="font-bold text-blue-900">{formatCurrency(teamBaseCost)}</span>
                 </div>
 
                 <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <span className="text-sm font-medium text-amber-900">+ Complejidad</span>
+                  <span className="text-sm font-medium text-amber-900">2. + Ajuste Complejidad ({getComplexityPercentage()}%)</span>
                   <span className="font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-300">
+                  <span className="text-sm font-medium text-gray-900">Subtotal (Base + Complejidad)</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithComplexity)}</span>
                 </div>
 
                 {/* Inflation - Only show if applied */}
                 {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                  <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                    <span className="text-sm font-medium text-orange-900">+ Inflación</span>
-                    <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <span className="text-sm font-medium text-orange-900">3. + Ajuste Inflación</span>
+                      <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-300">
+                      <span className="text-sm font-medium text-gray-900">Base Ajustada con Inflación</span>
+                      <span className="font-bold text-gray-900">{formatCurrency(finalBaseAfterInflation)}</span>
+                    </div>
+                  </>
                 )}
 
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-200">
-                  <span className="text-sm font-medium text-green-900">+ Margen (100%)</span>
+                  <span className="text-sm font-medium text-green-900">
+                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 ? '4.' : '3.'} + Margen Comercial (100%)
+                  </span>
                   <span className="font-bold text-green-900">+{formatCurrency(teamMarkupAmount)}</span>
                 </div>
 
@@ -459,15 +490,39 @@ export default function FinancialReviewFinal() {
                 onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
               />
               
-              <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="font-medium text-amber-800 mb-1">¿Cómo funciona la inflación?</p>
-                    <p className="text-amber-700">
-                      La inflación se aplica al subtotal (base + complejidad) basándose en la fecha de inicio del proyecto. 
-                      El ajuste se suma antes del margen comercial para proteger contra la depreciación monetaria.
-                    </p>
+              <div className="mt-4 space-y-3">
+                {/* Status indicator */}
+                <div className={`p-3 rounded-lg border ${
+                  quotationData.inflation.applyInflationAdjustment 
+                    ? 'bg-blue-50 border-blue-200' 
+                    : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Estado actual:</span>
+                    <Badge variant={quotationData.inflation.applyInflationAdjustment ? "default" : "secondary"}>
+                      {quotationData.inflation.applyInflationAdjustment 
+                        ? `Inflación aplicada: +${formatCurrency(inflationAdjustment)}` 
+                        : 'Sin ajuste de inflación'
+                      }
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-800 mb-1">¿Cómo funciona la inflación?</p>
+                      <p className="text-amber-700">
+                        La inflación se aplica al subtotal (base + complejidad) basándose en la fecha de inicio del proyecto. 
+                        El ajuste se suma antes del margen comercial para proteger contra la depreciación monetaria.
+                        {!quotationData.inflation.applyInflationAdjustment && (
+                          <span className="block mt-2 font-medium">
+                            ⚠️ Actualmente desactivada - todos los cálculos usan valores base sin inflación.
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
