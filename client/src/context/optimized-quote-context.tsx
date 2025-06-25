@@ -11,6 +11,11 @@ interface Client {
   phone?: string;
   industry?: string;
   logo?: string;
+  logoUrl?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  createdBy?: number | null;
 }
 
 interface ReportTemplate {
@@ -37,6 +42,7 @@ interface Personnel {
   roleId: number;
   hourlyRate: number;
   isActive: boolean;
+  name?: string;
 }
 
 interface TeamMember {
@@ -46,6 +52,9 @@ interface TeamMember {
   hoursPerWeek: number;
   weeksCovered: number;
   totalCost: number;
+  hours?: number;
+  rate?: number;
+  cost?: number;
 }
 
 interface QuoteDeliverable {
@@ -82,6 +91,13 @@ interface QuotationData {
   markupPercentage: number;
   discountPercentage: number;
   notes: string;
+  financials?: {
+    baseCost: number;
+    complexityAdjustment: number;
+    markupAmount: number;
+    discountAmount: number;
+    totalAmount: number;
+  };
 }
 
 interface OptimizedQuoteContextType {
