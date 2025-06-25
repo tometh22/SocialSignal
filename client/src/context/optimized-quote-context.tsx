@@ -252,6 +252,39 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     setRecalculationTrigger(prev => prev + 1);
   }, []);
 
+  // Auto-save draft to localStorage
+  useEffect(() => {
+    const saveInterval = setInterval(() => {
+      if (quotationData.project.name || quotationData.teamMembers.length > 0) {
+        localStorage.setItem('draft-quotation', JSON.stringify({
+          quotationData,
+          timestamp: Date.now()
+        }));
+        console.log('📝 Draft auto-saved');
+      }
+    }, 30000); // Save every 30 seconds
+
+    return () => clearInterval(saveInterval);
+  }, [quotationData]);
+
+  // Load draft on mount
+  useEffect(() => {
+    const draft = localStorage.getItem('draft-quotation');
+    if (draft) {
+      try {
+        const { quotationData: savedData, timestamp } = JSON.parse(draft);
+        const isRecent = Date.now() - timestamp < 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (isRecent && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
+          setQuotationData(savedData);
+          console.log('📋 Draft restored from auto-save');
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
+    }
+  }, []);
+
   // Calculate recommended roles based on template
   const recommendedRoleIds = useMemo(() => {
     if (!quotationData.template) return [];
