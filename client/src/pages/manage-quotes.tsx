@@ -59,6 +59,7 @@ export default function ManageQuotes() {
   const [newStatus, setNewStatus] = useState("");
   const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
   const [checkingProjects, setCheckingProjects] = useState(false);
+  const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const { toast } = useToast();
   
   // Función auxiliar para obtener el nombre del cliente por ID
@@ -199,6 +200,8 @@ export default function ManageQuotes() {
     if (!selectedQuote) return;
     
     try {
+      // Iniciar animación de eliminación
+      setDeletingQuoteId(selectedQuote.id);
       
       // Usamos fetch directamente en lugar de apiRequest para tener más control sobre el manejo de respuestas
       const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
@@ -223,6 +226,7 @@ export default function ManageQuotes() {
       
       // Manejar los diferentes casos según el código HTTP
       if (response.status === 409) {
+        setDeletingQuoteId(null);
         toast({
           title: "No se puede eliminar",
           description: "Esta cotización está siendo utilizada por proyectos activos y no puede ser eliminada.",
@@ -232,14 +236,19 @@ export default function ManageQuotes() {
       }
       
       if (response.ok && data.success) {
-        toast({
-          title: "Cotización eliminada",
-          description: "La cotización ha sido eliminada correctamente.",
-        });
-        
-        refetch();
-        setDeleteDialogOpen(false);
+        // Esperar un momento para que se vea la animación
+        setTimeout(() => {
+          toast({
+            title: "Cotización eliminada",
+            description: "La cotización ha sido eliminada correctamente.",
+          });
+          
+          refetch();
+          setDeleteDialogOpen(false);
+          setDeletingQuoteId(null);
+        }, 800);
       } else {
+        setDeletingQuoteId(null);
         // Si hay un error del servidor o success: false
         toast({
           title: "Error",
@@ -248,6 +257,7 @@ export default function ManageQuotes() {
         });
       }
     } catch (error) {
+      setDeletingQuoteId(null);
       console.error(`[CLIENT] Error al eliminar cotización:`, error);
       toast({
         title: "Error",
@@ -371,7 +381,14 @@ export default function ManageQuotes() {
                       </thead>
                       <tbody>
                         {filteredQuotations.map((quote) => (
-                          <tr key={quote.id} className="border-b hover:bg-muted/50 transition-colors">
+                          <tr 
+                            key={quote.id} 
+                            className={`border-b hover:bg-muted/50 transition-all duration-300 ${
+                              deletingQuoteId === quote.id 
+                                ? 'opacity-30 scale-95 bg-red-50 animate-pulse' 
+                                : 'opacity-100 scale-100'
+                            }`}
+                          >
                             <td className="px-4 py-3 text-body font-medium">{quote.projectName}</td>
                             <td className="px-4 py-3 text-body">{getClientName(quote.clientId)}</td>
                             <td className="px-4 py-3 text-body">{quote.projectType || "Always On"}</td>
@@ -455,9 +472,19 @@ export default function ManageQuotes() {
                                   size="sm"
                                   className="hover-lift text-destructive hover:text-destructive-foreground hover:bg-destructive"
                                   onClick={() => openDeleteDialog(quote)}
+                                  disabled={deletingQuoteId === quote.id}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-1" />
-                                  Eliminar
+                                  {deletingQuoteId === quote.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                      Eliminando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash2 className="h-4 w-4 mr-1" />
+                                      Eliminar
+                                    </>
+                                  )}
                                 </Button>
                               </div>
                             </td>
