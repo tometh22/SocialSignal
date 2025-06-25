@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
@@ -7,6 +8,19 @@ import { Button } from "@/components/ui/button";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Users, 
+  Calculator, 
+  TrendingUp, 
+  DollarSign, 
+  Globe, 
+  MessageCircle,
+  BarChart3,
+  CheckCircle,
+  AlertTriangle,
+  Info
+} from "lucide-react";
 
 export default function FinancialReviewFinal() {
   const {
@@ -23,43 +37,12 @@ export default function FinancialReviewFinal() {
     updateFinancials
   } = useOptimizedQuote();
 
-  // Debug log para verificar valores
-  useEffect(() => {
-    console.log('Financial Review - Current values:', {
-      baseCost,
-      complexityAdjustment,
-      markupAmount,
-      totalAmount,
-      complexityFactors,
-      teamMembers: quotationData.teamMembers
-    });
-  }, [baseCost, complexityAdjustment, markupAmount, totalAmount, complexityFactors, quotationData.teamMembers]);
-
   // Force recalculation when component mounts or data changes
   useEffect(() => {
     if (quotationData.teamMembers.length > 0) {
       forceRecalculate();
     }
   }, [quotationData.teamMembers, forceRecalculate]);
-
-  // Calculate total complexity factor for display
-  const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
-
-  const runDiagnostic = () => {
-    console.log('🔍 === MANUAL DIAGNOSTIC ===');
-    console.log('💰 Current values:', {
-      baseCost,
-      complexityAdjustment,
-      markupAmount,
-      totalAmount
-    });
-    console.log('👥 Team members:', quotationData.teamMembers);
-    console.log('🧮 Complexity factors:', complexityFactors);
-    console.log('📋 Template:', quotationData.template);
-
-    // Force recalculation
-    forceRecalculate();
-  };
 
   // Helper function to get role name
   const getRoleName = (roleId) => {
@@ -73,36 +56,35 @@ export default function FinancialReviewFinal() {
     return person ? person.name : `Personal #${personnelId}`;
   };
 
-    const calculateTeamBaseCost = () => {
-        let cost = 0;
-        quotationData.teamMembers.forEach(member => {
-            cost += member.cost;
-        });
-        return cost;
-    };
+  const calculateTeamBaseCost = () => {
+    let cost = 0;
+    quotationData.teamMembers.forEach(member => {
+      cost += member.cost;
+    });
+    return cost;
+  };
 
-    const calculateComplexityAdjustment = (teamBaseCost) => {
-        let adjustment = 0;
-        adjustment += teamBaseCost * complexityFactors.analysisTypeFactor;
-        adjustment += teamBaseCost * complexityFactors.mentionsVolumeFactor;
-        adjustment += teamBaseCost * complexityFactors.countriesFactor;
-        adjustment += teamBaseCost * complexityFactors.clientEngagementFactor;
-        return adjustment;
-    };
+  const calculateComplexityAdjustment = (teamBaseCost) => {
+    let adjustment = 0;
+    adjustment += teamBaseCost * complexityFactors.analysisTypeFactor;
+    adjustment += teamBaseCost * complexityFactors.mentionsVolumeFactor;
+    adjustment += teamBaseCost * complexityFactors.countriesFactor;
+    adjustment += teamBaseCost * complexityFactors.clientEngagementFactor;
+    return adjustment;
+  };
 
-    const getComplexityPercentage = (level) => {
-        if (level === 'low') return 0;
-        if (level === 'medium') return 10;
-        return 25;
-    };
+  const getComplexityPercentage = () => {
+    const totalFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
+    return (totalFactor * 100).toFixed(1);
+  };
     
-    // Calculate values
+  // Calculate values
   const teamBaseCost = calculateTeamBaseCost();
   const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
   const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
 
   // Calculate inflation if applicable
-  const baseForInflation = subtotalWithComplexity; // Base cost + complexity, BEFORE markup
+  const baseForInflation = subtotalWithComplexity;
   let inflationAdjustment = 0;
   let inflationProjectedCost = baseForInflation;
 
@@ -113,17 +95,15 @@ export default function FinancialReviewFinal() {
                            (startDate.getMonth() - currentDate.getMonth());
 
     if (monthsDifference > 0) {
-      // Convert to ARS if needed
-      const exchangeRate = 1100; // This should come from API
+      const exchangeRate = 1100;
       let baseCostInARS = quotationData.inflation.quotationCurrency === 'USD' ? 
                          baseForInflation * exchangeRate : baseForInflation;
 
-      // Calculate inflation
       let inflationRate;
       if (quotationData.inflation.inflationMethod === 'manual') {
         inflationRate = quotationData.inflation.manualInflationRate || 25;
       } else {
-        inflationRate = 25; // This should come from API average
+        inflationRate = 25;
       }
 
       const annualRateDecimal = inflationRate / 100;
@@ -136,7 +116,7 @@ export default function FinancialReviewFinal() {
   }
 
   // Continue with markup calculation using inflated base
-  const teamMarkupAmount = inflationProjectedCost; // 2x markup on inflated cost
+  const teamMarkupAmount = inflationProjectedCost;
   const subtotalWithMarkup = inflationProjectedCost + teamMarkupAmount;
 
   // Platform cost and adjustments
@@ -157,291 +137,309 @@ export default function FinancialReviewFinal() {
       totalCost: finalTotal,
       complexityAdjustment: teamComplexityAdjustment,
       markupAmount: teamMarkupAmount,
-      inflationAdjustment, // Include inflation adjustment
+      inflationAdjustment,
     });
   }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Revisión Financiera Final</h2>
-        <div className="flex gap-2">
-          <Button onClick={runDiagnostic} variant="outline" size="sm">
-            🔍 Diagnóstico
-          </Button>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            Paso 4 de 4
-          </Badge>
+    <div className="max-w-6xl mx-auto space-y-8 p-6">
+      {/* Header Section */}
+      <div className="text-center space-y-4">
+        <div className="flex items-center justify-center gap-3">
+          <CheckCircle className="h-8 w-8 text-green-600" />
+          <h1 className="text-3xl font-bold text-gray-900">Cotización Finalizada</h1>
         </div>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          Revisión completa de tu proyecto con todos los ajustes aplicados
+        </p>
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          Paso 4 de 4 - Listo para presentar
+        </Badge>
       </div>
 
-      {/* Complexity Factors Display */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Factores de Complejidad</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600">Tipo de Análisis</div>
-              <div className="flex items-center gap-2">
-                <Badge variant={quotationData.analysisType === "Estándar" ? "default" : quotationData.analysisType === "Avanzado" ? "destructive" : "secondary"}>
-                  {quotationData.analysisType || "No seleccionado"}
-                </Badge>
-                <span className="text-xs text-gray-500">
-                  +{(complexityFactors.analysisTypeFactor * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600">Volumen de Menciones</div>
-              <div className="flex items-center gap-2">
-                <Badge variant={quotationData.mentionsVolume === "Medio" ? "default" : quotationData.mentionsVolume === "Alto" ? "destructive" : "secondary"}>
-                  {quotationData.mentionsVolume || "No seleccionado"}
-                </Badge>
-                <span className="text-xs text-gray-500">
-                  +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600">Países Cubiertos</div>
-              <div className="flex items-center gap-2">
-                <Badge variant={quotationData.countriesCovered === "4+ países" ? "destructive" : quotationData.countriesCovered === "2-3 países" ? "default" : "secondary"}>
-                  {quotationData.countriesCovered || "No seleccionado"}
-                </Badge>
-                <span className="text-xs text-gray-500">
-                  +{(complexityFactors.countriesFactor * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600">Compromiso del Cliente</div>
-              <div className="flex items-center gap-2">
-                <Badge variant={quotationData.clientEngagement === "Alto" ? "destructive" : quotationData.clientEngagement === "Medio" ? "default" : "secondary"}>
-                  {quotationData.clientEngagement || "No seleccionado"}
-                </Badge>
-                <span className="text-xs text-gray-500">
-                  +{(complexityFactors.clientEngagementFactor * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Team Members Cost Breakdown */}
-      {quotationData.teamMembers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Desglose del Equipo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {quotationData.teamMembers.map((member, index) => (
-                <div key={member.id || index} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-md">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">
-                      {member.personnelId 
-                        ? getPersonnelName(member.personnelId) 
-                        : getRoleName(member.roleId)
-                      }
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {member.hours}h × ${member.rate}/h
-                    </span>
-                  </div>
-                  <span className="text-sm font-mono font-medium">
-                    {formatCurrency(member.cost)}
-                  </span>
-                </div>
-              ))}
-              <div className="border-t pt-2 mt-3">
-                <div className="flex justify-between items-center font-medium">
-                  <span>Costo Base del Equipo</span>
-                  <span className="font-mono">{formatCurrency(teamBaseCost)}</span>
-                </div>
-              </div>
-              <div className="border-t pt-3 mt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-700">Subtotal (sin margen):</span>
-                  <span className="font-mono">{formatCurrency(subtotalWithComplexity)}</span>
-                </div>
-
-                {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                  <div className="flex justify-between text-sm text-orange-700 bg-orange-50 px-2 py-1 rounded">
-                    <span className="font-medium">+ Ajuste por inflación:</span>
-                    <span className="font-mono">{formatCurrency(inflationAdjustment)}</span>
-                  </div>
-                )}
-
-                {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                  <div className="flex justify-between text-sm border-t pt-2">
-                    <span className="font-medium text-gray-700">Subtotal proyectado:</span>
-                    <span className="font-mono font-semibold">{formatCurrency(inflationProjectedCost)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Markup Control */}
-      <Card className="border-blue-200 bg-blue-50/30">
+      {/* Project Overview */}
+      <Card className="border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center text-lg text-blue-800">
-            Configuración de Margen
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <Info className="h-6 w-6 text-blue-600" />
+            Resumen del Proyecto
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Factor de Margen</Label>
-                <span className="text-sm font-mono bg-blue-100 px-2 py-1 rounded">
-                  {quotationData.financials.marginFactor.toFixed(1)}x
-                </span>
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold text-gray-900">Cliente</span>
               </div>
-              <Slider
-                value={[quotationData.financials.marginFactor]}
-                onValueChange={([value]) => 
-                  updateFinancials({ marginFactor: value })
-                }
-                min={1.0}
-                max={4.0}
-                step={0.1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>1.0x (Sin margen)</span>
-                <span>2.0x (100% margen)</span>
-                <span>4.0x (300% margen)</span>
-              </div>
+              <p className="text-lg text-gray-700">{quotationData.client?.name || 'Cliente no seleccionado'}</p>
             </div>
-
-            <div className="bg-white p-3 rounded-lg border">
-              <div className="flex justify-between items-center text-sm">
-                <span>Margen aplicado:</span>
-                <span className="font-mono font-medium text-blue-600">
-                  +{formatCurrency(markupAmount)}
-                </span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold text-gray-900">Proyecto</span>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Factor {quotationData.financials.marginFactor.toFixed(1)}x sobre costo base + plataforma
+              <p className="text-lg text-gray-700">{quotationData.project.name || 'Proyecto sin nombre'}</p>
+              <Badge variant="secondary">
+                {quotationData.project.type === 'on-demand' ? 'Proyecto Único' : 
+                 quotationData.project.type === 'fee-mensual' ? 'Fee Mensual' : 
+                 'Tipo no especificado'}
+              </Badge>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-blue-600" />
+                <span className="font-semibold text-gray-900">Complejidad</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg text-gray-700">{quotationData.analysisType}</p>
+                <Badge variant={getComplexityPercentage() > 20 ? "destructive" : getComplexityPercentage() > 10 ? "default" : "secondary"}>
+                  +{getComplexityPercentage()}% ajuste total
+                </Badge>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Financial Summary */}
-      <Card>
+      {/* Team & Cost Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Team Composition */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-gray-700" />
+              Composición del Equipo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {quotationData.teamMembers.map((member, index) => (
+              <div key={member.id || index} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border">
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-gray-900">
+                    {member.personnelId 
+                      ? getPersonnelName(member.personnelId) 
+                      : getRoleName(member.roleId)
+                    }
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    {member.hours} horas × ${member.rate}/hora
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatCurrency(member.cost)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            
+            <Separator />
+            
+            <div className="flex justify-between items-center py-2">
+              <span className="text-lg font-semibold text-gray-900">Costo Base del Equipo</span>
+              <span className="text-xl font-bold text-blue-600">{formatCurrency(teamBaseCost)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Complexity Factors */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Calculator className="h-5 w-5 text-gray-700" />
+              Factores de Complejidad
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Tipo de Análisis</p>
+                  <p className="text-sm text-gray-600">{quotationData.analysisType}</p>
+                </div>
+                <Badge variant="outline">
+                  +{(complexityFactors.analysisTypeFactor * 100).toFixed(1)}%
+                </Badge>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Volumen de Menciones</p>
+                  <p className="text-sm text-gray-600">{quotationData.mentionsVolume}</p>
+                </div>
+                <Badge variant="outline">
+                  +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
+                </Badge>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Países Cubiertos</p>
+                  <p className="text-sm text-gray-600">{quotationData.countriesCovered}</p>
+                </div>
+                <Badge variant="outline">
+                  +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
+                </Badge>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Compromiso del Cliente</p>
+                  <p className="text-sm text-gray-600">{quotationData.clientEngagement}</p>
+                </div>
+                <Badge variant="outline">
+                  +{(complexityFactors.clientEngagementFactor * 100).toFixed(1)}%
+                </Badge>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="flex justify-between items-center py-2">
+              <span className="text-lg font-semibold text-gray-900">Ajuste por Complejidad</span>
+              <span className="text-xl font-bold text-amber-600">+{formatCurrency(teamComplexityAdjustment)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Financial Waterfall */}
+      <Card className="border-2 border-green-100">
         <CardHeader>
-          <CardTitle className="text-lg">Resumen Financiero</CardTitle>
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <DollarSign className="h-6 w-6 text-green-600" />
+            Desglose Financiero Completo
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Costo Base (Equipo)</span>
-                <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(teamBaseCost)}
-                </span>
+        <CardContent className="space-y-6">
+          
+          {/* Base Cost */}
+          <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div>
+              <h4 className="font-semibold text-blue-900">1. Costo Base del Equipo</h4>
+              <p className="text-sm text-blue-700">Suma de horas × tarifas de todos los miembros</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-blue-900">{formatCurrency(teamBaseCost)}</p>
+            </div>
+          </div>
+
+          {/* Complexity Adjustment */}
+          <div className="flex justify-between items-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <div>
+              <h4 className="font-semibold text-amber-900">2. Ajuste por Complejidad</h4>
+              <p className="text-sm text-amber-700">+{getComplexityPercentage()}% basado en factores del proyecto</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</p>
+            </div>
+          </div>
+
+          {/* Subtotal before markup */}
+          <div className="flex justify-between items-center p-4 bg-gray-100 rounded-lg border border-gray-300">
+            <div>
+              <h4 className="font-semibold text-gray-900">Subtotal (Base + Complejidad)</h4>
+              <p className="text-sm text-gray-600">Costo real del proyecto antes de márgenes</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(subtotalWithComplexity)}</p>
+            </div>
+          </div>
+
+          {/* Inflation Adjustment */}
+          {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+            <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div>
+                <h4 className="font-semibold text-orange-900">3. Ajuste por Inflación</h4>
+                <p className="text-sm text-orange-700">
+                  {quotationData.inflation.inflationMethod === 'manual' 
+                    ? `${quotationData.inflation.manualInflationRate}% anual aplicado` 
+                    : 'Promedio histórico de 12 meses'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</p>
               </div>
             </div>
+          )}
 
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">
-                  Ajuste por Complejidad ({getComplexityPercentage(quotationData.complexity.level)}%)
-                </span>
-                <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(teamComplexityAdjustment)}
-                </span>
+          {/* Markup */}
+          <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
+            <div>
+              <h4 className="font-semibold text-green-900">4. Margen Comercial</h4>
+              <p className="text-sm text-green-700">100% de margen estándar aplicado</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-green-900">+{formatCurrency(teamMarkupAmount)}</p>
+            </div>
+          </div>
+
+          {/* Platform Cost */}
+          {platformCost > 0 && (
+            <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div>
+                <h4 className="font-semibold text-purple-900">5. Costo de Plataforma</h4>
+                <p className="text-sm text-purple-700">Herramientas y servicios externos</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-purple-900">+{formatCurrency(platformCost)}</p>
               </div>
             </div>
+          )}
 
-            {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <div className="flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-orange-800">Ajuste por Inflación</span>
-                    <span className="text-xs text-orange-600">
-                      {quotationData.inflation.inflationMethod === 'manual' 
-                        ? `${quotationData.inflation.manualInflationRate}% anual` 
-                        : 'Promedio 12 meses'}
-                    </span>
-                  </div>
-                  <span className="text-lg font-mono font-semibold text-orange-800">
-                    +{formatCurrency(inflationAdjustment)}
-                  </span>
-                </div>
+          {/* Deviation */}
+          {deviationPercentage !== 0 && (
+            <div className={`flex justify-between items-center p-4 rounded-lg border ${
+              deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+            }`}>
+              <div>
+                <h4 className={`font-semibold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                  6. Ajuste {deviationPercentage > 0 ? 'Adicional' : 'Descuento'}
+                </h4>
+                <p className={`text-sm ${deviationPercentage > 0 ? 'text-red-700' : 'text-green-700'}`}>
+                  {deviationPercentage > 0 ? '+' : ''}{deviationPercentage}% sobre subtotal
+                </p>
               </div>
-            )}
-
-            <div className="bg-white p-4 rounded-lg border">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">
-                  Margen Estándar (100%)
-                  {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                    <span className="text-xs text-orange-600 block">Aplicado sobre costo con inflación</span>
-                  )}
-                </span>
-                <span className="text-lg font-mono font-semibold text-gray-900">
-                  {formatCurrency(teamMarkupAmount)}
-                </span>
+              <div className="text-right">
+                <p className={`text-2xl font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                  {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
+                </p>
               </div>
             </div>
+          )}
 
-            {platformCost > 0 && (
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Costo de Plataforma</span>
-                  <span className="text-lg font-mono font-semibold text-gray-900">
-                    {formatCurrency(platformCost)}
-                  </span>
-                </div>
+          {/* Discount */}
+          {discountPercentage > 0 && (
+            <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
+              <div>
+                <h4 className="font-semibold text-green-900">7. Descuento Aplicado</h4>
+                <p className="text-sm text-green-700">{discountPercentage}% de descuento especial</p>
               </div>
-            )}
-
-            {deviationPercentage !== 0 && (
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
-                  </span>
-                  <span className={`text-lg font-mono font-semibold ${deviationPercentage > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
-                  </span>
-                </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-green-900">-{formatCurrency(discountAmount)}</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {discountPercentage > 0 && (
-              <div className="bg-white p-4 rounded-lg border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Descuento ({discountPercentage}%)</span>
-                  <span className="text-lg font-mono font-semibold text-green-600">
-                    -{formatCurrency(discountAmount)}
-                  </span>
-                </div>
-              </div>
-            )}
+          <Separator className="my-6" />
 
-            <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
-              <div className="flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-lg font-bold text-primary">Total Final</span>
-                  {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                    <span className="text-xs text-primary/70">Incluye ajuste por inflación</span>
-                  )}
-                </div>
-                <span className="text-2xl font-mono font-bold text-primary">
-                  {quotationData.inflation.quotationCurrency === 'USD' 
+          {/* Final Total */}
+          <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg text-white">
+            <div>
+              <h3 className="text-2xl font-bold">TOTAL FINAL</h3>
+              <p className="text-indigo-100">
+                {quotationData.inflation.quotationCurrency === 'USD' ? 'Dólares Americanos' : 'Pesos Argentinos'}
+              </p>
+              {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                <p className="text-sm text-indigo-200 mt-1">Incluye proyección inflacionaria</p>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-4xl font-bold">
+                {quotationData.inflation.quotationCurrency === 'USD' 
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
@@ -455,20 +453,19 @@ export default function FinancialReviewFinal() {
                       maximumFractionDigits: 0,
                     }).format(finalTotal)
                 }
-                </span>
-              </div>
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Inflation Adjustment */}
+      {/* Inflation Configuration */}
       <InflationAdjustmentCard
         applyInflationAdjustment={quotationData.inflation.applyInflationAdjustment}
         inflationMethod={quotationData.inflation.inflationMethod}
         manualInflationRate={quotationData.inflation.manualInflationRate}
         projectStartDate={quotationData.inflation.projectStartDate}
-        totalCost={teamBaseCost + teamComplexityAdjustment + quotationData.financials.platformCost} // Costo SIN margen para inflación
+        totalCost={subtotalWithComplexity}
         quotationCurrency={quotationData.inflation.quotationCurrency}
         projectType={quotationData.project.type}
         projectDuration={quotationData.project.duration}
@@ -479,45 +476,16 @@ export default function FinancialReviewFinal() {
         onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
       />
 
-      {/* Project Information Summary */}
-      <Card className="border-slate-200 bg-slate-50/30">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center text-lg text-slate-800">
-            Resumen del Proyecto
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div>
-                <span className="text-sm font-medium text-slate-600">Cliente:</span>
-                <div className="text-base font-semibold">{quotationData.client?.name || 'No seleccionado'}</div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600">Proyecto:</span>
-                <div className="text-base font-semibold">{quotationData.project.name || 'Sin nombre'}</div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <span className="text-sm font-medium text-slate-600">Tipo de Proyecto:</span>
-                <div className="text-base font-semibold">
-                  {quotationData.project.type === 'on-demand' ? 'On Demand (Proyecto Único)' : 
-                   quotationData.project.type === 'fee-mensual' ? 'Fee Mensual (Contrato Recurrente)' : 
-                   'No especificado'}
-                </div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600">Duración:</span>
-                <div className="text-base font-semibold">
-                  {quotationData.project.duration || 'No especificada'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Action Buttons */}
+      <div className="flex justify-center gap-4 pt-8">
+        <Button variant="outline" size="lg" className="px-8">
+          Exportar PDF
+        </Button>
+        <Button size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+          <CheckCircle className="h-5 w-5 mr-2" />
+          Guardar Cotización
+        </Button>
+      </div>
     </div>
   );
 }
