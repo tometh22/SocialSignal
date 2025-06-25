@@ -116,7 +116,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{((complexityFactors?.analysisTypeFactor || 0) * 100).toFixed(1)}%
+              Factor: +{(complexityFactors?.analysisTypeFactor || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -143,7 +143,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{((complexityFactors?.mentionsVolumeFactor || 0) * 100).toFixed(1)}%
+              Factor: +{(complexityFactors?.mentionsVolumeFactor || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -170,7 +170,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{((complexityFactors?.countriesFactor || 0) * 100).toFixed(1)}%
+              Factor: +{(complexityFactors?.countriesFactor || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
@@ -197,7 +197,7 @@ const ComplexityFactorsCard: React.FC = () => {
               </SelectContent>
             </Select>
             <div className="text-xs text-gray-500">
-              Factor: +{((complexityFactors?.clientEngagementFactor || 0) * 100).toFixed(1)}%
+              Factor: +{(complexityFactors?.clientEngagementFactor || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
