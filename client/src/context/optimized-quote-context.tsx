@@ -126,6 +126,7 @@ interface OptimizedQuoteContextType {
   setTeamOption: (option: 'auto' | 'manual') => void;
   addTeamMember: (member: Omit<TeamMember, 'id'>) => void;
   updateTeamMember: (id: string | number, updates: Partial<Omit<TeamMember, 'id'>>) => void;
+  updateTeamMembers: (members: TeamMember[]) => void;
   removeTeamMember: (id: string | number) => void;
   applyRecommendedTeam: () => void;
   setIsAlwaysOnProject: (isAlwaysOn: boolean) => void;
@@ -478,6 +479,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     }
   }, []);
 
+  // Funciones de cálculo financiero
+  const updateTeamMembers = useCallback((members: TeamMember[]) => {
+    setQuotationData(prev => ({ ...prev, teamMembers: members }));
+  }, []);
+
   const contextValue: OptimizedQuoteContextType = {
     quotationData,
     baseCost,
@@ -504,6 +510,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
     setTeamOption,
     addTeamMember,
     updateTeamMember,
+    updateTeamMembers,
     removeTeamMember,
     applyRecommendedTeam,
     setIsAlwaysOnProject,
