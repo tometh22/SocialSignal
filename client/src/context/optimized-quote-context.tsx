@@ -60,6 +60,7 @@ interface ProjectDuration {
   weeks: number;
   isAlwaysOn: boolean;
   monthsForAlwaysOn?: number;
+  value?: string;
 }
 
 interface QuotationData {
@@ -208,12 +209,25 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({
 
   const updateProjectDuration = useCallback((value: string | ProjectDuration) => {
     if (typeof value === 'string') {
-      const weeks = parseInt(value);
+      // Mapear los valores del select a semanas
+      const durationMap: Record<string, number> = {
+        '3-weeks': 3,
+        '1-month': 4,
+        '2-months': 8,
+        '3-months': 12,
+        '4-months': 16,
+        '6-months': 24,
+        '12-months': 48,
+        'custom': 4
+      };
+      
+      const weeks = durationMap[value] || 4;
       setQuotationData(prev => ({ 
         ...prev, 
         projectDuration: { 
           ...prev.projectDuration, 
-          weeks: isNaN(weeks) ? 4 : weeks 
+          weeks,
+          value
         } 
       }));
     } else {
