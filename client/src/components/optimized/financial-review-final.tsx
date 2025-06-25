@@ -152,7 +152,7 @@ export default function FinancialReviewFinal() {
   }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 p-6">
+    <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
       {/* Level 1: Compact Success Header */}
       <div className="bg-gradient-to-r from-emerald-50 via-blue-50 to-indigo-50 rounded-2xl p-6 border border-emerald-200 shadow-sm">
         <div className="flex items-center justify-between">
@@ -196,7 +196,7 @@ export default function FinancialReviewFinal() {
       </div>
 
       {/* Level 2: Executive Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -286,11 +286,11 @@ export default function FinancialReviewFinal() {
         </Card>
       </div>
 
-      {/* Level 3: Main Content - Three Column Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      {/* Level 3: Main Content - Responsive Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         
-        {/* Left: Team Breakdown (4 columns) */}
-        <div className="xl:col-span-4 space-y-6">
+        {/* Left: Team Breakdown */}
+        <div className="space-y-6">
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -388,14 +388,14 @@ export default function FinancialReviewFinal() {
           </Card>
         </div>
 
-        {/* Center: Inflation Configuration (4 columns) - CRITICAL SECTION */}
-        <div className="xl:col-span-4 space-y-6">
-          <div className={`relative ${
+        {/* Center: Inflation Configuration - CRITICAL SECTION */}
+        <div className="space-y-6">
+          <div className={`relative w-full ${
             quotationData.inflation.applyInflationAdjustment 
-              ? 'ring-2 ring-orange-200 ring-offset-2 ring-offset-white' 
+              ? 'ring-2 ring-orange-200 ring-offset-1 lg:ring-offset-2 ring-offset-white' 
               : 'ring-1 ring-gray-200'
           } rounded-xl transition-all duration-200`}>
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-orange-50/30">
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-orange-50/30 w-full">
               <CardHeader className="pb-4 border-b border-orange-100">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -479,8 +479,8 @@ export default function FinancialReviewFinal() {
           </div>
         </div>
 
-        {/* Right: Financial Waterfall (4 columns) */}
-        <div className="xl:col-span-4 space-y-6">
+        {/* Right: Financial Waterfall */}
+        <div className="space-y-6">
           <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-emerald-50/30">
             <CardHeader className="pb-4 border-b border-emerald-100">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -615,7 +615,7 @@ export default function FinancialReviewFinal() {
       </div>
 
       {/* Level 4: Action Buttons */}
-      <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-8 border-t border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-6 lg:pt-8 border-t border-gray-200 mt-6">
         <Button variant="outline" size="lg" className="px-8 shadow-sm">
           <FileText className="h-4 w-4 mr-2" />
           Exportar PDF
