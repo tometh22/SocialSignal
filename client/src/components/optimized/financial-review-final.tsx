@@ -433,7 +433,7 @@ export default function FinancialReviewFinal() {
             </CardContent>
           </Card>
 
-          
+
         </div>
 
         {/* Center: Inflation Configuration - SIMPLIFIED */}
@@ -687,7 +687,8 @@ export default function FinancialReviewFinal() {
                     <span className={`text-sm font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
                       Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
                     </span>
-                    <span className={`font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                    <span```python
+className={`font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
                       {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
                     </span>
                   </div>
