@@ -1,25 +1,25 @@
-
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
-import { Slider } from "@/components/ui/slider";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Users, 
   Calculator, 
   TrendingUp, 
   DollarSign, 
   Globe, 
-  MessageCircle,
   BarChart3,
   CheckCircle,
   AlertTriangle,
-  Info
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Settings
 } from "lucide-react";
 
 export default function FinancialReviewFinal() {
@@ -36,6 +36,8 @@ export default function FinancialReviewFinal() {
     updateInflation,
     updateFinancials
   } = useOptimizedQuote();
+
+  const [isInflationOpen, setIsInflationOpen] = useState(false);
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function FinancialReviewFinal() {
     const totalFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
     return (totalFactor * 100).toFixed(1);
   };
-    
+
   // Calculate values
   const teamBaseCost = calculateTeamBaseCost();
   const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
@@ -142,303 +144,204 @@ export default function FinancialReviewFinal() {
   }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 p-6">
-      {/* Header Section */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-3">
-          <CheckCircle className="h-8 w-8 text-green-600" />
-          <h1 className="text-3xl font-bold text-gray-900">Cotización Finalizada</h1>
+    <div className="max-w-5xl mx-auto space-y-6 p-4">
+      {/* Compact Header */}
+      <div className="text-center space-y-2">
+        <div className="flex items-center justify-center gap-2">
+          <CheckCircle className="h-6 w-6 text-green-600" />
+          <h1 className="text-2xl font-bold text-gray-900">Cotización Finalizada</h1>
         </div>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Revisión completa de tu proyecto con todos los ajustes aplicados
-        </p>
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
-          <CheckCircle className="h-4 w-4 mr-2" />
-          Paso 4 de 4 - Listo para presentar
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Listo para presentar
         </Badge>
       </div>
 
-      {/* Project Overview */}
-      <Card className="border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <Info className="h-6 w-6 text-blue-600" />
-            Resumen del Proyecto
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-gray-900">Cliente</span>
+      {/* Compact Project Overview */}
+      <Card className="border-blue-200 bg-blue-50/30">
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              <div>
+                <span className="font-medium text-gray-900">Cliente:</span>
+                <p className="text-gray-700">{quotationData.client?.name || 'No seleccionado'}</p>
               </div>
-              <p className="text-lg text-gray-700">{quotationData.client?.name || 'Cliente no seleccionado'}</p>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-gray-900">Proyecto</span>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-blue-600" />
+              <div>
+                <span className="font-medium text-gray-900">Proyecto:</span>
+                <p className="text-gray-700">{quotationData.project.name || 'Sin nombre'}</p>
               </div>
-              <p className="text-lg text-gray-700">{quotationData.project.name || 'Proyecto sin nombre'}</p>
-              <Badge variant="secondary">
-                {quotationData.project.type === 'on-demand' ? 'Proyecto Único' : 
-                 quotationData.project.type === 'fee-mensual' ? 'Fee Mensual' : 
-                 'Tipo no especificado'}
-              </Badge>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-gray-900">Complejidad</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-lg text-gray-700">{quotationData.analysisType}</p>
-                <Badge variant={getComplexityPercentage() > 20 ? "destructive" : getComplexityPercentage() > 10 ? "default" : "secondary"}>
-                  +{getComplexityPercentage()}% ajuste total
-                </Badge>
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-blue-600" />
+              <div>
+                <span className="font-medium text-gray-900">Complejidad:</span>
+                <Badge variant="secondary" className="ml-1">+{getComplexityPercentage()}%</Badge>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Team & Cost Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Team Composition */}
+      {/* Compact Team & Financial Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Compact Team */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <Users className="h-5 w-5 text-gray-700" />
-              Composición del Equipo
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Equipo ({quotationData.teamMembers.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-2">
             {quotationData.teamMembers.map((member, index) => (
-              <div key={member.id || index} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border">
-                <div className="space-y-1">
-                  <h4 className="font-semibold text-gray-900">
+              <div key={member.id || index} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded text-sm">
+                <div>
+                  <span className="font-medium">
                     {member.personnelId 
                       ? getPersonnelName(member.personnelId) 
                       : getRoleName(member.roleId)
                     }
-                  </h4>
-                  <p className="text-sm text-gray-600">
-                    {member.hours} horas × ${member.rate}/hora
-                  </p>
+                  </span>
+                  <span className="text-gray-600 ml-2">
+                    {member.hours}h × ${member.rate}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-gray-900">
-                    {formatCurrency(member.cost)}
-                  </p>
-                </div>
+                <span className="font-semibold">{formatCurrency(member.cost)}</span>
               </div>
             ))}
-            
-            <Separator />
-            
-            <div className="flex justify-between items-center py-2">
-              <span className="text-lg font-semibold text-gray-900">Costo Base del Equipo</span>
-              <span className="text-xl font-bold text-blue-600">{formatCurrency(teamBaseCost)}</span>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Complexity Factors */}
+        {/* Compact Complexity Factors */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <Calculator className="h-5 w-5 text-gray-700" />
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
               Factores de Complejidad
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Tipo de Análisis</p>
-                  <p className="text-sm text-gray-600">{quotationData.analysisType}</p>
-                </div>
-                <Badge variant="outline">
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between p-2 bg-amber-50 rounded">
+                <span>Tipo Análisis</span>
+                <Badge variant="outline" className="text-xs">
                   +{(complexityFactors.analysisTypeFactor * 100).toFixed(1)}%
                 </Badge>
               </div>
-              
-              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Volumen de Menciones</p>
-                  <p className="text-sm text-gray-600">{quotationData.mentionsVolume}</p>
-                </div>
-                <Badge variant="outline">
+              <div className="flex justify-between p-2 bg-green-50 rounded">
+                <span>Menciones</span>
+                <Badge variant="outline" className="text-xs">
                   +{(complexityFactors.mentionsVolumeFactor * 100).toFixed(1)}%
                 </Badge>
               </div>
-              
-              <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Países Cubiertos</p>
-                  <p className="text-sm text-gray-600">{quotationData.countriesCovered}</p>
-                </div>
-                <Badge variant="outline">
+              <div className="flex justify-between p-2 bg-purple-50 rounded">
+                <span>Países</span>
+                <Badge variant="outline" className="text-xs">
                   +{(complexityFactors.countriesFactor * 100).toFixed(1)}%
                 </Badge>
               </div>
-              
-              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">Compromiso del Cliente</p>
-                  <p className="text-sm text-gray-600">{quotationData.clientEngagement}</p>
-                </div>
-                <Badge variant="outline">
+              <div className="flex justify-between p-2 bg-blue-50 rounded">
+                <span>Compromiso</span>
+                <Badge variant="outline" className="text-xs">
                   +{(complexityFactors.clientEngagementFactor * 100).toFixed(1)}%
                 </Badge>
               </div>
-            </div>
-            
-            <Separator />
-            
-            <div className="flex justify-between items-center py-2">
-              <span className="text-lg font-semibold text-gray-900">Ajuste por Complejidad</span>
-              <span className="text-xl font-bold text-amber-600">+{formatCurrency(teamComplexityAdjustment)}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Financial Waterfall */}
-      <Card className="border-2 border-green-100">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <DollarSign className="h-6 w-6 text-green-600" />
-            Desglose Financiero Completo
+      {/* Compact Financial Waterfall */}
+      <Card className="border-green-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            Desglose Financiero
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          
-          {/* Base Cost */}
-          <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div>
-              <h4 className="font-semibold text-blue-900">1. Costo Base del Equipo</h4>
-              <p className="text-sm text-blue-700">Suma de horas × tarifas de todos los miembros</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-blue-900">{formatCurrency(teamBaseCost)}</p>
-            </div>
-          </div>
+        <CardContent className="space-y-3">
 
-          {/* Complexity Adjustment */}
-          <div className="flex justify-between items-center p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <div>
-              <h4 className="font-semibold text-amber-900">2. Ajuste por Complejidad</h4>
-              <p className="text-sm text-amber-700">+{getComplexityPercentage()}% basado en factores del proyecto</p>
+          {/* Financial Steps - Compact */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-200">
+              <span className="font-medium text-blue-900">1. Costo Base del Equipo</span>
+              <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCost)}</span>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</p>
-            </div>
-          </div>
 
-          {/* Subtotal before markup */}
-          <div className="flex justify-between items-center p-4 bg-gray-100 rounded-lg border border-gray-300">
-            <div>
-              <h4 className="font-semibold text-gray-900">Subtotal (Base + Complejidad)</h4>
-              <p className="text-sm text-gray-600">Costo real del proyecto antes de márgenes</p>
+            <div className="flex justify-between items-center p-3 bg-amber-50 rounded border border-amber-200">
+              <span className="font-medium text-amber-900">
+                2. Ajuste Complejidad (+{getComplexityPercentage()}%)
+              </span>
+              <span className="text-lg font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(subtotalWithComplexity)}</p>
-            </div>
-          </div>
 
-          {/* Inflation Adjustment */}
-          {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-            <div className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border border-orange-200">
-              <div>
-                <h4 className="font-semibold text-orange-900">3. Ajuste por Inflación</h4>
-                <p className="text-sm text-orange-700">
-                  {quotationData.inflation.inflationMethod === 'manual' 
-                    ? `${quotationData.inflation.manualInflationRate}% anual aplicado` 
-                    : 'Promedio histórico de 12 meses'}
-                </p>
+            {/* Subtotal before inflation */}
+            <div className="flex justify-between items-center p-3 bg-gray-100 rounded border">
+              <span className="font-medium">Subtotal (Base + Complejidad)</span>
+              <span className="text-lg font-bold">{formatCurrency(subtotalWithComplexity)}</span>
+            </div>
+
+            {/* Inflation - Only show if applied */}
+            {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+              <div className="flex justify-between items-center p-3 bg-orange-50 rounded border border-orange-200">
+                <span className="font-medium text-orange-900">3. Ajuste Inflación</span>
+                <span className="text-lg font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Markup */}
-          <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
-            <div>
-              <h4 className="font-semibold text-green-900">4. Margen Comercial</h4>
-              <p className="text-sm text-green-700">100% de margen estándar aplicado</p>
+            <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
+              <span className="font-medium text-green-900">4. Margen Comercial (100%)</span>
+              <span className="text-lg font-bold text-green-900">+{formatCurrency(teamMarkupAmount)}</span>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-green-900">+{formatCurrency(teamMarkupAmount)}</p>
-            </div>
-          </div>
 
-          {/* Platform Cost */}
-          {platformCost > 0 && (
-            <div className="flex justify-between items-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div>
-                <h4 className="font-semibold text-purple-900">5. Costo de Plataforma</h4>
-                <p className="text-sm text-purple-700">Herramientas y servicios externos</p>
+            {/* Platform, deviation, discount - only if they exist */}
+            {platformCost > 0 && (
+              <div className="flex justify-between items-center p-3 bg-purple-50 rounded border border-purple-200">
+                <span className="font-medium text-purple-900">5. Costo Plataforma</span>
+                <span className="text-lg font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-purple-900">+{formatCurrency(platformCost)}</p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Deviation */}
-          {deviationPercentage !== 0 && (
-            <div className={`flex justify-between items-center p-4 rounded-lg border ${
-              deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-            }`}>
-              <div>
-                <h4 className={`font-semibold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
-                  6. Ajuste {deviationPercentage > 0 ? 'Adicional' : 'Descuento'}
-                </h4>
-                <p className={`text-sm ${deviationPercentage > 0 ? 'text-red-700' : 'text-green-700'}`}>
-                  {deviationPercentage > 0 ? '+' : ''}{deviationPercentage}% sobre subtotal
-                </p>
-              </div>
-              <div className="text-right">
-                <p className={`text-2xl font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+            {deviationPercentage !== 0 && (
+              <div className={`flex justify-between items-center p-3 rounded border ${
+                deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+              }`}>
+                <span className={`font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
+                  6. Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
+                </span>
+                <span className={`text-lg font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
                   {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
-                </p>
+                </span>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Discount */}
-          {discountPercentage > 0 && (
-            <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
-              <div>
-                <h4 className="font-semibold text-green-900">7. Descuento Aplicado</h4>
-                <p className="text-sm text-green-700">{discountPercentage}% de descuento especial</p>
+            {discountPercentage > 0 && (
+              <div className="flex justify-between items-center p-3 bg-green-50 rounded border border-green-200">
+                <span className="font-medium text-green-900">7. Descuento ({discountPercentage}%)</span>
+                <span className="text-lg font-bold text-green-900">-{formatCurrency(discountAmount)}</span>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-900">-{formatCurrency(discountAmount)}</p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <Separator className="my-6" />
+          <Separator className="my-4" />
 
-          {/* Final Total */}
-          <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg text-white">
+          {/* Compact Final Total */}
+          <div className="flex justify-between items-center p-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded text-white">
             <div>
-              <h3 className="text-2xl font-bold">TOTAL FINAL</h3>
-              <p className="text-indigo-100">
-                {quotationData.inflation.quotationCurrency === 'USD' ? 'Dólares Americanos' : 'Pesos Argentinos'}
+              <h3 className="text-xl font-bold">TOTAL FINAL</h3>
+              <p className="text-indigo-100 text-sm">
+                {quotationData.inflation.quotationCurrency === 'USD' ? 'USD' : 'ARS'}
+                {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && 
+                  ' (incluye inflación)'}
               </p>
-              {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                <p className="text-sm text-indigo-200 mt-1">Incluye proyección inflacionaria</p>
-              )}
             </div>
             <div className="text-right">
-              <p className="text-4xl font-bold">
+              <p className="text-3xl font-bold">
                 {quotationData.inflation.quotationCurrency === 'USD' 
                   ? new Intl.NumberFormat('en-US', {
                       style: 'currency',
@@ -459,30 +362,76 @@ export default function FinancialReviewFinal() {
         </CardContent>
       </Card>
 
-      {/* Inflation Configuration */}
-      <InflationAdjustmentCard
-        applyInflationAdjustment={quotationData.inflation.applyInflationAdjustment}
-        inflationMethod={quotationData.inflation.inflationMethod}
-        manualInflationRate={quotationData.inflation.manualInflationRate}
-        projectStartDate={quotationData.inflation.projectStartDate}
-        totalCost={subtotalWithComplexity}
-        quotationCurrency={quotationData.inflation.quotationCurrency}
-        projectType={quotationData.project.type}
-        projectDuration={quotationData.project.duration}
-        onApplyInflationChange={(value) => updateInflation({ applyInflationAdjustment: value })}
-        onInflationMethodChange={(value) => updateInflation({ inflationMethod: value })}
-        onManualInflationRateChange={(value) => updateInflation({ manualInflationRate: value })}
-        onProjectStartDateChange={(value) => updateInflation({ projectStartDate: value })}
-        onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
-      />
+      {/* Collapsible Inflation Configuration */}
+      <Collapsible open={isInflationOpen} onOpenChange={setIsInflationOpen}>
+        <Card className="border-orange-200">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer hover:bg-orange-50/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-orange-600" />
+                  Configuración de Inflación
+                  <Badge variant={quotationData.inflation.applyInflationAdjustment ? "default" : "secondary"} className="ml-2">
+                    {quotationData.inflation.applyInflationAdjustment ? 'Activada' : 'Desactivada'}
+                  </Badge>
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">
+                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 
+                      ? `+${formatCurrency(inflationAdjustment)}`
+                      : 'Sin ajuste'
+                    }
+                  </span>
+                  {isInflationOpen ? (
+                    <ChevronUp className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <InflationAdjustmentCard
+                applyInflationAdjustment={quotationData.inflation.applyInflationAdjustment}
+                inflationMethod={quotationData.inflation.inflationMethod}
+                manualInflationRate={quotationData.inflation.manualInflationRate}
+                projectStartDate={quotationData.inflation.projectStartDate}
+                totalCost={subtotalWithComplexity}
+                quotationCurrency={quotationData.inflation.quotationCurrency}
+                projectType={quotationData.project.type}
+                projectDuration={quotationData.project.duration}
+                onApplyInflationChange={(value) => updateInflation({ applyInflationAdjustment: value })}
+                onInflationMethodChange={(value) => updateInflation({ inflationMethod: value })}
+                onManualInflationRateChange={(value) => updateInflation({ manualInflationRate: value })}
+                onProjectStartDateChange={(value) => updateInflation({ projectStartDate: value })}
+                onQuotationCurrencyChange={(value) => updateInflation({ quotationCurrency: value })}
+              />
+              <div className="mt-4 p-3 bg-amber-50 rounded border border-amber-200">
+                <div className="flex items-start gap-2">
+                  <Info className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-800">¿Cómo funciona la inflación?</p>
+                    <p className="text-amber-700 mt-1">
+                      Cuando activas la inflación, se aplica un ajuste al subtotal (base + complejidad) 
+                      basado en la fecha de inicio del proyecto. Este ajuste se suma antes del margen comercial.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4 pt-8">
-        <Button variant="outline" size="lg" className="px-8">
+      {/* Compact Action Buttons */}
+      <div className="flex justify-center gap-3 pt-4">
+        <Button variant="outline" size="default">
           Exportar PDF
         </Button>
-        <Button size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-          <CheckCircle className="h-5 w-5 mr-2" />
+        <Button size="default" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+          <CheckCircle className="h-4 w-4 mr-2" />
           Guardar Cotización
         </Button>
       </div>
