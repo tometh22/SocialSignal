@@ -573,6 +573,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     const newMember: OptimizedTeamMember = {
       ...member,
       id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      roleId: member.roleId,
+      personnelId: member.personnelId || null, // Ensure null instead of undefined
       hours: defaultHours,
       rate: defaultRate,
       cost: defaultHours * defaultRate
@@ -684,41 +686,76 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
   const saveQuotation = useCallback(async () => {
     try {
+      // Validar datos requeridos
+      if (!quotationData.client?.id) {
+        throw new Error("Debe seleccionar un cliente");
+      }
+      
+      if (!quotationData.project.name?.trim()) {
+        throw new Error("Debe ingresar el nombre del proyecto");
+      }
+
+      if (quotationData.teamMembers.length === 0) {
+        throw new Error("Debe agregar al menos un miembro al equipo");
+      }
+
       const quotationPayload = {
-        clientId: quotationData.client?.id,
+        clientId: quotationData.client.id,
         projectName: quotationData.project.name,
-        projectType: quotationData.project.type,
-        analysisType: quotationData.analysisType,
-        mentionsVolume: quotationData.mentionsVolume,
-        countriesCovered: quotationData.countriesCovered,
-        clientEngagement: quotationData.clientEngagement,
-        templateId: quotationData.template?.id,
-        baseCost,
-        complexityAdjustment,
-        markupAmount,
-        totalAmount,
-        platformCost: quotationData.financials.platformCost,
-        deviationPercentage: quotationData.financials.deviationPercentage,
-        discountPercentage: quotationData.financials.discount,
+        projectType: quotationData.project.type || 'on-demand',
+        projectDuration: quotationData.project.duration || '',
+        analysisType: quotationData.analysisType || 'standard',
+        mentionsVolume: quotationData.mentionsVolume || 'medium',
+        countriesCovered: quotationData.countriesCovered || '1',
+        clientEngagement: quotationData.clientEngagement || 'medium',
+        templateId: quotationData.template?.id || null,
+        baseCost: baseCost || 0,
+        complexityAdjustment: complexityAdjustment || 0,
+        markupAmount: markupAmount || 0,
+        totalAmount: totalAmount || 0,
+        platformCost: quotationData.financials.platformCost || 0,
+        deviationPercentage: quotationData.financials.deviationPercentage || 0,
+        discountPercentage: quotationData.financials.discount || 0,
+        marginFactor: quotationData.financials.marginFactor || 2.0,
+        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
+        inflationMethod: quotationData.inflation.inflationMethod || 'manual',
+        manualInflationRate: quotationData.inflation.manualInflationRate || 0,
+        projectStartDate: quotationData.inflation.projectStartDate || null,
+        quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
         status: 'draft'
       };
 
-      const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
+      console.log('📤 Saving quotation with payload:', quotationPayload);
 
-      // Save team members
+      const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
+      console.log('✅ Quotation saved:', savedQuotation);
+
+      // Save team members with proper validation
+      console.log('👥 Saving team members:', quotationData.teamMembers);
+      
       for (const member of quotationData.teamMembers) {
-        await apiRequest('/api/quotation-team', 'POST', {
+        const teamMemberPayload = {
           quotationId: savedQuotation.id,
           roleId: member.roleId,
-          personnelId: member.personnelId,
-          hours: member.hours,
-          rate: member.rate
-        });
+          personnelId: member.personnelId || null, // Allow null for role-only assignments
+          hours: member.hours || 0,
+          rate: member.rate || 0
+        };
+
+        console.log('👤 Saving team member:', teamMemberPayload);
+        
+        try {
+          await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
+        } catch (memberError) {
+          console.error('Error saving team member:', memberError);
+          // Continue saving other members even if one fails
+        }
       }
 
+      console.log('🎉 Quotation and team saved successfully');
       return savedQuotation;
     } catch (error) {
-      console.error("Error saving quotation:", error);
+      console.error("❌ Error saving quotation:", error);
       throw error;
     }
   }, [quotationData, baseCost, complexityAdjustment, markupAmount, totalAmount]);

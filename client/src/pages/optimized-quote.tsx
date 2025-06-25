@@ -96,17 +96,51 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      await saveQuotation();
+      
+      // Validaciones previas
+      if (!quotationData.client) {
+        toast({
+          title: "Cliente requerido",
+          description: "Debe seleccionar un cliente antes de guardar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!quotationData.project.name?.trim()) {
+        toast({
+          title: "Nombre de proyecto requerido",
+          description: "Debe ingresar el nombre del proyecto antes de guardar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (quotationData.teamMembers.length === 0) {
+        toast({
+          title: "Equipo requerido",
+          description: "Debe agregar al menos un miembro al equipo antes de guardar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('💾 Iniciando guardado de cotización...');
+      const savedQuotation = await saveQuotation();
+      
       toast({
         title: "Cotización guardada",
-        description: "La cotización se ha guardado correctamente.",
+        description: `La cotización "${quotationData.project.name}" se ha guardado correctamente.`,
       });
+      
+      console.log('🎉 Cotización guardada exitosamente, redirigiendo...');
       setLocation('/manage-quotes');
     } catch (error) {
-      console.error("Error al guardar:", error);
+      console.error("❌ Error al guardar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast({
         title: "Error al guardar",
-        description: "No se pudo guardar la cotización. Por favor, intenta nuevamente.",
+        description: `No se pudo guardar la cotización: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {

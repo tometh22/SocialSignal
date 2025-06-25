@@ -782,16 +782,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotation-team", async (req, res) => {
     try {
+      // Preparar datos asegurando que cost esté presente
+      const teamMemberData = {
+        ...req.body,
+        cost: req.body.cost || (req.body.hours * req.body.rate) || 0,
+        personnelId: req.body.personnelId || null // Convertir undefined a null
+      };
 
       try {
         // Validar datos con Zod
-        const validatedData = insertQuotationTeamMemberSchema.parse(req.body);
+        const validatedData = insertQuotationTeamMemberSchema.parse(teamMemberData);
 
         // VALIDACIÓN OPCIONAL DE TARIFAS - Solo advertir si hay diferencias grandes
         if (validatedData.personnelId) {
           const personnel = await storage.getPersonnelById(validatedData.personnelId);
           if (personnel && personnel.hourlyRate !== validatedData.rate) {
             // Permitir la asignación con tarifa personalizada
+            console.log(`⚠️ Using custom rate ${validatedData.rate} instead of personnel rate ${personnel.hourlyRate}`);
           }
         }
 
@@ -800,6 +807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Verificar duplicados exactos
         const isDuplicate = existingMembers.some(existing => 
+          existing.roleId === validatedData.roleId &&
           existing.personnelId === validatedData.personnelId && 
           existing.hours === validatedData.hours && 
           existing.rate === validatedData.rate
@@ -808,15 +816,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isDuplicate) {
           // Simplemente devolver el primer miembro duplicado encontrado
           const duplicateMember = existingMembers.find(existing => 
+            existing.roleId === validatedData.roleId &&
             existing.personnelId === validatedData.personnelId && 
             existing.hours === validatedData.hours && 
             existing.rate === validatedData.rate
           );
+          console.log('📋 Returning existing duplicate member');
           return res.status(200).json(duplicateMember);
         }
 
         // Si no es duplicado, crear el nuevo miembro
         const member = await storage.createQuotationTeamMember(validatedData);
+        console.log('✅ Team member created successfully');
 
         res.status(201).json(member);
       } catch (validationError) {
