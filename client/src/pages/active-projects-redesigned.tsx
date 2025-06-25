@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   Building2, 
   Search, 
@@ -251,7 +253,10 @@ function ProjectCard({
                   Registro de Tiempo
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 cursor-pointer hover:bg-red-50">
+                <DropdownMenuItem 
+                  onClick={() => handleDeleteProject(project.id)}
+                  className="text-red-600 cursor-pointer hover:bg-red-50"
+                >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar Proyecto
                 </DropdownMenuItem>
@@ -333,6 +338,57 @@ export default function ActiveProjectsRedesigned() {
   const [filterClient, setFilterClient] = useState("all");
   const [sortBy, setSortBy] = useState("recent");
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
+  
+  // Estados para eliminación de proyectos
+  const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
+  const [deletingProjects, setDeletingProjects] = useState<Set<number>>(new Set());
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Mutación para eliminar proyecto
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      const response = await fetch(`/api/active-projects/${projectId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete project");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Proyecto eliminado",
+        description: "El proyecto ha sido eliminado exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/active-projects"] });
+      setDeleteProjectId(null);
+      setDeletingProjects(new Set());
+    },
+    onError: (error) => {
+      console.error("Error al eliminar proyecto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el proyecto. Intente nuevamente.",
+        variant: "destructive"
+      });
+      setDeletingProjects(new Set());
+    }
+  });
+
+  // Función para iniciar eliminación
+  const handleDeleteProject = (projectId: number) => {
+    setDeleteProjectId(projectId);
+  };
+
+  // Función para confirmar eliminación
+  const confirmDeleteProject = () => {
+    if (deleteProjectId) {
+      setDeletingProjects(new Set([deleteProjectId]));
+      deleteProjectMutation.mutate(deleteProjectId);
+    }
+  };
 
   // Datos
   const { data: projects = [], isLoading: loadingProjects } = useQuery({
@@ -658,6 +714,47 @@ export default function ActiveProjectsRedesigned() {
           </div>
         )}
       </div>
+
+      {/* Diálogo de confirmación para eliminar proyecto */}
+      <Dialog open={deleteProjectId !== null} onOpenChange={() => setDeleteProjectId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Eliminar Proyecto
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El proyecto y todos sus datos asociados serán eliminados permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteProjectId(null)}
+              disabled={deleteProjectMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteProject}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
