@@ -77,6 +77,7 @@ export default function ActiveProjects() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({16: true}); // ID 16 es el proyecto macro MODO, inicialmente expandido
+  const [deletingProjects, setDeletingProjects] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
   // Consulta para obtener subproyectos de un proyecto específico
@@ -169,21 +170,44 @@ export default function ActiveProjects() {
   // Mutación para eliminar un proyecto
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
+      // Agregar el proyecto a la lista de eliminación para activar la animación
+      setDeletingProjects(prev => new Set([...prev, projectId]));
+      
+      // Esperar un poco para que se vea la animación
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
       return response;
     },
-    onSuccess: () => {
-      toast({
-        title: "Proyecto eliminado",
-        description: "El proyecto ha sido eliminado correctamente.",
-      });
-      // Importante: invalidar la caché y forzar recarga de datos
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      // Cerrar el diálogo
-      setDeleteProjectId(null);
+    onSuccess: (_, projectId) => {
+      // Mantener la animación un poco más
+      setTimeout(() => {
+        setDeletingProjects(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(projectId);
+          return newSet;
+        });
+        
+        toast({
+          title: "Proyecto eliminado",
+          description: "El proyecto ha sido eliminado correctamente.",
+        });
+        
+        // Importante: invalidar la caché y forzar recarga de datos
+        queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+        // Cerrar el diálogo
+        setDeleteProjectId(null);
+      }, 200);
     },
-    onError: (error) => {
+    onError: (error, projectId) => {
       console.error('Error al eliminar el proyecto:', error);
+      // Remover de la lista de eliminación si hay error
+      setDeletingProjects(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(projectId);
+        return newSet;
+      });
+      
       toast({
         title: "Error",
         description: "No se pudo eliminar el proyecto. Inténtalo de nuevo más tarde.",
@@ -195,22 +219,45 @@ export default function ActiveProjects() {
   // Mutación para eliminar proyectos macro
   const deleteMacroProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
+      // Agregar el proyecto a la lista de eliminación para activar la animación
+      setDeletingProjects(prev => new Set([...prev, projectId]));
+      
+      // Esperar un poco para que se vea la animación
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const response = await apiRequest(`/api/active-projects/${projectId}`, 'DELETE');
       return response;
     },
-    onSuccess: () => {
-      toast({
-        title: "Proyecto macro eliminado",
-        description: "El proyecto macro y todos sus subproyectos han sido eliminados correctamente.",
-      });
-      // Importante: invalidar la caché y forzar recarga de datos
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      // Cerrar el diálogo y limpiar estado
-      setDeleteMacroProjectId(null);
-      setDeleteConfirmationText("");
+    onSuccess: (_, projectId) => {
+      // Mantener la animación un poco más
+      setTimeout(() => {
+        setDeletingProjects(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(projectId);
+          return newSet;
+        });
+        
+        toast({
+          title: "Proyecto macro eliminado",
+          description: "El proyecto macro y todos sus subproyectos han sido eliminados correctamente.",
+        });
+        
+        // Importante: invalidar la caché y forzar recarga de datos
+        queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+        // Cerrar el diálogo y limpiar estado
+        setDeleteMacroProjectId(null);
+        setDeleteConfirmationText("");
+      }, 300);
     },
-    onError: (error) => {
+    onError: (error, projectId) => {
       console.error('Error al eliminar el proyecto macro:', error);
+      // Remover de la lista de eliminación si hay error
+      setDeletingProjects(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(projectId);
+        return newSet;
+      });
+      
       toast({
         title: "Error",
         description: "No se pudo eliminar el proyecto macro. Inténtalo de nuevo más tarde.",
@@ -443,8 +490,16 @@ export default function ActiveProjects() {
               visibleProjects.map(project => (
                 <tr 
                   key={project.id} 
-                  className={`text-xs hover:bg-gray-50 cursor-pointer ${project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''} ${project.parentProjectId ? 'pl-4' : ''}`}
-                  onClick={() => setLocation(`/project-analytics/${project.id}`)}
+                  className={`text-xs hover:bg-gray-50 cursor-pointer transition-all duration-500 ease-in-out ${
+                    project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''
+                  } ${
+                    project.parentProjectId ? 'pl-4' : ''
+                  } ${
+                    deletingProjects.has(project.id) 
+                      ? 'opacity-0 scale-95 bg-red-50 border-red-200' 
+                      : 'opacity-100 scale-100'
+                  }`}
+                  onClick={() => !deletingProjects.has(project.id) && setLocation(`/project-analytics/${project.id}`)}
                 >
                   <td className="px-2 py-1.5 font-medium">
                     <div className="flex items-center justify-between w-full">
@@ -659,28 +714,43 @@ export default function ActiveProjects() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md"
+                          className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md disabled:opacity-50"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteMacroProject(project.id);
                           }}
+                          disabled={deletingProjects.has(project.id)}
                           title="ELIMINAR PROYECTO MACRO COMPLETO"
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          ELIMINAR MACRO
+                          {deletingProjects.has(project.id) ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                              ELIMINANDO...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              ELIMINAR MACRO
+                            </>
+                          )}
                         </Button>
                       ) : (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteProject(project.id);
                           }}
+                          disabled={deletingProjects.has(project.id)}
                           title="Eliminar proyecto"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          {deletingProjects.has(project.id) ? (
+                            <div className="w-3.5 h-3.5 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
                         </Button>
                       )}
                     </div>
