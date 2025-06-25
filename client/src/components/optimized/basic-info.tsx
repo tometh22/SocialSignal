@@ -123,7 +123,7 @@ const OptimizedBasicInfo: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Tipo de Proyecto</Label>
                   <Select
-                    value={quotationData.project.type}
+                    value={quotationData.projectType}
                     onValueChange={updateProjectType}
                     disabled={isLoadingProjectTypes}
                   >
@@ -152,21 +152,21 @@ const OptimizedBasicInfo: React.FC = () => {
                 </div>
 
                 {/* Duración del Proyecto */}
-                {quotationData.project.type && (
+                {quotationData.projectType && (
                   <div className="space-y-2">
                     <Label htmlFor="project-duration" className="text-sm font-medium text-gray-700 flex items-center">
                       <Calendar className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
                       Duración
                     </Label>
                     <Select
-                      value={quotationData.project.duration}
+                      value={quotationData.projectDuration.weeks.toString()}
                       onValueChange={updateProjectDuration}
                     >
                       <SelectTrigger id="project-duration" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
                         <SelectValue placeholder="Seleccionar duración" />
                       </SelectTrigger>
                       <SelectContent className="border border-neutral-200 bg-white">
-                        {quotationData.project.type === 'on-demand' && 
+                        {quotationData.projectType === 'on-demand' && 
                           projectDurationOptions["on-demand"].map((duration) => (
                             <SelectItem 
                               key={duration.value} 
@@ -177,7 +177,7 @@ const OptimizedBasicInfo: React.FC = () => {
                             </SelectItem>
                           ))
                         }
-                        {quotationData.project.type === 'fee-mensual' && 
+                        {quotationData.projectType === 'fee-mensual' && 
                           projectDurationOptions["fee-mensual"].map((duration) => (
                             <SelectItem 
                               key={duration.value} 
