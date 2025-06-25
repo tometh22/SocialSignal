@@ -151,64 +151,57 @@ export default function FinancialReviewFinal() {
   }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 p-6">
-      {/* Hero Header - Nivel 1 */}
-      <div className="text-center space-y-4 py-8">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 flex items-center justify-center">
-            <CheckCircle className="h-6 w-6 text-white" />
-          </div>
-          <div className="text-left">
-            <h1 className="text-3xl font-bold text-gray-900">Cotización Finalizada</h1>
-            <p className="text-gray-600">Lista para presentar al cliente</p>
+    <div className="max-w-6xl mx-auto space-y-6 p-4">
+      {/* Header compacto con información clave */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <h1 className="text-xl font-bold text-gray-900">Cotización Finalizada</h1>
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Lista para presentar
+            </Badge>
           </div>
         </div>
         
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-4 py-2">
-          <Sparkles className="h-4 w-4 mr-2" />
-          Revisión Completa
-        </Badge>
-      </div>
-
-      {/* Project Context - Nivel 2 */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Users className="h-5 w-5 text-blue-600" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Users className="h-4 w-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Cliente</p>
+              <p className="text-xs font-medium text-gray-900">Cliente</p>
               <p className="text-sm text-gray-600">{quotationData.client?.name || 'No seleccionado'}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-purple-600" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Proyecto</p>
+              <p className="text-xs font-medium text-gray-900">Proyecto</p>
               <p className="text-sm text-gray-600">{quotationData.project.name || 'Sin nombre'}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Target className="h-5 w-5 text-amber-600" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Target className="h-4 w-4 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Complejidad</p>
-              <Badge variant="secondary" className="mt-1">+{getComplexityPercentage()}%</Badge>
+              <p className="text-xs font-medium text-gray-900">Complejidad</p>
+              <Badge variant="secondary" className="text-xs">+{getComplexityPercentage()}%</Badge>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-green-600" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-green-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900">Total</p>
+              <p className="text-xs font-medium text-gray-900">Total</p>
               <p className="text-lg font-bold text-green-600">
                 {quotationData.inflation.quotationCurrency === 'USD' 
                   ? new Intl.NumberFormat('en-US', {
@@ -230,11 +223,11 @@ export default function FinancialReviewFinal() {
         </div>
       </div>
 
-      {/* Main Content Grid - Nivel 3 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main Content Grid - Más compacto */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left Column - Team & Complexity */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           
           {/* Team Section */}
           <Card className="border-0 shadow-sm">
@@ -245,12 +238,12 @@ export default function FinancialReviewFinal() {
                 <Badge variant="outline" className="ml-auto">{quotationData.teamMembers.length} miembros</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {quotationData.teamMembers.map((member, index) => (
-                <div key={member.id || index} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-sm font-medium text-blue-600">
+                <div key={member.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center">
+                      <span className="text-xs font-medium text-blue-600">
                         {(member.personnelId 
                           ? getPersonnelName(member.personnelId) 
                           : getRoleName(member.roleId)
@@ -258,18 +251,18 @@ export default function FinancialReviewFinal() {
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="text-sm font-medium text-gray-900">
                         {member.personnelId 
                           ? getPersonnelName(member.personnelId) 
                           : getRoleName(member.roleId)
                         }
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-gray-600">
                         {member.hours}h × ${member.rate}/h
                       </p>
                     </div>
                   </div>
-                  <span className="text-lg font-semibold text-gray-900">{formatCurrency(member.cost)}</span>
+                  <span className="text-base font-semibold text-gray-900">{formatCurrency(member.cost)}</span>
                 </div>
               ))}
               
@@ -290,8 +283,8 @@ export default function FinancialReviewFinal() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-100">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-100">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-amber-900">Tipo Análisis</span>
                     <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
@@ -334,7 +327,7 @@ export default function FinancialReviewFinal() {
         </div>
 
         {/* Right Column - Financial Waterfall */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -342,21 +335,21 @@ export default function FinancialReviewFinal() {
                 Resumen Financiero
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
 
               {/* Financial Steps */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-blue-50 rounded-lg border border-blue-200">
                   <span className="text-sm font-medium text-blue-900">1. Costo Base del Equipo</span>
                   <span className="font-bold text-blue-900">{formatCurrency(teamBaseCost)}</span>
                 </div>
 
-                <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex justify-between items-center p-2 bg-amber-50 rounded-lg border border-amber-200">
                   <span className="text-sm font-medium text-amber-900">2. + Ajuste Complejidad ({getComplexityPercentage()}%)</span>
                   <span className="font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
                 </div>
 
-                <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-300">
+                <div className="flex justify-between items-center p-2 bg-gray-100 rounded-lg border border-gray-300">
                   <span className="text-sm font-medium text-gray-900">Subtotal (Base + Complejidad)</span>
                   <span className="font-bold text-gray-900">{formatCurrency(subtotalWithComplexity)}</span>
                 </div>
@@ -364,18 +357,18 @@ export default function FinancialReviewFinal() {
                 {/* Inflation - Only show if applied */}
                 {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
                   <>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="flex justify-between items-center p-2 bg-orange-50 rounded-lg border border-orange-200">
                       <span className="text-sm font-medium text-orange-900">3. + Ajuste Inflación</span>
                       <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-300">
+                    <div className="flex justify-between items-center p-2 bg-gray-100 rounded-lg border border-gray-300">
                       <span className="text-sm font-medium text-gray-900">Base Ajustada con Inflación</span>
                       <span className="font-bold text-gray-900">{formatCurrency(finalBaseAfterInflation)}</span>
                     </div>
                   </>
                 )}
 
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex justify-between items-center p-2 bg-green-50 rounded-lg border border-green-200">
                   <span className="text-sm font-medium text-green-900">
                     {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 ? '4.' : '3.'} + Margen Comercial (100%)
                   </span>
@@ -384,14 +377,14 @@ export default function FinancialReviewFinal() {
 
                 {/* Additional costs - only if they exist */}
                 {platformCost > 0 && (
-                  <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex justify-between items-center p-2 bg-purple-50 rounded-lg border border-purple-200">
                     <span className="text-sm font-medium text-purple-900">+ Plataforma</span>
                     <span className="font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
                   </div>
                 )}
 
                 {deviationPercentage !== 0 && (
-                  <div className={`flex justify-between items-center p-3 rounded-lg border ${
+                  <div className={`flex justify-between items-center p-2 rounded-lg border ${
                     deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
                   }`}>
                     <span className={`text-sm font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
@@ -404,7 +397,7 @@ export default function FinancialReviewFinal() {
                 )}
 
                 {discountPercentage > 0 && (
-                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex justify-between items-center p-2 bg-green-50 rounded-lg border border-green-200">
                     <span className="text-sm font-medium text-green-900">- Descuento ({discountPercentage}%)</span>
                     <span className="font-bold text-green-900">-{formatCurrency(discountAmount)}</span>
                   </div>
@@ -414,9 +407,9 @@ export default function FinancialReviewFinal() {
               <Separator className="my-4" />
 
               {/* Final Total - Hero Style */}
-              <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white text-center">
-                <p className="text-sm text-indigo-100 mb-1">TOTAL FINAL</p>
-                <p className="text-3xl font-bold mb-2">
+              <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white text-center">
+                <p className="text-xs text-indigo-100 mb-1">TOTAL FINAL</p>
+                <p className="text-2xl font-bold mb-1">
                   {quotationData.inflation.quotationCurrency === 'USD' 
                     ? new Intl.NumberFormat('en-US', {
                         style: 'currency',
@@ -532,7 +525,7 @@ export default function FinancialReviewFinal() {
       </Collapsible>
 
       {/* Action Buttons - Nivel 4 */}
-      <div className="flex justify-center gap-4 pt-8 border-t border-gray-200">
+      <div className="flex justify-center gap-4 pt-4 border-t border-gray-200">
         <Button variant="outline" size="lg" className="px-8">
           <FileText className="h-4 w-4 mr-2" />
           Exportar PDF
