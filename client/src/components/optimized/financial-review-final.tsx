@@ -1,0 +1,1 @@
+import { useOptimizedQuote } from '@/context/optimized-quote-context';
