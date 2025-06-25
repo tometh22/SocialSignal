@@ -170,21 +170,33 @@ export default function ActiveProjects() {
   // Mutación para eliminar un proyecto
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
+      console.log('Eliminando proyecto con ID:', projectId);
       const response = await fetch(`/api/active-projects/${projectId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
+        const errorText = await response.text();
+        console.error('Error del servidor:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: `Error ${response.status}: ${errorText || 'Error desconocido'}` };
+        }
         throw new Error(errorData.message || 'Error al eliminar el proyecto');
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('Proyecto eliminado exitosamente:', result);
+      return result;
     },
     onMutate: async (projectId) => {
+      console.log('Iniciando eliminación del proyecto:', projectId);
       // Cancelar consultas pendientes
       await queryClient.cancelQueries({ queryKey: ['/api/active-projects'] });
       
@@ -194,8 +206,7 @@ export default function ActiveProjects() {
       return { projectId };
     },
     onSuccess: async (data, projectId) => {
-      // Mostrar animación de salida por 500ms
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Proyecto eliminado exitosamente, actualizando UI...');
       
       // Remover de la lista de eliminación
       setDeletingProjects(prev => {
@@ -209,13 +220,17 @@ export default function ActiveProjects() {
         description: "El proyecto ha sido eliminado correctamente.",
       });
       
-      // Invalidar y refrescar datos
-      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      await refetchProjects();
-      await refetchSubprojects();
+      // Invalidar y refrescar datos inmediatamente
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       
       // Cerrar el diálogo
       setDeleteProjectId(null);
+      setDeleteConfirmationText("");
+      
+      // Forzar recarga de la página para asegurar consistencia
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     },
     onError: (error, projectId) => {
       console.error('Error al eliminar el proyecto:', error);
@@ -235,6 +250,7 @@ export default function ActiveProjects() {
       
       // Cerrar el diálogo en caso de error
       setDeleteProjectId(null);
+      setDeleteConfirmationText("");
     }
   });
 
@@ -338,8 +354,11 @@ export default function ActiveProjects() {
   });
 
   const confirmDelete = () => {
-    if (!deleteProjectId) return;
-    console.log('Iniciando eliminación del proyecto:', deleteProjectId);
+    if (!deleteProjectId) {
+      console.log('No hay ID de proyecto para eliminar');
+      return;
+    }
+    console.log('Confirmando eliminación del proyecto:', deleteProjectId);
     deleteProjectMutation.mutate(deleteProjectId);
   };
 
@@ -769,12 +788,13 @@ export default function ActiveProjects() {
                           className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md disabled:opacity-50"
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('Clickeando eliminar proyecto macro:', project.id);
                             handleDeleteMacroProject(project.id);
                           }}
-                          disabled={deletingProjects.has(project.id)}
+                          disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending || deleteMacroProjectMutation.isPending}
                           title="ELIMINAR PROYECTO MACRO COMPLETO"
                         >
-                          {deletingProjects.has(project.id) ? (
+                          {(deletingProjects.has(project.id) || deleteMacroProjectMutation.isPending) ? (
                             <>
                               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
                               ELIMINANDO...
@@ -793,12 +813,13 @@ export default function ActiveProjects() {
                           className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('Clickeando eliminar proyecto normal:', project.id);
                             handleDeleteProject(project.id);
                           }}
-                          disabled={deletingProjects.has(project.id)}
+                          disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending}
                           title="Eliminar proyecto"
                         >
-                          {deletingProjects.has(project.id) ? (
+                          {(deletingProjects.has(project.id) || deleteProjectMutation.isPending) ? (
                             <div className="w-3.5 h-3.5 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <Trash2 className="h-3.5 w-3.5" />
@@ -824,8 +845,34 @@ export default function ActiveProjects() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteProjectId(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                console.log('Cancelando eliminación');
+                setDeleteProjectId(null);
+                setDeleteConfirmationText("");
+              }}
+              disabled={deleteProjectMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                console.log('Confirmando eliminación desde diálogo');
+                confirmDelete();
+              }}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
