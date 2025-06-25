@@ -158,12 +158,16 @@ export default function ActiveProjects() {
   });
 
   // Función para manejar la eliminación de proyecto individual
-  const handleDeleteProject = (projectId: number) => {
+  const handleDeleteProject = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation();
+    console.log('Iniciando eliminación del proyecto:', projectId);
     setDeleteProjectId(projectId);
   };
 
   // Función para manejar la eliminación de proyecto macro Always-On
-  const handleDeleteMacroProject = (projectId: number) => {
+  const handleDeleteMacroProject = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation();
+    console.log('Iniciando eliminación del proyecto macro:', projectId);
     setDeleteMacroProjectId(projectId);
   };
 
@@ -359,6 +363,7 @@ export default function ActiveProjects() {
       return;
     }
     console.log('Confirmando eliminación del proyecto:', deleteProjectId);
+    setDeleteConfirmationText("");
     deleteProjectMutation.mutate(deleteProjectId);
   };
 
@@ -786,11 +791,7 @@ export default function ActiveProjects() {
                           variant="destructive"
                           size="sm"
                           className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md disabled:opacity-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log('Clickeando eliminar proyecto macro:', project.id);
-                            handleDeleteMacroProject(project.id);
-                          }}
+                          onClick={(e) => handleDeleteMacroProject(e, project.id)}
                           disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending || deleteMacroProjectMutation.isPending}
                           title="ELIMINAR PROYECTO MACRO COMPLETO"
                         >
@@ -811,11 +812,7 @@ export default function ActiveProjects() {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log('Clickeando eliminar proyecto normal:', project.id);
-                            handleDeleteProject(project.id);
-                          }}
+                          onClick={(e) => handleDeleteProject(e, project.id)}
                           disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending}
                           title="Eliminar proyecto"
                         >
