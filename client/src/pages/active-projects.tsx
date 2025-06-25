@@ -160,8 +160,10 @@ export default function ActiveProjects() {
   // Función para manejar la eliminación de proyecto individual
   const handleDeleteProject = (e: React.MouseEvent, projectId: number) => {
     e.stopPropagation();
-    console.log('Iniciando eliminación del proyecto:', projectId);
+    console.log('🗑️ Iniciando eliminación del proyecto:', projectId);
+    console.log('🗑️ Estado actual deleteProjectId:', deleteProjectId);
     setDeleteProjectId(projectId);
+    console.log('🗑️ Proyecto marcado para eliminación:', projectId);
   };
 
   // Función para manejar la eliminación de proyecto macro Always-On
