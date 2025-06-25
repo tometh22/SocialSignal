@@ -176,34 +176,43 @@ export default function ActiveProjects() {
   // Mutación para eliminar un proyecto
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
-      console.log('Eliminando proyecto con ID:', projectId);
+      console.log('🔥 INICIANDO ELIMINACIÓN - ID:', projectId);
+      console.log('🔥 URL:', `/api/active-projects/${projectId}`);
       
-      const response = await fetch(`/api/active-projects/${projectId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error del servidor:', errorText);
+      try {
+        const response = await fetch(`/api/active-projects/${projectId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
         
-        let errorMessage = 'Error al eliminar el proyecto';
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          errorMessage = `Error ${response.status}: ${errorText || 'Error desconocido'}`;
+        console.log('🔥 RESPUESTA RECIBIDA - Status:', response.status);
+        console.log('🔥 RESPUESTA RECIBIDA - OK:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('🚨 ERROR DEL SERVIDOR:', errorText);
+          
+          let errorMessage = 'Error al eliminar el proyecto';
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            errorMessage = `Error ${response.status}: ${errorText || 'Error desconocido'}`;
+          }
+          
+          throw new Error(errorMessage);
         }
         
-        throw new Error(errorMessage);
+        const result = await response.json();
+        console.log('🎉 PROYECTO ELIMINADO EXITOSAMENTE:', result);
+        return result;
+      } catch (error) {
+        console.error('🚨 ERROR EN FETCH:', error);
+        throw error;
       }
-      
-      const result = await response.json();
-      console.log('Proyecto eliminado exitosamente:', result);
-      return result;
     },
     onMutate: async (projectId) => {
       console.log('Iniciando eliminación del proyecto:', projectId);
@@ -363,11 +372,12 @@ export default function ActiveProjects() {
 
   const confirmDelete = () => {
     if (!deleteProjectId) {
-      console.log('No hay ID de proyecto para eliminar');
+      console.log('🚨 No hay ID de proyecto para eliminar');
       return;
     }
     
-    console.log('Confirmando eliminación del proyecto:', deleteProjectId);
+    console.log('✅ Confirmando eliminación del proyecto:', deleteProjectId);
+    console.log('🔄 Llamando a deleteProjectMutation.mutate con ID:', deleteProjectId);
     deleteProjectMutation.mutate(deleteProjectId);
   };
 
