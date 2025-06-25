@@ -287,10 +287,10 @@ export default function FinancialReviewFinal() {
       </div>
 
       {/* Level 3: Main Content - Responsive Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
         
         {/* Left: Team Breakdown */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6">
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -389,13 +389,13 @@ export default function FinancialReviewFinal() {
         </div>
 
         {/* Center: Inflation Configuration - CRITICAL SECTION */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6">
           <div className={`relative w-full ${
             quotationData.inflation.applyInflationAdjustment 
               ? 'ring-2 ring-orange-200 ring-offset-1 lg:ring-offset-2 ring-offset-white' 
               : 'ring-1 ring-gray-200'
           } rounded-xl transition-all duration-200`}>
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-orange-50/30 w-full">
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-orange-50/30 w-full h-fit">
               <CardHeader className="pb-4 border-b border-orange-100">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -480,8 +480,8 @@ export default function FinancialReviewFinal() {
         </div>
 
         {/* Right: Financial Waterfall */}
-        <div className="space-y-6">
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-emerald-50/30">
+        <div className="space-y-4 lg:space-y-6">
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-emerald-50/30 h-fit">
             <CardHeader className="pb-4 border-b border-emerald-100">
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-emerald-600" />
@@ -615,7 +615,7 @@ export default function FinancialReviewFinal() {
       </div>
 
       {/* Level 4: Action Buttons */}
-      <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-6 lg:pt-8 border-t border-gray-200 mt-6">
+      <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-4 lg:pt-6 border-t border-gray-200 mt-4 lg:mt-6">
         <Button variant="outline" size="lg" className="px-8 shadow-sm">
           <FileText className="h-4 w-4 mr-2" />
           Exportar PDF

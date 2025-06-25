@@ -252,7 +252,7 @@ export function InflationAdjustmentCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* Toggle principal - más prominente */}
         <div className="flex items-center justify-between p-4 bg-white rounded-lg border-2 border-orange-200 shadow-sm">
           <div className="space-y-1">
@@ -274,8 +274,9 @@ export function InflationAdjustmentCard({
           />
         </div>
 
-        {/* Configuración de inflación - Siempre visible */}
-        <div className="space-y-4">
+        {/* Configuración de inflación - Solo visible cuando está activada */}
+        {applyInflationAdjustment && (
+          <div className="space-y-4 pt-2 border-t border-orange-100">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Método de inflación */}
             <div className="space-y-2">
@@ -426,18 +427,37 @@ export function InflationAdjustmentCard({
             </div>
           )}
 
-          {/* Warning sobre volatilidad */}
-          <div className="flex items-start space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-yellow-800">
-              <p className="font-medium mb-1">Aviso importante:</p>
-              <p>
-                Las proyecciones de inflación son estimativas basadas en datos históricos 
-                y pueden diferir de la realidad económica futura.
-              </p>
+          {/* Warning sobre volatilidad - compacto */}
+            <div className="flex items-start space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">Aviso importante:</p>
+                <p>
+                  Las proyecciones de inflación son estimativas basadas en datos históricos 
+                  y pueden diferir de la realidad económica futura.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Resumen cuando está desactivada */}
+        {!applyInflationAdjustment && (
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Sin protección inflacionaria</span>
+              </div>
+              <Badge variant="secondary" className="text-gray-600">
+                No aplicada
+              </Badge>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              La cotización se mantiene en valores actuales sin proyección inflacionaria
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
