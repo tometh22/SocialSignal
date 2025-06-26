@@ -315,6 +315,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/personnel/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+
+    try {
+      const success = await storage.deletePersonnel(id);
+
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete this personnel. They may have active time entries or project assignments." 
+        });
+      }
+
+      res.json({ success: true, message: "Personnel deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting personnel:", error);
+      res.status(500).json({ message: "Failed to delete personnel" });
+    }
+  });
+
   // Report templates routes
   app.get("/api/templates", requireAuth, async (_, res) => {
     const templates = await storage.getReportTemplates();

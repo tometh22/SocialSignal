@@ -54,6 +54,7 @@ export interface IStorage {
   getPersonnelById(id: number): Promise<Personnel | undefined>;
   createPersonnel(personnel: InsertPersonnel): Promise<Personnel>;
   updatePersonnel(id: number, personnel: Partial<InsertPersonnel>): Promise<Personnel | undefined>;
+  deletePersonnel(id: number): Promise<boolean>;
 
   // Report template operations
   getReportTemplates(): Promise<ReportTemplate[]>;
@@ -517,6 +518,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(personnel.id, id))
       .returning();
     return updatedPerson;
+  }
+
+  async deletePersonnel(id: number): Promise<boolean> {
+    await db.delete(personnel).where(eq(personnel.id, id));
+    const person = await db.select().from(personnel).where(eq(personnel.id, id));
+    return person.length === 0;
   }
 
   // Template operations
