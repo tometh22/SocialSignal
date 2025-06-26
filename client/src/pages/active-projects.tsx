@@ -11,14 +11,15 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, LineChartIcon, PenSquare } from "lucide-react";
+import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, PenSquare, Building2, Zap, Target, DollarSign } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
-// Definición de tipos (from original code)
+// Definición de tipos
 interface Client {
   id: number;
   name: string;
@@ -57,17 +58,23 @@ interface ActiveProject {
 
 export default function ActiveProjects() {
   const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState("todos");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterClient, setFilterClient] = useState("all");
+  const [sortBy, setSortBy] = useState("recent");
+
   const { data: projects = [], refetch: refetchProjects, isFetching: isLoadingProjects } = useQuery<ActiveProject[]>({ 
     queryKey: ['/api/active-projects', { showSubprojects: false }],
     queryFn: async () => {
-      // Consulta que solo devuelve proyectos principales (no subproyectos)
       const response = await fetch(`/api/active-projects?showSubprojects=false`);
       if (!response.ok) throw new Error('Error al cargar proyectos activos');
       return response.json();
     },
     refetchOnWindowFocus: true,
   });
+
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
+
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [deleteMacroProjectId, setDeleteMacroProjectId] = useState<number | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
@@ -76,24 +83,21 @@ export default function ActiveProjects() {
   const [assignClientDialogOpen, setAssignClientDialogOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({16: true}); // ID 16 es el proyecto macro MODO, inicialmente expandido
+  const [expandedProjects, setExpandedProjects] = useState<{[key: number]: boolean}>({});
   const [deletingProjects, setDeletingProjects] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
-  // Consulta para obtener subproyectos de un proyecto específico
-  const { data: subprojects = [], refetch: refetchSubprojects, isLoading: isLoadingSubprojects } = useQuery<ActiveProject[]>({
+  // Consulta para obtener subproyectos
+  const { data: subprojects = [], refetch: refetchSubprojects } = useQuery<ActiveProject[]>({
     queryKey: ['/api/active-projects/parent', expandedProjects],
     queryFn: async () => {
-      // Obtener subproyectos solo para los proyectos expandidos
       const expandedIds = Object.keys(expandedProjects)
         .filter(id => expandedProjects[parseInt(id)])
         .map(id => parseInt(id));
 
       if (expandedIds.length === 0) return [];
 
-      // Realizar consultas para todos los proyectos expandidos
       const allSubprojects: ActiveProject[] = [];
-
       for (const id of expandedIds) {
         try {
           const response = await fetch(`/api/active-projects/parent/${id}`);
@@ -105,39 +109,105 @@ export default function ActiveProjects() {
           console.error(`Error al obtener subproyectos para el proyecto ${id}:`, error);
         }
       }
-
       return allSubprojects;
     },
     enabled: Object.values(expandedProjects).some(expanded => expanded),
   });
 
-  // Función para desplegar o colapsar un proyecto
-  const toggleProjectExpansion = (e: React.MouseEvent, projectId: number) => {
-    e.stopPropagation(); // Evita que se active el onClick del tr
-    setExpandedProjects(prev => {
-      const newState = {
-        ...prev,
-        [projectId]: !prev[projectId]
-      };
+  // Filtrar proyectos según el tab activo
+  const filteredProjects = useMemo(() => {
+    if (!projects) return [];
 
-      // Refrescar subproyectos si es necesario
-      if (newState[projectId]) {
-        // Retrasamos la llamada para dar tiempo a que se actualice el estado
-        setTimeout(() => {
-          refetchSubprojects();
-        }, 100);
-      }
+    let filtered = projects;
 
-      return newState;
+    // Filtrar por tipo de proyecto según el tab
+    switch (activeTab) {
+      case "always-on":
+        filtered = projects.filter(p => 
+          p.isAlwaysOnMacro || 
+          p.quotation?.projectName?.toLowerCase().includes('always-on') ||
+          p.quotation?.projectName?.toLowerCase().includes('modo') ||
+          p.macroMonthlyBudget ||
+          (p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'))
+        );
+        break;
+      case "unicos":
+        filtered = projects.filter(p => 
+          !p.isAlwaysOnMacro && 
+          !p.quotation?.projectName?.toLowerCase().includes('always-on') &&
+          !p.quotation?.projectName?.toLowerCase().includes('modo') &&
+          !p.macroMonthlyBudget &&
+          !(p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'))
+        );
+        break;
+      case "completados":
+        filtered = projects.filter(p => p.status === 'completed' || p.status === 'cancelled');
+        break;
+      default: // "todos"
+        filtered = projects;
+    }
+
+    // Aplicar filtros adicionales
+    filtered = filtered.filter(project => {
+      const client = clients.find(c => c.id === project.quotation?.clientId);
+      const projectName = project.quotation?.projectName || "";
+      const clientName = client?.name || "";
+
+      const matchesSearch = searchTerm === "" || 
+        projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        clientName.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesClient = filterClient === "all" || project.quotation?.clientId?.toString() === filterClient;
+
+      return matchesSearch && matchesClient;
     });
-  };
 
-  // Mutation para asignar cliente a un proyecto
+    // Ordenar
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return (a.quotation?.projectName || "").localeCompare(b.quotation?.projectName || "");
+        case "client":
+          const clientA = clients.find(c => c.id === a.quotation?.clientId)?.name || "";
+          const clientB = clients.find(c => c.id === b.quotation?.clientId)?.name || "";
+          return clientA.localeCompare(clientB);
+        case "budget":
+          return (b.quotation?.totalAmount || 0) - (a.quotation?.totalAmount || 0);
+        case "recent":
+        default:
+          return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+      }
+    });
+  }, [projects, clients, activeTab, searchTerm, filterClient, sortBy]);
+
+  // Estadísticas por tipo
+  const stats = useMemo(() => {
+    if (!projects) return { total: 0, alwaysOn: 0, unicos: 0, completados: 0 };
+
+    const alwaysOn = projects.filter(p => 
+      p.isAlwaysOnMacro || 
+      p.quotation?.projectName?.toLowerCase().includes('always-on') ||
+      p.quotation?.projectName?.toLowerCase().includes('modo') ||
+      p.macroMonthlyBudget ||
+      (p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'))
+    ).length;
+
+    const completados = projects.filter(p => p.status === 'completed' || p.status === 'cancelled').length;
+    const unicos = projects.length - alwaysOn - completados;
+
+    return {
+      total: projects.length,
+      alwaysOn,
+      unicos,
+      completados
+    };
+  }, [projects]);
+
+  // Mutation para asignar cliente
   const assignClientMutation = useMutation({
     mutationFn: ({ projectId, clientId }: { projectId: number; clientId: number }) => 
       apiRequest(`/api/active-projects/${projectId}/assign-client`, "PATCH", { clientId }),
     onSuccess: async () => {
-      // Invalidar caché y forzar actualización
       await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       await refetchProjects();
       toast({
@@ -157,240 +227,198 @@ export default function ActiveProjects() {
     }
   });
 
-  // Función para manejar la eliminación de proyecto individual
-  const handleDeleteProject = (e: React.MouseEvent, projectId: number) => {
-    e.stopPropagation();
-    console.log('🗑️ Iniciando eliminación del proyecto:', projectId);
-    console.log('🗑️ Estado actual deleteProjectId:', deleteProjectId);
-    setDeleteProjectId(projectId);
-    console.log('🗑️ Proyecto marcado para eliminación:', projectId);
-  };
+    // Mutación para eliminar todos los proyectos activos
+    const deleteAllProjectsMutation = useMutation({
+      mutationFn: async () => {
+        const response = await apiRequest("/api/active-projects", "DELETE");
+        return response;
+      },
+      onSuccess: async (data) => {
+        await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+        await refetchProjects();
+        toast({
+          title: "Éxito",
+          description: `Se eliminaron ${data.deletedCount} proyectos correctamente.`,
+        });
+        setDeleteAllProjectsDialogOpen(false);
+        setDeleteAllConfirmationText("");
+      },
+      onError: (error) => {
+        console.error('Error al eliminar todos los proyectos:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron eliminar todos los proyectos. Inténtalo de nuevo más tarde.",
+          variant: "destructive",
+        });
+      }
+    });
 
-  // Función para manejar la eliminación de proyecto macro Always-On
-  const handleDeleteMacroProject = (e: React.MouseEvent, projectId: number) => {
-    e.stopPropagation();
-    console.log('Iniciando eliminación del proyecto macro:', projectId);
-    setDeleteMacroProjectId(projectId);
-  };
-
-  // Mutación para eliminar un proyecto
+  // Mutation para eliminar proyecto
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
-      console.log('🔥 INICIANDO ELIMINACIÓN - ID:', projectId);
-      console.log('🔥 URL:', `/api/active-projects/${projectId}`);
-      
-      try {
-        const response = await fetch(`/api/active-projects/${projectId}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        });
-        
-        console.log('🔥 RESPUESTA RECIBIDA - Status:', response.status);
-        console.log('🔥 RESPUESTA RECIBIDA - OK:', response.ok);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('🚨 ERROR DEL SERVIDOR:', errorText);
-          
-          let errorMessage = 'Error al eliminar el proyecto';
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.message || errorMessage;
-          } catch {
-            errorMessage = `Error ${response.status}: ${errorText || 'Error desconocido'}`;
-          }
-          
-          throw new Error(errorMessage);
+      const response = await fetch(`/api/active-projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Error al eliminar el proyecto';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = `Error ${response.status}: ${errorText || 'Error desconocido'}`;
         }
-        
-        const result = await response.json();
-        console.log('🎉 PROYECTO ELIMINADO EXITOSAMENTE:', result);
-        return result;
-      } catch (error) {
-        console.error('🚨 ERROR EN FETCH:', error);
-        throw error;
+        throw new Error(errorMessage);
       }
+
+      return response.json();
     },
     onMutate: async (projectId) => {
-      console.log('Iniciando eliminación del proyecto:', projectId);
-      
-      // Cancelar consultas pendientes
       await queryClient.cancelQueries({ queryKey: ['/api/active-projects'] });
-      
-      // Agregar el proyecto a la lista de eliminación para la animación
       setDeletingProjects(prev => new Set([...prev, projectId]));
-      
       return { projectId };
     },
     onSuccess: async (data, projectId) => {
-      console.log('Proyecto eliminado exitosamente, actualizando UI...');
-      
-      // Remover de la lista de eliminación
       setDeletingProjects(prev => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
       });
-      
+
       toast({
         title: "Proyecto eliminado",
         description: "El proyecto ha sido eliminado correctamente.",
       });
-      
-      // Cerrar el diálogo
+
       setDeleteProjectId(null);
       setDeleteConfirmationText("");
-      
-      // Invalidar y refrescar datos
+
       await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       await refetchProjects();
       await refetchSubprojects();
     },
     onError: (error, projectId) => {
-      console.error('Error al eliminar el proyecto:', error);
-      
-      // Remover de la lista de eliminación si hay error
       setDeletingProjects(prev => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
       });
-      
+
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo eliminar el proyecto.",
         variant: "destructive",
       });
-      
-      // Cerrar el diálogo en caso de error
+
       setDeleteProjectId(null);
       setDeleteConfirmationText("");
     }
   });
 
-  // Mutación para eliminar proyectos macro
+  // Mutation para eliminar proyecto macro
   const deleteMacroProjectMutation = useMutation({
     mutationFn: async (projectId: number) => {
       const response = await fetch(`/api/active-projects/${projectId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
         throw new Error(errorData.message || 'Error al eliminar el proyecto macro');
       }
-      
+
       return response.json();
     },
     onMutate: async (projectId) => {
-      // Cancelar consultas pendientes
       await queryClient.cancelQueries({ queryKey: ['/api/active-projects'] });
-      
-      // Agregar el proyecto a la lista de eliminación para la animación
       setDeletingProjects(prev => new Set([...prev, projectId]));
-      
       return { projectId };
     },
     onSuccess: async (data, projectId) => {
-      // Mostrar animación de salida por 800ms (más tiempo para proyectos macro)
       await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Remover de la lista de eliminación
+
       setDeletingProjects(prev => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
       });
-      
+
       toast({
         title: "Proyecto macro eliminado",
         description: "El proyecto macro y todos sus subproyectos han sido eliminados correctamente.",
       });
-      
-      // Invalidar y refrescar datos
+
       await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       await refetchProjects();
       await refetchSubprojects();
-      
-      // Cerrar el diálogo y limpiar estado
+
       setDeleteMacroProjectId(null);
       setDeleteConfirmationText("");
     },
     onError: (error, projectId) => {
-      console.error('Error al eliminar el proyecto macro:', error);
-      
-      // Remover de la lista de eliminación si hay error
       setDeletingProjects(prev => {
         const newSet = new Set(prev);
         newSet.delete(projectId);
         return newSet;
       });
-      
+
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo eliminar el proyecto macro.",
         variant: "destructive",
       });
-      
-      // Cerrar el diálogo y limpiar estado
+
       setDeleteMacroProjectId(null);
       setDeleteConfirmationText("");
     }
   });
 
-  // Mutación para eliminar todos los proyectos activos
-  const deleteAllProjectsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("/api/active-projects", "DELETE");
-      return response;
-    },
-    onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      await refetchProjects();
-      toast({
-        title: "Éxito",
-        description: `Se eliminaron ${data.deletedCount} proyectos correctamente.`,
-      });
-      setDeleteAllProjectsDialogOpen(false);
-      setDeleteAllConfirmationText("");
-    },
-    onError: (error) => {
-      console.error('Error al eliminar todos los proyectos:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron eliminar todos los proyectos. Inténtalo de nuevo más tarde.",
-        variant: "destructive",
-      });
-    }
-  });
+  const toggleProjectExpansion = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation();
+    setExpandedProjects(prev => {
+      const newState = {
+        ...prev,
+        [projectId]: !prev[projectId]
+      };
+
+      if (newState[projectId]) {
+        setTimeout(() => {
+          refetchSubprojects();
+        }, 100);
+      }
+
+      return newState;
+    });
+  };
+
+  const handleDeleteProject = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation();
+    setDeleteProjectId(projectId);
+  };
+
+  const handleDeleteMacroProject = (e: React.MouseEvent, projectId: number) => {
+    e.stopPropagation();
+    setDeleteMacroProjectId(projectId);
+  };
 
   const confirmDelete = () => {
-    if (!deleteProjectId) {
-      console.log('🚨 No hay ID de proyecto para eliminar');
-      return;
-    }
-    
-    console.log('✅ Confirmando eliminación del proyecto:', deleteProjectId);
-    console.log('🔄 Llamando a deleteProjectMutation.mutate con ID:', deleteProjectId);
+    if (!deleteProjectId) return;
     deleteProjectMutation.mutate(deleteProjectId);
   };
 
   const confirmDeleteMacro = () => {
     if (!deleteMacroProjectId || deleteConfirmationText !== "DELETE") return;
-    console.log('Iniciando eliminación del proyecto macro:', deleteMacroProjectId);
     deleteMacroProjectMutation.mutate(deleteMacroProjectId);
   };
 
-  const confirmDeleteAllProjects = () => {
-    if (deleteAllConfirmationText !== "ELIMINAR TODO") return;
-    deleteAllProjectsMutation.mutate();
-  };
+    const confirmDeleteAllProjects = () => {
+      if (deleteAllConfirmationText !== "ELIMINAR TODO") return;
+      deleteAllProjectsMutation.mutate();
+    };
 
   const openAssignClientDialog = (e: React.MouseEvent, projectId: number) => {
     e.stopPropagation();
@@ -420,29 +448,21 @@ export default function ActiveProjects() {
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
-  // Estado para almacenar todos los proyectos visibles (proyectos principales + subproyectos)
+  // Estado para proyectos visibles (principales + subproyectos expandidos)
   const [allVisibleProjects, setAllVisibleProjects] = useState<ActiveProject[]>([]);
 
-  // Efecto para cargar subproyectos cuando se expande un proyecto
   useEffect(() => {
     const loadSubprojectsForExpandedProjects = async () => {
-      // Primero empezamos con los proyectos principales
-      const updatedProjects = [...projects];
+      const updatedProjects = [...filteredProjects];
 
-      // Para cada proyecto expandido, cargamos sus subproyectos
       for (const projectId in expandedProjects) {
         if (expandedProjects[parseInt(projectId)]) {
           try {
             const response = await fetch(`/api/active-projects/parent/${projectId}`);
-
             if (response.ok) {
               const childProjects = await response.json();
-
-              // Encontrar la posición del proyecto padre
               const parentIndex = updatedProjects.findIndex(p => p.id === parseInt(projectId));
-
               if (parentIndex !== -1) {
-                // Insertar los subproyectos justo después del padre
                 updatedProjects.splice(parentIndex + 1, 0, ...childProjects);
               }
             }
@@ -456,16 +476,17 @@ export default function ActiveProjects() {
     };
 
     loadSubprojectsForExpandedProjects();
-  }, [projects, expandedProjects]);
-
-  // Usamos allVisibleProjects en lugar de visibleProjects
-  const visibleProjects = allVisibleProjects;
+  }, [filteredProjects, expandedProjects]);
 
   return (
-    <div className="p-3 space-y-3">
-      {/* Header más compacto */}
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-lg font-semibold">Gestión de Proyectos</h1>
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Gestión de Proyectos</h1>
+          <p className="text-gray-600 mt-1">Administra todos tus proyectos desde un solo lugar</p>
+        </div>
+
         <div className="flex gap-2">
           <Button
             onClick={() => setDeleteAllProjectsDialogOpen(true)}
@@ -479,374 +500,320 @@ export default function ActiveProjects() {
           </Button>
           <Button
             onClick={() => setLocation("/active-projects/new")}
-            size="sm"
-            className="bg-indigo-600 hover:bg-indigo-700 h-8 text-xs"
+            className="bg-indigo-600 hover:bg-indigo-700"
           >
-            <Plus className="h-3.5 w-3.5 mr-1" />
+            <Plus className="h-4 w-4 mr-2" />
             Nuevo Proyecto
           </Button>
         </div>
       </div>
 
-      {/* Filtros integrados en la tabla */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        {/* Barra de filtros */}
-        <div className="flex gap-2 items-center p-2 border-b bg-gray-50">
-          <div className="flex items-center text-xs font-medium text-gray-600 mr-1">
-            <Search className="h-3.5 w-3.5 mr-1 text-gray-500" />
-            Filtros:
-          </div>
-
-          <div className="flex-1">
-            <div className="relative">
-              <Input
-                placeholder="Buscar proyectos..."
-                className="pl-6 h-7 text-xs"
-              />
-              <Search className="absolute left-1.5 top-1.5 h-3.5 w-3.5 text-gray-400" />
+      {/* Estadísticas rápidas */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
+              <div className="text-sm text-blue-700">Total Proyectos</div>
             </div>
-          </div>
-
-          <div className="w-40">
-            <Select defaultValue="all">
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Todos los clientes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los clientes</SelectItem>
-                {clients && clients.map((client: Client) => (
-                  <SelectItem key={client.id} value={client.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      {client.logoUrl ? (
-                        <div className="h-4 w-4 rounded overflow-hidden flex-shrink-0">
-                          <img 
-                            src={client.logoUrl} 
-                            alt={`${client.name} logo`} 
-                            className="h-full w-full object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-4 w-4 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                          <span className="text-[9px] font-medium text-primary">
-                            {client.name.substring(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                      {client.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Building2 className="h-8 w-8 text-blue-600" />
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-2 bg-gray-50 border-b">
-          <h2 className="text-xs font-medium text-gray-600">Proyectos en Ejecución</h2>
-          <div className="flex gap-1">
-            <Badge variant="outline" className="text-[10px] h-5 bg-white">
-              {projects.length} proyectos
-            </Badge>
+        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-purple-900">{stats.alwaysOn}</div>
+              <div className="text-sm text-purple-700">Always-On</div>
+            </div>
+            <Zap className="h-8 w-8 text-purple-600" />
           </div>
         </div>
 
-        {/* Tabla optimizada */}
-        <table className="w-full">
-          <thead>
-            <tr className="text-[11px] text-gray-500 bg-gray-50">
-              <th className="px-2 py-1.5 text-left font-medium">Proyecto</th>
-              <th className="px-2 py-1.5 text-left font-medium">Cliente</th>
-              <th className="px-2 py-1.5 text-left font-medium">Estado</th>
-              <th className="px-2 py-1.5 text-left font-medium">Inicio</th>
-              <th className="px-2 py-1.5 text-left font-medium">Fin Esperado</th>
-              <th className="px-2 py-1.5 text-left font-medium">Seguimiento</th>
-              <th className="px-2 py-1.5 text-left font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {visibleProjects.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-2 py-4 text-center text-gray-500 text-xs">No hay proyectos</td>
-              </tr>
-            ) : (
-              visibleProjects.map(project => (
-                <tr 
-                  key={project.id} 
-                  className={`text-xs hover:bg-gray-50 cursor-pointer transition-all duration-700 ease-out transform ${
-                    project.isAlwaysOnMacro ? 'bg-blue-50/50' : ''
-                  } ${
-                    project.parentProjectId ? 'pl-4' : ''
-                  } ${
-                    deletingProjects.has(project.id) 
-                      ? 'opacity-0 scale-95 -translate-x-4 bg-red-50 border-red-200 pointer-events-none' 
-                      : 'opacity-100 scale-100 translate-x-0'
-                  }`}
-                  onClick={() => !deletingProjects.has(project.id) && setLocation(`/project-analytics/${project.id}`)}
-                  style={{
-                    transition: deletingProjects.has(project.id) 
-                      ? 'all 0.7s cubic-bezier(0.4, 0, 0.2, 1)' 
-                      : 'all 0.2s ease-in-out'
-                  }}
-                >
-                  <td className="px-2 py-1.5 font-medium">
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center">
-                        {/* Botón para expandir/colapsar para proyectos macro */}
-                        {(project.isAlwaysOnMacro || 
-                          project.quotation?.projectName?.toLowerCase().includes('always-on') ||
-                          project.quotation?.projectName?.toLowerCase().includes('modo') ||
-                          project.macroMonthlyBudget ||
-                          (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) && (
-                          <Button 
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 mr-1 text-blue-600"
-                            onClick={(e) => toggleProjectExpansion(e, project.id)}
-                          >
-                            {expandedProjects[project.id] ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                                <path d="M19 12h-14"></path>
-                              </svg>
-                            ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
-                                <path d="M12 5v14M5 12h14"></path>
-                              </svg>
-                            )}
-                            <span className="sr-only">
-                              {expandedProjects[project.id] ? 'Colapsar' : 'Expandir'}
-                            </span>
-                          </Button>
-                        )}
+        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-green-900">{stats.unicos}</div>
+              <div className="text-sm text-green-700">Únicos</div>
+            </div>
+            <Target className="h-8 w-8 text-green-600" />
+          </div>
+        </div>
 
-                        {(project.isAlwaysOnMacro || 
-                          project.quotation?.projectName?.toLowerCase().includes('always-on') ||
-                          project.quotation?.projectName?.toLowerCase().includes('modo') ||
-                          project.macroMonthlyBudget ||
-                          (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) && (
-                          <Badge variant="outline" className="mr-2 bg-blue-100 text-blue-800 border-blue-200">
-                            Always On
-                          </Badge>
-                        )}
-                        {project.parentProjectId && (
-                          <span className="text-gray-400 mr-1">└─</span>
-                        )}
-                        {project.quotation?.projectName || '-'}
-                        {project.isAlwaysOnMacro && (
-                          <span className="ml-2 text-blue-600 text-[10px]">
-                            ${(project.macroMonthlyBudget || 4200)?.toLocaleString()} / mes
-                          </span>
-                        )}
-                      </div>
-
-
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center gap-2">
-                      {project.quotation?.client?.logoUrl ? (
-                        <div className="h-5 w-5 rounded overflow-hidden border flex-shrink-0">
-                          <img 
-                            src={project.quotation.client.logoUrl} 
-                            alt={`${project.quotation.client.name} logo`} 
-                            className="h-full w-full object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      ) : project.quotation?.client?.name ? (
-                        <div className="h-5 w-5 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                          <span className="text-[9px] font-medium text-primary">
-                            {project.quotation.client.name.substring(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      ) : null}
-                      <span>{project.quotation?.client?.name || 'Cliente Desconocido'}</span>
-                      {(!project.quotation?.client?.name || project.quotation?.client?.name === '') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                          onClick={(e) => openAssignClientDialog(e, project.id)}
-                          title="Asignar cliente"
-                        >
-                          <UserPlus className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <Badge className={`text-[10px] py-0.5 ${project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}`}>
-                      {project.status === 'active' ? 'Activo' : project.status === 'en_progreso' ? 'En progreso' : project.status}
-                    </Badge>
-                  </td>
-                  <td className="px-2 py-1.5 text-gray-600">
-                    {formatDate(project.startDate)}
-                  </td>
-                  <td className="px-2 py-1.5 text-gray-600">
-                    {formatDate(project.expectedEndDate)}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    {project.trackingFrequency === "weekly" ? "Semanal" : 
-                     project.trackingFrequency === "biweekly" ? "Quincenal" :
-                     project.trackingFrequency === "monthly" ? "Mensual" : 
-                     project.trackingFrequency}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLocation(`/project-analytics/${project.id}`);
-                        }}
-                        title="Ver analíticas"
-                      >
-                        <LineChart className="h-3.5 w-3.5" />
-                      </Button>
-
-                      {/* Botón para editar proyecto Always On (solo para proyectos macro) */}
-                      {project.isAlwaysOnMacro && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLocation(`/project-analytics/${project.id}?edit=true`);
-                          }}
-                          title="Editar Proyecto Always On"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                            <path d="M12 20h9"></path>
-                            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                          </svg>
-                        </Button>
-                      )}
-
-                      {/* Botón para editar indicadores de robustez */}
-                      {project.status !== 'cancelled' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              // Verificar si existe el indicador de robustez para este proyecto
-                              const response = await fetch(`/api/deliverables/project/${project.id}`);
-                              if (response.ok) {
-                                const deliverable = await response.json();
-                                if (deliverable && deliverable.id) {
-                                  setLocation(`/edit-robustness/${deliverable.id}`);
-                                } else {
-                                  // No existe, crearlo
-                                  const createResponse = await fetch('/api/deliverables', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                      projectId: project.id,
-                                      feedbackGeneral: 0,
-                                      feedbackBrief: 0,
-                                      feedbackAppliedMetrics: 0,
-                                      feedbackDeliverables: 0,
-                                      feedbackExecution: 0,
-                                      feedbackRecommendations: 0,
-                                      feedbackExtraValue: 0,
-                                      feedbackScore: 0,
-                                      title: `Indicadores para ${project.quotation?.projectName || 'Proyecto'}`
-                                    }),
-                                  });
-
-                                  if (createResponse.ok) {
-                                    const newDeliverable = await createResponse.json();
-                                    setLocation(`/edit-robustness/${newDeliverable.id}`);
-                                  } else {
-                                    toast({
-                                      title: "Error",
-                                      description: "No se pudo crear un registro de indicadores",
-                                      variant: "destructive",
-                                    });
-                                  }
-                                }
-                              }
-                            } catch (error) {
-                              console.error('Error al buscar el entregable:', error);
-                              toast({
-                                title: "Error",
-                                description: "No se pudo acceder a los indicadores de robustez",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          title="Editar Indicadores de Robustez"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                            <path d="M16 16v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1"></path>
-                            <path d="m8 11 2 2 7-7"></path>
-                          </svg>
-                        </Button>
-                      )}
-
-                      {/* Botón de eliminar - diferente estilo para proyectos macro Always-On */}
-                      {(project.isAlwaysOnMacro || 
-                        project.quotation?.projectName?.toLowerCase().includes('always-on') ||
-                        project.quotation?.projectName?.toLowerCase().includes('modo') ||
-                        project.macroMonthlyBudget ||
-                        (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))) ? (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="h-7 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 border border-red-800 shadow-md disabled:opacity-50"
-                          onClick={(e) => handleDeleteMacroProject(e, project.id)}
-                          disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending || deleteMacroProjectMutation.isPending}
-                          title="ELIMINAR PROYECTO MACRO COMPLETO"
-                        >
-                          {(deletingProjects.has(project.id) || deleteMacroProjectMutation.isPending) ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
-                              ELIMINANDO...
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              ELIMINAR MACRO
-                            </>
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          onClick={(e) => handleDeleteProject(e, project.id)}
-                          disabled={deletingProjects.has(project.id) || deleteProjectMutation.isPending}
-                          title="Eliminar proyecto"
-                        >
-                          {(deletingProjects.has(project.id) || deleteProjectMutation.isPending) ? (
-                            <div className="w-3.5 h-3.5 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{stats.completados}</div>
+              <div className="text-sm text-gray-700">Completados</div>
+            </div>
+            <Clock className="h-8 w-8 text-gray-600" />
+          </div>
+        </div>
       </div>
 
-      {/* Diálogo de confirmación para eliminar */}
+      {/* Filtros */}
+      <div className="flex gap-4 items-center bg-white p-4 rounded-lg border">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Buscar proyectos o clientes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <Select value={filterClient} onValueChange={setFilterClient}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Todos los clientes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los clientes</SelectItem>
+            {clients.map((client: Client) => (
+              <SelectItem key={client.id} value={client.id.toString()}>
+                {client.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Más recientes</SelectItem>
+            <SelectItem value="name">Nombre A-Z</SelectItem>
+            <SelectItem value="client">Cliente A-Z</SelectItem>
+            <SelectItem value="budget">Presupuesto ↓</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Tabs por tipo de proyecto */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="todos" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Todos ({stats.total})
+          </TabsTrigger>
+          <TabsTrigger value="always-on" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Always-On ({stats.alwaysOn})
+          </TabsTrigger>
+          <TabsTrigger value="unicos" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Únicos ({stats.unicos})
+          </TabsTrigger>
+          <TabsTrigger value="completados" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Completados ({stats.completados})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="space-y-4">
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="text-xs text-gray-500 bg-gray-50">
+                  <th className="px-4 py-3 text-left font-medium">Proyecto</th>
+                  <th className="px-4 py-3 text-left font-medium">Cliente</th>
+                  <th className="px-4 py-3 text-left font-medium">Tipo</th>
+                  <th className="px-4 py-3 text-left font-medium">Estado</th>
+                  <th className="px-4 py-3 text-left font-medium">Presupuesto</th>
+                  <th className="px-4 py-3 text-left font-medium">Inicio</th>
+                  <th className="px-4 py-3 text-left font-medium">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {allVisibleProjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                      {activeTab === "todos" && "No hay proyectos"}
+                      {activeTab === "always-on" && "No hay proyectos Always-On"}
+                      {activeTab === "unicos" && "No hay proyectos únicos"}
+                      {activeTab === "completados" && "No hay proyectos completados"}
+                    </td>
+                  </tr>
+                ) : (
+                  allVisibleProjects.map(project => {
+                    const client = clients.find(c => c.id === project.quotation?.clientId);
+                    const isAlwaysOn = project.isAlwaysOnMacro || 
+                      project.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                      project.quotation?.projectName?.toLowerCase().includes('modo') ||
+                      project.macroMonthlyBudget ||
+                      (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'));
+
+                    return (
+                      <tr 
+                        key={project.id} 
+                        className={`text-sm hover:bg-gray-50 cursor-pointer transition-all duration-700 ease-out transform ${
+                          isAlwaysOn ? 'bg-blue-50/30' : ''
+                        } ${
+                          project.parentProjectId ? 'bg-gray-50' : ''
+                        } ${
+                          deletingProjects.has(project.id) 
+                            ? 'opacity-0 scale-95 -translate-x-4 bg-red-50 border-red-200 pointer-events-none' 
+                            : 'opacity-100 scale-100 translate-x-0'
+                        }`}
+                        onClick={() => !deletingProjects.has(project.id) && setLocation(`/project-analytics/${project.id}`)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {isAlwaysOn && !project.parentProjectId && (
+                              <Button 
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-blue-600"
+                                onClick={(e) => toggleProjectExpansion(e, project.id)}
+                              >
+                                {expandedProjects[project.id] ? '−' : '+'}
+                              </Button>
+                            )}
+                            {project.parentProjectId && (
+                              <span className="text-gray-400 ml-4">└─</span>
+                            )}
+                            <span className="font-medium">
+                              {project.quotation?.projectName || 'Proyecto sin nombre'}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {client?.logoUrl ? (
+                              <img 
+                                src={client.logoUrl} 
+                                alt={`${client.name} logo`} 
+                                className="h-6 w-6 rounded object-contain"
+                              />
+                            ) : (
+                              <div className="h-6 w-6 bg-gray-200 rounded flex items-center justify-center">
+                                <span className="text-xs font-medium">
+                                  {client?.name?.substring(0, 2).toUpperCase() || '??'}
+                                </span>
+                              </div>
+                            )}
+                            <span>{client?.name || 'Cliente Desconocido'}</span>
+                            {(!client?.name || client?.name === '') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 text-indigo-600"
+                                onClick={(e) => openAssignClientDialog(e, project.id)}
+                                title="Asignar cliente"
+                              >
+                                <UserPlus className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          {isAlwaysOn ? (
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              <Zap className="h-3 w-3 mr-1" />
+                              Always-On
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <Target className="h-3 w-3 mr-1" />
+                              Único
+                            </Badge>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <Badge className={`text-xs ${
+                            project.status === 'active' ? 'bg-green-500 hover:bg-green-600' : 
+                            project.status === 'completed' ? 'bg-blue-500 hover:bg-blue-600' :
+                            project.status === 'cancelled' ? 'bg-red-500 hover:bg-red-600' :
+                            'bg-gray-500 hover:bg-gray-600'
+                          }`}>
+                            {project.status === 'active' ? 'Activo' : 
+                             project.status === 'completed' ? 'Completado' :
+                             project.status === 'cancelled' ? 'Cancelado' :
+                             project.status}
+                          </Badge>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3 text-gray-500" />
+                            <span className="font-medium">
+                              {isAlwaysOn && project.macroMonthlyBudget ? 
+                                `${project.macroMonthlyBudget.toLocaleString()}/mes` :
+                                (project.quotation?.totalAmount || 0).toLocaleString()
+                              }
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3 text-gray-600">
+                          {formatDate(project.startDate)}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLocation(`/project-analytics/${project.id}`);
+                              }}
+                              title="Ver analíticas"
+                            >
+                              <LineChart className="h-3.5 w-3.5" />
+                            </Button>
+
+                            {isAlwaysOn && project.isAlwaysOnMacro ? (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700"
+                                onClick={(e) => handleDeleteMacroProject(e, project.id)}
+                                disabled={deletingProjects.has(project.id)}
+                                title="Eliminar proyecto macro"
+                              >
+                                {deletingProjects.has(project.id) ? (
+                                  <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={(e) => handleDeleteProject(e, project.id)}
+                                disabled={deletingProjects.has(project.id)}
+                                title="Eliminar proyecto"
+                              >
+                                {deletingProjects.has(project.id) ? (
+                                  <div className="w-3.5 h-3.5 border border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Diálogos */}
       <Dialog open={deleteProjectId !== null} onOpenChange={(open) => {
         if (!open && !deleteProjectMutation.isPending) {
           setDeleteProjectId(null);
@@ -864,7 +831,6 @@ export default function ActiveProjects() {
             <Button 
               variant="outline" 
               onClick={() => {
-                console.log('Cancelando eliminación');
                 setDeleteProjectId(null);
                 setDeleteConfirmationText("");
               }}
@@ -879,7 +845,7 @@ export default function ActiveProjects() {
             >
               {deleteProjectMutation.isPending ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                   Eliminando...
                 </>
               ) : (
@@ -890,7 +856,6 @@ export default function ActiveProjects() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de confirmación para eliminar proyecto macro */}
       <Dialog open={deleteMacroProjectId !== null} onOpenChange={() => {
         setDeleteMacroProjectId(null);
         setDeleteConfirmationText("");
@@ -905,7 +870,7 @@ export default function ActiveProjects() {
               <p className="font-medium">
                 Estás a punto de eliminar el proyecto macro{" "}
                 <span className="font-semibold text-red-700">
-                  "{visibleProjects.find(p => p.id === deleteMacroProjectId)?.quotation?.projectName}"
+                  "{allVisibleProjects.find(p => p.id === deleteMacroProjectId)?.quotation?.projectName}"
                 </span>{" "}
                 y <strong>TODOS sus subproyectos asociados</strong>.
               </p>
@@ -966,7 +931,60 @@ export default function ActiveProjects() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para asignar cliente */}
+            {/* Diálogo para confirmar eliminación de todos los proyectos */}
+            <Dialog open={deleteAllProjectsDialogOpen} onOpenChange={setDeleteAllProjectsDialogOpen}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle className="text-red-600">⚠️ Eliminar Todos los Proyectos</DialogTitle>
+                  <DialogDescription className="space-y-3">
+                    <p>
+                      <strong>Esta acción eliminará TODOS los proyectos activos del sistema, incluyendo:</strong>
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      <li>Todos los proyectos macro (Always-On)</li>
+                      <li>Todos los subproyectos asociados</li>
+                      <li>Todas las plantillas recurrentes</li>
+                      <li>Todos los registros de tiempo</li>
+                      <li>Todos los reportes de progreso</li>
+                      <li>Todos los entregables</li>
+                    </ul>
+                    <p className="text-red-600 font-medium">
+                      Esta acción NO se puede deshacer. Se perderán todos los datos permanentemente.
+                    </p>
+                    <p>
+                      Para confirmar, escribe exactamente: <code className="bg-gray-100 px-2 py-1 rounded">ELIMINAR TODO</code>
+                    </p>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    value={deleteAllConfirmationText}
+                    onChange={(e) => setDeleteAllConfirmationText(e.target.value)}
+                    placeholder="Escribe 'ELIMINAR TODO' para confirmar"
+                    className="text-center"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDeleteAllProjectsDialogOpen(false);
+                      setDeleteAllConfirmationText("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={confirmDeleteAllProjects}
+                    disabled={deleteAllConfirmationText !== "ELIMINAR TODO" || deleteAllProjectsMutation.isPending}
+                  >
+                    {deleteAllProjectsMutation.isPending ? "Eliminando..." : "Eliminar Todo"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
       <Dialog open={assignClientDialogOpen} onOpenChange={setAssignClientDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -992,60 +1010,6 @@ export default function ActiveProjects() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignClientDialogOpen(false)}>Cancelar</Button>
             <Button onClick={assignClient}>Asignar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo para confirmar eliminación de todos los proyectos */}
-      <Dialog open={deleteAllProjectsDialogOpen} onOpenChange={setDeleteAllProjectsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-red-600">⚠️ Eliminar Todos los Proyectos</DialogTitle>
-            <DialogDescription className="space-y-3">
-              <p>
-                <strong>Esta acción eliminará TODOS los proyectos activos del sistema, incluyendo:</strong>
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Todos los proyectos macro (Always-On)</li>
-                <li>Todos los subproyectos asociados</li>
-                <li>Todas las plantillas recurrentes</li>
-                <li>Todos los registros de tiempo</li>
-                <li>Todos los reportes de progreso</li>
-                <li>Todos los entregables</li>
-              </ul>
-              <p className="text-red-600 font-medium">
-                Esta acción NO se puede deshacer. Se perderán todos los datos permanentemente.
-              </p>
-              <p>
-                Para confirmar, escribe exactamente: <code className="bg-gray-100 px-2 py-1 rounded">ELIMINAR TODO</code>
-              </p>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              value={deleteAllConfirmationText}
-              onChange={(e) => setDeleteAllConfirmationText(e.target.value)}
-              placeholder="Escribe 'ELIMINAR TODO' para confirmar"
-              className="text-center"
-            />
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setDeleteAllProjectsDialogOpen(false);
-                setDeleteAllConfirmationText("");
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={confirmDeleteAllProjects}
-              disabled={deleteAllConfirmationText !== "ELIMINAR TODO" || deleteAllProjectsMutation.isPending}
-            >
-              {deleteAllProjectsMutation.isPending ? "Eliminando..." : "Eliminar Todo"}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
