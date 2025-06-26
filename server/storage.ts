@@ -342,15 +342,21 @@ export class DatabaseStorage implements IStorage {
         await tx.delete(projectBaseTeam).where(eq(projectBaseTeam.projectId, id));
 
         // 6. Eliminar entregables relacionados
-        await tx.delete(deliverables).where(eq(deliverables.projectId, id));
+        await tx.delete(deliverables).where(eq(deliverables.project_id, id));
 
         // 7. Eliminar comentarios MODO del cliente
-        await tx.delete(clientModoComments).where(eq(clientModoComments.projectId, id));
+        await tx.delete(clientModoComments).where(eq(clientModoComments.project_id, id));
 
-        // 8. Eliminar ciclos de proyecto
-        await tx.delete(projectCycles).where(eq(projectCycles.projectId, id));
+        // 8. Eliminar ciclos de proyecto como padre
+        await tx.delete(projectCycles).where(eq(projectCycles.parent_project_id, id));
+        
+        // 9. Eliminar ciclos de proyecto como subproyecto
+        await tx.delete(projectCycles).where(eq(projectCycles.subproject_id, id));
 
-        // 9. Eliminar entradas de tiempo rápido
+        // 10. Eliminar plantillas de proyectos recurrentes que referencian este proyecto
+        await tx.delete(recurringProjectTemplates).where(eq(recurringProjectTemplates.parentProjectId, id));
+
+        // 11. Eliminar entradas de tiempo rápido
         await tx.delete(quickTimeEntries).where(eq(quickTimeEntries.projectId, id));
 
         // 10. Actualizar proyectos hijos para quitar la referencia padre
