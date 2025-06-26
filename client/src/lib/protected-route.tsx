@@ -13,6 +13,9 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
 
+  // Debug logging
+  console.log(`🔍 ProtectedRoute (${path}):`, { user: !!user, isLoading });
+
   if (isLoading) {
     return (
       <Route path={path}>
@@ -24,6 +27,7 @@ export function ProtectedRoute({
   }
 
   if (!user) {
+    console.log(`🚫 No user found, redirecting to /auth from ${path}`);
     return (
       <Route path={path}>
         <Redirect to="/auth" />
@@ -31,5 +35,6 @@ export function ProtectedRoute({
     );
   }
 
+  console.log(`✅ User found, rendering component for ${path}`);
   return <Route path={path} component={Component} {...rest} />;
 }

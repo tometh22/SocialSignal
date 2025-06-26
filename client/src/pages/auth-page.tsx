@@ -43,10 +43,13 @@ export default function AuthPage() {
 
   // Redireccionar si el usuario ya está autenticado
   useEffect(() => {
+    console.log('🔍 AuthPage useEffect:', { user: !!user, redirecting });
     if (user) {
+      console.log('✅ User detected in AuthPage, starting redirect...');
       setRedirecting(true);
       // Redirección con un pequeño delay para asegurar que la sesión esté establecida
       setTimeout(() => {
+        console.log('🚀 Navigating to /dashboard');
         navigate("/dashboard");
       }, 100);
     }
