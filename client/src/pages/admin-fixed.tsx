@@ -956,45 +956,26 @@ export default function Admin() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nombre</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Rol</TableHead>
                         <TableHead>Tarifa por Hora</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
+                        <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {personnel.map((person) => (
-                        <TableRow key={person.id}>
-                          <TableCell className="font-medium">{person.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {getRoleName(person.roleId)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-mono">
-                              ${person.hourlyRate}/hr
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => openEditPersonnelDialog(person)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => deletePersonnelMutation.mutate(person.id)}
-                                disabled={deletePersonnelMutation.isPending}
-                              >
-                                <Trash className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                        <InlineEditPersonnel 
+                          key={person.id} 
+                          person={{
+                            id: person.id,
+                            name: person.name,
+                            email: person.email || '',
+                            roleId: person.roleId,
+                            roleName: getRoleName(person.roleId),
+                            hourlyRate: person.hourlyRate
+                          }} 
+                          roles={roles || []} 
+                        />
                       ))}
                     </TableBody>
                   </Table>
