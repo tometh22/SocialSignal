@@ -45,8 +45,10 @@ export default function AuthPage() {
   useEffect(() => {
     if (user) {
       setRedirecting(true);
-      // Redirección inmediata
-      navigate("/");
+      // Redirección con un pequeño delay para asegurar que la sesión esté establecida
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 100);
     }
   }, [user, navigate]);
 
@@ -93,7 +95,7 @@ export default function AuthPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
         // Redirección con pequeño delay para asegurar que el estado se actualice
         setTimeout(() => {
-          navigate("/");
+          navigate("/dashboard");
         }, 100);
       },
       onError: (error) => {
@@ -114,7 +116,9 @@ export default function AuthPage() {
         // Actualizar el estado y redirigir
         queryClient.setQueryData(["/api/current-user"], user);
         setRedirecting(true);
-        navigate("/");
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 100);
       }
     });
   }

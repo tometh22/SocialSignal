@@ -110,6 +110,7 @@ function AppRoutes() {
                 <Switch>
                   <ProtectedRoute path="/recurring-templates" component={AlwaysOnLanding} />
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
+                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
