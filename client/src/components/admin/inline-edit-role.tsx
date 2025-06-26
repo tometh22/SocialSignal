@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Check, X, Loader2 } from "lucide-react";
+import { Edit, Check, X, Loader2, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InlineEditRoleProps {
@@ -18,6 +18,7 @@ interface InlineEditRoleProps {
 
 function InlineEditRole({ role }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editedName, setEditedName] = useState(role.name);
   const [editedDescription, setEditedDescription] = useState(role.description || "");
   const [editedHourlyRate, setEditedHourlyRate] = useState(role.defaultRate.toString());
@@ -61,6 +62,44 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       });
     }
   });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/roles/${role.id}`, "DELETE");
+    },
+    onSuccess: () => {
+      // Actualizar cache de forma optimista eliminando el rol
+      queryClient.setQueryData(["/api/roles"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((r: any) => r.id !== role.id);
+      });
+
+      // Invalidar queries para forzar actualización
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+
+      toast({
+        title: "Éxito",
+        description: "Rol eliminado correctamente"
+      });
+    },
+    onError: (err) => {
+      console.error("Error deleting role:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el rol. Puede estar en uso.",
+        variant: "destructive"
+      });
+      setIsDeleting(false);
+    }
+  });
+
+  const handleDelete = () => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar el rol "${role.name}"? Esta acción no se puede deshacer.`)) {
+      setIsDeleting(true);
+      deleteRoleMutation.mutate();
+    }
+  };
 
   const handleSave = () => {
     const hourlyRate = parseFloat(editedHourlyRate);
@@ -181,14 +220,30 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
         </div>
       </td>
       <td className="px-6 py-4">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setIsEditing(true)}
-          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsEditing(true)}
+            disabled={isDeleting}
+            className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleDelete}
+            disabled={isDeleting || deleteRoleMutation.isPending}
+            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            {isDeleting || deleteRoleMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </td>
     </tr>
   );

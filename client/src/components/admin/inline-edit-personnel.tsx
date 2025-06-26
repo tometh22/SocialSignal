@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Check, X, Loader2 } from "lucide-react";
+import { Edit, Check, X, Loader2, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InlineEditPersonnelProps {
@@ -22,6 +22,7 @@ interface InlineEditPersonnelProps {
 
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editedName, setEditedName] = useState(person.name);
   const [editedEmail, setEditedEmail] = useState(person.email);
   const [editedRoleId, setEditedRoleId] = useState(person.roleId.toString());
@@ -70,6 +71,43 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       });
     }
   });
+
+  const deletePersonnelMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/personnel/${person.id}`, "DELETE");
+    },
+    onSuccess: () => {
+      // Actualizar cache de forma optimista eliminando el personal
+      queryClient.setQueryData(["/api/personnel"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((p: any) => p.id !== person.id);
+      });
+
+      // Invalidar queries para forzar actualización
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+
+      toast({
+        title: "Éxito",
+        description: "Personal eliminado correctamente"
+      });
+    },
+    onError: (err) => {
+      console.error("Error deleting personnel:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el personal",
+        variant: "destructive"
+      });
+      setIsDeleting(false);
+    }
+  });
+
+  const handleDelete = () => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar a "${person.name}"? Esta acción no se puede deshacer.`)) {
+      setIsDeleting(true);
+      deletePersonnelMutation.mutate();
+    }
+  };
 
   const handleSave = () => {
     const hourlyRate = parseFloat(editedHourlyRate);
