@@ -27,7 +27,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
 
   const updateRoleMutation = useMutation({
     mutationFn: async (data: { name: string; description: string; defaultRate: number }) => {
-      return apiRequest(`/api/roles/${role.id}`, "PUT", data);
+      return apiRequest(`/api/roles/${role.id}`, "PATCH", data);
     },
     onSuccess: (updatedRole) => {
       // Actualizar los valores locales inmediatamente

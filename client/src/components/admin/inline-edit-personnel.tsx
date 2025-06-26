@@ -32,7 +32,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   const updatePersonnelMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; roleId: number; hourlyRate: number }) => {
-      return apiRequest(`/api/personnel/${person.id}`, "PUT", data);
+      return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
     },
     onSuccess: (updatedPerson) => {
       // Actualizar los valores locales inmediatamente
