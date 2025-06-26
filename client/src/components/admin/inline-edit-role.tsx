@@ -1,329 +1,201 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Role } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit, Loader2, Trash2, AlertTriangle } from "lucide-react";
-import { parseDecimal, formatNumericInput } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Edit, Check, X, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface InlineEditRoleProps {
-  role: Role;
-  onUpdate?: (updatedRole: Role) => void;
-  onDelete?: (roleId: number) => void;
+  role: {
+    id: number;
+    name: string;
+    description: string;
+    hourlyRate: number;
+  };
 }
 
-export function InlineEditRole({ role, onUpdate, onDelete }: InlineEditRoleProps) {
+export default function InlineEditRole({ role }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(role.name);
-  const [editDescription, setEditDescription] = useState(role.description || "");
-  // Asegurarse de que editDefaultRate sea un número válido inicialmente
-  const [editDefaultRate, setEditDefaultRate] = useState(typeof role.defaultRate === 'number' ? role.defaultRate : 0);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  // Estado local para mostrar los cambios inmediatamente
-  const [localRole, setLocalRole] = useState<Role>(role);
-  const [renderKey, setRenderKey] = useState(0);
+  const [editedName, setEditedName] = useState(role.name);
+  const [editedDescription, setEditedDescription] = useState(role.description || "");
+  const [editedHourlyRate, setEditedHourlyRate] = useState(role.hourlyRate.toString());
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Update when the role prop changes
-  useEffect(() => {
-    setLocalRole(role);
-    if (!isEditing) {
-      setEditName(role.name);
-      setEditDescription(role.description || "");
-      setEditDefaultRate(typeof role.defaultRate === 'number' ? role.defaultRate : 0);
-    }
-  }, [role, isEditing]);
-
-  // Update role mutation
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { name: string; description: string; defaultRate: number } }) => {
-      const response = await apiRequest("PATCH", `/api/roles/${id}`, data);
-      const updatedRole = await response.json();
-      return updatedRole as Role;
+    mutationFn: async (data: { name: string; description: string; hourlyRate: number }) => {
+      return apiRequest(`/api/roles/${role.id}`, "PUT", data);
     },
-    onSuccess: (updatedData: Role) => {
-      
-      // SOLUCIÓN DEFINITIVA: Forzar actualización inmediata con múltiples estrategias
-      
-      // 1. Actualizar estado local inmediatamente
-      setLocalRole({...updatedData});
-      setEditName(updatedData.name);
-      setEditDescription(updatedData.description || "");
-      setEditDefaultRate(updatedData.defaultRate);
-      
-      // 2. Forzar re-render con key única
-      setRenderKey(prev => prev + 1);
-      
-      // 3. Actualizar caché de React Query inmediatamente
-      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-        if (!oldData) return [updatedData];
-        return oldData.map(item => item.id === updatedData.id ? updatedData : item);
+    onMutate: async (newData) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/roles"] });
+
+      // Snapshot the previous value
+      const previousRoles = queryClient.getQueryData(["/api/roles"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["/api/roles"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((r: any) => 
+          r.id === role.id 
+            ? { ...r, ...newData }
+            : r
+        );
       });
-      
-      // 4. Invalidar y refrescar datos
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      queryClient.refetchQueries({ queryKey: ["/api/roles"] });
-      
-      // 5. Notificar al componente padre con datos frescos
-      if (onUpdate) {
-        onUpdate(updatedData);
-      }
-      
-      // 6. Forzar segunda actualización con delay
-      setTimeout(() => {
-        setLocalRole({...updatedData});
-        setRenderKey(prev => prev + 1);
-      }, 50);
-      
-      // 7. Tercera actualización para casos extremos
-      setTimeout(() => {
-        setLocalRole({...updatedData});
-        queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      }, 200);
-      
+
+      return { previousRoles };
+    },
+    onError: (err, newData, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      queryClient.setQueryData(["/api/roles"], context?.previousRoles);
       toast({
-        title: "Guardado",
-        description: `${updatedData.name}: $${updatedData.defaultRate}/hr`,
+        title: "Error",
+        description: "No se pudo actualizar el rol",
+        variant: "destructive"
+      });
+    },
+    onSuccess: (updatedRole) => {
+      // Update the cache with the server response
+      queryClient.setQueryData(["/api/roles"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((r: any) => 
+          r.id === role.id ? updatedRole : r
+        );
+      });
+
+      toast({
+        title: "Éxito",
+        description: "Rol actualizado correctamente"
       });
       setIsEditing(false);
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update role.",
-        variant: "destructive",
-      });
-    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+    }
   });
 
   const handleSave = () => {
-    // Validate inputs
-    if (!editName.trim()) {
+    const hourlyRate = parseFloat(editedHourlyRate);
+
+    if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
         title: "Error",
-        description: "Role name cannot be empty",
-        variant: "destructive",
+        description: "La tarifa por hora debe ser un número válido",
+        variant: "destructive"
       });
       return;
     }
 
-    if (editDefaultRate <= 0) {
+    if (!editedName.trim()) {
       toast({
         title: "Error",
-        description: "Default rate must be greater than 0",
-        variant: "destructive",
+        description: "El nombre del rol es requerido",
+        variant: "destructive"
       });
       return;
     }
 
-    // Execute mutation
-    updateRoleMutation.mutate({ 
-      id: role.id, 
-      data: {
-        name: editName,
-        description: editDescription,
-        defaultRate: editDefaultRate
-      }
+    updateRoleMutation.mutate({
+      name: editedName.trim(),
+      description: editedDescription.trim(),
+      hourlyRate: hourlyRate
     });
   };
 
   const handleCancel = () => {
-    setEditName(localRole.name);
-    setEditDescription(localRole.description || "");
-    setEditDefaultRate(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0);
+    setEditedName(role.name);
+    setEditedDescription(role.description || "");
+    setEditedHourlyRate(role.hourlyRate.toString());
     setIsEditing(false);
   };
 
-  // Delete role mutation
-  const deleteRoleMutation = useMutation({
-    mutationFn: async () => {
-      // Realizar la eliminación y devolver el ID
-      const response = await apiRequest("DELETE", `/api/roles/${role.id}`);
-      
-      // Validar la respuesta del servidor
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al eliminar el rol");
-      }
-      
-      return role.id;
-    },
-    onSuccess: (deletedId) => {
-      // Actualizar la caché directamente aquí para eliminar el rol
-      queryClient.setQueryData(["/api/roles"], (oldData: Role[] | undefined) => {
-        if (!oldData) return [];
-        const filtered = oldData.filter(item => item.id !== deletedId);
-        return filtered;
-      });
-      
-      // Invalidar las consultas para forzar refrescar los datos
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
-      
-      // Notificar al componente padre si existe onDelete
-      if (onDelete) {
-        onDelete(deletedId);
-      }
-      
-      toast({
-        title: "Éxito",
-        description: "Rol eliminado correctamente",
-      });
-    },
-    onError: (error) => {
-      console.error("Error al eliminar rol:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el rol. Puede que tenga personal asignado.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleDelete = () => {
-    deleteRoleMutation.mutate();
-    setIsDeleteDialogOpen(false);
-  };
+  if (isEditing) {
+    return (
+      <tr className="border-b">
+        <td className="px-4 py-3">
+          <Input
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
+            className="h-8"
+            disabled={updateRoleMutation.isPending}
+          />
+        </td>
+        <td className="px-4 py-3">
+          <Input
+            value={editedDescription}
+            onChange={(e) => setEditedDescription(e.target.value)}
+            className="h-8"
+            placeholder="Sin descripción"
+            disabled={updateRoleMutation.isPending}
+          />
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1">
+            <span className="text-sm">$</span>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={editedHourlyRate}
+              onChange={(e) => setEditedHourlyRate(e.target.value)}
+              className="h-8 w-20"
+              disabled={updateRoleMutation.isPending}
+            />
+            <span className="text-sm text-muted-foreground">/hr</span>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleSave}
+              disabled={updateRoleMutation.isPending}
+              className="h-8 w-8 p-0"
+            >
+              {updateRoleMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 text-green-600" />
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleCancel}
+              disabled={updateRoleMutation.isPending}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4 text-red-600" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
 
   return (
-    <>
-      <TableRow key={`role-${role.id}-${renderKey}`}>
-        <TableCell className="font-medium">
-          {isEditing ? (
-            <Input 
-              value={editName} 
-              onChange={(e) => setEditName(e.target.value)}
-              className="w-full h-9"
-              disabled={updateRoleMutation.isPending}
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`name-${localRole.id}-${localRole.name}-${renderKey}`}>{localRole.name}</span>
-            </div>
-          )}
-        </TableCell>
-        <TableCell>
-          {isEditing ? (
-            <Textarea 
-              value={editDescription} 
-              onChange={(e) => setEditDescription(e.target.value)}
-              className="w-full h-10 resize-none min-h-0 py-2"
-              style={{ overflow: 'auto', lineHeight: '1.2' }}
-              disabled={updateRoleMutation.isPending}
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`desc-${localRole.id}-${localRole.description}-${renderKey}`}>{localRole.description || "-"}</span>
-            </div>
-          )}
-        </TableCell>
-        <TableCell>
-          {isEditing ? (
-            <Input 
-              type="text" 
-              inputMode="decimal"
-              placeholder="0,00"
-              value={editDefaultRate.toString().replace('.', ',')} 
-              onChange={(e) => {
-                const value = parseDecimal(e.target.value);
-                setEditDefaultRate(isNaN(value) ? 0 : value);
-              }} 
-              className="w-full h-9"
-              disabled={updateRoleMutation.isPending}
-            />
-          ) : (
-            <div className="flex items-center gap-2">
-              {updateRoleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-              <span key={`rate-${localRole.id}-${localRole.defaultRate}-${renderKey}`} className="font-mono">
-                ${(typeof localRole.defaultRate === 'number' ? localRole.defaultRate : 0).toFixed(2).replace('.', ',')}/hr
-              </span>
-            </div>
-          )}
-        </TableCell>
-        <TableCell className="text-right">
-          {isEditing ? (
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" size="sm" onClick={handleCancel}>
-                Cancelar
-              </Button>
-              <Button 
-                variant="default" 
-                size="sm" 
-                onClick={handleSave}
-                disabled={updateRoleMutation.isPending}
-              >
-                {updateRoleMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    Guardando...
-                  </>
-                ) : "Guardar"}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex justify-end space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsDeleteDialogOpen(true)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                <Edit className="h-4 w-4 mr-1" />
-                Editar
-              </Button>
-            </div>
-          )}
-        </TableCell>
-      </TableRow>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center text-red-600">
-              <AlertTriangle className="h-5 w-5 mr-2" /> Eliminar Rol
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro que deseas eliminar el rol <strong>{localRole.name}</strong>?
-              <br /><br />
-              Esta acción no se puede deshacer. Si hay personal asignado a este rol, la eliminación fallará.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {deleteRoleMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Eliminando...
-                </>
-              ) : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <tr className="border-b hover:bg-muted/50">
+      <td className="px-4 py-3 font-medium">{role.name}</td>
+      <td className="px-4 py-3 text-muted-foreground">
+        {role.description || "Sin descripción"}
+      </td>
+      <td className="px-4 py-3">
+        <span className="font-medium">${role.hourlyRate}/hr</span>
+      </td>
+      <td className="px-4 py-3">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setIsEditing(true)}
+          className="h-8 w-8 p-0"
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      </td>
+    </tr>
   );
 }

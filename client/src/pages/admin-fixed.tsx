@@ -157,13 +157,13 @@ interface SystemConfig {
 export default function Admin() {
   // Estado para manejar tabs 
   const [activeTab, setActiveTab] = useState("roles");
-  
+
   // Estados para manejar diálogos
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
-  
+
   // Estados para formularios
   const [isEditing, setIsEditing] = useState(false);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
@@ -171,37 +171,37 @@ export default function Admin() {
   const [currentTemplate, setCurrentTemplate] = useState<ReportTemplate | null>(null);
   const [newRoleId, setNewRoleId] = useState("");
   const [newRoleHours, setNewRoleHours] = useState(0);
-  
+
   // Estados para inflación
   const [exchangeRate, setExchangeRate] = useState(1100);
   const [inflationDialogOpen, setInflationDialogOpen] = useState(false);
   const [currentInflationData, setCurrentInflationData] = useState<MonthlyInflation | null>(null);
   const [isEditingInflation, setIsEditingInflation] = useState(false);
-  
+
   // Estado para controlar animaciones de eliminación
   const [deletingTemplates, setDeletingTemplates] = useState<Set<number>>(new Set());
   const [hiddenTemplates, setHiddenTemplates] = useState<Set<number>>(new Set());
-  
+
   const { toast } = useToast();
   const { 
     updatePersonnelInCache, 
     invalidatePersonnelData,
     invalidateAllRelatedData 
   } = useGlobalCacheInvalidation();
-  
+
   // Obtener datos necesarios
   const { data: roles, isLoading: rolesLoading } = useQuery<Role[]>({
     queryKey: ["/api/roles"],
   });
-  
+
   const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
   });
-  
+
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
   });
-  
+
   const { data: templateRoleAssignments, isLoading: templateRoleAssignmentsLoading } = useQuery<(TemplateRoleAssignment & { role: Role })[]>({
     queryKey: [`/api/template-roles/${currentTemplate?.id}/with-roles`],
     enabled: !!currentTemplate?.id,
@@ -209,12 +209,12 @@ export default function Admin() {
 
   // Estado local para inflación (patrón del cotizador)
   const [inflationData, setInflationData] = useState<MonthlyInflation[]>([]);
-  
+
   // Query para cargar datos inicialmente
   const { data: queryInflationData, isLoading: inflationLoading } = useQuery<MonthlyInflation[]>({
     queryKey: ['/api/admin/monthly-inflation'],
   });
-  
+
   // Effect para sincronizar con la query inicial
   useEffect(() => {
     if (queryInflationData) {
@@ -273,7 +273,7 @@ export default function Admin() {
       source: 'INDEC'
     }
   });
-  
+
   // Mutations para crear y editar roles
   const createRoleMutation = useMutation({
     mutationFn: (role: InsertRole) => apiRequest("/api/roles", "POST", role),
@@ -294,7 +294,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const updateRoleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertRole> }) => {
       return await apiRequest(`/api/roles/${id}`, "PATCH", data);
@@ -316,7 +316,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const deleteRoleMutation = useMutation({
     mutationFn: async (id: number) => {
       return await apiRequest(`/api/roles/${id}`, "DELETE");
@@ -336,7 +336,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   // Mutations para crear y editar personal
   const createPersonnelMutation = useMutation({
     mutationFn: (personnel: InsertPersonnel) => apiRequest("/api/personnel", "POST", personnel),
@@ -357,7 +357,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const updatePersonnelMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertPersonnel> }) => {
       return await apiRequest(`/api/personnel/${id}`, "PATCH", data);
@@ -379,7 +379,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const deletePersonnelMutation = useMutation({
     mutationFn: async (id: number) => {
       return await apiRequest(`/api/personnel/${id}`, "DELETE");
@@ -420,7 +420,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const updateTemplateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertReportTemplate> }) => {
       return await apiRequest(`/api/templates/${id}`, "PATCH", data);
@@ -442,7 +442,7 @@ export default function Admin() {
       });
     },
   });
-  
+
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: number) => {
       return await apiRequest(`/api/templates/${id}`, "DELETE");
@@ -454,7 +454,7 @@ export default function Admin() {
         newSet.add(id);
         return newSet;
       });
-      
+
       // Después de 300ms, ocultar completamente
       setTimeout(() => {
         setHiddenTemplates(prev => {
@@ -489,7 +489,7 @@ export default function Admin() {
         newSet.delete(id);
         return newSet;
       });
-      
+
       toast({
         title: "Error",
         description: "No se pudo eliminar la plantilla.",
@@ -525,7 +525,7 @@ export default function Admin() {
   // Funciones para actualizar inflación (patrón del cotizador)
   const addInflationData = (newData: InflationFormValues) => {
     setIsCreating(true);
-    
+
     // Actualización inmediata del estado local
     const newInflation: MonthlyInflation = {
       id: Date.now(), // ID temporal
@@ -536,9 +536,9 @@ export default function Admin() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    
+
     setInflationData(prev => [newInflation, ...prev].sort((a, b) => b.year - a.year || b.month - a.month));
-    
+
     // Llamada a la API en segundo plano
     apiRequest('/api/admin/monthly-inflation', 'POST', newData)
       .then(() => {
@@ -561,12 +561,12 @@ export default function Admin() {
 
   const updateInflationData = (id: number, updates: Partial<InflationFormValues>) => {
     setIsUpdating(true);
-    
+
     // Actualización inmediata del estado local
     setInflationData(prev => prev.map(item => 
       item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
     ));
-    
+
     // Llamada a la API en segundo plano
     apiRequest(`/api/admin/monthly-inflation/${id}`, 'PATCH', updates)
       .then(() => {
@@ -589,13 +589,13 @@ export default function Admin() {
 
   const deleteInflationData = (id: number) => {
     setIsDeleting(true);
-    
+
     // Guardar referencia para posible rollback
     const originalData = [...inflationData];
-    
+
     // Actualización inmediata del estado local
     setInflationData(prev => prev.filter(item => item.id !== id));
-    
+
     // Llamada a la API en segundo plano
     apiRequest(`/api/admin/monthly-inflation/${id}`, 'DELETE')
       .then(() => {
@@ -765,12 +765,12 @@ export default function Admin() {
       toast({ title: 'La tasa de inflación debe ser mayor a 0', variant: 'destructive' });
       return;
     }
-    
+
     // Cerrar modal inmediatamente
     setInflationDialogOpen(false);
     setCurrentInflationData(null);
     setIsEditingInflation(false);
-    
+
     if (isEditingInflation && currentInflationData) {
       updateInflationData(currentInflationData.id, values);
     } else {
@@ -839,7 +839,7 @@ export default function Admin() {
           <span>/</span>
           <span className="text-foreground font-medium">Panel de Administración</span>
         </nav>
-        
+
         <div className="flex-between">
           <div>
             <h1 className="heading-page">Panel de Administración</h1>
@@ -902,37 +902,8 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {roles.map((role) => (
-                        <TableRow key={role.id}>
-                          <TableCell className="font-medium">{role.name}</TableCell>
-                          <TableCell className="text-muted-foreground max-w-xs truncate">
-                            {role.description || "Sin descripción"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-mono">
-                              ${role.defaultRate}/hr
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => openEditRoleDialog(role)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => deleteRoleMutation.mutate(role.id)}
-                                disabled={deleteRoleMutation.isPending}
-                              >
-                                <Trash className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                      {roles.map((role: any) => (
+                        <InlineEditRole key={role.id} role={role} />
                       ))}
                     </TableBody>
                   </Table>
@@ -955,7 +926,7 @@ export default function Admin() {
             )}
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="personnel">
           <Card className="standard-card mt-6">
             <CardHeader>
