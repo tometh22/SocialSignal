@@ -686,15 +686,15 @@ export default function ActiveProjectsRedesigned() {
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="flex flex-col items-center justify-center text-center py-20 px-6">
+            <Building2 className="h-16 w-16 text-gray-400 mb-6" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
               {searchTerm || filterStatus !== "all" || filterClient !== "all" 
                 ? "No se encontraron proyectos" 
                 : "No hay proyectos activos"
               }
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-8 max-w-md">
               {searchTerm || filterStatus !== "all" || filterClient !== "all"
                 ? "Ajusta los filtros para ver más resultados"
                 : "Comienza creando tu primer proyecto para gestionar tus operaciones"
