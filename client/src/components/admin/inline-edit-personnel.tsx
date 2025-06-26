@@ -253,14 +253,30 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </div>
       </td>
       <td className="px-6 py-4">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setIsEditing(true)}
-          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsEditing(true)}
+            disabled={isDeleting}
+            className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleDelete}
+            disabled={isDeleting || deletePersonnelMutation.isPending}
+            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            {isDeleting || deletePersonnelMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin text-red-600" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </td>
     </tr>
   );
