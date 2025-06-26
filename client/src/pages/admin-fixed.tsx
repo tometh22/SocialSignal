@@ -956,39 +956,26 @@ export default function Admin() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nombre</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Rol</TableHead>
                         <TableHead>Tarifa por Defecto</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
+                        <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {personnel.map((person: any) => (
-                        <tr key={person.id} className="border-b hover:bg-muted/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-gray-900">{person.name}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-muted-foreground max-w-xs truncate">
-                              {getRoleName(person.roleId)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm font-semibold text-green-700">${person.hourlyRate.toFixed(1)}</span>
-                              <span className="text-xs text-muted-foreground">/hr</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditPersonnelDialog(person)}
-                              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
+                        <InlineEditPersonnel 
+                          key={person.id} 
+                          person={{
+                            id: person.id,
+                            name: person.name,
+                            email: person.email || '',
+                            roleId: person.roleId,
+                            roleName: getRoleName(person.roleId),
+                            hourlyRate: person.hourlyRate
+                          }} 
+                          roles={roles || []} 
+                        />
                       ))}
                     </TableBody>
                   </Table>
