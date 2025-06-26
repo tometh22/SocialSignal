@@ -16,7 +16,7 @@ interface InlineEditRoleProps {
   };
 }
 
-export default function InlineEditRole({ role }: InlineEditRoleProps) {
+function InlineEditRole({ role }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(role.name);
   const [editedDescription, setEditedDescription] = useState(role.description || "");
@@ -198,3 +198,6 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
     </tr>
   );
 }
+
+export { InlineEditRole };
+export default InlineEditRole;

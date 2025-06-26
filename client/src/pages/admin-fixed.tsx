@@ -73,8 +73,8 @@ import {
   Users,
   Users2 
 } from "lucide-react";
-import InlineEditRole from "@/components/admin/inline-edit-role";
-import InlineEditPersonnel from "@/components/admin/inline-edit-personnel";
+import { default as InlineEditRole } from "@/components/admin/inline-edit-role";
+import { default as InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
