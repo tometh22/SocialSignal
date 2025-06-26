@@ -869,6 +869,10 @@ export default function Admin() {
 
   const currentExchangeRate = systemConfig.find(c => c.configKey === 'usd_exchange_rate')?.configValue || 1100;
 
+  // Ordenar datos por tarifa de mayor a menor
+  const sortedRoles = roles ? [...roles].sort((a, b) => (b.defaultRate || 0) - (a.defaultRate || 0)) : [];
+  const sortedPersonnel = personnel ? [...personnel].sort((a, b) => (b.hourlyRate || 0) - (a.hourlyRate || 0)) : [];
+
   return (
     <div className="page-container">
       {/* Breadcrumbs unificados */}
@@ -929,7 +933,7 @@ export default function Admin() {
                 <div className="flex justify-center py-8">
                   <Loader variant="dots" size="md" text="Cargando roles" />
                 </div>
-              ) : roles && roles.length > 0 ? (
+              ) : sortedRoles && sortedRoles.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -941,7 +945,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {roles.map((role: any) => (
+                      {sortedRoles.map((role: any) => (
                         <InlineEditRole key={role.id} role={role} />
                       ))}
                     </TableBody>
@@ -1002,7 +1006,7 @@ export default function Admin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {personnel.map((person: any) => (
+                      {sortedPersonnel.map((person: any) => (
                         <InlineEditPersonnel 
                           key={person.id} 
                           person={{
