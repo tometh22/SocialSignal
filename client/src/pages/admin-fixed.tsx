@@ -932,12 +932,12 @@ export default function Admin() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle className="heading-card">Gestión de Personal</CardTitle>
-                  <CardDescription>Añadir y actualizar miembros del equipo y sus tarifas</CardDescription>
+                  <CardTitle className="heading-card">Personal del Equipo</CardTitle>
+                  <CardDescription>Gestiona el personal y sus tarifas por defecto</CardDescription>
                 </div>
                 <Button onClick={openNewPersonnelDialog} disabled={!roles || roles.length === 0}>
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Añadir Miembro
+                  Añadir Personal
                 </Button>
               </div>
             </CardHeader>
@@ -956,40 +956,53 @@ export default function Admin() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nombre</TableHead>
-                        <TableHead>Email</TableHead>
                         <TableHead>Rol</TableHead>
-                        <TableHead>Tarifa por Hora</TableHead>
-                        <TableHead>Acciones</TableHead>
+                        <TableHead>Tarifa por Defecto</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {personnel.map((person) => (
-                        <InlineEditPersonnel 
-                          key={person.id} 
-                          person={{
-                            id: person.id,
-                            name: person.name,
-                            email: person.email || '',
-                            roleId: person.roleId,
-                            roleName: getRoleName(person.roleId),
-                            hourlyRate: person.hourlyRate
-                          }} 
-                          roles={roles || []} 
-                        />
+                      {personnel.map((person: any) => (
+                        <tr key={person.id} className="border-b hover:bg-muted/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">{person.name}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-muted-foreground max-w-xs truncate">
+                              {getRoleName(person.roleId)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-semibold text-green-700">${person.hourlyRate.toFixed(1)}</span>
+                              <span className="text-xs text-muted-foreground">/hr</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openEditPersonnelDialog(person)}
+                              className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  No hay miembros del equipo registrados. ¡Añade tu primer miembro!
+                  No hay personal configurado. ¡Añade tu primer miembro!
                 </div>
               )}
             </CardContent>
             {personnel && personnel.length > 0 && (
               <div className="p-4 bg-slate-50 border-t">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Total: {personnel.length} miembros del equipo</span>
+                  <span className="text-slate-500">Total: {personnel.length} personal configurado</span>
                   <span className="text-blue-600 font-medium">
                     Tarifa promedio: ${(personnel.reduce((sum, person) => sum + person.hourlyRate, 0) / personnel.length).toFixed(2)}/hr
                   </span>
