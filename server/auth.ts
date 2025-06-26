@@ -63,13 +63,16 @@ async function comparePasswords(supplied: string, stored: string) {
 export function setupAuth(app: Express, storage: IStorage) {
   // Configuración de la sesión optimizada para entorno multiusuario y trabajo prolongado
   const isProduction = process.env.NODE_ENV === 'production';
+  const isReplit = process.env.REPLIT_DOMAINS || process.env.REPL_ID;
+  
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
     resave: false, // Solo guardar cuando se modifique
     saveUninitialized: false, // No guardar sesiones vacías para cumplir con GDPR
     rolling: true, // CRÍTICO: Renovar cookie en cada respuesta para mantener la sesión activa
     cookie: {
-      secure: isProduction, // Usar 'true' en producción para HTTPS
+      // En Replit, incluso en producción, las cookies secure pueden causar problemas
+      secure: isProduction && !isReplit, // Solo secure en producción real, no en Replit
       maxAge: 1000 * 60 * 60 * 24 * 180, // 180 días (6 meses) para máxima persistencia
       sameSite: 'lax' as const, // Protección contra CSRF pero permite navegación normal
       httpOnly: true, // Previene acceso a la cookie mediante JavaScript
@@ -154,11 +157,13 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const { email, password } = req.body;
       
+      console.log(`🔐 Login attempt for: ${email}`);
       
       // Buscar el usuario
       const user = await storage.getUserByEmail(email);
       
       if (!user) {
+        console.log(`❌ User not found: ${email}`);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
       
@@ -181,6 +186,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       
       // Establecer la sesión
       req.session.userId = user.id;
+      console.log(`✅ Session established for user ID: ${user.id}`);
       
       // Preparar respuesta sin información sensible
       const userResponse = {
@@ -192,6 +198,7 @@ export function setupAuth(app: Express, storage: IStorage) {
         isAdmin: user.isAdmin
       };
       
+      console.log(`📤 Sending login response for: ${user.email}`);
       // Usar res.json() para evitar problemas de serialización
       // Esta manera es la forma correcta y profesional para devolver JSON
       res.status(200).json(userResponse);
@@ -213,7 +220,10 @@ export function setupAuth(app: Express, storage: IStorage) {
   });
 
   app.get("/api/current-user", async (req, res) => {
+    console.log(`🔍 Current user check. Session ID: ${req.session.userId}`);
+    
     if (!req.session.userId) {
+      console.log(`❌ No session found`);
       return res.status(401).json({ message: "No autenticado" });
     }
     
@@ -221,9 +231,11 @@ export function setupAuth(app: Express, storage: IStorage) {
       const user = await storage.getUser(req.session.userId);
       
       if (!user) {
+        console.log(`❌ User not found for session ID: ${req.session.userId}`);
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
       
+      console.log(`✅ Current user validated: ${user.email}`);
       const { password, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);
     } catch (error) {
