@@ -188,11 +188,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/roles/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
+    console.log("PATCH /api/roles/:id - Request received", { id, body: req.body });
+    
     if (isNaN(id)) return res.status(400).json({ message: "Invalid role ID" });
 
     try {
       const validatedData = insertRoleSchema.partial().parse(req.body);
+      console.log("PATCH /api/roles/:id - Validated data:", validatedData);
+      
       const updatedRole = await storage.updateRole(id, validatedData);
+      console.log("PATCH /api/roles/:id - Updated role:", updatedRole);
 
       if (!updatedRole) {
         return res.status(404).json({ message: "Role not found" });
@@ -200,6 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updatedRole);
     } catch (error) {
+      console.error("PATCH /api/roles/:id - Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid role data", errors: error.errors });
       }
@@ -281,6 +287,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
+    console.log("PATCH /api/personnel/:id - Request received", { id, body: req.body });
+    
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
@@ -299,8 +307,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const validatedData = insertPersonnelSchema.partial().parse(data);
+      console.log("PATCH /api/personnel/:id - Validated data:", validatedData);
 
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
+      console.log("PATCH /api/personnel/:id - Updated person:", updatedPerson);
 
       if (!updatedPerson) {
         return res.status(404).json({ message: "Personnel not found" });
