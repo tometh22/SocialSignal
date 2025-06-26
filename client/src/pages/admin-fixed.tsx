@@ -957,12 +957,12 @@ export default function Admin() {
                 </div>
               )}
             </CardContent>
-            {roles && roles.length > 0 && (
+            {sortedRoles && sortedRoles.length > 0 && (
               <div className="p-4 bg-slate-50 border-t">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Total: {roles.length} roles configurados</span>
+                  <span className="text-slate-500">Total: {sortedRoles.length} roles configurados</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(roles.reduce((sum, role) => sum + role.defaultRate, 0) / roles.length).toFixed(2)}/hr
+                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toFixed(2)}/hr
                   </span>
                 </div>
               </div>
@@ -993,7 +993,7 @@ export default function Admin() {
                 <div className="text-center py-8 text-muted-foreground">
                   Primero debes crear al menos un rol antes de añadir personal.
                 </div>
-              ) : personnel && personnel.length > 0 ? (
+              ) : sortedPersonnel && sortedPersonnel.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -1029,12 +1029,12 @@ export default function Admin() {
                 </div>
               )}
             </CardContent>
-            {personnel && personnel.length > 0 && (
+            {sortedPersonnel && sortedPersonnel.length > 0 && (
               <div className="p-4 bg-slate-50 border-t">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Total: {personnel.length} personal configurado</span>
+                  <span className="text-slate-500">Total: {sortedPersonnel.length} personal configurado</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(personnel.reduce((sum, person) => sum + person.hourlyRate, 0) / personnel.length).toFixed(2)}/hr
+                    Tarifa promedio: ${(sortedPersonnel.reduce((sum, person) => sum + person.hourlyRate, 0) / sortedPersonnel.length).toFixed(2)}/hr
                   </span>
                 </div>
               </div>
