@@ -63,12 +63,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       });
     },
     onSuccess: (updatedPerson) => {
+      // Actualizar inmediatamente los datos en el cache
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: any) => 
-          p.id === person.id ? updatedPerson : p
+          p.id === person.id ? {
+            ...updatedPerson,
+            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || updatedPerson.roleName
+          } : p
         );
       });
+
+      // Forzar re-render
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
       toast({
         title: "Éxito",
@@ -122,7 +129,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   if (isEditing) {
     return (
       <tr className="border-b">
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <Input
             value={editedName}
             onChange={(e) => setEditedName(e.target.value)}
@@ -130,7 +137,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             disabled={updatePersonnelMutation.isPending}
           />
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <Input
             type="email"
             value={editedEmail}
@@ -139,7 +146,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             disabled={updatePersonnelMutation.isPending}
           />
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <Select
             value={editedRoleId}
             onValueChange={setEditedRoleId}
@@ -157,7 +164,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </SelectContent>
           </Select>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-1">
             <span className="text-sm">$</span>
             <Input
@@ -172,7 +179,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             <span className="text-sm text-muted-foreground">/hr</span>
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -204,17 +211,17 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   return (
     <tr className="border-b hover:bg-muted/50">
-      <td className="px-4 py-3 font-medium">{person.name}</td>
-      <td className="px-4 py-3 text-muted-foreground">{person.email}</td>
-      <td className="px-4 py-3">
+      <td className="px-6 py-4 font-medium">{person.name}</td>
+      <td className="px-6 py-4 text-muted-foreground">{person.email}</td>
+      <td className="px-6 py-4">
         <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
           {person.roleName}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-6 py-4">
         <span className="font-medium">${person.hourlyRate}/hr</span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-6 py-4">
         <Button
           size="sm"
           variant="ghost"

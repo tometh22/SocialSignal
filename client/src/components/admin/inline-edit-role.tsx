@@ -110,7 +110,7 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
   if (isEditing) {
     return (
       <tr className="border-b">
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <Input
             value={editedName}
             onChange={(e) => setEditedName(e.target.value)}
@@ -118,7 +118,7 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
             disabled={updateRoleMutation.isPending}
           />
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <Input
             value={editedDescription}
             onChange={(e) => setEditedDescription(e.target.value)}
@@ -127,7 +127,7 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
             disabled={updateRoleMutation.isPending}
           />
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-1">
             <span className="text-sm">$</span>
             <Input
@@ -142,7 +142,7 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
             <span className="text-sm text-muted-foreground">/hr</span>
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -174,14 +174,14 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
 
   return (
     <tr className="border-b hover:bg-muted/50">
-      <td className="px-4 py-3 font-medium">{role.name}</td>
-      <td className="px-4 py-3 text-muted-foreground">
+      <td className="px-6 py-4 font-medium">{role.name}</td>
+      <td className="px-6 py-4 text-muted-foreground">
         {role.description || "Sin descripción"}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-6 py-4">
         <span className="font-medium">${role.defaultRate}/hr</span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-6 py-4">
         <Button
           size="sm"
           variant="ghost"
