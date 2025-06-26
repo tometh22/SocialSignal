@@ -54,12 +54,16 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
       });
     },
     onSuccess: (updatedRole) => {
+      // Actualizar inmediatamente los datos en el cache
       queryClient.setQueryData(["/api/roles"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((r: any) => 
           r.id === role.id ? updatedRole : r
         );
       });
+
+      // Forzar re-render
+      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
 
       toast({
         title: "Éxito",
