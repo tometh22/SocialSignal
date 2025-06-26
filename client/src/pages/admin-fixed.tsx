@@ -277,7 +277,20 @@ export default function Admin() {
   // Mutations para crear y editar roles
   const createRoleMutation = useMutation({
     mutationFn: (role: InsertRole) => apiRequest("/api/roles", "POST", role),
-    onSuccess: async () => {
+    onSuccess: async (response, role) => {
+      // Actualizar cache de forma optimista
+      queryClient.setQueryData(['/api/roles'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        // Agregar el nuevo rol con un ID temporal basado en timestamp
+        const newRole = { 
+          ...role, 
+          id: response?.id || Date.now(),
+          defaultRate: role.defaultRate || 0
+        };
+        return [...old, newRole];
+      });
+
+      // Invalidar queries para forzar actualización completa
       invalidateAllRelatedData();
       setRoleDialogOpen(false);
       roleForm.reset();
@@ -299,7 +312,16 @@ export default function Admin() {
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertRole> }) => {
       return await apiRequest(`/api/roles/${id}`, "PATCH", data);
     },
-    onSuccess: async () => {
+    onSuccess: async (response, { id, data }) => {
+      // Actualizar cache de forma optimista
+      queryClient.setQueryData(['/api/roles'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((role: any) => 
+          role.id === id ? { ...role, ...data } : role
+        );
+      });
+
+      // Invalidar queries para forzar actualización completa
       invalidateAllRelatedData();
       setRoleDialogOpen(false);
       roleForm.reset();
