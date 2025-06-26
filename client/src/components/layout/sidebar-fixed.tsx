@@ -65,7 +65,7 @@ export default function SidebarFixed() {
     const interval = setInterval(fetchProjectCount, 2000);
     return () => clearInterval(interval);
   }, []);
-  
+
   // Función para obtener las iniciales del usuario
   const getUserInitials = () => {
     if (!user) return "US";
@@ -80,7 +80,6 @@ export default function SidebarFixed() {
     { href: "/active-projects", title: "Proyectos", icon: Briefcase, badge: projectCount.toString() },
     { href: "/clients", title: "Clientes", icon: Building2 },
     { href: "/statistics", title: "Análisis", icon: BarChart3 },
-    { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const },
     { href: "/admin", title: "Configuración", icon: Settings },
   ];
 
@@ -88,7 +87,7 @@ export default function SidebarFixed() {
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const isActive = currentPath === item.href;
-    
+
     return (
       <TooltipProvider key={item.href}>
         <Tooltip>
@@ -105,7 +104,7 @@ export default function SidebarFixed() {
             >
               <div className="flex items-center flex-1 min-w-0">
                 <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed ? "mx-auto" : "mr-3")} />
-                
+
                 {!isCollapsed && (
                   <div className="flex items-center justify-between flex-1">
                     <span className="truncate font-medium">{item.title}</span>
@@ -162,7 +161,7 @@ export default function SidebarFixed() {
               <h1 className="text-base font-bold text-foreground">Mind</h1>
             </div>
           )}
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -189,7 +188,7 @@ export default function SidebarFixed() {
                 {getUserInitials()}
               </AvatarFallback>
             </Avatar>
-            
+
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground truncate">
@@ -201,7 +200,7 @@ export default function SidebarFixed() {
                 </div>
               </div>
             )}
-            
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

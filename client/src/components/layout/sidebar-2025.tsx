@@ -135,14 +135,6 @@ export default function Sidebar2025() {
       title: "Automatización",
       priority: "medium",
       items: [
-        { 
-          href: "/recurring-templates", 
-          title: "Always-On", 
-          icon: Zap, 
-          status: 'new' as const, 
-          description: "Servicios recurrentes",
-          color: "yellow"
-        },
       ]
     },
     {
@@ -209,7 +201,7 @@ export default function Sidebar2025() {
     const Icon = item.icon;
     const isActive = currentPath === item.href;
     const isHovered = hoveredItem === item.href;
-    
+
     return (
       <motion.div
         key={item.href}
@@ -240,7 +232,7 @@ export default function Sidebar2025() {
               transition={{ duration: 0.6, ease: "easeInOut" }}
             />
           )}
-          
+
           <div className={cn(
             "flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 flex-shrink-0",
             item.color ? getIconColorClasses(item.color, isActive) : (isActive ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-600 group-hover:bg-gray-200"),
@@ -248,7 +240,7 @@ export default function Sidebar2025() {
           )}>
             <Icon className="h-4 w-4" />
           </div>
-          
+
           <AnimatePresence>
             {!isCollapsed && (
               <motion.div
@@ -282,7 +274,7 @@ export default function Sidebar2025() {
               </motion.div>
             )}
           </AnimatePresence>
-          
+
           {/* Keyboard shortcut hint */}
           {!isCollapsed && item.shortcut && isHovered && (
             <motion.div
@@ -328,7 +320,7 @@ export default function Sidebar2025() {
             )}
           </div>
         )}
-        
+
         <div className="space-y-1">
           {group.items.map((item) => renderNavItem(item, group.priority))}
         </div>
@@ -368,7 +360,7 @@ export default function Sidebar2025() {
               <span className="text-white font-bold text-lg tracking-tight">M</span>
             </div>
           </motion.div>
-          
+
           <AnimatePresence>
             {!isCollapsed && (
               <motion.div
@@ -388,7 +380,7 @@ export default function Sidebar2025() {
             )}
           </AnimatePresence>
         </Link>
-        
+
         <AnimatePresence>
           {!isCollapsed && (
             <motion.div
@@ -430,7 +422,7 @@ export default function Sidebar2025() {
                 {getUserInitials()}
               </AvatarFallback>
             </Avatar>
-            
+
             <AnimatePresence>
               {!isCollapsed && (
                 <motion.div
@@ -450,7 +442,7 @@ export default function Sidebar2025() {
                 </motion.div>
               )}
             </AnimatePresence>
-            
+
             <AnimatePresence>
               {!isCollapsed && (
                 <motion.div
@@ -472,7 +464,7 @@ export default function Sidebar2025() {
             </AnimatePresence>
           </div>
         )}
-        
+
         {/* Botón de expansión cuando está colapsada */}
         <AnimatePresence>
           {isCollapsed && (

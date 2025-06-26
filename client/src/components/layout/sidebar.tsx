@@ -57,7 +57,7 @@ export default function Sidebar() {
       { href: "/admin", label: "Panel Admin", icon: Cog, description: "Configuración del sistema" }
     ]
   };
-  
+
   // Gestionar la sección expandida
   const toggleSection = (section: string) => {
     if (expandedSection === section) {
@@ -66,7 +66,7 @@ export default function Sidebar() {
       setExpandedSection(section);
     }
   };
-  
+
   // Activar búsqueda
   const activateSearch = () => {
     setIsSearchActive(true);
@@ -74,14 +74,14 @@ export default function Sidebar() {
       searchInputRef.current?.focus();
     }, 100);
   };
-  
+
   // Desactivar búsqueda
   const deactivateSearch = () => {
     if (searchQuery === "") {
       setIsSearchActive(false);
     }
   };
-  
+
   // Toggle mobile menu
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -102,14 +102,14 @@ export default function Sidebar() {
   // Filtrar elementos según la búsqueda
   const filterNavItems = () => {
     if (!searchQuery) return null;
-    
+
     const allItems = Object.values(navCategories).flat();
     return allItems.filter(item => 
       item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   };
-  
+
   // Elementos filtrados por búsqueda
   const filteredItems = filterNavItems();
 
@@ -130,7 +130,7 @@ export default function Sidebar() {
   const renderNavLink = (item: any, mobile = false) => {
     const Icon = item.icon;
     const isActive = location === item.href;
-    
+
     return (
       <TooltipProvider key={item.href} delayDuration={300}>
         <Tooltip>
@@ -155,7 +155,7 @@ export default function Sidebar() {
               )}>
                 <Icon className="h-4 w-4" />
               </div>
-              
+
               {!isCollapsed && (
                 <>
                   <span className="ml-3 font-medium tracking-tight">{item.label}</span>
@@ -246,7 +246,7 @@ export default function Sidebar() {
                 </div>
               )}
             </div>
-            
+
             {/* Collapse toggle button */}
             <Button
               variant="ghost"
@@ -260,7 +260,7 @@ export default function Sidebar() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          
+
           {/* Spacer instead of search */}
           <div className="border-b border-sidebar-border/20 mx-5 my-2"></div>
 
@@ -304,7 +304,7 @@ export default function Sidebar() {
                     {navCategories.general.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
-                
+
                 {/* Cotizaciones */}
                 <div>
                   <div 
@@ -336,7 +336,7 @@ export default function Sidebar() {
                     {navCategories.cotizaciones.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
-                
+
                 {/* Proyectos */}
                 <div>
                   <div 
@@ -368,7 +368,7 @@ export default function Sidebar() {
                     {navCategories.proyectos.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
-                
+
                 {/* Datos */}
                 <div>
                   <div 
@@ -400,7 +400,7 @@ export default function Sidebar() {
                     {navCategories.datos.map((item) => renderNavLink(item))}
                   </nav>
                 </div>
-                
+
                 {/* Sistema */}
                 <div>
                   <div className={cn(
@@ -423,7 +423,7 @@ export default function Sidebar() {
                 </div>
               </>
             )}
-            
+
             {/* Actividad Reciente - Solo visible cuando no hay búsqueda y no está colapsado */}
             {!filteredItems && !isCollapsed && (
               <div className="mt-auto">

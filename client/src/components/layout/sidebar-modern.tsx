@@ -85,7 +85,7 @@ export default function ModernSidebar() {
     {
       title: "Automatización",
       items: [
-        { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const, description: "Servicios recurrentes" },
+        // { href: "/recurring-templates", title: "Always-On", icon: Zap, status: 'new' as const, description: "Servicios recurrentes" },
       ]
     },
     {
@@ -99,7 +99,7 @@ export default function ModernSidebar() {
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon;
     const isActive = currentPath === item.href;
-    
+
     return (
       <Link
         key={item.href}
@@ -119,7 +119,7 @@ export default function ModernSidebar() {
         )}>
           <Icon className="h-3.5 w-3.5" />
         </div>
-        
+
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
@@ -148,7 +148,7 @@ export default function ModernSidebar() {
 
   const renderSection = (section: NavSection) => {
     const isExpanded = expandedSections.includes(section.title);
-    
+
     return (
       <div key={section.title} className="px-3">
         {section.collapsible ? (
@@ -193,7 +193,7 @@ export default function ModernSidebar() {
             )}
           </div>
         )}
-        
+
         {(!section.collapsible || isExpanded || isCollapsed) && (
           <nav className="space-y-1.5">
             {section.items.map((item) => renderNavLink(item))}
@@ -235,7 +235,7 @@ export default function ModernSidebar() {
             </div>
           )}
         </Link>
-        
+
         {!isCollapsed && (
           <Button
             variant="ghost"
@@ -285,7 +285,7 @@ export default function ModernSidebar() {
             )}
           </div>
         )}
-        
+
         {/* Actividad Reciente - Solo cuando no está colapsado */}
         {!isCollapsed && (
           <div className="mt-4 pt-4 border-t border-gray-200">
@@ -300,7 +300,7 @@ export default function ModernSidebar() {
             </div>
           </div>
         )}
-        
+
         {isCollapsed && (
           <div className="mt-3 flex justify-center">
             <Button
