@@ -71,12 +71,14 @@ export const insertRoleSchema = createInsertSchema(roles).pick({
 export const personnel = pgTable("personnel", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  email: text("email"), // Email opcional
   roleId: integer("role_id").notNull(),
   hourlyRate: doublePrecision("hourly_rate").notNull(),
 });
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   name: true,
+  email: true,
   roleId: true,
   hourlyRate: true,
 });

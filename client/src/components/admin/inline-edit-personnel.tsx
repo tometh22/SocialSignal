@@ -84,10 +84,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
-    if (!editedName.trim() || !editedEmail.trim()) {
+    if (!editedName.trim()) {
       toast({
         title: "Error",
-        description: "El nombre y email son requeridos",
+        description: "El nombre es requerido",
         variant: "destructive"
       });
       return;
@@ -128,7 +128,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             onChange={(e) => setEditedEmail(e.target.value)}
             className="h-9 border-blue-200 focus:border-blue-400"
             disabled={updatePersonnelMutation.isPending}
-            placeholder="email@ejemplo.com"
+            placeholder="email@ejemplo.com (opcional)"
           />
         </td>
         <td className="px-6 py-4">
