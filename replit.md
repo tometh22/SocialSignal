@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- June 26, 2025: Fixed admin panel real-time updates for both roles and personnel hourly rates
+- June 26, 2025: Corrected HTTP method mismatch from PUT to PATCH for role and personnel updates 
+- June 26, 2025: Enhanced admin panel styling with consistent typography and professional edit interface
+- June 26, 2025: Added spinner animations and immediate visual feedback for admin panel updates
 - June 24, 2025: Fixed critical Select component crashes when adding team members
 - June 24, 2025: Updated "Agregar Miembro Completo" button to more professional "Configurar Miembro"
 - June 23, 2025: Initial setup
