@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -29,13 +30,10 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
       return apiRequest(`/api/roles/${role.id}`, "PUT", data);
     },
     onMutate: async (newData) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["/api/roles"] });
 
-      // Snapshot the previous value
       const previousRoles = queryClient.getQueryData(["/api/roles"]);
 
-      // Optimistically update to the new value
       queryClient.setQueryData(["/api/roles"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((r: any) => 
@@ -48,7 +46,6 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
       return { previousRoles };
     },
     onError: (err, newData, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       queryClient.setQueryData(["/api/roles"], context?.previousRoles);
       toast({
         title: "Error",
@@ -57,7 +54,6 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
       });
     },
     onSuccess: (updatedRole) => {
-      // Update the cache with the server response
       queryClient.setQueryData(["/api/roles"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((r: any) => 
@@ -72,7 +68,6 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
       setIsEditing(false);
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
     }
   });
