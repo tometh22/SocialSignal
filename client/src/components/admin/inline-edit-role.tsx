@@ -11,7 +11,7 @@ interface InlineEditRoleProps {
     id: number;
     name: string;
     description: string;
-    hourlyRate: number;
+    defaultRate: number;
   };
 }
 
@@ -19,13 +19,13 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(role.name);
   const [editedDescription, setEditedDescription] = useState(role.description || "");
-  const [editedHourlyRate, setEditedHourlyRate] = useState(role.hourlyRate.toString());
+  const [editedHourlyRate, setEditedHourlyRate] = useState(role.defaultRate.toString());
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const updateRoleMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; hourlyRate: number }) => {
+    mutationFn: async (data: { name: string; description: string; defaultRate: number }) => {
       return apiRequest(`/api/roles/${role.id}`, "PUT", data);
     },
     onMutate: async (newData) => {
@@ -101,14 +101,14 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
     updateRoleMutation.mutate({
       name: editedName.trim(),
       description: editedDescription.trim(),
-      hourlyRate: hourlyRate
+      defaultRate: hourlyRate
     });
   };
 
   const handleCancel = () => {
     setEditedName(role.name);
     setEditedDescription(role.description || "");
-    setEditedHourlyRate(role.hourlyRate.toString());
+    setEditedHourlyRate(role.defaultRate.toString());
     setIsEditing(false);
   };
 
@@ -184,7 +184,7 @@ export default function InlineEditRole({ role }: InlineEditRoleProps) {
         {role.description || "Sin descripción"}
       </td>
       <td className="px-4 py-3">
-        <span className="font-medium">${role.hourlyRate}/hr</span>
+        <span className="font-medium">${role.defaultRate}/hr</span>
       </td>
       <td className="px-4 py-3">
         <Button
