@@ -623,8 +623,25 @@ export default function Admin() {
         configValue: rate,
         description: 'Tipo de cambio USD/ARS'
       }),
-    onSuccess: () => {
+    onSuccess: (response, rate) => {
+      // Actualizar cache de forma optimista
+      queryClient.setQueryData(['/api/admin/system-config'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        const existingIndex = old.findIndex((config: any) => config.configKey === 'usd_exchange_rate');
+        if (existingIndex >= 0) {
+          // Actualizar configuración existente
+          const updated = [...old];
+          updated[existingIndex] = { ...updated[existingIndex], configValue: rate };
+          return updated;
+        } else {
+          // Agregar nueva configuración
+          return [...old, { configKey: 'usd_exchange_rate', configValue: rate, description: 'Tipo de cambio USD/ARS' }];
+        }
+      });
+
+      // Invalidar queries para forzar actualización
       queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config'] });
+      
       toast({ title: 'Tipo de cambio actualizado exitosamente' });
     },
     onError: () => {
