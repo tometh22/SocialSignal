@@ -34,36 +34,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     mutationFn: async (data: { name: string; email: string; roleId: number; hourlyRate: number }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PUT", data);
     },
-    onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/personnel"] });
-
-      const previousPersonnel = queryClient.getQueryData(["/api/personnel"]);
-
-      queryClient.setQueryData(["/api/personnel"], (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((p: any) => 
-          p.id === person.id 
-            ? { 
-                ...p, 
-                ...newData,
-                roleName: roles.find(r => r.id === newData.roleId)?.name || p.roleName
-              }
-            : p
-        );
-      });
-
-      return { previousPersonnel };
-    },
-    onError: (err, newData, context) => {
-      queryClient.setQueryData(["/api/personnel"], context?.previousPersonnel);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el personal",
-        variant: "destructive"
-      });
-    },
     onSuccess: (updatedPerson) => {
-      // Actualizar inmediatamente los datos en el cache
+      // Actualizar los valores locales inmediatamente
+      setEditedName(updatedPerson.name);
+      setEditedEmail(updatedPerson.email);
+      setEditedRoleId(updatedPerson.roleId.toString());
+      setEditedHourlyRate(updatedPerson.hourlyRate.toString());
+
+      // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: any) => 
@@ -74,7 +52,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         );
       });
 
-      // Forzar re-render
+      // Invalidar queries para forzar actualización
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
       toast({
@@ -83,8 +61,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       });
       setIsEditing(false);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    onError: (err) => {
+      console.error("Error updating personnel:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el personal",
+        variant: "destructive"
+      });
     }
   });
 
@@ -128,13 +111,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   if (isEditing) {
     return (
-      <tr className="border-b">
+      <tr className="border-b bg-blue-50/30">
         <td className="px-6 py-4">
           <Input
             value={editedName}
             onChange={(e) => setEditedName(e.target.value)}
-            className="h-8"
+            className="h-9 border-blue-200 focus:border-blue-400"
             disabled={updatePersonnelMutation.isPending}
+            placeholder="Nombre completo"
           />
         </td>
         <td className="px-6 py-4">
@@ -142,8 +126,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             type="email"
             value={editedEmail}
             onChange={(e) => setEditedEmail(e.target.value)}
-            className="h-8"
+            className="h-9 border-blue-200 focus:border-blue-400"
             disabled={updatePersonnelMutation.isPending}
+            placeholder="email@ejemplo.com"
           />
         </td>
         <td className="px-6 py-4">
@@ -152,8 +137,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             onValueChange={setEditedRoleId}
             disabled={updatePersonnelMutation.isPending}
           >
-            <SelectTrigger className="h-8">
-              <SelectValue />
+            <SelectTrigger className="h-9 border-blue-200 focus:border-blue-400">
+              <SelectValue placeholder="Seleccionar rol" />
             </SelectTrigger>
             <SelectContent>
               {roles?.map((role: any) => (
@@ -166,15 +151,16 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-1">
-            <span className="text-sm">$</span>
+            <span className="text-sm font-medium text-gray-600">$</span>
             <Input
               type="number"
               step="0.1"
               min="0"
               value={editedHourlyRate}
               onChange={(e) => setEditedHourlyRate(e.target.value)}
-              className="h-8 w-20"
+              className="h-9 w-24 border-blue-200 focus:border-blue-400"
               disabled={updatePersonnelMutation.isPending}
+              placeholder="0.0"
             />
             <span className="text-sm text-muted-foreground">/hr</span>
           </div>
@@ -186,10 +172,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               variant="ghost"
               onClick={handleSave}
               disabled={updatePersonnelMutation.isPending}
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 hover:bg-green-100 hover:text-green-700"
             >
               {updatePersonnelMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               ) : (
                 <Check className="h-4 w-4 text-green-600" />
               )}
@@ -199,7 +185,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               variant="ghost"
               onClick={handleCancel}
               disabled={updatePersonnelMutation.isPending}
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 hover:bg-red-100 hover:text-red-700"
             >
               <X className="h-4 w-4 text-red-600" />
             </Button>
@@ -210,23 +196,30 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   }
 
   return (
-    <tr className="border-b hover:bg-muted/50">
-      <td className="px-6 py-4 font-medium">{person.name}</td>
-      <td className="px-6 py-4 text-muted-foreground">{person.email}</td>
+    <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-6 py-4">
-        <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+        <div className="font-medium text-gray-900">{person.name}</div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="text-sm text-muted-foreground">{person.email}</div>
+      </td>
+      <td className="px-6 py-4">
+        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
           {person.roleName}
         </span>
       </td>
       <td className="px-6 py-4">
-        <span className="font-medium">${person.hourlyRate}/hr</span>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-green-700">${person.hourlyRate.toFixed(1)}</span>
+          <span className="text-xs text-muted-foreground">/hr</span>
+        </div>
       </td>
       <td className="px-6 py-4">
         <Button
           size="sm"
           variant="ghost"
           onClick={() => setIsEditing(true)}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
         >
           <Edit className="h-4 w-4" />
         </Button>

@@ -29,32 +29,13 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
     mutationFn: async (data: { name: string; description: string; defaultRate: number }) => {
       return apiRequest(`/api/roles/${role.id}`, "PUT", data);
     },
-    onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/roles"] });
-
-      const previousRoles = queryClient.getQueryData(["/api/roles"]);
-
-      queryClient.setQueryData(["/api/roles"], (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((r: any) => 
-          r.id === role.id 
-            ? { ...r, ...newData }
-            : r
-        );
-      });
-
-      return { previousRoles };
-    },
-    onError: (err, newData, context) => {
-      queryClient.setQueryData(["/api/roles"], context?.previousRoles);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el rol",
-        variant: "destructive"
-      });
-    },
     onSuccess: (updatedRole) => {
-      // Actualizar inmediatamente los datos en el cache
+      // Actualizar los valores locales inmediatamente
+      setEditedName(updatedRole.name);
+      setEditedDescription(updatedRole.description || "");
+      setEditedHourlyRate(updatedRole.defaultRate.toString());
+
+      // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/roles"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((r: any) => 
@@ -62,7 +43,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
         );
       });
 
-      // Forzar re-render
+      // Invalidar queries para forzar actualización
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
 
       toast({
@@ -71,8 +52,13 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       });
       setIsEditing(false);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
+    onError: (err) => {
+      console.error("Error updating role:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el rol",
+        variant: "destructive"
+      });
     }
   });
 
@@ -113,35 +99,37 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
 
   if (isEditing) {
     return (
-      <tr className="border-b">
+      <tr className="border-b bg-blue-50/30">
         <td className="px-6 py-4">
           <Input
             value={editedName}
             onChange={(e) => setEditedName(e.target.value)}
-            className="h-8"
+            className="h-9 border-blue-200 focus:border-blue-400"
             disabled={updateRoleMutation.isPending}
+            placeholder="Nombre del rol"
           />
         </td>
         <td className="px-6 py-4">
           <Input
             value={editedDescription}
             onChange={(e) => setEditedDescription(e.target.value)}
-            className="h-8"
-            placeholder="Sin descripción"
+            className="h-9 border-blue-200 focus:border-blue-400"
+            placeholder="Descripción del rol"
             disabled={updateRoleMutation.isPending}
           />
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-1">
-            <span className="text-sm">$</span>
+            <span className="text-sm font-medium text-gray-600">$</span>
             <Input
               type="number"
               step="0.1"
               min="0"
               value={editedHourlyRate}
               onChange={(e) => setEditedHourlyRate(e.target.value)}
-              className="h-8 w-20"
+              className="h-9 w-24 border-blue-200 focus:border-blue-400"
               disabled={updateRoleMutation.isPending}
+              placeholder="0.0"
             />
             <span className="text-sm text-muted-foreground">/hr</span>
           </div>
@@ -153,10 +141,10 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
               variant="ghost"
               onClick={handleSave}
               disabled={updateRoleMutation.isPending}
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 hover:bg-green-100 hover:text-green-700"
             >
               {updateRoleMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
               ) : (
                 <Check className="h-4 w-4 text-green-600" />
               )}
@@ -166,7 +154,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
               variant="ghost"
               onClick={handleCancel}
               disabled={updateRoleMutation.isPending}
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 hover:bg-red-100 hover:text-red-700"
             >
               <X className="h-4 w-4 text-red-600" />
             </Button>
@@ -177,20 +165,27 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
   }
 
   return (
-    <tr className="border-b hover:bg-muted/50">
-      <td className="px-6 py-4 font-medium">{role.name}</td>
-      <td className="px-6 py-4 text-muted-foreground">
-        {role.description || "Sin descripción"}
+    <tr className="border-b hover:bg-muted/50 transition-colors">
+      <td className="px-6 py-4">
+        <div className="font-medium text-gray-900">{role.name}</div>
       </td>
       <td className="px-6 py-4">
-        <span className="font-medium">${role.defaultRate}/hr</span>
+        <div className="text-sm text-muted-foreground max-w-xs truncate">
+          {role.description || "Sin descripción"}
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-green-700">${role.defaultRate.toFixed(1)}</span>
+          <span className="text-xs text-muted-foreground">/hr</span>
+        </div>
       </td>
       <td className="px-6 py-4">
         <Button
           size="sm"
           variant="ghost"
           onClick={() => setIsEditing(true)}
-          className="h-8 w-8 p-0"
+          className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors"
         >
           <Edit className="h-4 w-4" />
         </Button>
