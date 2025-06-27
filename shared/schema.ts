@@ -992,3 +992,25 @@ export type InsertRecurringTemplatePersonnel = z.infer<typeof insertRecurringTem
 
 export type ProjectCycle = typeof projectCycles.$inferSelect;
 export type InsertProjectCycle = z.infer<typeof insertProjectCycleSchema>;
+
+// ==================== HISTORIAL DE TIPOS DE CAMBIO ====================
+// Tabla para versionado de tipos de cambio
+export const exchangeRateHistory = pgTable("exchange_rate_history", {
+  id: serial("id").primaryKey(),
+  rate: numeric("rate", { precision: 8, scale: 4 }).notNull(),
+  effectiveFrom: timestamp("effective_from").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const insertExchangeRateHistorySchema = createInsertSchema(exchangeRateHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ExchangeRateHistory = typeof exchangeRateHistory.$inferSelect;
+export type InsertExchangeRateHistory = z.infer<typeof insertExchangeRateHistorySchema>;
+
+export const exchangeRateHistoryRelations = relations(exchangeRateHistory, ({ one }) => ({
+  creator: one(users, { fields: [exchangeRateHistory.createdBy], references: [users.id] }),
+}));

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db, pool } from "./db";
 import { z } from "zod";
+import { currencyService } from "./services/currency-service";
 import { 
   insertClientSchema, 
   insertRoleSchema, 
@@ -3666,6 +3667,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error approving quick time entry:", error);
       res.status(500).json({ message: "Failed to approve quick time entry" });
+    }
+  });
+
+  // ==================== RUTAS API MEJORADAS ====================
+
+  // Ruta para guardar cotización con sistema mejorado
+  app.post("/api/quotations/enhanced", requireAuth, async (req, res) => {
+    try {
+      const {
+        clientId,
+        projectName,
+        teamMembers,
+        complexityConfig,
+        inflationConfig,
+        financialConfig,
+        displayCurrency = 'USD'
+      } = req.body;
+
+      // Obtener tipo de cambio actual
+      const currentRate = await currencyService.getCurrentRate();
+
+      // Calcular costos base en USD
+      const teamBaseCostUsd = teamMembers.reduce((sum: number, member: any) => sum + member.cost, 0);
+      const complexityAdjustmentUsd = teamBaseCostUsd * (complexityConfig?.totalFactor || 0);
+      const inflationAdjustmentUsd = inflationConfig?.appliedAdjustment || 0;
+      const platformCostUsd = financialConfig?.platformCost || 0;
+      const marginAmountUsd = (teamBaseCostUsd + complexityAdjustmentUsd + inflationAdjustmentUsd + platformCostUsd) * (financialConfig?.markupMultiplier - 1);
+      const discountAmountUsd = financialConfig?.discountAmount || 0;
+      const finalTotalUsd = teamBaseCostUsd + complexityAdjustmentUsd + inflationAdjustmentUsd + platformCostUsd + marginAmountUsd - discountAmountUsd;
+
+      // Validar cálculos
+      const validation = currencyService.validateQuotationCalculation({
+        teamBaseCostUsd,
+        complexityAdjustmentUsd,
+        inflationAdjustmentUsd,
+        platformCostUsd,
+        marginAmountUsd,
+        discountAmountUsd,
+        finalTotalUsd
+      });
+
+      if (!validation.isValid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      // Preparar datos para almacenamiento en formato actual
+      const quotationData = await currencyService.prepareQuotationForStorage({
+        clientId,
+        projectName,
+        teamBaseCostUsd,
+        complexityAdjustmentUsd,
+        inflationAdjustmentUsd,
+        platformCostUsd,
+        marginAmountUsd,
+        discountAmountUsd,
+        finalTotalUsd,
+        analysisType: complexityConfig?.analysisType || 'standard',
+        projectType: complexityConfig?.projectType || 'comprehensive',
+        mentionsVolume: complexityConfig?.mentionsVolume || 'medium',
+        countriesCovered: complexityConfig?.countriesCovered || '1',
+        clientEngagement: complexityConfig?.clientEngagement || 'medium'
+      }, displayCurrency);
+
+      // Guardar cotización usando el sistema actual
+      const savedQuotation = await storage.createQuotation(quotationData);
+
+      // Guardar miembros del equipo
+      for (const member of teamMembers) {
+        await storage.createQuotationTeamMember({
+          quotationId: savedQuotation.id,
+          personnelId: member.personnelId,
+          roleId: member.roleId,
+          hours: member.hours,
+          rate: member.rate,
+          cost: member.cost,
+          fte: member.fte,
+          dedication: member.dedication
+        });
+      }
+
+      // Guardar snapshot del tipo de cambio para auditoría
+      await currencyService.saveExchangeRateSnapshot(currentRate, req.user?.id);
+
+      res.json({
+        ...savedQuotation,
+        displayCurrency,
+        exchangeRateUsed: currentRate,
+        teamMembers
+      });
+
+    } catch (error) {
+      console.error("Error saving enhanced quotation:", error);
+      res.status(500).json({ message: "Failed to save quotation" });
+    }
+  });
+
+  // Ruta para obtener cotización con conversión automática
+  app.get("/api/quotations/:id/display/:currency", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const currency = req.params.currency;
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid quotation ID" });
+      }
+
+      const quotation = await storage.getQuotation(id);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      const currentRate = await currencyService.getCurrentRate();
+
+      // Convertir valores USD a la moneda solicitada
+      const convertedQuotation = {
+        ...quotation,
+        displayCurrency: currency,
+        exchangeRateUsed: currentRate,
+        baseCostDisplay: currencyService.convertFromUSD(quotation.baseCost, currency, currentRate),
+        complexityAdjustmentDisplay: currencyService.convertFromUSD(quotation.complexityAdjustment, currency, currentRate),
+        totalAmountDisplay: currencyService.convertFromUSD(quotation.totalAmount, currency, currentRate),
+        formattedTotal: currencyService.formatCurrency(
+          currencyService.convertFromUSD(quotation.totalAmount, currency, currentRate), 
+          currency
+        )
+      };
+
+      res.json(convertedQuotation);
+    } catch (error) {
+      console.error("Error fetching quotation with currency conversion:", error);
+      res.status(500).json({ message: "Failed to fetch quotation" });
     }
   });
 
