@@ -104,8 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    onSuccess: (user) => {
+    onSuccess: async (user) => {
+      // Actualizar inmediatamente la cache y invalidar para forzar re-fetch
       queryClient.setQueryData(["/api/current-user"], user);
+      await queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      
       toast({
         title: "Inicio de sesión exitoso",
         description: `Bienvenido ${user.firstName} ${user.lastName}`,
@@ -189,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: user ?? null,
         isLoading,
         error,
         loginMutation,
