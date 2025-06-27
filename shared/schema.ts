@@ -151,9 +151,14 @@ const baseInsertQuotationSchema = createInsertSchema(quotations).omit({
   updatedAt: true,
 });
 
-// Esquema personalizado que permite tanto Date como string para las fechas
+// Esquema personalizado que permite Date, string o undefined para las fechas
 export const insertQuotationSchema = baseInsertQuotationSchema.extend({
-  projectStartDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  projectStartDate: z.union([
+    z.date(), 
+    z.string().transform((str) => new Date(str)),
+    z.undefined(),
+    z.null().transform(() => undefined)
+  ]).optional(),
 });
 
 // ==================== ASIGNACIÓN DE MIEMBROS DE EQUIPO ====================

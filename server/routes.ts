@@ -798,7 +798,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si hay múltiples proyectos que usan la misma cotización, crear una copia
 
         // Crear una copia de la cotización con el nuevo cliente
-        const newQuotation = { ...currentQuotation, id: undefined, clientId };
+        const newQuotation = { 
+          ...currentQuotation, 
+          id: undefined, 
+          clientId,
+          projectStartDate: currentQuotation.projectStartDate || undefined
+        };
         const createdQuotation = await storage.createQuotation(newQuotation);
 
         if (!createdQuotation) {

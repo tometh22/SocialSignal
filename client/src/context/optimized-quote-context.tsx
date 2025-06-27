@@ -765,7 +765,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
-        projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : null,
+        projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
         status: status
       };
@@ -778,7 +778,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       const isEditing = quotationData.id !== undefined && quotationData.id !== null && quotationData.id > 0;
       console.log('🔍 Is editing mode:', isEditing);
       
-      let savedQuotation;
+      let savedQuotation: any;
       if (isEditing) {
         // Actualizar cotización existente
         console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
