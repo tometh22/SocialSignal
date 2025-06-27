@@ -771,9 +771,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       };
 
       console.log('📤 Saving quotation with payload:', quotationPayload);
+      console.log('🔍 QuotationData.id value:', quotationData.id);
+      console.log('🔍 QuotationData.id type:', typeof quotationData.id);
 
       // Detectar si estamos editando una cotización existente
-      const isEditing = quotationData.id !== undefined;
+      const isEditing = quotationData.id !== undefined && quotationData.id !== null && quotationData.id > 0;
+      console.log('🔍 Is editing mode:', isEditing);
       
       let savedQuotation;
       if (isEditing) {
@@ -786,6 +789,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         console.log('➕ Creating new quotation');
         savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
         console.log('✅ Quotation created:', savedQuotation);
+        
+        // Actualizar el ID en el contexto después de crear
+        setQuotationData(prev => ({ ...prev, id: savedQuotation.id }));
       }
 
       // Save team members with proper validation
