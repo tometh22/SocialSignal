@@ -213,23 +213,23 @@ export default function FinancialReviewFinal() {
 
   // Apply dynamic markup multiplier
   const subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
-  const marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+  const marginAmountDisplaySD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
 
   // Apply dynamic discount
   const discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
   const finalTotalUSD = subtotalWithMarginUSD - discountAmountUSD;
 
-  // Convert final amounts to display currency
-  const teamBaseCost = convertToDisplayCurrency(calculateTeamBaseCost());
-  const teamComplexityAdjustment = convertToDisplayCurrency(calculateComplexityAdjustment(calculateTeamBaseCost()));
-  const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
-  const platformCost = convertToDisplayCurrency(platformCostUSD);
-  const finalBaseAfterInflation = convertToDisplayCurrency(finalBaseAfterInflationUSD);
-  const subtotalWithPlatform = convertToDisplayCurrency(subtotalWithPlatformUSD);
-  const subtotalWithMargin = convertToDisplayCurrency(subtotalWithMarginUSD);
-  const marginAmount = convertToDisplayCurrency(marginAmountUSD);
-  const discountAmount = convertToDisplayCurrency(discountAmountUSD);
-  const finalTotal = convertToDisplayCurrency(finalTotalUSD);
+  // Convert final amounts to display currency (for UI display only)
+  const teamBaseCostDisplay = convertToDisplayCurrency(teamBaseCostUSD);
+  const teamComplexityAdjustmentDisplay = convertToDisplayCurrency(teamComplexityAdjustmentUSD);
+  const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
+  const platformCostDisplay = convertToDisplayCurrency(platformCostUSD);
+  const finalBaseAfterInflationDisplay = convertToDisplayCurrency(finalBaseAfterInflationUSD);
+  const subtotalWithPlatformDisplay = convertToDisplayCurrency(subtotalWithPlatformUSD);
+  const subtotalWithMarginDisplay = convertToDisplayCurrency(subtotalWithMarginUSD);
+  const marginAmountDisplay = convertToDisplayCurrency(marginAmountDisplaySD);
+  const discountAmountDisplay = convertToDisplayCurrency(discountAmountUSD);
+  const finalTotalDisplay = convertToDisplayCurrency(finalTotalUSD);
 
   // Update discount percentage when it changes
   React.useEffect(() => {
@@ -306,7 +306,7 @@ export default function FinancialReviewFinal() {
           <div className="text-right">
             <p className="text-sm text-gray-600 mb-1">Total Proyecto</p>
             <p className="text-3xl font-bold text-gray-900">
-              {formatFinalCurrency(finalTotal)}
+              {formatFinalCurrency(finalTotalDisplay)}
             </p>
             <p className="text-xs text-gray-500">
               {quotationData.inflation.quotationCurrency} • {quotationData.client?.name}
@@ -326,7 +326,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-blue-800">Equipo</p>
                 <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
-                <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCost)} base</p>
+                <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
               </div>
             </div>
           </CardContent>
@@ -341,7 +341,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-amber-800">Complejidad</p>
                 <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
-                <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustment)}</p>
+                <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
               </div>
             </div>
           </CardContent>
@@ -399,7 +399,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-green-800">Markup</p>
                 <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
-                <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmount)}</p>
+                <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
               </div>
             </div>
           </CardContent>
@@ -504,7 +504,7 @@ export default function FinancialReviewFinal() {
 
               <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <span className="font-semibold text-amber-900">Total Ajuste Complejidad</span>
-                <span className="text-lg font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustment)}</span>
+                <span className="text-lg font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
               </div>
             </CardContent>
           </Card>
@@ -548,7 +548,7 @@ export default function FinancialReviewFinal() {
                   <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-green-900">Ganancia Generada:</span>
-                      <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmount)}</span>
+                      <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
                       Base: {formatFinalCurrency(subtotalWithPlatform)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMargin)}
@@ -793,14 +793,14 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-blue-900">1. Costo Base Equipo</span>
-                  <span className="font-bold text-blue-900">{formatFinalCurrency(teamBaseCost)}</span>
+                  <span className="font-bold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-900">2. + Complejidad ({getComplexityPercentage()}%)</span>
-                  <span className="font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustment)}</span>
+                  <span className="font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
                 </div>
               </div>
 
@@ -837,7 +837,7 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-green-900">5. + Margen ({markupMultiplier}x)</span>
-                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmount)}</span>
+                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay}</span>
                 </div>
               </div>
 
@@ -866,7 +866,7 @@ export default function FinancialReviewFinal() {
                     <span className="text-lg font-bold text-emerald-900">TOTAL FINAL PROYECTO</span>
                   </div>
                   <span className="text-2xl font-bold text-emerald-900">
-                    {formatFinalCurrency(finalTotal)}
+                    {formatFinalCurrency(finalTotalDisplay)}
                   </span>
                 </div>
                 <p className="text-sm text-emerald-700 mt-1">
