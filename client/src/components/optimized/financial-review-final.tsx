@@ -81,7 +81,8 @@ export default function FinancialReviewFinal() {
     quotationData.teamMembers.forEach(member => {
       cost += member.cost;
     });
-    return cost;
+    // Convert to display currency
+    return convertToDisplayCurrency(cost);
   };
 
   const calculateComplexityAdjustment = (teamBaseCost) => {
@@ -103,7 +104,10 @@ export default function FinancialReviewFinal() {
   const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
   const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
 
-  // Calculate inflation if applicable - CORREGIDO
+  // Get exchange rate for currency conversions
+  const exchangeRate = 1100; // TODO: Get from system config
+
+  // Calculate inflation if applicable - CORREGIDO CON CONVERSIÓN MONETARIA
   const baseForInflation = subtotalWithComplexity;
   let inflationAdjustment = 0;
   let inflationProjectedCost = baseForInflation;
@@ -123,6 +127,7 @@ export default function FinancialReviewFinal() {
     console.log('📅 Months to project:', monthsToProject);
     console.log('💰 Base cost for inflation:', baseForInflation);
     console.log('💱 Currency:', quotationData.inflation.quotationCurrency);
+    console.log('🔄 Exchange rate:', exchangeRate);
 
     if (monthsToProject > 0) {
       // Obtener la tasa de inflación anual
@@ -148,17 +153,33 @@ export default function FinancialReviewFinal() {
       console.log('📊 Inflation factor for', monthsToProject, 'months:', inflationFactor.toFixed(6));
       console.log('📊 Total inflation percentage:', totalInflationPercentage.toFixed(2) + '%');
 
-      // APLICAR INFLACIÓN DIRECTAMENTE EN LA MONEDA DE COTIZACIÓN
+      // NUEVA LÓGICA: La inflación siempre se calcula en ARS, pero se presenta en la moneda elegida
       if (quotationData.inflation.quotationCurrency === 'USD') {
-        // Si cotizamos en USD, aplicamos inflación directamente en USD
-        inflationProjectedCost = baseForInflation * inflationFactor;
-        inflationAdjustment = inflationProjectedCost - baseForInflation;
-        console.log('💵 USD: Base =', baseForInflation, 'Projected =', inflationProjectedCost, 'Adjustment =', inflationAdjustment);
+        // Cotización en USD: convertir base a ARS, aplicar inflación, y convertir resultado a USD
+        const baseInARS = baseForInflation * exchangeRate;
+        const projectedInARS = baseInARS * inflationFactor;
+        const adjustmentInARS = projectedInARS - baseInARS;
+        
+        // Convertir de vuelta a USD para mostrar
+        inflationProjectedCost = projectedInARS / exchangeRate;
+        inflationAdjustment = adjustmentInARS / exchangeRate;
+        
+        console.log('💵 USD Mode: Base =', baseForInflation, 'USD (', baseInARS.toLocaleString(), 'ARS)');
+        console.log('💵 USD Mode: Projected =', inflationProjectedCost.toFixed(2), 'USD (', projectedInARS.toLocaleString(), 'ARS)');
+        console.log('💵 USD Mode: Adjustment =', inflationAdjustment.toFixed(2), 'USD (', adjustmentInARS.toLocaleString(), 'ARS)');
       } else {
-        // Si cotizamos en ARS, aplicamos inflación directamente en ARS
-        inflationProjectedCost = baseForInflation * inflationFactor;
-        inflationAdjustment = inflationProjectedCost - baseForInflation;
-        console.log('💸 ARS: Base =', baseForInflation, 'Projected =', inflationProjectedCost, 'Adjustment =', inflationAdjustment);
+        // Cotización en ARS: convertir base a ARS, aplicar inflación directamente
+        const baseInARS = baseForInflation * exchangeRate; // El base está en USD, convertir a ARS
+        const projectedInARS = baseInARS * inflationFactor;
+        const adjustmentInARS = projectedInARS - baseInARS;
+        
+        // Mantener todo en ARS
+        inflationProjectedCost = projectedInARS;
+        inflationAdjustment = adjustmentInARS;
+        
+        console.log('💸 ARS Mode: Base =', baseInARS.toLocaleString(), 'ARS (from', baseForInflation, 'USD)');
+        console.log('💸 ARS Mode: Projected =', projectedInARS.toLocaleString(), 'ARS');
+        console.log('💸 ARS Mode: Adjustment =', adjustmentInARS.toLocaleString(), 'ARS');
       }
 
       console.log('🎯 Final inflation adjustment:', inflationAdjustment);
@@ -167,10 +188,16 @@ export default function FinancialReviewFinal() {
   }
 
   // Calculate final base after inflation (if any)
-  const finalBaseAfterInflation = inflationProjectedCost;
+  let finalBaseAfterInflation = inflationProjectedCost;
+  
+  // If showing in ARS but inflation wasn't applied, convert the base
+  if (quotationData.inflation.quotationCurrency === 'ARS' && !quotationData.inflation.applyInflationAdjustment) {
+    finalBaseAfterInflation = subtotalWithComplexity * exchangeRate;
+  }
 
-  // Platform cost
-  const platformCost = quotationData.financials.platformCost || 0;
+  // Platform cost - convert to display currency
+  const platformCostUSD = quotationData.financials.platformCost || 0;
+  const platformCost = convertToDisplayCurrency(platformCostUSD);
   const subtotalWithPlatform = finalBaseAfterInflation + platformCost;
 
   // Apply dynamic markup multiplier
@@ -218,6 +245,16 @@ export default function FinancialReviewFinal() {
     }
   };
 
+  // Helper function to convert values based on selected currency
+  const convertToDisplayCurrency = (usdAmount) => {
+    if (quotationData.inflation.quotationCurrency === 'USD') {
+      return usdAmount;
+    } else {
+      return usdAmount * exchangeRate;
+    }
+  };
+
+  // Helper function to format currency based on selected currency
   const formatFinalCurrency = (amount) => {
     if (quotationData.inflation.quotationCurrency === 'USD') {
       return new Intl.NumberFormat('en-US', {
@@ -278,7 +315,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-blue-800">Equipo</p>
                 <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
-                <p className="text-xs text-blue-600">{formatCurrency(teamBaseCost)} base</p>
+                <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCost)} base</p>
               </div>
             </div>
           </CardContent>
@@ -293,7 +330,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-amber-800">Complejidad</p>
                 <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
-                <p className="text-xs text-amber-600">+{formatCurrency(teamComplexityAdjustment)}</p>
+                <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustment)}</p>
               </div>
             </div>
           </CardContent>
@@ -335,7 +372,7 @@ export default function FinancialReviewFinal() {
                     ? 'text-orange-600' 
                     : 'text-gray-600'
                 }`}>
-                  {inflationAdjustment > 0 ? `+${formatCurrency(inflationAdjustment)}` : 'N/A'}
+                  {inflationAdjustment > 0 ? `+${formatFinalCurrency(inflationAdjustment)}` : 'N/A'}
                 </p>
               </div>
             </div>
@@ -351,7 +388,7 @@ export default function FinancialReviewFinal() {
               <div>
                 <p className="text-xs font-medium text-green-800">Markup</p>
                 <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
-                <p className="text-xs text-green-600">+{formatCurrency(marginAmount)}</p>
+                <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmount)}</p>
               </div>
             </div>
           </CardContent>
@@ -396,7 +433,9 @@ export default function FinancialReviewFinal() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm font-bold text-gray-900">{formatCurrency(member.cost)}</span>
+                      <span className="text-sm font-bold text-gray-900">
+                        {formatFinalCurrency(convertToDisplayCurrency(member.cost))}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -454,7 +493,7 @@ export default function FinancialReviewFinal() {
 
               <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <span className="font-semibold text-amber-900">Total Ajuste Complejidad</span>
-                <span className="text-lg font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
+                <span className="text-lg font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustment)}</span>
               </div>
             </CardContent>
           </Card>
@@ -498,10 +537,10 @@ export default function FinancialReviewFinal() {
                   <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-green-900">Ganancia Generada:</span>
-                      <span className="text-lg font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                      <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmount)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
-                      Base: {formatCurrency(subtotalWithPlatform)} × {markupMultiplier} = {formatCurrency(subtotalWithMargin)}
+                      Base: {formatFinalCurrency(subtotalWithPlatform)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMargin)}
                     </p>
                   </div>
                 </div>
@@ -540,10 +579,10 @@ export default function FinancialReviewFinal() {
                     <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-red-900">Descuento Aplicado:</span>
-                        <span className="text-lg font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
+                        <span className="text-lg font-bold text-red-900">-{formatFinalCurrency(discountAmount)}</span>
                       </div>
                       <p className="text-xs text-red-700 mt-1">
-                        Se aplica sobre: {formatCurrency(subtotalWithMargin)} (subtotal + margen)
+                        Se aplica sobre: {formatFinalCurrency(subtotalWithMargin)} (subtotal + margen)
                       </p>
                     </div>
                   )}
@@ -743,21 +782,21 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-blue-900">1. Costo Base Equipo</span>
-                  <span className="font-bold text-blue-900">{formatCurrency(teamBaseCost)}</span>
+                  <span className="font-bold text-blue-900">{formatFinalCurrency(teamBaseCost)}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-900">2. + Complejidad ({getComplexityPercentage()}%)</span>
-                  <span className="font-bold text-amber-900">+{formatCurrency(teamComplexityAdjustment)}</span>
+                  <span className="font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustment)}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal (Base + Complejidad)</span>
-                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithComplexity)}</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(convertToDisplayCurrency(subtotalWithComplexity))}</span>
                 </div>
               </div>
 
@@ -779,7 +818,7 @@ export default function FinancialReviewFinal() {
                 <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-purple-900">4. + Costos de Plataforma</span>
-                    <span className="font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
+                    <span className="font-bold text-purple-900">+{formatFinalCurrency(platformCost)}</span>
                   </div>
                 </div>
               )}
@@ -787,14 +826,14 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-green-900">5. + Margen ({markupMultiplier}x)</span>
-                  <span className="font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmount)}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal con Margen</span>
-                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithMargin)}</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithMargin)}</span>
                 </div>
               </div>
 
@@ -802,7 +841,7 @@ export default function FinancialReviewFinal() {
                 <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-red-900">6. - Descuento ({discountPercentage}%)</span>
-                    <span className="font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
+                    <span className="font-bold text-red-900">-{formatFinalCurrency(discountAmount)}</span>
                   </div>
                 </div>
               )}
