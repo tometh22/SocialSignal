@@ -35,6 +35,7 @@ interface QuotationFinancials {
 }
 
 export interface QuotationData {
+  id?: number; // Para rastrear cotización existente al editar
   client: Client | null;
   project: ProjectData;
   analysisType: string;
@@ -657,6 +658,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
 
       setQuotationData({
+        id: quotation.id, // Importante: establecer el ID para indicar que estamos editando
         client: clientData,
         project: {
           name: quotation.projectName || "",
@@ -738,8 +740,21 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
       console.log('📤 Saving quotation with payload:', quotationPayload);
 
-      const savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
-      console.log('✅ Quotation saved:', savedQuotation);
+      // Detectar si estamos editando una cotización existente
+      const isEditing = quotationData.id !== undefined;
+      
+      let savedQuotation;
+      if (isEditing) {
+        // Actualizar cotización existente
+        console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
+        savedQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', quotationPayload);
+        console.log('✅ Quotation updated:', savedQuotation);
+      } else {
+        // Crear nueva cotización
+        console.log('➕ Creating new quotation');
+        savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
+        console.log('✅ Quotation created:', savedQuotation);
+      }
 
       // Save team members with proper validation
       console.log('👥 Saving team members:', quotationData.teamMembers);

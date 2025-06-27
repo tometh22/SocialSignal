@@ -595,6 +595,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ruta PUT para actualizar cotización completa (para ediciones)
+  app.put("/api/quotations/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+      // Validar que la cotización existe
+      const existingQuotation = await storage.getQuotation(id);
+      if (!existingQuotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      try {
+        // Validar datos con Zod
+        const validatedData = insertQuotationSchema.parse(req.body);
+
+        // Actualizar cotización
+        const updatedQuotation = await storage.updateQuotation(id, validatedData);
+
+        res.json(updatedQuotation);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          console.error("Error de validación Zod en actualización:", JSON.stringify(validationError.errors, null, 2));
+          return res.status(400).json({ 
+            message: "Invalid quotation data", 
+            errors: validationError.errors 
+          });
+        }
+        throw validationError;
+      }
+    } catch (error) {
+      console.error("Error al actualizar cotización:", error);
+      res.status(500).json({ message: "Failed to update quotation", error: String(error) });
+    }
+  });
+
   app.patch("/api/quotations/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
