@@ -220,16 +220,13 @@ export default function FinancialReviewFinal() {
   const discountAmount = subtotalWithMargin * (discountPercentage / 100);
   const finalTotal = subtotalWithMargin - discountAmount;
 
-  // Update totals
+  // Update discount percentage when it changes
   React.useEffect(() => {
     updateFinancials({
-      baseCost: teamBaseCost,
-      totalCost: finalTotal,
-      complexityAdjustment: teamComplexityAdjustment,
-      markupAmount: marginAmount,
-      inflationAdjustment,
+      discountPercentage: discountPercentage,
+      marginFactor: markupMultiplier,
     });
-  }, [teamBaseCost, finalTotal, teamComplexityAdjustment, marginAmount, inflationAdjustment, updateFinancials]);
+  }, [discountPercentage, markupMultiplier, updateFinancials]);
 
   const handleSaveQuotation = async () => {
     try {
