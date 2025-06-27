@@ -94,10 +94,8 @@ export default function FinancialReviewFinal() {
     }
   };
 
-  // Enhanced formatFinalCurrency that uses the new prefix format
-  const formatFinalCurrency = (amount: number) => {
-    return formatCurrencyWithPrefix(amount);
-  };
+  // Use formatCurrencyWithPrefix as formatFinalCurrency
+  const formatFinalCurrency = formatCurrencyWithPrefix;
 
   // Helper function to get role name
   const getRoleName = (roleId: number) => {
@@ -249,24 +247,7 @@ export default function FinancialReviewFinal() {
     }
   };
 
-  // Helper function to format currency based on selected currency
-  const formatFinalCurrency = (amount: number) => {
-    if (quotationData.inflation.quotationCurrency === 'USD') {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    } else {
-      return new Intl.NumberFormat('es-AR', {
-        style: 'currency',
-        currency: 'ARS',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount);
-    }
-  };
+
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
