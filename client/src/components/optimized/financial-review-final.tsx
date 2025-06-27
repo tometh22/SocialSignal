@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -55,7 +54,7 @@ export default function FinancialReviewFinal() {
     updateFinancials,
     saveQuotation
   } = useOptimizedQuote();
-  
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -174,7 +173,7 @@ export default function FinancialReviewFinal() {
 
   // Calculate final base after inflation (if any) - keep in USD for now
   let finalBaseAfterInflationUSD = inflationProjectedCostUSD;
-  
+
   // If inflation wasn't applied, use the original subtotal in USD
   if (!quotationData.inflation.applyInflationAdjustment) {
     finalBaseAfterInflationUSD = subtotalWithComplexityUSD;
@@ -894,7 +893,7 @@ export default function FinancialReviewFinal() {
             {/* Botón Guardar Borrador */}
             <Button 
               onClick={handleSaveDraft}
-              disabled={isSavingDraft}
+              disabled={isSavingDraft || !quotationData.client || !quotationData.project.name?.trim()}
               size="lg"
               variant="outline"
               className="w-full border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 px-8 rounded-xl transition-all"

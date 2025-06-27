@@ -730,7 +730,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
   const saveQuotation = useCallback(async (status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft') => {
     try {
-      // Validar datos requeridos
+      // Validaciones básicas para todos los estados
       if (!quotationData.client?.id) {
         throw new Error("Debe seleccionar un cliente");
       }
@@ -739,7 +739,8 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         throw new Error("Debe ingresar el nombre del proyecto");
       }
 
-      if (quotationData.teamMembers.length === 0) {
+      // Para borradores, permitir cotizaciones sin equipo
+      if (status !== 'draft' && quotationData.teamMembers.length === 0) {
         throw new Error("Debe agregar al menos un miembro al equipo");
       }
 
