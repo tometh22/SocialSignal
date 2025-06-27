@@ -68,7 +68,7 @@ export default function FinancialReviewFinal() {
   }, [quotationData.teamMembers, forceRecalculate]);
 
   // Get exchange rate for currency conversions
-  const exchangeRate = 1100; // TODO: Get from system config
+  const exchangeRate = 1200; // Actualizado: 1 USD = 1200 ARS
 
   // Helper function to convert values based on selected currency
   const convertToDisplayCurrency = (usdAmount: number) => {
@@ -96,8 +96,8 @@ export default function FinancialReviewFinal() {
     quotationData.teamMembers.forEach(member => {
       cost += member.cost;
     });
-    // Convert to display currency
-    return convertToDisplayCurrency(cost);
+    // Keep in USD for calculations, convert only for display
+    return cost;
   };
 
   const calculateComplexityAdjustment = (teamBaseCost: number) => {
@@ -114,13 +114,13 @@ export default function FinancialReviewFinal() {
     return (totalFactor * 100).toFixed(1);
   };
 
-  // Calculate values
-  const teamBaseCost = calculateTeamBaseCost();
-  const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
-  const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
+  // Calculate base values in USD
+  const teamBaseCostUSD = calculateTeamBaseCost();
+  const teamComplexityAdjustmentUSD = calculateComplexityAdjustment(teamBaseCostUSD);
+  const subtotalWithComplexityUSD = teamBaseCostUSD + teamComplexityAdjustmentUSD;
 
   // Calculate inflation if applicable - CORREGIDO CON CONVERSIÓN MONETARIA
-  const baseForInflation = subtotalWithComplexity;
+  const baseForInflation = subtotalWithComplexityUSD;
   let inflationAdjustment = 0;
   let inflationProjectedCost = baseForInflation;
   let monthlyInflationRate = 0;
@@ -199,26 +199,37 @@ export default function FinancialReviewFinal() {
     }
   }
 
-  // Calculate final base after inflation (if any)
-  let finalBaseAfterInflation = inflationProjectedCost;
+  // Calculate final base after inflation (if any) - keep in USD for now
+  let finalBaseAfterInflationUSD = inflationProjectedCost;
   
-  // If showing in ARS but inflation wasn't applied, convert the base
-  if (quotationData.inflation.quotationCurrency === 'ARS' && !quotationData.inflation.applyInflationAdjustment) {
-    finalBaseAfterInflation = subtotalWithComplexity * exchangeRate;
+  // If inflation wasn't applied, use the original subtotal in USD
+  if (!quotationData.inflation.applyInflationAdjustment) {
+    finalBaseAfterInflationUSD = subtotalWithComplexityUSD;
   }
 
-  // Platform cost - convert to display currency
+  // Platform cost - keep in USD
   const platformCostUSD = quotationData.financials.platformCost || 0;
-  const platformCost = convertToDisplayCurrency(platformCostUSD);
-  const subtotalWithPlatform = finalBaseAfterInflation + platformCost;
+  const subtotalWithPlatformUSD = finalBaseAfterInflationUSD + platformCostUSD;
 
   // Apply dynamic markup multiplier
-  const subtotalWithMargin = subtotalWithPlatform * markupMultiplier;
-  const marginAmount = subtotalWithMargin - subtotalWithPlatform;
+  const subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
+  const marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
 
   // Apply dynamic discount
-  const discountAmount = subtotalWithMargin * (discountPercentage / 100);
-  const finalTotal = subtotalWithMargin - discountAmount;
+  const discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
+  const finalTotalUSD = subtotalWithMarginUSD - discountAmountUSD;
+
+  // Convert final amounts to display currency
+  const teamBaseCost = convertToDisplayCurrency(calculateTeamBaseCost());
+  const teamComplexityAdjustment = convertToDisplayCurrency(calculateComplexityAdjustment(calculateTeamBaseCost()));
+  const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
+  const platformCost = convertToDisplayCurrency(platformCostUSD);
+  const finalBaseAfterInflation = convertToDisplayCurrency(finalBaseAfterInflationUSD);
+  const subtotalWithPlatform = convertToDisplayCurrency(subtotalWithPlatformUSD);
+  const subtotalWithMargin = convertToDisplayCurrency(subtotalWithMarginUSD);
+  const marginAmount = convertToDisplayCurrency(marginAmountUSD);
+  const discountAmount = convertToDisplayCurrency(discountAmountUSD);
+  const finalTotal = convertToDisplayCurrency(finalTotalUSD);
 
   // Update discount percentage when it changes
   React.useEffect(() => {
