@@ -1,0 +1,48 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#read🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: 3
+✅ Current user validated: tomas@epical.digital
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: 3
+✅ Current user validated: tomas@epical.digital
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+5:56:38 PM [vite] hmr update /src/components/optimized/EnhancedTeamConfig.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt
+5:56:45 PM [vite] hmr update /src/components/optimized/EnhancedTeamConfig.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt (x2)
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: 3
+✅ Current user validated: tomas@epical.digital
+🔍 Current user check. Session ID: 3
+✅ Current user validated: tomas@epical.digital
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found
+6:00:21 PM [vite] hmr update /src/components/optimized/EnhancedTeamConfig.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt (x3)
+6:00:30 PM [vite] hmr update /src/components/optimized/EnhancedTeamConfig.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt (x4)
+6:00:52 PM [vite] hmr update /src/pages/optimized-quote.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt
+6:00:59 PM [vite] hmr update /src/pages/optimized-quote.tsx, /src/index.css?v=NMlNsBZBFU7c1U7trqwHt (x2)
+🔍 Current user check. Session ID: 3
+✅ Current user validated: tomas@epical.digital
+🔍 Current user check. Session ID: undefined
+❌ No session found
+🔍 Current user check. Session ID: undefined
+❌ No session found

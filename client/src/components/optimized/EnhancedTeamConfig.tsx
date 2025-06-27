@@ -630,17 +630,17 @@ const EnhancedTeamConfig: React.FC = () => {
                                     size="sm" 
                                     variant="ghost"
                                     onClick={() => saveEdit(member.id)}
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 group"
                                   >
-                                    <Check className="h-4 w-4 text-green-600" />
+                                    <Check className="h-4 w-4 text-green-600 group-hover:text-white" />
                                   </Button>
                                   <Button 
                                     size="sm" 
                                     variant="ghost"
                                     onClick={cancelEdit}
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 group"
                                   >
-                                    <X className="h-4 w-4 text-red-600" />
+                                    <X className="h-4 w-4 text-red-600 group-hover:text-white" />
                                   </Button>
                                 </>
                               ) : (

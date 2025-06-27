@@ -345,7 +345,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               variant="ghost"
               onClick={previousStep}
               disabled={currentStep === 1}
-              className="flex items-center text-neutral-600 hover:text-neutral-800"
+              className="flex items-center text-neutral-600 hover:text-white"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
@@ -369,7 +369,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             <Button
               variant="ghost"
               onClick={previousStep}
-              className="flex items-center text-neutral-600 hover:text-neutral-800"
+              className="flex items-center text-neutral-600 hover:text-white"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Anterior
