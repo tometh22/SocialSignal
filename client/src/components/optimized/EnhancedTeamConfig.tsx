@@ -68,7 +68,7 @@ const EnhancedTeamConfig: React.FC = () => {
   });
 
   // Estados para edición inline
-  const [editValues, setEditValues] = useState<Record<string, {hours: number, rate: number}>>({});
+  const [editValues, setEditValues] = useState<Record<string, {hours: number | string, rate: number | string}>>({});
 
   // Sincronizar con el contexto
   useEffect(() => {
@@ -197,8 +197,8 @@ const EnhancedTeamConfig: React.FC = () => {
     const values = editValues[memberId];
     if (values) {
       updateTeamMember(memberId, {
-        hours: values.hours,
-        rate: values.rate
+        hours: typeof values.hours === 'string' ? (parseInt(values.hours) || 0) : values.hours,
+        rate: typeof values.rate === 'string' ? (parseFloat(values.rate) || 0) : values.rate
       });
     }
     setEditingMember(null);
@@ -551,12 +551,12 @@ const EnhancedTeamConfig: React.FC = () => {
                                   <div className="flex items-center space-x-2">
                                     <Input
                                       type="number"
-                                      value={editValues[member.id]?.hours || member.hours}
+                                      value={editValues[member.id]?.hours !== undefined ? editValues[member.id].hours : member.hours}
                                       onChange={(e) => setEditValues(prev => ({
                                         ...prev,
                                         [member.id]: {
                                           ...prev[member.id],
-                                          hours: parseInt(e.target.value) || 0
+                                          hours: e.target.value
                                         }
                                       }))}
                                       className="w-16 h-8 text-xs"
@@ -573,7 +573,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                         ...prev,
                                         [member.id]: {
                                           ...prev[member.id],
-                                          rate: parseDecimalInput(e.target.value)
+                                          rate: e.target.value
                                         }
                                       }))}
                                       className="w-20 h-8 text-xs"
