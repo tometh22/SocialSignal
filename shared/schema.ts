@@ -175,8 +175,8 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
   dedication: doublePrecision("dedication"), // Porcentaje en entero (ej: 50%)
 });
 
-export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers).omit({
-  id: true,
+export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers, {
+  personnelId: z.number().nullable().optional()
 });
 
 // ==================== ASIGNACIÓN DE ROLES EN PLANTILLAS ====================
@@ -272,19 +272,19 @@ export const activeProjects = pgTable("active_projects", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
-  
+
   // Campos para proyectos macro y subproyectos
   parentProjectId: integer("parent_project_id"), // Referencia al proyecto padre (para subproyectos)
   isAlwaysOnMacro: boolean("is_always_on_macro").default(false), // Indica si es un proyecto macro "Always On"
   macroMonthlyBudget: doublePrecision("macro_monthly_budget"), // Presupuesto mensual consolidado para proyectos "Always On"
-  
+
   // Nuevos campos para entregables y frecuencias
   deliverableFrequency: text("deliverable_frequency"), // quincenal, mensual, trimestral, etc.
   deliverableType: text("deliverable_type"), // tipo de entregable (informe, reporte, análisis, etc.)
   deliverableBudget: doublePrecision("deliverable_budget"), // presupuesto específico para este entregable
   additionalDeliverableCost: doublePrecision("additional_deliverable_cost"), // costo de entregables opcionales/adicionales
   deliverableDescription: text("deliverable_description"), // descripción detallada del entregable
-  
+
   // Campos para subproyectos únicos
   subprojectName: text("subproject_name"), // nombre único del subproyecto (ej: "Informe Mensual Enero")
   completionStatus: text("completion_status").default("pending"), // pending, in_progress, completed, cancelled
@@ -307,14 +307,14 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   parentProjectId: z.number().optional(),
   isAlwaysOnMacro: z.boolean().optional(),
   macroMonthlyBudget: z.number().optional(),
-  
+
   // Nuevos campos para entregables
   deliverableFrequency: z.string().optional(), // quincenal, mensual, trimestral, etc.
   deliverableType: z.string().optional(), // tipo de entregable
   deliverableBudget: z.number().optional(), // presupuesto específico para este entregable
   additionalDeliverableCost: z.number().optional(), // costo adicional para entregables fuera de lo planeado
   deliverableDescription: z.string().optional(), // descripción detallada del entregable
-  
+
   // Nuevos campos para subproyectos únicos
   subprojectName: z.string().optional(), // nombre único del subproyecto
   completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),

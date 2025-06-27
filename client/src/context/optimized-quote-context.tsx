@@ -833,15 +833,18 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           roleId: member.roleId,
           personnelId: member.personnelId || null, // Allow null for role-only assignments
           hours: member.hours || 0,
-          rate: member.rate || 0
+          rate: member.rate || 0,
+          cost: (member.hours || 0) * (member.rate || 0) // Ensure cost is calculated
         };
 
         console.log('👤 Saving team member:', teamMemberPayload);
 
         try {
           await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
+          console.log('✅ Team member saved successfully');
         } catch (memberError) {
           console.error('❌ Error saving team member:', memberError);
+          console.error('❌ Failed payload:', teamMemberPayload);
           // Continue saving other members even if one fails
         }
       }

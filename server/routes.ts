@@ -880,7 +880,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Validar datos con Zod
-        const validatedData = insertQuotationTeamMemberSchema.parse(teamMemberData);
+        // Validar datos con Zod, permitiendo personnelId como null
+        const validatedData = insertQuotationTeamMemberSchema.parse({
+          ...teamMemberData,
+          personnelId: teamMemberData.personnelId || null
+        });
 
         // VALIDACIÓN OPCIONAL DE TARIFAS - Solo advertir si hay diferencias grandes
         if (validatedData.personnelId) {
