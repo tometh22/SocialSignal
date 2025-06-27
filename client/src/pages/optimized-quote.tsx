@@ -54,13 +54,13 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       quotationId,
       currentQuotationData: quotationData
     });
-    
+
     if (effectiveQuotationId && !isRequote) {
       console.log('📥 Starting to load quotation:', effectiveQuotationId);
-      
+
       // Clear any existing data first
       setIsSaving(true);
-      
+
       loadQuotation(effectiveQuotationId)
         .then(() => {
           console.log('✅ Quotation loaded successfully');
@@ -126,7 +126,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      
+
       // Validaciones previas
       if (!quotationData.client) {
         toast({
@@ -157,12 +157,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
       console.log('💾 Iniciando guardado de cotización...');
       const savedQuotation = await saveQuotation();
-      
+
       toast({
         title: "Cotización guardada",
         description: `La cotización "${quotationData.project.name}" se ha guardado correctamente.`,
       });
-      
+
       console.log('🎉 Cotización guardada exitosamente, redirigiendo...');
       setLocation('/manage-quotes');
     } catch (error) {
@@ -392,7 +392,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             </div>
           </div>
         )}
-        
+
         {/* Show only back button in last step */}
         {isLastStep && (
           <div className="flex justify-start items-center pt-6 border-t">
