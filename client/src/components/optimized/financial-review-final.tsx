@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,24 +52,9 @@ export default function FinancialReviewFinal() {
     updateFinancials,
     saveQuotation
   } = useOptimizedQuote();
-  // Import hooks at the top of the file are already there, so we can use them properly
-  const [, navigate] = useLocation();
   
-  // Manual toast implementation to avoid hook issues
-  const toast = (props: any) => {
-    console.log('Toast:', props);
-    // Create a simple toast notification
-    const toastEl = document.createElement('div');
-    toastEl.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg z-50';
-    toastEl.textContent = props.title || props.description || 'Operación completada';
-    document.body.appendChild(toastEl);
-    
-    setTimeout(() => {
-      if (toastEl.parentNode) {
-        toastEl.parentNode.removeChild(toastEl);
-      }
-    }, 3000);
-  };
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [markupMultiplier, setMarkupMultiplier] = useState(2.0); // Default 2x markup
