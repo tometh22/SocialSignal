@@ -124,10 +124,10 @@ export default function FinancialReviewFinal() {
   const teamComplexityAdjustmentUSD = calculateComplexityAdjustment(teamBaseCostUSD);
   const subtotalWithComplexityUSD = teamBaseCostUSD + teamComplexityAdjustmentUSD;
 
-  // Calculate inflation if applicable - CORREGIDO CON CONVERSIÓN MONETARIA
+  // Calculate inflation if applicable - SIMPLIFIED LOGIC
   const baseForInflation = subtotalWithComplexityUSD;
-  let inflationAdjustment = 0;
-  let inflationProjectedCost = baseForInflation;
+  let inflationAdjustmentUSD = 0;
+  let inflationProjectedCostUSD = baseForInflation;
   let monthlyInflationRate = 0;
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
@@ -138,74 +138,37 @@ export default function FinancialReviewFinal() {
     monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
                      (startDate.getMonth() - currentDate.getMonth());
 
-    console.log('🏦 === INFLATION CALCULATION DEBUG ===');
-    console.log('📅 Current date:', currentDate.toISOString().split('T')[0]);
-    console.log('📅 Project start date:', startDate.toISOString().split('T')[0]);
-    console.log('📅 Months to project:', monthsToProject);
-    console.log('💰 Base cost for inflation:', baseForInflation);
-    console.log('💱 Currency:', quotationData.inflation.quotationCurrency);
-    console.log('🔄 Exchange rate:', exchangeRate);
-
     if (monthsToProject > 0) {
-      // Obtener la tasa de inflación anual
+      // Get annual inflation rate
       let annualInflationRate;
       if (quotationData.inflation.inflationMethod === 'manual') {
         annualInflationRate = quotationData.inflation.manualInflationRate || 25;
       } else {
-        annualInflationRate = 25; // Default automático
+        annualInflationRate = 25; // Default automatic
       }
 
-      console.log('📊 Annual inflation rate:', annualInflationRate + '%');
-
-      // Calcular tasa mensual compuesta: (1 + tasa_anual)^(1/12) - 1
+      // Calculate monthly compound rate: (1 + annual_rate)^(1/12) - 1
       const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
       monthlyInflationRate = monthlyRateDecimal * 100;
 
-      console.log('📊 Monthly inflation rate:', monthlyInflationRate.toFixed(4) + '%');
-
-      // Factor de inflación compuesta para N meses
+      // Compound inflation factor for N months
       const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
       totalInflationPercentage = (inflationFactor - 1) * 100;
 
-      console.log('📊 Inflation factor for', monthsToProject, 'months:', inflationFactor.toFixed(6));
-      console.log('📊 Total inflation percentage:', totalInflationPercentage.toFixed(2) + '%');
+      // SIMPLIFIED: Apply inflation directly to USD base cost
+      inflationProjectedCostUSD = baseForInflation * inflationFactor;
+      inflationAdjustmentUSD = inflationProjectedCostUSD - baseForInflation;
 
-      // NUEVA LÓGICA: La inflación siempre se calcula en ARS, pero se presenta en la moneda elegida
-      if (quotationData.inflation.quotationCurrency === 'USD') {
-        // Cotización en USD: convertir base a ARS, aplicar inflación, y convertir resultado a USD
-        const baseInARS = baseForInflation * exchangeRate;
-        const projectedInARS = baseInARS * inflationFactor;
-        const adjustmentInARS = projectedInARS - baseInARS;
-        
-        // Convertir de vuelta a USD para mostrar
-        inflationProjectedCost = projectedInARS / exchangeRate;
-        inflationAdjustment = adjustmentInARS / exchangeRate;
-        
-        console.log('💵 USD Mode: Base =', baseForInflation, 'USD (', baseInARS.toLocaleString(), 'ARS)');
-        console.log('💵 USD Mode: Projected =', inflationProjectedCost.toFixed(2), 'USD (', projectedInARS.toLocaleString(), 'ARS)');
-        console.log('💵 USD Mode: Adjustment =', inflationAdjustment.toFixed(2), 'USD (', adjustmentInARS.toLocaleString(), 'ARS)');
-      } else {
-        // Cotización en ARS: convertir base a ARS, aplicar inflación directamente
-        const baseInARS = baseForInflation * exchangeRate; // El base está en USD, convertir a ARS
-        const projectedInARS = baseInARS * inflationFactor;
-        const adjustmentInARS = projectedInARS - baseInARS;
-        
-        // Mantener todo en ARS
-        inflationProjectedCost = projectedInARS;
-        inflationAdjustment = adjustmentInARS;
-        
-        console.log('💸 ARS Mode: Base =', baseInARS.toLocaleString(), 'ARS (from', baseForInflation, 'USD)');
-        console.log('💸 ARS Mode: Projected =', projectedInARS.toLocaleString(), 'ARS');
-        console.log('💸 ARS Mode: Adjustment =', adjustmentInARS.toLocaleString(), 'ARS');
-      }
-
-      console.log('🎯 Final inflation adjustment:', inflationAdjustment);
-      console.log('🏦 === END INFLATION CALCULATION ===');
+      console.log('🏦 Inflation calculation (simplified):');
+      console.log('💰 Base:', baseForInflation, 'USD');
+      console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
+      console.log('💰 Projected:', inflationProjectedCostUSD.toFixed(2), 'USD');
+      console.log('💰 Adjustment:', inflationAdjustmentUSD.toFixed(2), 'USD');
     }
   }
 
   // Calculate final base after inflation (if any) - keep in USD for now
-  let finalBaseAfterInflationUSD = inflationProjectedCost;
+  let finalBaseAfterInflationUSD = inflationProjectedCostUSD;
   
   // If inflation wasn't applied, use the original subtotal in USD
   if (!quotationData.inflation.applyInflationAdjustment) {
@@ -218,7 +181,7 @@ export default function FinancialReviewFinal() {
 
   // Apply dynamic markup multiplier
   const subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
-  const marginAmountDisplaySD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+  const marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
 
   // Apply dynamic discount
   const discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
@@ -232,9 +195,10 @@ export default function FinancialReviewFinal() {
   const finalBaseAfterInflationDisplay = convertToDisplayCurrency(finalBaseAfterInflationUSD);
   const subtotalWithPlatformDisplay = convertToDisplayCurrency(subtotalWithPlatformUSD);
   const subtotalWithMarginDisplay = convertToDisplayCurrency(subtotalWithMarginUSD);
-  const marginAmountDisplay = convertToDisplayCurrency(marginAmountDisplaySD);
+  const marginAmountDisplay = convertToDisplayCurrency(marginAmountUSD);
   const discountAmountDisplay = convertToDisplayCurrency(discountAmountUSD);
   const finalTotalDisplay = convertToDisplayCurrency(finalTotalUSD);
+  const inflationAdjustmentDisplay = convertToDisplayCurrency(inflationAdjustmentUSD);
 
   // Update discount percentage when it changes
   React.useEffect(() => {
@@ -388,7 +352,7 @@ export default function FinancialReviewFinal() {
                     ? 'text-orange-600' 
                     : 'text-gray-600'
                 }`}>
-                  {inflationAdjustment > 0 ? `+${formatFinalCurrency(inflationAdjustment)}` : 'N/A'}
+                  {inflationAdjustmentUSD > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'N/A'}
                 </p>
               </div>
             </div>
@@ -676,7 +640,7 @@ export default function FinancialReviewFinal() {
                       </div>
                     </div>
                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                      {inflationAdjustment > 0 ? `+${formatCurrency(inflationAdjustment)}` : 'Configurando...'}
+                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay)}` : 'Configurando...'}
                     </Badge>
                   </div>
 
