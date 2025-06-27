@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -67,8 +68,12 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.teamMembers, forceRecalculate]);
 
-  // Get exchange rate for currency conversions
-  const exchangeRate = 1200; // Actualizado: 1 USD = 1200 ARS
+  // Get exchange rate dynamically from database
+  const { data: exchangeRateData } = useQuery<{ rate: number }>({
+    queryKey: ['/api/exchange-rate'],
+  });
+  
+  const exchangeRate = exchangeRateData?.rate || 1200; // Fallback to 1200 if not loaded yet
 
   // Helper function to convert values based on selected currency
   const convertToDisplayCurrency = (usdAmount: number) => {
@@ -701,6 +706,9 @@ export default function FinancialReviewFinal() {
                           <SelectItem value="USD">Dólares Estadounidenses (USD)</SelectItem>
                         </SelectContent>
                       </Select>
+                      <div className="text-xs text-orange-600 mt-1">
+                        Tipo de cambio: 1 USD = ${exchangeRate.toLocaleString()} ARS
+                      </div>
                     </div>
 
                     <div className="space-y-2">
