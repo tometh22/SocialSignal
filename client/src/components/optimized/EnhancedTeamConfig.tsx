@@ -68,7 +68,9 @@ const EnhancedTeamConfig: React.FC = () => {
   });
 
   // Estados para edición inline
-  const [editValues, setEditValues] = useState<Record<string, {hours: number | string, rate: number | string}>>({});
+  const [editValues, setEditValues] = useState<Record<string, {hours: number, rate: number}>>({});
+  // Estados temporales para edición que permiten strings vacías
+  const [tempEditValues, setTempEditValues] = useState<Record<string, {hours: string, rate: string}>>({});
 
   // Sincronizar con el contexto
   useEffect(() => {
@@ -189,6 +191,14 @@ const EnhancedTeamConfig: React.FC = () => {
     setEditValues(prev => ({
       ...prev,
       [memberId]: { hours: currentHours, rate: currentRate }
+    }));
+    // Inicializar valores temporales como strings
+    setTempEditValues(prev => ({
+      ...prev,
+      [memberId]: { 
+        hours: currentHours.toString(), 
+        rate: currentRate.toString() 
+      }
     }));
   };
 
@@ -556,7 +566,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                         ...prev,
                                         [member.id]: {
                                           ...prev[member.id],
-                                          hours: e.target.value
+                                          hours: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
                                         }
                                       }))}
                                       className="w-16 h-8 text-xs"
@@ -596,11 +606,23 @@ const EnhancedTeamConfig: React.FC = () => {
                               {/* Cost */}
                               <div className="text-center">
                                 <div className="font-bold text-lg text-primary">
-                                  ${(isEditing 
-                                    ? (editValues[member.id]?.hours || member.hours) * 
-                                      (editValues[member.id]?.rate || member.rate)
-                                    : member.cost
-                                  ).toLocaleString()}
+                                  ${(() => {
+                                    if (!isEditing) return member.cost;
+                                    
+                                    const hours = editValues[member.id]?.hours !== undefined 
+                                      ? (typeof editValues[member.id]?.hours === 'string' 
+                                          ? (parseFloat(editValues[member.id]?.hours as string) || 0) 
+                                          : editValues[member.id]?.hours as number)
+                                      : member.hours;
+                                      
+                                    const rate = editValues[member.id]?.rate !== undefined 
+                                      ? (typeof editValues[member.id]?.rate === 'string' 
+                                          ? (parseFloat(editValues[member.id]?.rate as string) || 0) 
+                                          : editValues[member.id]?.rate as number)
+                                      : member.rate;
+                                      
+                                    return hours * rate;
+                                  })().toLocaleString()}
                                 </div>
                                 <div className="text-xs text-gray-500">total</div>
                               </div>
