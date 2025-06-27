@@ -166,7 +166,7 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
 export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull(),
-  personnelId: integer("personnel_id").notNull(),
+  personnelId: integer("personnel_id"), // Permitir null para asignaciones solo por rol
   roleId: integer("role_id"), // ID del rol (puede ser diferente del rol del personnel)
   hours: doublePrecision("hours").notNull(),
   rate: doublePrecision("rate").notNull(),

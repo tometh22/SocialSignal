@@ -628,6 +628,10 @@ export class DatabaseStorage implements IStorage {
     return member.length === 0;
   }
 
+  async deleteQuotationTeamMemberById(id: number): Promise<void> {
+    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
+  }
+
   // Template role assignment operations
   async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
     return await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
