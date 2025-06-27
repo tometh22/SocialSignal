@@ -186,6 +186,24 @@ export default function FinancialReviewFinal() {
     }
   };
 
+  const formatFinalCurrency = (amount) => {
+    if (quotationData.inflation.quotationCurrency === 'USD') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } else {
+      return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    }
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
       {/* Level 1: Compact Success Header */}
@@ -208,20 +226,7 @@ export default function FinancialReviewFinal() {
           <div className="text-right">
             <p className="text-sm text-gray-600 mb-1">Total Proyecto</p>
             <p className="text-3xl font-bold text-gray-900">
-              {quotationData.inflation.quotationCurrency === 'USD' 
-                ? new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }).format(finalTotal)
-                : new Intl.NumberFormat('es-AR', {
-                    style: 'currency',
-                    currency: 'ARS',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  }).format(finalTotal)
-              }
+              {formatFinalCurrency(finalTotal)}
             </p>
             <p className="text-xs text-gray-500">
               {quotationData.inflation.quotationCurrency} • {quotationData.client?.name}
@@ -719,133 +724,4 @@ export default function FinancialReviewFinal() {
               </div>
 
               {/* Step 3: Inflation (if applicable) */}
-              {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                <>
-                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-orange-900">3. + Protección Inflación</span>
-                      <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-orange-100 rounded-lg border border-orange-300">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-semibold text-orange-900">Base Protegida</span>
-                      <span className="font-bold text-orange-900">{formatCurrency(finalBaseAfterInflation)}</span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Step 4: Platform Cost */}
-              {platformCost > 0 && (
-                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-purple-900">
-                      {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 ? '4.' : '3.'} + Plataforma
-                    </span>
-                    <span className="font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Subtotal before margin */}
-              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-900">Base para Margen</span>
-                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithPlatform)}</span>
-                </div>
-              </div>
-
-              {/* Step 5: Dynamic Markup */}
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-green-900">
-                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 
-                      ? (platformCost > 0 ? '5.' : '4.') 
-                      : (platformCost > 0 ? '4.' : '3.')
-                    } × Markup ({markupMultiplier}x)
-                  </span>
-                  <span className="font-bold text-green-900">×{markupMultiplier}</span>
-                </div>
-              </div>
-
-              {/* Subtotal with markup */}
-              <div className="p-3 bg-blue-100 rounded-lg border border-blue-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-blue-900">Subtotal con Markup</span>
-                  <span className="font-bold text-blue-900">{formatCurrency(subtotalWithMargin)}</span>
-                </div>
-              </div>
-
-              {/* Step 6: Dynamic Discount */}
-              {discountPercentage > 0 && (
-                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-red-900">- Descuento ({discountPercentage}%)</span>
-                    <span className="font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
-                  </div>
-                </div>
-              )}
-
-              <Separator className="my-4" />
-
-              {/* Final Total */}
-              <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white text-center">
-                <p className="text-xs text-indigo-100 mb-1">TOTAL FINAL PROYECTO</p>
-                <p className="text-3xl font-bold mb-2">
-                  {quotationData.inflation.quotationCurrency === 'USD' 
-                    ? new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD',
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(finalTotal)
-                    : new Intl.NumberFormat('es-AR', {
-                        style: 'currency',
-                        currency: 'ARS',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      }).format(finalTotal)
-                  }
-                </p>
-                <div className="flex items-center justify-center gap-2 text-indigo-200 text-xs">
-                  <span>{quotationData.inflation.quotationCurrency}</span>
-                  <span>•</span>
-                  <span>{quotationData.teamMembers.length} miembros</span>
-                  {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
-                    <>
-                      <span>•</span>
-                      <span>Protegida</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Level 4: Action Buttons */}
-      <div className="flex flex-col sm:flex-row justify-center items-center gap-3 lg:gap-4 pt-4 lg:pt-6 border-t border-gray-200 mt-4 lg:mt-6">
-        <Button 
-          size="lg" 
-          className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 px-12 shadow-lg" 
-          onClick={handleSaveQuotation}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Guardar Cotización
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
+              {quotationData.inflation.applyInflationAdjustment
