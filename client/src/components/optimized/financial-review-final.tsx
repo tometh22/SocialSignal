@@ -894,7 +894,7 @@ export default function FinancialReviewFinal() {
                   <FileText className="mr-2 h-5 w-5" />
                   TOTAL FINAL PROYECTO
                   <br />
-                  ${finalTotal.toFixed(2)}
+                  ${finalTotalDisplay.toFixed(2)}
                 </>
               )}
             </Button>
