@@ -51,21 +51,31 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       effectiveQuotationId, 
       isRequote, 
       urlQuotationId,
-      quotationId 
+      quotationId,
+      currentQuotationData: quotationData
     });
     
     if (effectiveQuotationId && !isRequote) {
-      console.log('📥 Loading quotation:', effectiveQuotationId);
-      loadQuotation(effectiveQuotationId).then(() => {
-        goToStep(1); // Start from first step when editing
-      }).catch(error => {
-        console.error('❌ Error loading quotation:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo cargar la cotización",
-          variant: "destructive",
+      console.log('📥 Starting to load quotation:', effectiveQuotationId);
+      
+      // Clear any existing data first
+      setIsSaving(true);
+      
+      loadQuotation(effectiveQuotationId)
+        .then(() => {
+          console.log('✅ Quotation loaded successfully');
+          goToStep(1); // Start from first step when editing
+          setIsSaving(false);
+        })
+        .catch(error => {
+          console.error('❌ Error loading quotation:', error);
+          setIsSaving(false);
+          toast({
+            title: "Error al cargar cotización",
+            description: `No se pudo cargar la cotización ID ${effectiveQuotationId}: ${error.message || 'Error desconocido'}`,
+            variant: "destructive",
+          });
         });
-      });
     }
   }, [effectiveQuotationId, isRequote, loadQuotation, goToStep, toast]);
 

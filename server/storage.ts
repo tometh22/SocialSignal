@@ -347,7 +347,7 @@ export class DatabaseStorage implements IStorage {
 
         // 7. Eliminar ciclos de proyecto como padre
         await tx.delete(projectCycles).where(eq(projectCycles.parentProjectId, id));
-        
+
         // 8. Eliminar ciclos de proyecto como subproyecto
         await tx.delete(projectCycles).where(eq(projectCycles.subprojectId, id));
 
@@ -596,7 +596,16 @@ export class DatabaseStorage implements IStorage {
 
   // Quotation team member operations
   async getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]> {
-    return await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+    console.log(`📊 Storage: Getting team members for quotation ${quotationId}`);
+
+    try {
+      const members = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+      console.log(`📊 Storage: Found ${members.length} team members for quotation ${quotationId}:`, members);
+      return members;
+    } catch (error) {
+      console.error(`❌ Storage: Error getting team members for quotation ${quotationId}:`, error);
+      throw error;
+    }
   }
 
   async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
@@ -2157,10 +2166,10 @@ export class DatabaseStorage implements IStorage {
   async createQuickTimeEntryDetail(detail: InsertQuickTimeEntryDetail): Promise<QuickTimeEntryDetail> {
     try {
       const [created] = await db.insert(quickTimeEntryDetails).values(detail).returning();
-      
+
       // Actualizar totales del registro principal
       await this.updateQuickTimeEntryTotals(detail.quickTimeEntryId);
-      
+
       return created;
     } catch (error) {
       console.error("Error al crear detalle de registro rápido:", error);
@@ -2171,12 +2180,12 @@ export class DatabaseStorage implements IStorage {
   async updateQuickTimeEntryDetail(id: number, detail: Partial<InsertQuickTimeEntryDetail>): Promise<QuickTimeEntryDetail | undefined> {
     try {
       const [updated] = await db.update(quickTimeEntryDetails).set(detail).where(eq(quickTimeEntryDetails.id, id)).returning();
-      
+
       if (updated) {
         // Actualizar totales del registro principal
         await this.updateQuickTimeEntryTotals(updated.quickTimeEntryId);
       }
-      
+
       return updated;
     } catch (error) {
       console.error("Error al actualizar detalle de registro rápido:", error);

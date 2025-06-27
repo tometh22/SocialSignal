@@ -831,8 +831,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
-    const members = await storage.getQuotationTeamMembers(quotationId);
-    res.json(members);
+    try {
+      console.log(`🔍 Fetching team members for quotation ID: ${quotationId}`);
+      const members = await storage.getQuotationTeamMembers(quotationId);
+      console.log(`👥 Found ${members.length} team members:`, members);
+      res.json(members);
+    } catch (error) {
+      console.error(`❌ Error fetching team members for quotation ${quotationId}:`, error);
+      res.status(500).json({ message: "Failed to fetch team members", error: String(error) });
+    }
   });
 
   app.post("/api/quotation-team", async (req, res) => {

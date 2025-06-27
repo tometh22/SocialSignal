@@ -642,58 +642,89 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
+      console.log('🔍 Loading quotation ID:', quotationId);
+      
       const quotation: any = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
+      console.log('📄 Quotation data loaded:', quotation);
+      
       const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
+      console.log('👥 Team members loaded:', teamMembers);
 
-      const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any) => ({
-        id: `member-${member.id}`,
-        roleId: member.roleId,
-        personnelId: member.personnelId,
-        hours: member.hours,
-        rate: member.rate,
-        cost: member.hours * member.rate
-      }));
+      // Ensure team members are properly reconstructed
+      const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any, index: number) => {
+        const teamMember = {
+          id: `member-${member.id || Date.now()}-${index}`,
+          roleId: Number(member.roleId),
+          personnelId: member.personnelId ? Number(member.personnelId) : null,
+          hours: Number(member.hours) || 0,
+          rate: Number(member.rate) || 0,
+          cost: Number(member.hours || 0) * Number(member.rate || 0)
+        };
+        console.log('👤 Processing team member:', teamMember);
+        return teamMember;
+      });
 
       // Get client data separately
       const clientData = quotation.clientId ? await apiRequest(`/api/clients/${quotation.clientId}`, 'GET') : null;
+      console.log('🏢 Client data loaded:', clientData);
 
-      setQuotationData({
+      // Get template data if available
+      let templateData = null;
+      if (quotation.templateId) {
+        try {
+          templateData = await apiRequest(`/api/templates/${quotation.templateId}`, 'GET');
+          console.log('📋 Template data loaded:', templateData);
+        } catch (templateError) {
+          console.warn('⚠️ Could not load template:', templateError);
+        }
+      }
+
+      const loadedQuotationData = {
         id: quotation.id, // Importante: establecer el ID para indicar que estamos editando
         client: clientData,
         project: {
           name: quotation.projectName || "",
-          type: quotation.projectType || "",
+          type: quotation.projectType || "on-demand",
           duration: quotation.projectDuration || ""
         },
         analysisType: quotation.analysisType || "standard",
         mentionsVolume: quotation.mentionsVolume || "medium",
         countriesCovered: quotation.countriesCovered || "1",
         clientEngagement: quotation.clientEngagement || "medium",
-        template: null, // Will be loaded separately if needed
-        complexity: 'basic',
+        template: templateData,
+        complexity: (templateData?.complexity as 'basic' | 'medium' | 'high') || 'basic',
         teamMembers: optimizedTeamMembers,
         deliverables: [],
         additionalDeliverableCost: 0,
         financials: {
-          platformCost: quotation.platformCost || 0,
-          deviationPercentage: quotation.deviationPercentage || 0,
-          discount: 0,
-          marginFactor: 2.0,
-          marginPercentage: 100,
-          discountPercentage: 0
+          platformCost: Number(quotation.platformCost || 0),
+          deviationPercentage: Number(quotation.deviationPercentage || 0),
+          discount: Number(quotation.discountPercentage || 0),
+          marginFactor: Number(quotation.marginFactor || 2.0),
+          marginPercentage: quotation.marginFactor ? (quotation.marginFactor - 1) * 100 : 100,
+          discountPercentage: Number(quotation.discountPercentage || 0)
         },
         inflation: {
-          applyInflationAdjustment: quotation.applyInflationAdjustment || false,
-          inflationMethod: quotation.inflationMethod || "automatic",
-          manualInflationRate: quotation.manualInflationRate || 0,
+          applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
+          inflationMethod: quotation.inflationMethod || "manual",
+          manualInflationRate: Number(quotation.manualInflationRate || 0),
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
-          quotationCurrency: quotation.quotationCurrency || "ARS"
+          quotationCurrency: quotation.quotationCurrency || "USD"
         }
-      });
+      };
 
-      forceRecalculate();
+      console.log('📊 Final quotation data to set:', loadedQuotationData);
+      setQuotationData(loadedQuotationData);
+
+      // Force recalculation after loading
+      setTimeout(() => {
+        console.log('🔄 Triggering recalculation after load');
+        forceRecalculate();
+      }, 100);
+      
     } catch (error) {
-      console.error("Error loading quotation:", error);
+      console.error("❌ Error loading quotation:", error);
+      throw error;
     }
   }, [forceRecalculate]);
 
