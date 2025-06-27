@@ -1,6 +1,3 @@
-The code changes the edit quotation routing to use the correct quotation ID, adding a console log for debugging purposes.
-```
-```replit_final_file
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
