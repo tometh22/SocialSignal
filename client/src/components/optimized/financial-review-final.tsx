@@ -69,30 +69,17 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.teamMembers, forceRecalculate]);
 
-  // Get exchange rate dynamically from database
-  const { data: exchangeRateData } = useQuery<{ rate: number }>({
-    queryKey: ['/api/exchange-rate'],
-  });
-  
-  const exchangeRate = exchangeRateData?.rate || 1200; // Fallback to 1200 if not loaded yet
+  // Use the enhanced currency hook
+  const { 
+    exchangeRate, 
+    exchangeRateLoading, 
+    convertFromUSD, 
+    formatCurrency: formatCurrencyWithPrefix 
+  } = useCurrency();
 
   // Helper function to convert values based on selected currency
   const convertToDisplayCurrency = (usdAmount: number) => {
-    if (quotationData.inflation.quotationCurrency === 'USD') {
-      return usdAmount;
-    } else {
-      return usdAmount * exchangeRate;
-    }
-  };
-
-  // Helper function to format currency with proper prefix (USD/ARS)
-  const formatCurrencyWithPrefix = (amount: number) => {
-    const currency = quotationData.inflation.quotationCurrency;
-    if (currency === 'USD') {
-      return `USD ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } else {
-      return `ARS ${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    }
+    return convertFromUSD(usdAmount, quotationData.inflation.quotationCurrency);
   };
 
   // Use formatCurrencyWithPrefix as formatFinalCurrency
