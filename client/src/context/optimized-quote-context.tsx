@@ -25,6 +25,15 @@ export interface ComplexityFactors {
   clientEngagementFactor: number;
 }
 
+interface QuotationFinancials {
+  platformCost: number;
+  deviationPercentage: number;
+  discount: number;
+  marginFactor: number;
+  marginPercentage?: number;
+  discountPercentage?: number;
+}
+
 export interface QuotationData {
   client: Client | null;
   project: ProjectData;
@@ -37,12 +46,7 @@ export interface QuotationData {
   teamMembers: OptimizedTeamMember[];
   deliverables: any[];
   additionalDeliverableCost: number;
-  financials: {
-    platformCost: number;
-    deviationPercentage: number;
-    discount: number;
-    marginFactor: number;
-  };
+  financials: QuotationFinancials;
   inflation: {
     applyInflationAdjustment: boolean;
     inflationMethod: string;
@@ -127,7 +131,9 @@ const initialQuotationData: QuotationData = {
     platformCost: 0,
     deviationPercentage: 0,
     discount: 0,
-    marginFactor: 2.0
+    marginFactor: 2.0,
+    marginPercentage: 100,
+    discountPercentage: 0
   },
   inflation: {
     applyInflationAdjustment: false,
@@ -445,12 +451,15 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
     // Step 5: Apply business factors
     const platformCost = quotationData.financials.platformCost || 0;
-    const marginMultiplier = quotationData.financials.marginFactor || 2.0;
+    const marginPercentage = (quotationData.financials.marginPercentage || 100) / 100;
+    const marginMultiplier = 1 + marginPercentage;
     const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
-    const discount = subtotal * ((quotationData.financials.discount || 0) / 100);
+    const discountPercentage = (quotationData.financials.discountPercentage || 0) / 100;
+    const discount = subtotal * discountPercentage;
     const finalTotal = subtotal - discount;
 
     console.log(`🏢 Platform cost: $${platformCost}`);
+    console.log(`📊 Margin Percentage: ${marginPercentage * 100}%`);
     console.log(`📊 Margin factor: ${marginMultiplier}x`);
     console.log(`💰 Subtotal: $${subtotal}`);
     console.log(`💸 Discount: $${discount}`);
@@ -667,7 +676,9 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           platformCost: quotation.platformCost || 0,
           deviationPercentage: quotation.deviationPercentage || 0,
           discount: 0,
-          marginFactor: 2.0
+          marginFactor: 2.0,
+          marginPercentage: 100,
+          discountPercentage: 0
         },
         inflation: {
           applyInflationAdjustment: quotation.applyInflationAdjustment || false,
@@ -690,7 +701,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       if (!quotationData.client?.id) {
         throw new Error("Debe seleccionar un cliente");
       }
-      
+
       if (!quotationData.project.name?.trim()) {
         throw new Error("Debe ingresar el nombre del proyecto");
       }
@@ -732,7 +743,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
 
       // Save team members with proper validation
       console.log('👥 Saving team members:', quotationData.teamMembers);
-      
+
       for (const member of quotationData.teamMembers) {
         const teamMemberPayload = {
           quotationId: savedQuotation.id,
@@ -743,7 +754,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         };
 
         console.log('👤 Saving team member:', teamMemberPayload);
-        
+
         try {
           await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
         } catch (memberError) {

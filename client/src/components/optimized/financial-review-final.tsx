@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -29,7 +30,8 @@ import {
   Clock,
   Zap,
   Shield,
-  Loader2
+  Loader2,
+  Percent
 } from "lucide-react";
 
 export default function FinancialReviewFinal() {
@@ -51,6 +53,8 @@ export default function FinancialReviewFinal() {
   const toast = (props) => {console.log(props)};
 
   const [isSaving, setIsSaving] = useState(false);
+  const [marginPercentage, setMarginPercentage] = useState(100); // Default 100% margin
+  const [discountPercentage, setDiscountPercentage] = useState(0); // Default 0% discount
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {
@@ -133,20 +137,18 @@ export default function FinancialReviewFinal() {
   // Calculate final base after inflation (if any)
   const finalBaseAfterInflation = inflationProjectedCost;
 
-  // Continue with markup calculation using the final base
-  const teamMarkupAmount = finalBaseAfterInflation;
-  const subtotalWithMarkup = finalBaseAfterInflation + teamMarkupAmount;
-
-  // Platform cost and adjustments
+  // Platform cost
   const platformCost = quotationData.financials.platformCost || 0;
-  const deviationPercentage = quotationData.financials.deviationPercentage || 0;
-  const discountPercentage = quotationData.financials.discountPercentage || 0;
+  const subtotalWithPlatform = finalBaseAfterInflation + platformCost;
 
-  const subtotalWithPlatform = subtotalWithMarkup + platformCost;
-  const deviationAmount = subtotalWithPlatform * (deviationPercentage / 100);
-  const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
-  const discountAmount = subtotalWithDeviation * (discountPercentage / 100);
-  const finalTotal = subtotalWithDeviation - discountAmount;
+  // Apply dynamic margin
+  const marginMultiplier = marginPercentage / 100;
+  const marginAmount = subtotalWithPlatform * marginMultiplier;
+  const subtotalWithMargin = subtotalWithPlatform + marginAmount;
+
+  // Apply dynamic discount
+  const discountAmount = subtotalWithMargin * (discountPercentage / 100);
+  const finalTotal = subtotalWithMargin - discountAmount;
 
   // Update totals
   React.useEffect(() => {
@@ -154,10 +156,10 @@ export default function FinancialReviewFinal() {
       baseCost: teamBaseCost,
       totalCost: finalTotal,
       complexityAdjustment: teamComplexityAdjustment,
-      markupAmount: teamMarkupAmount,
+      markupAmount: marginAmount,
       inflationAdjustment,
     });
-  }, [teamBaseCost, finalTotal, teamComplexityAdjustment, teamMarkupAmount, inflationAdjustment, updateFinancials]);
+  }, [teamBaseCost, finalTotal, teamComplexityAdjustment, marginAmount, inflationAdjustment, updateFinancials]);
 
   const handleSaveQuotation = async () => {
     try {
@@ -312,8 +314,8 @@ export default function FinancialReviewFinal() {
               </div>
               <div>
                 <p className="text-xs font-medium text-green-800">Margen</p>
-                <p className="text-lg font-bold text-green-900">100%</p>
-                <p className="text-xs text-green-600">+{formatCurrency(teamMarkupAmount)}</p>
+                <p className="text-lg font-bold text-green-900">{marginPercentage}%</p>
+                <p className="text-xs text-green-600">+{formatCurrency(marginAmount)}</p>
               </div>
             </div>
           </CardContent>
@@ -422,8 +424,98 @@ export default function FinancialReviewFinal() {
           </Card>
         </div>
 
-        {/* Center: Inflation Configuration - SIMPLIFIED */}
+        {/* Center: Controls and Inflation */}
         <div className="space-y-4 lg:space-y-6">
+          {/* Margin and Discount Controls */}
+          <Card className="shadow-sm border-0 bg-white">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Percent className="h-5 w-5 text-indigo-600" />
+                Ajustes Financieros
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {/* Margin Control */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-900">
+                    Margen de Ganancia
+                  </Label>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    {marginPercentage}%
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  <Slider
+                    value={[marginPercentage]}
+                    onValueChange={(value) => setMarginPercentage(value[0])}
+                    min={0}
+                    max={300}
+                    step={5}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>0%</span>
+                    <span>150%</span>
+                    <span>300%</span>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-green-900">Monto del Margen:</span>
+                      <span className="text-lg font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                    </div>
+                    <p className="text-xs text-green-700 mt-1">
+                      Se aplica sobre: {formatCurrency(subtotalWithPlatform)} (base + plataforma + inflación)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Discount Control */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-900">
+                    Descuento al Cliente
+                  </Label>
+                  <Badge variant="outline" className={discountPercentage > 0 
+                    ? "bg-red-50 text-red-700 border-red-200" 
+                    : "bg-gray-50 text-gray-700 border-gray-200"
+                  }>
+                    {discountPercentage}%
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  <Slider
+                    value={[discountPercentage]}
+                    onValueChange={(value) => setDiscountPercentage(value[0])}
+                    min={0}
+                    max={50}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                  </div>
+                  {discountPercentage > 0 && (
+                    <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-red-900">Descuento Aplicado:</span>
+                        <span className="text-lg font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
+                      </div>
+                      <p className="text-xs text-red-700 mt-1">
+                        Se aplica sobre: {formatCurrency(subtotalWithMargin)} (subtotal + margen)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-lg flex items-center justify-between">
@@ -645,46 +737,53 @@ export default function FinancialReviewFinal() {
                 </>
               )}
 
-              {/* Step 4: Markup */}
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-green-900">
-                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 ? '4.' : '3.'} + Margen (100%)
-                  </span>
-                  <span className="font-bold text-green-900">+{formatCurrency(teamMarkupAmount)}</span>
-                </div>
-              </div>
-
-              {/* Additional costs */}
+              {/* Step 4: Platform Cost */}
               {platformCost > 0 && (
                 <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-purple-900">+ Plataforma</span>
+                    <span className="text-sm font-medium text-purple-900">
+                      {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 ? '4.' : '3.'} + Plataforma
+                    </span>
                     <span className="font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
                   </div>
                 </div>
               )}
 
-              {deviationPercentage !== 0 && (
-                <div className={`p-3 rounded-lg border ${
-                  deviationPercentage > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-                }`}>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
-                      Ajuste ({deviationPercentage > 0 ? '+' : ''}{deviationPercentage}%)
-                    </span>
-                    <span className={`font-bold ${deviationPercentage > 0 ? 'text-red-900' : 'text-green-900'}`}>
-                      {deviationPercentage > 0 ? '+' : ''}{formatCurrency(deviationAmount)}
-                    </span>
-                  </div>
+              {/* Subtotal before margin */}
+              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">Base para Margen</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithPlatform)}</span>
                 </div>
-              )}
+              </div>
 
+              {/* Step 5: Dynamic Margin */}
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-green-900">
+                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 
+                      ? (platformCost > 0 ? '5.' : '4.') 
+                      : (platformCost > 0 ? '4.' : '3.')
+                    } + Margen ({marginPercentage}%)
+                  </span>
+                  <span className="font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                </div>
+              </div>
+
+              {/* Subtotal with margin */}
+              <div className="p-3 bg-blue-100 rounded-lg border border-blue-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-blue-900">Subtotal con Margen</span>
+                  <span className="font-bold text-blue-900">{formatCurrency(subtotalWithMargin)}</span>
+                </div>
+              </div>
+
+              {/* Step 6: Dynamic Discount */}
               {discountPercentage > 0 && (
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-green-900">- Descuento ({discountPercentage}%)</span>
-                    <span className="font-bold text-green-900">-{formatCurrency(discountAmount)}</span>
+                    <span className="text-sm font-medium text-red-900">- Descuento ({discountPercentage}%)</span>
+                    <span className="font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
                   </div>
                 </div>
               )}
