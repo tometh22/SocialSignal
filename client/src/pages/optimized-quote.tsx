@@ -338,38 +338,20 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         )}
 
-        {/* Navigation buttons */}
-        <div className="flex justify-between items-center pt-6 border-t">
-          <Button
-            variant="ghost"
-            onClick={previousStep}
-            disabled={currentStep === 1}
-            className="flex items-center text-neutral-600 hover:text-neutral-800"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Anterior
-          </Button>
+        {/* Navigation buttons - Hide the blue button in last step since it has its own action buttons */}
+        {!isLastStep && (
+          <div className="flex justify-between items-center pt-6 border-t">
+            <Button
+              variant="ghost"
+              onClick={previousStep}
+              disabled={currentStep === 1}
+              className="flex items-center text-neutral-600 hover:text-neutral-800"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
 
-          <div className="flex gap-3">
-            {isLastStep ? (
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-primary hover:bg-primary/90 text-white px-6"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    {isEditing ? "Finalizar Actualización" : isRequote ? "Finalizar Recotización" : "Finalizar Cotización"}
-                  </>
-                )}
-              </Button>
-            ) : (
+            <div className="flex gap-3">
               <Button
                 onClick={nextStep}
                 className="bg-primary hover:bg-primary/90 text-white flex items-center px-6"
@@ -377,9 +359,23 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 Siguiente
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
-            )}
+            </div>
           </div>
-        </div>
+        )}
+        
+        {/* Show only back button in last step */}
+        {isLastStep && (
+          <div className="flex justify-start items-center pt-6 border-t">
+            <Button
+              variant="ghost"
+              onClick={previousStep}
+              className="flex items-center text-neutral-600 hover:text-neutral-800"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

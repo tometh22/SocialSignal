@@ -876,7 +876,7 @@ export default function FinancialReviewFinal() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-700" />
-                    <span className="text-lg font-bold text-emerald-900">TOTAL FINAL PROYECTO</span>
+                    <span className="text-lg font-bold text-emerald-900">Resumen Final</span>
                   </div>
                   <span className="text-2xl font-bold text-emerald-900">
                     {formatFinalCurrency(finalTotalDisplay)}

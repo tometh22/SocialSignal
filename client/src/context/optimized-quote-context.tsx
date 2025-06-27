@@ -731,7 +731,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
-        projectStartDate: quotationData.inflation.projectStartDate || null,
+        projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : null,
         quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
         status: status
       };
