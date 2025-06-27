@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useRoute } from 'wouter';
 import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-quote-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,18 +36,38 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     updateAdditionalDeliverableCost
   } = useOptimizedQuote();
 
-  const isEditing = Boolean(quotationId);
+  // Get quotation ID from URL if not passed as prop
+  const [match, params] = useRoute('/optimized-quote/:id');
+  const urlQuotationId = match ? params?.id : null;
+  const effectiveQuotationId = quotationId || (urlQuotationId && !isNaN(parseInt(urlQuotationId)) ? parseInt(urlQuotationId) : null);
+
+  const isEditing = Boolean(effectiveQuotationId);
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
 
   // Load quotation if editing
   useEffect(() => {
-    if (quotationId && !isRequote) {
-      loadQuotation(quotationId).then(() => {
-        goToStep(4);
+    console.log('🔍 OptimizedQuote useEffect:', { 
+      effectiveQuotationId, 
+      isRequote, 
+      urlQuotationId,
+      quotationId 
+    });
+    
+    if (effectiveQuotationId && !isRequote) {
+      console.log('📥 Loading quotation:', effectiveQuotationId);
+      loadQuotation(effectiveQuotationId).then(() => {
+        goToStep(1); // Start from first step when editing
+      }).catch(error => {
+        console.error('❌ Error loading quotation:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo cargar la cotización",
+          variant: "destructive",
+        });
       });
     }
-  }, [quotationId, isRequote, loadQuotation, goToStep]);
+  }, [effectiveQuotationId, isRequote, loadQuotation, goToStep, toast]);
 
   // Monitor user session and show warnings
   useEffect(() => {

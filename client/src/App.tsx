@@ -52,20 +52,20 @@ function OptimizedQuoteWrapper() {
   // Obtener los parámetros de consulta de la URL
   const search = useSearch();
   const params = new URLSearchParams(search);
-  
+
   // Extraer parámetros para edición o recotización
   const idParam = params.get('id');
   const cloneParam = params.get('clone');
-  
+
   // Convertir a números si existen
   const quotationId = idParam ? parseInt(idParam) : undefined;
   const cloneId = cloneParam ? parseInt(cloneParam) : undefined;
-  
+
   // Determinar el modo: edición normal o recotización
   const isRequote = !!cloneId;
   const finalId = isRequote ? cloneId : quotationId;
-  
-  
+
+
   // Renderizar OptimizedQuote envuelto en su provider
   return (
     <OptimizedQuoteProvider quotationId={finalId} isRequote={isRequote}>
@@ -77,7 +77,7 @@ function OptimizedQuoteWrapper() {
 // Wrapper para rutas con path parameters (como /optimized-quote/13)
 function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
   const quotationId = parseInt(params.id);
-  
+
   return (
     <OptimizedQuoteProvider quotationId={quotationId} isRequote={false}>
       <OptimizedQuote />
@@ -99,7 +99,7 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      
+
       <Route path="*">
         <div className="flex h-screen overflow-hidden bg-background">
           <SidebarFixed />
@@ -127,7 +127,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin" component={Admin} />
 
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
-                  
+
                   {/* Rutas para gestión de proyectos activos */}
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />

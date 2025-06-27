@@ -1,3 +1,6 @@
+The code changes the edit quotation routing to use the correct quotation ID, adding a console log for debugging purposes.
+```
+```replit_final_file
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
@@ -44,7 +47,7 @@ export default function ManageQuotes() {
   const { data: quotations, isLoading, refetch } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
   });
-  
+
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
   });
@@ -61,7 +64,7 @@ export default function ManageQuotes() {
   const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const { toast } = useToast();
-  
+
   // Función auxiliar para obtener el nombre del cliente por ID
   const getClientName = (clientId: number) => {
     const client = clients.find(c => c.id === clientId);
@@ -83,31 +86,31 @@ export default function ManageQuotes() {
     : [];
 
   const handleStatusChange = async () => {
-    
+
     if (!selectedQuote || !newStatus) {
       return;
     }
 
     try {
-      
+
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
         { status: newStatus }
       );
-      
-      
+
+
       toast({
         title: "Estado actualizado",
         description: `El estado de la cotización ha sido actualizado a ${translateStatus(newStatus)}.`,
       });
-      
+
       // Si la cotización fue aprobada, mostrar modal para crear proyecto
       if (newStatus === 'approved') {
         setApprovedQuote(selectedQuote);
         setCreateProjectDialogOpen(true);
       }
-      
+
       refetch();
       setDialogOpen(false);
     } catch (error) {
@@ -128,11 +131,11 @@ export default function ManageQuotes() {
       setDialogOpen(true);
     }, 10);
   };
-  
+
   const openDeleteDialog = async (quote: Quotation) => {
     setSelectedQuote(quote);
     setCheckingProjects(true);
-    
+
     try {
       // Check if quotation has associated projects
       const response = await fetch(`/api/active-projects/quotation/${quote.id}`);
@@ -146,10 +149,10 @@ export default function ManageQuotes() {
       setDeleteDialogOpen(true);
     }
   };
-  
+
   const handleCreateProject = async () => {
     if (!approvedQuote) return;
-    
+
     try {
       // Crear el proyecto basado en la cotización aprobada
       const projectData = {
@@ -164,18 +167,18 @@ export default function ManageQuotes() {
       };
 
       const createdProject = await apiRequest('/api/projects', 'POST', projectData);
-      
+
       toast({
         title: "Proyecto creado exitosamente",
         description: `El proyecto "${approvedQuote.projectName}" ha sido creado y está listo para comenzar.`,
       });
-      
+
       setCreateProjectDialogOpen(false);
       setApprovedQuote(null);
-      
+
       // Navegar al nuevo proyecto
       navigate(`/projects/${createdProject.id}`);
-      
+
     } catch (error) {
       console.error('Error al crear proyecto:', error);
       toast({
@@ -189,7 +192,7 @@ export default function ManageQuotes() {
   const handleSkipProjectCreation = () => {
     setCreateProjectDialogOpen(false);
     setApprovedQuote(null);
-    
+
     toast({
       title: "Cotización aprobada",
       description: "La cotización ha sido aprobada. Puedes crear el proyecto más tarde desde la sección de proyectos.",
@@ -198,11 +201,11 @@ export default function ManageQuotes() {
 
   const handleDeleteQuotation = async () => {
     if (!selectedQuote) return;
-    
+
     try {
       // Iniciar animación de eliminación
       setDeletingQuoteId(selectedQuote.id);
-      
+
       // Usamos fetch directamente en lugar de apiRequest para tener más control sobre el manejo de respuestas
       const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
         method: 'DELETE',
@@ -211,8 +214,8 @@ export default function ManageQuotes() {
           'Content-Type': 'application/json'
         }
       });
-      
-      
+
+
       // Intentamos obtener la respuesta JSON, pero manejamos casos donde no sea posible
       let data;
       try {
@@ -222,8 +225,8 @@ export default function ManageQuotes() {
         // Si no hay JSON, creamos un objeto con el estado de la respuesta
         data = { success: response.ok, message: response.statusText };
       }
-      
-      
+
+
       // Manejar los diferentes casos según el código HTTP
       if (response.status === 409) {
         setDeletingQuoteId(null);
@@ -234,7 +237,7 @@ export default function ManageQuotes() {
         });
         return;
       }
-      
+
       if (response.ok && data.success) {
         // Esperar un momento para que se vea la animación
         setTimeout(() => {
@@ -242,7 +245,7 @@ export default function ManageQuotes() {
             title: "Cotización eliminada",
             description: "La cotización ha sido eliminada correctamente.",
           });
-          
+
           refetch();
           setDeleteDialogOpen(false);
           setDeletingQuoteId(null);
@@ -308,6 +311,13 @@ export default function ManageQuotes() {
     return statusMap[status] || status;
   };
 
+  // Función para manejar la edición de cotización
+  const handleEditQuotation = (quotation: Quotation) => {
+    console.log('🔧 Editando cotización:', quotation.id, quotation.projectName);
+    // Navegar a la página de edición con el ID correcto
+    navigate(`/optimized-quote/${quotation.id}`);
+  };
+
   return (
     <>
       <div className="page-container">
@@ -318,7 +328,7 @@ export default function ManageQuotes() {
             <span>/</span>
             <span className="text-foreground font-medium">Gestión de Cotizaciones</span>
           </nav>
-          
+
           <div className="flex-between">
             <div>
               <h1 className="heading-page">Gestión de Cotizaciones</h1>
@@ -441,7 +451,7 @@ export default function ManageQuotes() {
                                     variant="outline" 
                                     size="sm"
                                     className="hover-lift bg-blue-50 hover:bg-blue-100 text-blue-700"
-                                    onClick={() => navigate(`/optimized-quote?id=${quote.id}`)}
+                                    onClick={() => handleEditQuotation(quote)}
                                   >
                                     <Edit className="h-4 w-4 mr-1" />
                                     Editar
@@ -627,7 +637,7 @@ export default function ManageQuotes() {
               La cotización ha sido aprobada exitosamente. ¿Deseas crear un proyecto basado en esta cotización?
             </DialogDescription>
           </DialogHeader>
-          
+
           {approvedQuote && (
             <div className="py-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -666,10 +676,10 @@ export default function ManageQuotes() {
                     {(() => {
                       const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
                       const finalAmount = approvedQuote.totalAmount || 0;
-                      
+
                       // Calcular margen simple: precio final menos costo base
                       const marginAmount = finalAmount - baseCostTotal;
-                      
+
                       return (
                         <>
                           <div className="flex justify-between">
