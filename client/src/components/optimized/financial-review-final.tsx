@@ -706,12 +706,12 @@ export default function FinancialReviewFinal() {
                     )}
                   </div>
 
-                  {quotationData.inflation.projectStartDate && inflationAdjustment > 0 && (
+                  {quotationData.inflation.projectStartDate && inflationAdjustmentUSD > 0 && (
                     <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-green-900">Impacto Proyectado:</span>
                         <span className="text-lg font-bold text-green-900">
-                          +{formatFinalCurrency(inflationAdjustment)}
+                          +{formatFinalCurrency(inflationAdjustmentDisplay)}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
@@ -783,7 +783,7 @@ export default function FinancialReviewFinal() {
                 </div>
               </div>
 
-              {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+              {quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 && (
                 <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
                   <div className="flex justify-between items-center">
                     <div className="flex flex-col">
@@ -792,7 +792,7 @@ export default function FinancialReviewFinal() {
                         {totalInflationPercentage.toFixed(2)}% en {monthsToProject} meses
                       </span>
                     </div>
-                    <span className="font-bold text-orange-900">+{formatFinalCurrency(inflationAdjustment)}</span>
+                    <span className="font-bold text-orange-900">+{formatFinalCurrency(inflationAdjustmentDisplay)}</span>
                   </div>
                 </div>
               )}
