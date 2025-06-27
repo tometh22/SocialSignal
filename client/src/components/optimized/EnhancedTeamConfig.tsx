@@ -196,20 +196,20 @@ const EnhancedTeamConfig: React.FC = () => {
     setTempEditValues(prev => ({
       ...prev,
       [memberId]: { 
-        hours: currentHours.toString(), 
-        rate: currentRate.toString() 
+        hours: String(currentHours), 
+        rate: String(currentRate) 
       }
     }));
   };
 
   // Guardar edición
   const saveEdit = (memberId: string) => {
-    const values = editValues[memberId];
-    if (values) {
-      updateTeamMember(memberId, {
-        hours: typeof values.hours === 'string' ? (parseInt(values.hours) || 0) : values.hours,
-        rate: typeof values.rate === 'string' ? (parseFloat(values.rate) || 0) : values.rate
-      });
+    const tempValues = tempEditValues[memberId];
+    if (tempValues) {
+      const hours = tempValues.hours === '' ? 0 : parseInt(tempValues.hours) || 0;
+      const rate = tempValues.rate === '' ? 0 : parseFloat(tempValues.rate) || 0;
+      
+      updateTeamMember(memberId, { hours, rate });
     }
     setEditingMember(null);
   };
@@ -561,12 +561,12 @@ const EnhancedTeamConfig: React.FC = () => {
                                   <div className="flex items-center space-x-2">
                                     <Input
                                       type="number"
-                                      value={editValues[member.id]?.hours !== undefined ? editValues[member.id].hours : member.hours}
-                                      onChange={(e) => setEditValues(prev => ({
+                                      value={tempEditValues[member.id]?.hours !== undefined ? tempEditValues[member.id].hours : member.hours}
+                                      onChange={(e) => setTempEditValues(prev => ({
                                         ...prev,
                                         [member.id]: {
                                           ...prev[member.id],
-                                          hours: e.target.value === '' ? 0 : parseInt(e.target.value) || 0
+                                          hours: e.target.value
                                         }
                                       }))}
                                       className="w-16 h-8 text-xs"
@@ -578,8 +578,8 @@ const EnhancedTeamConfig: React.FC = () => {
                                     <Input
                                       type="number"
                                       step="0.01"
-                                      value={editValues[member.id]?.rate || member.rate}
-                                      onChange={(e) => setEditValues(prev => ({
+                                      value={tempEditValues[member.id]?.rate !== undefined ? tempEditValues[member.id].rate : member.rate}
+                                      onChange={(e) => setTempEditValues(prev => ({
                                         ...prev,
                                         [member.id]: {
                                           ...prev[member.id],
@@ -609,17 +609,11 @@ const EnhancedTeamConfig: React.FC = () => {
                                   ${(() => {
                                     if (!isEditing) return member.cost;
                                     
-                                    const hours = editValues[member.id]?.hours !== undefined 
-                                      ? (typeof editValues[member.id]?.hours === 'string' 
-                                          ? (parseFloat(editValues[member.id]?.hours as string) || 0) 
-                                          : editValues[member.id]?.hours as number)
-                                      : member.hours;
-                                      
-                                    const rate = editValues[member.id]?.rate !== undefined 
-                                      ? (typeof editValues[member.id]?.rate === 'string' 
-                                          ? (parseFloat(editValues[member.id]?.rate as string) || 0) 
-                                          : editValues[member.id]?.rate as number)
-                                      : member.rate;
+                                    const tempValues = tempEditValues[member.id];
+                                    if (!tempValues) return member.cost;
+                                    
+                                    const hours = tempValues.hours === '' ? 0 : parseFloat(tempValues.hours) || 0;
+                                    const rate = tempValues.rate === '' ? 0 : parseFloat(tempValues.rate) || 0;
                                       
                                     return hours * rate;
                                   })().toLocaleString()}
