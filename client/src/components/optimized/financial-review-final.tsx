@@ -1,6 +1,8 @@
 
 import React, { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
+import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,8 +52,9 @@ export default function FinancialReviewFinal() {
     updateFinancials,
     saveQuotation
   } = useOptimizedQuote();
-  const navigate = "";
-  const toast = (props) => {console.log(props)};
+  // Import hooks at the top of the file are already there, so we can use them properly
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
   const [markupMultiplier, setMarkupMultiplier] = useState(2.0); // Default 2x markup
