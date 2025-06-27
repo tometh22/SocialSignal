@@ -53,7 +53,7 @@ export default function FinancialReviewFinal() {
   const toast = (props) => {console.log(props)};
 
   const [isSaving, setIsSaving] = useState(false);
-  const [marginPercentage, setMarginPercentage] = useState(100); // Default 100% margin
+  const [markupMultiplier, setMarkupMultiplier] = useState(2.0); // Default 2x markup
   const [discountPercentage, setDiscountPercentage] = useState(0); // Default 0% discount
 
   // Force recalculation when component mounts or data changes
@@ -141,10 +141,9 @@ export default function FinancialReviewFinal() {
   const platformCost = quotationData.financials.platformCost || 0;
   const subtotalWithPlatform = finalBaseAfterInflation + platformCost;
 
-  // Apply dynamic margin
-  const marginMultiplier = marginPercentage / 100;
-  const marginAmount = subtotalWithPlatform * marginMultiplier;
-  const subtotalWithMargin = subtotalWithPlatform + marginAmount;
+  // Apply dynamic markup multiplier
+  const subtotalWithMargin = subtotalWithPlatform * markupMultiplier;
+  const marginAmount = subtotalWithMargin - subtotalWithPlatform;
 
   // Apply dynamic discount
   const discountAmount = subtotalWithMargin * (discountPercentage / 100);
@@ -313,8 +312,8 @@ export default function FinancialReviewFinal() {
                 <TrendingUp className="h-4 w-4 text-green-700" />
               </div>
               <div>
-                <p className="text-xs font-medium text-green-800">Margen</p>
-                <p className="text-lg font-bold text-green-900">{marginPercentage}%</p>
+                <p className="text-xs font-medium text-green-800">Markup</p>
+                <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
                 <p className="text-xs text-green-600">+{formatCurrency(marginAmount)}</p>
               </div>
             </div>
@@ -435,37 +434,37 @@ export default function FinancialReviewFinal() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              {/* Margin Control */}
+              {/* Markup Control */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-900">
-                    Margen de Ganancia
+                    Multiplicador de Markup
                   </Label>
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    {marginPercentage}%
+                    {markupMultiplier}x
                   </Badge>
                 </div>
                 <div className="space-y-3">
                   <Slider
-                    value={[marginPercentage]}
-                    onValueChange={(value) => setMarginPercentage(value[0])}
-                    min={0}
-                    max={300}
-                    step={5}
+                    value={[markupMultiplier]}
+                    onValueChange={(value) => setMarkupMultiplier(value[0])}
+                    min={1.0}
+                    max={6.0}
+                    step={0.1}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>0%</span>
-                    <span>150%</span>
-                    <span>300%</span>
+                    <span>1.0x (Sin ganancia)</span>
+                    <span>3.5x</span>
+                    <span>6.0x</span>
                   </div>
                   <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-green-900">Monto del Margen:</span>
+                      <span className="text-sm font-medium text-green-900">Ganancia Generada:</span>
                       <span className="text-lg font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
-                      Se aplica sobre: {formatCurrency(subtotalWithPlatform)} (base + plataforma + inflación)
+                      Base: {formatCurrency(subtotalWithPlatform)} × {markupMultiplier} = {formatCurrency(subtotalWithMargin)}
                     </p>
                   </div>
                 </div>
@@ -757,23 +756,23 @@ export default function FinancialReviewFinal() {
                 </div>
               </div>
 
-              {/* Step 5: Dynamic Margin */}
+              {/* Step 5: Dynamic Markup */}
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-green-900">
                     {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 
                       ? (platformCost > 0 ? '5.' : '4.') 
                       : (platformCost > 0 ? '4.' : '3.')
-                    } + Margen ({marginPercentage}%)
+                    } × Markup ({markupMultiplier}x)
                   </span>
-                  <span className="font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                  <span className="font-bold text-green-900">×{markupMultiplier}</span>
                 </div>
               </div>
 
-              {/* Subtotal with margin */}
+              {/* Subtotal with markup */}
               <div className="p-3 bg-blue-100 rounded-lg border border-blue-300">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-blue-900">Subtotal con Margen</span>
+                  <span className="text-sm font-semibold text-blue-900">Subtotal con Markup</span>
                   <span className="font-bold text-blue-900">{formatCurrency(subtotalWithMargin)}</span>
                 </div>
               </div>
