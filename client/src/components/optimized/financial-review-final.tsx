@@ -67,14 +67,26 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.teamMembers, forceRecalculate]);
 
+  // Get exchange rate for currency conversions
+  const exchangeRate = 1100; // TODO: Get from system config
+
+  // Helper function to convert values based on selected currency
+  const convertToDisplayCurrency = (usdAmount: number) => {
+    if (quotationData.inflation.quotationCurrency === 'USD') {
+      return usdAmount;
+    } else {
+      return usdAmount * exchangeRate;
+    }
+  };
+
   // Helper function to get role name
-  const getRoleName = (roleId) => {
+  const getRoleName = (roleId: number) => {
     const role = availableRoles.find((r) => r.id === roleId);
     return role ? role.name : `Rol #${roleId}`;
   };
 
   // Helper function to get personnel name
-  const getPersonnelName = (personnelId) => {
+  const getPersonnelName = (personnelId: number) => {
     const person = availablePersonnel.find((p) => p.id === personnelId);
     return person ? person.name : `Personal #${personnelId}`;
   };
@@ -88,7 +100,7 @@ export default function FinancialReviewFinal() {
     return convertToDisplayCurrency(cost);
   };
 
-  const calculateComplexityAdjustment = (teamBaseCost) => {
+  const calculateComplexityAdjustment = (teamBaseCost: number) => {
     let adjustment = 0;
     adjustment += teamBaseCost * complexityFactors.analysisTypeFactor;
     adjustment += teamBaseCost * complexityFactors.mentionsVolumeFactor;
@@ -106,9 +118,6 @@ export default function FinancialReviewFinal() {
   const teamBaseCost = calculateTeamBaseCost();
   const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
   const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
-
-  // Get exchange rate for currency conversions
-  const exchangeRate = 1100; // TODO: Get from system config
 
   // Calculate inflation if applicable - CORREGIDO CON CONVERSIÓN MONETARIA
   const baseForInflation = subtotalWithComplexity;
@@ -248,17 +257,8 @@ export default function FinancialReviewFinal() {
     }
   };
 
-  // Helper function to convert values based on selected currency
-  const convertToDisplayCurrency = (usdAmount) => {
-    if (quotationData.inflation.quotationCurrency === 'USD') {
-      return usdAmount;
-    } else {
-      return usdAmount * exchangeRate;
-    }
-  };
-
   // Helper function to format currency based on selected currency
-  const formatFinalCurrency = (amount) => {
+  const formatFinalCurrency = (amount: number) => {
     if (quotationData.inflation.quotationCurrency === 'USD') {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
