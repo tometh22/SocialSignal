@@ -103,35 +103,66 @@ export default function FinancialReviewFinal() {
   const teamComplexityAdjustment = calculateComplexityAdjustment(teamBaseCost);
   const subtotalWithComplexity = teamBaseCost + teamComplexityAdjustment;
 
-  // Calculate inflation if applicable
+  // Calculate inflation if applicable - CORREGIDO
   const baseForInflation = subtotalWithComplexity;
   let inflationAdjustment = 0;
   let inflationProjectedCost = baseForInflation;
+  let monthlyInflationRate = 0;
+  let totalInflationPercentage = 0;
+  let monthsToProject = 0;
 
   if (quotationData.inflation.applyInflationAdjustment && quotationData.inflation.projectStartDate) {
     const startDate = new Date(quotationData.inflation.projectStartDate);
     const currentDate = new Date();
-    const monthsDifference = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
-                           (startDate.getMonth() - currentDate.getMonth());
+    monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
+                     (startDate.getMonth() - currentDate.getMonth());
 
-    if (monthsDifference > 0) {
-      const exchangeRate = 1100;
-      let baseCostInARS = quotationData.inflation.quotationCurrency === 'USD' ? 
-                         baseForInflation * exchangeRate : baseForInflation;
+    console.log('🏦 === INFLATION CALCULATION DEBUG ===');
+    console.log('📅 Current date:', currentDate.toISOString().split('T')[0]);
+    console.log('📅 Project start date:', startDate.toISOString().split('T')[0]);
+    console.log('📅 Months to project:', monthsToProject);
+    console.log('💰 Base cost for inflation:', baseForInflation);
+    console.log('💱 Currency:', quotationData.inflation.quotationCurrency);
 
-      let inflationRate;
+    if (monthsToProject > 0) {
+      // Obtener la tasa de inflación anual
+      let annualInflationRate;
       if (quotationData.inflation.inflationMethod === 'manual') {
-        inflationRate = quotationData.inflation.manualInflationRate || 25;
+        annualInflationRate = quotationData.inflation.manualInflationRate || 25;
       } else {
-        inflationRate = 25;
+        annualInflationRate = 25; // Default automático
       }
 
-      const annualRateDecimal = inflationRate / 100;
-      const monthlyRateDecimal = annualRateDecimal / 12;
-      const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsDifference);
+      console.log('📊 Annual inflation rate:', annualInflationRate + '%');
 
-      inflationProjectedCost = baseCostInARS * inflationFactor;
-      inflationAdjustment = inflationProjectedCost - baseCostInARS;
+      // Calcular tasa mensual compuesta: (1 + tasa_anual)^(1/12) - 1
+      const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
+      monthlyInflationRate = monthlyRateDecimal * 100;
+
+      console.log('📊 Monthly inflation rate:', monthlyInflationRate.toFixed(4) + '%');
+
+      // Factor de inflación compuesta para N meses
+      const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
+      totalInflationPercentage = (inflationFactor - 1) * 100;
+
+      console.log('📊 Inflation factor for', monthsToProject, 'months:', inflationFactor.toFixed(6));
+      console.log('📊 Total inflation percentage:', totalInflationPercentage.toFixed(2) + '%');
+
+      // APLICAR INFLACIÓN DIRECTAMENTE EN LA MONEDA DE COTIZACIÓN
+      if (quotationData.inflation.quotationCurrency === 'USD') {
+        // Si cotizamos en USD, aplicamos inflación directamente en USD
+        inflationProjectedCost = baseForInflation * inflationFactor;
+        inflationAdjustment = inflationProjectedCost - baseForInflation;
+        console.log('💵 USD: Base =', baseForInflation, 'Projected =', inflationProjectedCost, 'Adjustment =', inflationAdjustment);
+      } else {
+        // Si cotizamos en ARS, aplicamos inflación directamente en ARS
+        inflationProjectedCost = baseForInflation * inflationFactor;
+        inflationAdjustment = inflationProjectedCost - baseForInflation;
+        console.log('💸 ARS: Base =', baseForInflation, 'Projected =', inflationProjectedCost, 'Adjustment =', inflationAdjustment);
+      }
+
+      console.log('🎯 Final inflation adjustment:', inflationAdjustment);
+      console.log('🏦 === END INFLATION CALCULATION ===');
     }
   }
 
@@ -658,10 +689,28 @@ export default function FinancialReviewFinal() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-green-900">Impacto Proyectado:</span>
                         <span className="text-lg font-bold text-green-900">
-                          +{formatCurrency(inflationAdjustment)}
+                          +{formatFinalCurrency(inflationAdjustment)}
                         </span>
                       </div>
-                      <p className="text-sm text-green-700">
+                      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-green-700">
+                            <strong>Período:</strong> {monthsToProject} meses
+                          </p>
+                          <p className="text-green-700">
+                            <strong>Tasa mensual:</strong> {monthlyInflationRate.toFixed(4)}%
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-green-700">
+                            <strong>Inflación total:</strong> {totalInflationPercentage.toFixed(2)}%
+                          </p>
+                          <p className="text-green-700">
+                            <strong>Moneda:</strong> {quotationData.inflation.quotationCurrency}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-green-700 mt-2 pt-2 border-t border-green-200">
                         Proyección desde {new Date().toLocaleDateString('es-AR')} hasta{' '}
                         {new Date(quotationData.inflation.projectStartDate).toLocaleDateString('es-AR')}
                       </p>
@@ -715,8 +764,13 @@ export default function FinancialReviewFinal() {
               {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
                 <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-orange-900">3. + Protección Inflacionaria</span>
-                    <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-orange-900">3. + Protección Inflacionaria</span>
+                      <span className="text-xs text-orange-700">
+                        {totalInflationPercentage.toFixed(2)}% en {monthsToProject} meses
+                      </span>
+                    </div>
+                    <span className="font-bold text-orange-900">+{formatFinalCurrency(inflationAdjustment)}</span>
                   </div>
                 </div>
               )}
