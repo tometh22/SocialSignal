@@ -293,8 +293,30 @@ export default function FinancialReviewFinal() {
       });
 
     } catch (error) {
-      console.error("Error al guardar borrador:", error);
+      console.error("❌ Error al guardar borrador:", error);
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      
+      // Verificar si es un error de sesión
+      if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
+        toast({
+          title: "Sesión expirada",
+          description: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+          variant: "destructive",
+        });
+        navigate('/auth');
+        return;
+      }
+
+      // Verificar si es un error de cotización no encontrada
+      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        toast({
+          title: "Error al guardar borrador",
+          description: "La cotización no fue encontrada. Se creará una nueva cotización.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Error al guardar borrador",
         description: `No se pudo guardar el borrador: ${errorMessage}`,
@@ -350,8 +372,30 @@ export default function FinancialReviewFinal() {
 
       navigate('/manage-quotes');
     } catch (error) {
-      console.error("Error al finalizar cotización:", error);
+      console.error("❌ Error al finalizar cotización:", error);
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      
+      // Verificar si es un error de sesión
+      if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
+        toast({
+          title: "Sesión expirada",
+          description: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+          variant: "destructive",
+        });
+        navigate('/auth');
+        return;
+      }
+
+      // Verificar si es un error de cotización no encontrada
+      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        toast({
+          title: "Error al finalizar",
+          description: "La cotización no fue encontrada. Se creará una nueva cotización.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Error al finalizar",
         description: `No se pudo finalizar la cotización: ${errorMessage}`,

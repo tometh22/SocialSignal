@@ -774,14 +774,44 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       console.log('🔍 QuotationData.id value:', quotationData.id);
       console.log('🔍 QuotationData.id type:', typeof quotationData.id);
 
-      // Detectar si estamos editando una cotización existente
-      const isEditing = quotationData.id !== undefined && quotationData.id !== null && quotationData.id > 0;
-      console.log('🔍 Is editing mode:', isEditing);
+      // SOLUCIÓN CRÍTICA: Verificar primero si la cotización existe
+      let isEditing = false;
+      let quotationExists = false;
+      
+      if (quotationData.id !== undefined && quotationData.id !== null && quotationData.id > 0) {
+        try {
+          // Verificar si la cotización realmente existe antes de intentar actualizarla
+          console.log(`🔍 Checking if quotation ${quotationData.id} exists...`);
+          const existingQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'GET');
+          if (existingQuotation && existingQuotation.id) {
+            quotationExists = true;
+            isEditing = true;
+            console.log('✅ Quotation exists, will update');
+          }
+        } catch (checkError) {
+          console.warn(`⚠️ Quotation ${quotationData.id} not found, will create new one instead`);
+          // Reset the ID in context since the quotation doesn't exist
+          setQuotationData(prev => ({ ...prev, id: undefined }));
+          isEditing = false;
+          quotationExists = false;
+        }
+      }
+
+      console.log('🔍 Final decision - Is editing:', isEditing, 'Exists:', quotationExists);
       
       let savedQuotation: any;
-      if (isEditing) {
+      if (isEditing && quotationExists) {
         // Actualizar cotización existente
         console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
+        
+        // Eliminar miembros del equipo existentes antes de agregar nuevos
+        try {
+          await apiRequest(`/api/quotation-team/${quotationData.id}`, 'DELETE');
+          console.log('🗑️ Existing team members cleared');
+        } catch (deleteError) {
+          console.warn('⚠️ Could not clear existing team members:', deleteError);
+        }
+        
         savedQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', quotationPayload);
         console.log('✅ Quotation updated:', savedQuotation);
       } else {
@@ -811,7 +841,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         try {
           await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);
         } catch (memberError) {
-          console.error('Error saving team member:', memberError);
+          console.error('❌ Error saving team member:', memberError);
           // Continue saving other members even if one fails
         }
       }
