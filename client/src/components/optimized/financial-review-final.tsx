@@ -217,8 +217,27 @@ export default function FinancialReviewFinal() {
       setIsSaving(true);
       console.log('💾 Guardando cotización...');
 
-      // Usar la función de guardado del contexto
-      await saveQuotation();
+      // Validaciones básicas antes de guardar
+      if (!quotationData.client) {
+        toast({
+          title: "Cliente requerido",
+          description: "Debe seleccionar un cliente antes de guardar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!quotationData.project.name?.trim()) {
+        toast({
+          title: "Nombre de proyecto requerido",
+          description: "Debe ingresar el nombre del proyecto antes de guardar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Usar la función de guardado del contexto con estado 'pending'
+      await saveQuotation('pending');
 
       toast({
         title: "Cotización guardada",
@@ -228,9 +247,10 @@ export default function FinancialReviewFinal() {
       navigate('/manage-quotes');
     } catch (error) {
       console.error("Error al guardar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast({
         title: "Error al guardar",
-        description: "No se pudo guardar la cotización. Inténtalo de nuevo.",
+        description: `No se pudo guardar la cotización: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -244,6 +264,25 @@ export default function FinancialReviewFinal() {
       setIsSavingDraft(true);
       console.log('💾 Guardando borrador...');
 
+      // Validaciones mínimas para borrador
+      if (!quotationData.client) {
+        toast({
+          title: "Cliente requerido",
+          description: "Debe seleccionar un cliente antes de guardar el borrador.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!quotationData.project.name?.trim()) {
+        toast({
+          title: "Nombre de proyecto requerido", 
+          description: "Debe ingresar el nombre del proyecto antes de guardar el borrador.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Usar la función de guardado del contexto pero como borrador
       await saveQuotation('draft');
 
@@ -254,9 +293,10 @@ export default function FinancialReviewFinal() {
 
     } catch (error) {
       console.error("Error al guardar borrador:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast({
         title: "Error al guardar borrador",
-        description: "No se pudo guardar el borrador. Inténtalo de nuevo.",
+        description: `No se pudo guardar el borrador: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -270,6 +310,34 @@ export default function FinancialReviewFinal() {
       setIsFinalizing(true);
       console.log('✅ Finalizando cotización...');
 
+      // Validaciones completas para finalización
+      if (!quotationData.client) {
+        toast({
+          title: "Cliente requerido",
+          description: "Debe seleccionar un cliente antes de finalizar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!quotationData.project.name?.trim()) {
+        toast({
+          title: "Nombre de proyecto requerido",
+          description: "Debe ingresar el nombre del proyecto antes de finalizar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (quotationData.teamMembers.length === 0) {
+        toast({
+          title: "Equipo requerido",
+          description: "Debe agregar al menos un miembro al equipo antes de finalizar.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Usar la función de guardado del contexto como cotización finalizada
       await saveQuotation('pending');
 
@@ -281,9 +349,10 @@ export default function FinancialReviewFinal() {
       navigate('/manage-quotes');
     } catch (error) {
       console.error("Error al finalizar cotización:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
       toast({
         title: "Error al finalizar",
-        description: "No se pudo finalizar la cotización. Inténtalo de nuevo.",
+        description: `No se pudo finalizar la cotización: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
