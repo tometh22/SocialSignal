@@ -84,6 +84,21 @@ export default function FinancialReviewFinal() {
     }
   };
 
+  // Helper function to format currency with proper prefix (USD/ARS)
+  const formatCurrencyWithPrefix = (amount: number) => {
+    const currency = quotationData.inflation.quotationCurrency;
+    if (currency === 'USD') {
+      return `USD ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      return `ARS ${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    }
+  };
+
+  // Enhanced formatFinalCurrency that uses the new prefix format
+  const formatFinalCurrency = (amount: number) => {
+    return formatCurrencyWithPrefix(amount);
+  };
+
   // Helper function to get role name
   const getRoleName = (roleId: number) => {
     const role = availableRoles.find((r) => r.id === roleId);
