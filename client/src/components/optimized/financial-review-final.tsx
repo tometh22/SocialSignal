@@ -74,7 +74,7 @@ export default function FinancialReviewFinal() {
     exchangeRate, 
     exchangeRateLoading, 
     convertFromUSD, 
-    formatCurrency: formatCurrencyWithPrefix 
+    formatCurrency 
   } = useCurrency();
 
   // Helper function to convert values based on selected currency
@@ -82,8 +82,9 @@ export default function FinancialReviewFinal() {
     return convertFromUSD(usdAmount, quotationData.inflation.quotationCurrency);
   };
 
-  // Use formatCurrencyWithPrefix as formatFinalCurrency
-  const formatFinalCurrency = formatCurrencyWithPrefix;
+  // Helper function to format currency with current quotation currency
+  const formatFinalCurrency = (amount: number) => 
+    formatCurrency(amount, quotationData.inflation.quotationCurrency);
 
   // Helper function to get role name
   const getRoleName = (roleId: number) => {

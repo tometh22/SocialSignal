@@ -67,23 +67,17 @@ export function setupAuth(app: Express, storage: IStorage) {
   
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
-    resave: false, // Solo guardar cuando se modifique
-    saveUninitialized: false, // No guardar sesiones vacías para cumplir con GDPR
+    resave: true, // Cambiar a true para forzar guardado en cada request
+    saveUninitialized: true, // Cambiar a true para debug
     rolling: true, // CRÍTICO: Renovar cookie en cada respuesta para mantener la sesión activa
     cookie: {
-      // En Replit, incluso en producción, las cookies secure pueden causar problemas
-      secure: isProduction && !isReplit, // Solo secure en producción real, no en Replit
-      maxAge: 1000 * 60 * 60 * 24 * 180, // 180 días (6 meses) para máxima persistencia
-      sameSite: 'lax' as const, // Protección contra CSRF pero permite navegación normal
-      httpOnly: true, // Previene acceso a la cookie mediante JavaScript
-      path: '/', // Asegurar que la cookie sea accesible en todas las rutas
+      secure: false, // Desactivar secure para debugging en Replit
+      maxAge: 1000 * 60 * 60 * 24 * 7, // Reducir a 7 días para testing
+      sameSite: 'lax' as const,
+      httpOnly: true,
+      path: '/',
     },
-    name: 'epical.persistent.sid', // Nombre personalizado para la cookie
-    // Usar generador de ID más seguro
-    genid: () => {
-      // Usar randomBytes para generar identificadores de sesión más seguros con mayor entropía
-      return randomBytes(64).toString('hex'); // Aumentado a 64 bytes para mayor seguridad
-    }
+    name: 'epical.session.sid', // Simplificar nombre de cookie
   };
 
   // Agregar el store de sesiones a la configuración
