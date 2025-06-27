@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
 import { formatCurrency } from "@/lib/utils";
@@ -520,6 +521,7 @@ export default function FinancialReviewFinal() {
             </CardContent>
           </Card>
 
+          {/* Inflation Card */}
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-lg flex items-center justify-between">
@@ -555,7 +557,6 @@ export default function FinancialReviewFinal() {
 
             <CardContent className="p-4">
               {!quotationData.inflation.applyInflationAdjustment ? (
-                // Estado desactivado - Simple
                 <div className="text-center py-8">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                     <Shield className="h-8 w-8 text-gray-400" />
@@ -575,9 +576,7 @@ export default function FinancialReviewFinal() {
                   </Button>
                 </div>
               ) : (
-                // Estado activado - Configuración expandida
                 <div className="space-y-6">
-                  {/* Header con badge */}
                   <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -595,9 +594,7 @@ export default function FinancialReviewFinal() {
                     </Badge>
                   </div>
 
-                  {/* Configuración en grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Fecha de inicio */}
                     <div className="space-y-2">
                       <Label className="font-medium">Fecha de inicio del proyecto</Label>
                       <Input
@@ -609,7 +606,6 @@ export default function FinancialReviewFinal() {
                       />
                     </div>
 
-                    {/* Moneda */}
                     <div className="space-y-2">
                       <Label className="font-medium">Moneda de cotización</Label>
                       <Select 
@@ -626,7 +622,6 @@ export default function FinancialReviewFinal() {
                       </Select>
                     </div>
 
-                    {/* Método de inflación */}
                     <div className="space-y-2">
                       <Label className="font-medium">Método de cálculo</Label>
                       <Select 
@@ -643,7 +638,6 @@ export default function FinancialReviewFinal() {
                       </Select>
                     </div>
 
-                    {/* Tasa manual (si aplica) */}
                     {quotationData.inflation.inflationMethod === 'manual' && (
                       <div className="space-y-2">
                         <Label className="font-medium">Tasa inflación anual (%)</Label>
@@ -659,7 +653,6 @@ export default function FinancialReviewFinal() {
                     )}
                   </div>
 
-                  {/* Resumen de impacto */}
                   {quotationData.inflation.projectStartDate && inflationAdjustment > 0 && (
                     <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                       <div className="flex items-center justify-between mb-2">
@@ -675,7 +668,6 @@ export default function FinancialReviewFinal() {
                     </div>
                   )}
 
-                  {/* Warning */}
                   <div className="flex items-start gap-2 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                     <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-yellow-800">
@@ -699,7 +691,6 @@ export default function FinancialReviewFinal() {
             </CardHeader>
             <CardContent className="p-4 space-y-3">
 
-              {/* Step 1: Base Cost */}
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-blue-900">1. Costo Base Equipo</span>
@@ -707,7 +698,6 @@ export default function FinancialReviewFinal() {
                 </div>
               </div>
 
-              {/* Step 2: Complexity */}
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-amber-900">2. + Complejidad ({getComplexityPercentage()}%)</span>
@@ -715,7 +705,6 @@ export default function FinancialReviewFinal() {
                 </div>
               </div>
 
-              {/* Subtotal */}
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal (Base + Complejidad)</span>
@@ -723,5 +712,91 @@ export default function FinancialReviewFinal() {
                 </div>
               </div>
 
-              {/* Step 3: Inflation (if applicable) */}
-              {quotationData.inflation.applyInflationAdjustment
+              {quotationData.inflation.applyInflationAdjustment && inflationAdjustment > 0 && (
+                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-orange-900">3. + Protección Inflacionaria</span>
+                    <span className="font-bold text-orange-900">+{formatCurrency(inflationAdjustment)}</span>
+                  </div>
+                </div>
+              )}
+
+              {platformCost > 0 && (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-purple-900">4. + Costos de Plataforma</span>
+                    <span className="font-bold text-purple-900">+{formatCurrency(platformCost)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-green-900">5. + Margen ({markupMultiplier}x)</span>
+                  <span className="font-bold text-green-900">+{formatCurrency(marginAmount)}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">Subtotal con Margen</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(subtotalWithMargin)}</span>
+                </div>
+              </div>
+
+              {discountPercentage > 0 && (
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-red-900">6. - Descuento ({discountPercentage}%)</span>
+                    <span className="font-bold text-red-900">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                </div>
+              )}
+
+              <Separator className="my-4" />
+
+              <div className="p-4 bg-gradient-to-r from-emerald-100 to-green-100 rounded-xl border-2 border-emerald-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-emerald-700" />
+                    <span className="text-lg font-bold text-emerald-900">TOTAL FINAL PROYECTO</span>
+                  </div>
+                  <span className="text-2xl font-bold text-emerald-900">
+                    {formatFinalCurrency(finalTotal)}
+                  </span>
+                </div>
+                <p className="text-sm text-emerald-700 mt-1">
+                  {quotationData.inflation.quotationCurrency} • 6 miembros • {quotationData.client?.name}
+                </p>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-center">
+            <Button 
+              onClick={handleSaveQuotation}
+              disabled={isSaving}
+              size="lg"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Guardando cotización...
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-5 w-5" />
+                  TOTAL FINAL PROYECTO
+                  <br />
+                  ${finalTotal.toFixed(2)}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
