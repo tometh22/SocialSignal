@@ -48,6 +48,20 @@ import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
+
+// Helper function to convert null values to undefined for Zod validation
+function nullToUndefined(obj: any): any {
+  if (obj === null) return undefined;
+  if (Array.isArray(obj)) return obj.map(nullToUndefined);
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {};
+    for (const key in obj) {
+      result[key] = nullToUndefined(obj[key]);
+    }
+    return result;
+  }
+  return obj;
+}
 import { upload, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import path from 'path';
@@ -798,12 +812,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si hay múltiples proyectos que usan la misma cotización, crear una copia
 
         // Crear una copia de la cotización con el nuevo cliente
-        const newQuotation = { 
-          ...currentQuotation, 
-          id: undefined, 
-          clientId,
-          projectStartDate: currentQuotation.projectStartDate || undefined
-        };
+        const { id, createdAt, updatedAt, ...quotationData } = currentQuotation;
+        const newQuotation = nullToUndefined({ 
+          ...quotationData, 
+          clientId
+        });
         const createdQuotation = await storage.createQuotation(newQuotation);
 
         if (!createdQuotation) {
@@ -2228,8 +2241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Si hay más proyectos usando la misma cotización, crear una copia para este proyecto
 
         // Crear una copia de la cotización con el nuevo nombre
-        const { id, ...quotationWithoutId } = quotation;
-        const newQuotation = { ...quotationWithoutId, projectName: name.trim() };
+        const { id, createdAt, updatedAt, ...quotationWithoutId } = quotation;
+        const newQuotation = nullToUndefined({ ...quotationWithoutId, projectName: name.trim() });
 
         const createdQuotation = await storage.createQuotation(newQuotation);
         if (!createdQuotation) {
