@@ -455,7 +455,7 @@ export default function FinancialReviewFinal() {
               <div className="p-4 bg-blue-50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-blue-900">Subtotal Base</span>
-                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCost)}</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay)}</span>
                 </div>
               </div>
             </CardContent>
@@ -551,7 +551,7 @@ export default function FinancialReviewFinal() {
                       <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
-                      Base: {formatFinalCurrency(subtotalWithPlatform)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMargin)}
+                      Base: {formatFinalCurrency(subtotalWithPlatformDisplay)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMarginDisplay)}
                     </p>
                   </div>
                 </div>
@@ -590,10 +590,10 @@ export default function FinancialReviewFinal() {
                     <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-red-900">Descuento Aplicado:</span>
-                        <span className="text-lg font-bold text-red-900">-{formatFinalCurrency(discountAmount)}</span>
+                        <span className="text-lg font-bold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
                       </div>
                       <p className="text-xs text-red-700 mt-1">
-                        Se aplica sobre: {formatFinalCurrency(subtotalWithMargin)} (subtotal + margen)
+                        Se aplica sobre: {formatFinalCurrency(subtotalWithMarginDisplay)} (subtotal + margen)
                       </p>
                     </div>
                   )}
@@ -807,7 +807,7 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal (Base + Complejidad)</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(convertToDisplayCurrency(subtotalWithComplexity))}</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithComplexityDisplay)}</span>
                 </div>
               </div>
 
@@ -825,11 +825,11 @@ export default function FinancialReviewFinal() {
                 </div>
               )}
 
-              {platformCost > 0 && (
+              {platformCostDisplay > 0 && (
                 <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-purple-900">4. + Costos de Plataforma</span>
-                    <span className="font-bold text-purple-900">+{formatFinalCurrency(platformCost)}</span>
+                    <span className="font-bold text-purple-900">+{formatFinalCurrency(platformCostDisplay)}</span>
                   </div>
                 </div>
               )}
@@ -837,14 +837,14 @@ export default function FinancialReviewFinal() {
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-green-900">5. + Margen ({markupMultiplier}x)</span>
-                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay}</span>
+                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                 </div>
               </div>
 
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal con Margen</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithMargin)}</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithMarginDisplay)}</span>
                 </div>
               </div>
 
@@ -852,7 +852,7 @@ export default function FinancialReviewFinal() {
                 <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-red-900">6. - Descuento ({discountPercentage}%)</span>
-                    <span className="font-bold text-red-900">-{formatFinalCurrency(discountAmount)}</span>
+                    <span className="font-bold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
                   </div>
                 </div>
               )}
