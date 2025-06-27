@@ -584,10 +584,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quotations", requireAuth, async (req, res) => {
     try {
+      console.log('📥 POST /api/quotations - Request body:', JSON.stringify(req.body, null, 2));
 
       try {
         // Validar datos con Zod
+        console.log('🔍 Validating quotation data...');
         const validatedData = insertQuotationSchema.parse(req.body);
+        console.log('✅ Validation successful:', JSON.stringify(validatedData, null, 2));
 
         // Crear cotización
         const quotation = await storage.createQuotation(validatedData);
@@ -613,16 +616,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/quotations/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log('📥 PUT /api/quotations/:id - ID:', id);
+      console.log('📥 PUT /api/quotations/:id - Request body:', JSON.stringify(req.body, null, 2));
+      
       if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
       // Validar que la cotización existe
       const existingQuotation = await storage.getQuotation(id);
       if (!existingQuotation) {
+        console.log('❌ Quotation not found for ID:', id);
         return res.status(404).json({ message: "Quotation not found" });
       }
+      console.log('✅ Existing quotation found:', existingQuotation.id);
 
       try {
         // Validar datos con Zod
+        console.log('🔍 Validating quotation data for update...');
         const validatedData = insertQuotationSchema.parse(req.body);
 
         // Actualizar cotización

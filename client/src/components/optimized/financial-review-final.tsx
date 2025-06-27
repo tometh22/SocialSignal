@@ -263,6 +263,7 @@ export default function FinancialReviewFinal() {
     try {
       setIsSavingDraft(true);
       console.log('💾 Guardando borrador...');
+      console.log('🔍 Current quotationData:', quotationData);
 
       // Validaciones mínimas para borrador
       if (!quotationData.client) {
@@ -309,6 +310,7 @@ export default function FinancialReviewFinal() {
     try {
       setIsFinalizing(true);
       console.log('✅ Finalizando cotización...');
+      console.log('🔍 Current quotationData:', quotationData);
 
       // Validaciones completas para finalización
       if (!quotationData.client) {
