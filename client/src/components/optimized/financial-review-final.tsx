@@ -33,6 +33,7 @@ import {
   Target,
   Sparkles,
   Clock,
+  Save,
   Zap,
   Shield,
   Loader2,
@@ -59,6 +60,8 @@ export default function FinancialReviewFinal() {
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [markupMultiplier, setMarkupMultiplier] = useState(2.0); // Default 2x markup
   const [discountPercentage, setDiscountPercentage] = useState(0); // Default 0% discount
 
@@ -409,7 +412,7 @@ export default function FinancialReviewFinal() {
               <div className="p-4 bg-blue-50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-blue-900">Subtotal Base</span>
-                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay)}</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay, quotationData.inflation.quotationCurrency)}</span>
                 </div>
               </div>
             </CardContent>
@@ -625,7 +628,7 @@ export default function FinancialReviewFinal() {
                       </div>
                     </div>
                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay)}` : 'Configurando...'}
+                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay, quotationData.inflation.quotationCurrency)}` : 'Configurando...'}
                     </Badge>
                   </div>
 
@@ -834,24 +837,47 @@ export default function FinancialReviewFinal() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-center">
+          <div className="flex flex-col gap-3">
+            {/* Botón Guardar Borrador */}
             <Button 
-              onClick={handleSaveQuotation}
-              disabled={isSaving}
+              onClick={handleSaveDraft}
+              disabled={isSavingDraft}
               size="lg"
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all"
+              variant="outline"
+              className="w-full border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 px-8 rounded-xl transition-all"
             >
-              {isSaving ? (
+              {isSavingDraft ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Guardando cotización...
+                  Guardando borrador...
                 </>
               ) : (
                 <>
-                  <FileText className="mr-2 h-5 w-5" />
-                  TOTAL FINAL PROYECTO
-                  <br />
-                  ${finalTotalDisplay.toFixed(2)}
+                  <Save className="mr-2 h-5 w-5" />
+                  Guardar Borrador
+                </>
+              )}
+            </Button>
+
+            {/* Botón Finalizar Cotización */}
+            <Button 
+              onClick={handleFinalizeQuotation}
+              disabled={isFinalizing}
+              size="lg"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all"
+            >
+              {isFinalizing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Finalizando cotización...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-5 w-5" />
+                  Finalizar Cotización
+                  <div className="text-sm opacity-90">
+                    {formatFinalCurrency(finalTotalDisplay)}
+                  </div>
                 </>
               )}
             </Button>
