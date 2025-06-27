@@ -144,10 +144,16 @@ export const quotations = pgTable("quotations", {
   createdBy: integer("created_by").references(() => users.id),
 });
 
-export const insertQuotationSchema = createInsertSchema(quotations).omit({
+// Esquema base generado por drizzle-zod
+const baseInsertQuotationSchema = createInsertSchema(quotations).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+// Esquema personalizado que permite tanto Date como string para las fechas
+export const insertQuotationSchema = baseInsertQuotationSchema.extend({
+  projectStartDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 // ==================== ASIGNACIÓN DE MIEMBROS DE EQUIPO ====================
