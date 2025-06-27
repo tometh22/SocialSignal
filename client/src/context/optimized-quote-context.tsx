@@ -94,7 +94,7 @@ interface OptimizedQuoteContextType {
 
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
-  saveQuotation: () => Promise<void>;
+  saveQuotation: (status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation') => Promise<void>;
   calculateTotalCost: () => void;
   resetQuotation: () => void;
   loadRoles: () => void;
@@ -695,7 +695,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     }
   }, [forceRecalculate]);
 
-  const saveQuotation = useCallback(async () => {
+  const saveQuotation = useCallback(async (status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft') => {
     try {
       // Validar datos requeridos
       if (!quotationData.client?.id) {
@@ -733,7 +733,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate || null,
         quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
-        status: 'draft'
+        status: status
       };
 
       console.log('📤 Saving quotation with payload:', quotationPayload);

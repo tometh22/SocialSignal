@@ -239,6 +239,59 @@ export default function FinancialReviewFinal() {
     }
   };
 
+  // Función para guardar como borrador
+  const handleSaveDraft = async () => {
+    try {
+      setIsSavingDraft(true);
+      console.log('💾 Guardando borrador...');
+
+      // Usar la función de guardado del contexto pero como borrador
+      await saveQuotation('draft');
+
+      toast({
+        title: "Borrador guardado",
+        description: "El borrador se ha guardado correctamente. Puedes continuar editándolo más tarde.",
+      });
+
+    } catch (error) {
+      console.error("Error al guardar borrador:", error);
+      toast({
+        title: "Error al guardar borrador",
+        description: "No se pudo guardar el borrador. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  // Función para finalizar cotización
+  const handleFinalizeQuotation = async () => {
+    try {
+      setIsFinalizing(true);
+      console.log('✅ Finalizando cotización...');
+
+      // Usar la función de guardado del contexto como cotización finalizada
+      await saveQuotation('pending');
+
+      toast({
+        title: "Cotización finalizada",
+        description: "La cotización ha sido finalizada y está lista para el cliente.",
+      });
+
+      navigate('/manage-quotes');
+    } catch (error) {
+      console.error("Error al finalizar cotización:", error);
+      toast({
+        title: "Error al finalizar",
+        description: "No se pudo finalizar la cotización. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
 
 
   return (
