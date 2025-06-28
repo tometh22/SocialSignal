@@ -632,6 +632,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
   }
 
+  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
+    try {
+      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+    } catch (error) {
+      console.error("Error al eliminar miembros del equipo:", error);
+      throw error;
+    }
+  }
+
   // Template role assignment operations
   async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
     return await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
