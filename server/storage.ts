@@ -609,6 +609,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
+    // Validar que personnel_id no sea null
+    if (!member.personnelId) {
+      throw new Error('personnel_id es requerido para crear un miembro del equipo');
+    }
+
+    console.log('📝 Creando miembro del equipo con datos:', {
+      quotationId: member.quotationId,
+      personnelId: member.personnelId,
+      roleId: member.roleId,
+      hourlyRate: member.hourlyRate,
+      hoursAllocated: member.hoursAllocated
+    });
+
     const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
     return newMember;
   }
