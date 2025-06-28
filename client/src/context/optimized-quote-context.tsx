@@ -584,7 +584,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       ...member,
       id: `member-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       roleId: member.roleId,
-      personnelId: member.personnelId || null, // Ensure null instead of undefined
+      personnelId: member.personnelId ?? null, // Explicitly handle null/undefined
       hours: defaultHours,
       rate: defaultRate,
       cost: defaultHours * defaultRate
