@@ -233,7 +233,7 @@ interface OptimizedQuoteProviderProps {
   isRequote?: boolean;
 }
 
-export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ children, quotationId, isRequote }) => {
+const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ children, quotationId, isRequote }) => {
   const [quotationData, setQuotationData] = useState<QuotationData>(initialQuotationData);
   const [baseCost, setBaseCost] = useState(0);
   const [complexityAdjustment, setComplexityAdjustment] = useState(0);
@@ -990,10 +990,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
   );
 };
 
-export function useOptimizedQuote() {
+export { OptimizedQuoteProvider };
+
+export const useOptimizedQuote = () => {
   const context = useContext(OptimizedQuoteContext);
   if (context === undefined) {
     throw new Error("useOptimizedQuote must be used within an OptimizedQuoteProvider");
   }
   return context;
-}
+};
