@@ -319,6 +319,44 @@ export default function ManageQuotes() {
     totalValue: filteredQuotations.reduce((sum, q) => sum + q.totalAmount, 0),
   };
 
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('es-ES', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+        }).format(amount);
+    };
+
+    const getStatusVariant = (status: string) => {
+        switch (status) {
+            case 'approved':
+                return 'success';
+            case 'pending':
+                return 'secondary';
+            case 'rejected':
+                return 'destructive';
+            default:
+                return 'default';
+        }
+    };
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'approved':
+                return 'Aprobada';
+            case 'pending':
+                return 'Pendiente';
+            case 'rejected':
+                return 'Rechazada';
+            case 'in-negotiation':
+                return 'En Negociación';
+            case 'draft':
+                return 'Borrador';
+            default:
+                return 'Desconocido';
+        }
+    };
+
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pb-16">
@@ -462,197 +500,82 @@ export default function ManageQuotes() {
                   <Loader variant="dots" size="lg" text="Cargando cotizaciones..." />
                 </div>
               ) : filteredQuotations.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
-                      <tr>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          <div className="flex items-center space-x-2">
-                            <Building2 className="h-4 w-4" />
-                            <span>Proyecto</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          <div className="flex items-center space-x-2">
-                            <Users className="h-4 w-4" />
-                            <span>Cliente</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          <div className="flex items-center space-x-2">
-                            <TrendingUp className="h-4 w-4" />
-                            <span>Tipo</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200 hidden sm:table-cell">
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="h-4 w-4" />
-                            <span>Creación</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          <div className="flex items-center space-x-2">
-                            <AlertCircle className="h-4 w-4" />
-                            <span>Estado</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          <div className="flex items-center space-x-2">
-                            <DollarSign className="h-4 w-4" />
-                            <span>Valor</span>
-                          </div>
-                        </th>
-                        <th className="px-4 lg:px-6 py-4 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {filteredQuotations.map((quote, index) => (
-                        <tr 
-                          key={quote.id} 
-                          className={`hover:bg-slate-50/50 transition-all duration-300 group ${
-                            deletingQuoteId === quote.id 
-                              ? 'opacity-30 bg-red-50 animate-pulse' 
-                              : 'opacity-100'
-                          }`}
-                        >
-                          <td className="px-4 lg:px-6 py-4">
-                            <div className="flex items-center space-x-3">
-                              <div className="h-10 w-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md">
-                                {quote.projectName.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-slate-900 truncate">{quote.projectName}</div>
-                                <div className="text-xs text-slate-500 mt-1">ID: #{quote.id}</div>
-                              </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                  {filteredQuotations.map((quote, index) => (
+                    <Card key={quote.id} className="shadow-md hover:shadow-lg transition-shadow duration-200">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col">
+                          <div className="flex items-center mb-2">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                              <span className="text-blue-600 font-semibold">{quote.projectName.charAt(0).toUpperCase()}</span>
                             </div>
-                          </td>
-                          <td className="px-4 lg:px-6 py-4">
-                            <div className="flex items-center space-x-3">
-                              {(() => {
-                                const client = getClient(quote.clientId);
-                                return client?.logoUrl ? (
-                                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm">
-                                    <img 
-                                      src={client.logoUrl} 
-                                      alt={`${client.name} logo`} 
-                                      className="h-full w-full object-cover"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">
-                                    {getClientName(quote.clientId).charAt(0)}
-                                  </div>
-                                );
-                              })()}
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-slate-900 truncate">{getClientName(quote.clientId)}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 lg:px-6 py-4">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium text-xs">
-                              {quote.projectType || "Always On"}
-                            </Badge>
-                          </td>
-                          <td className="px-4 lg:px-6 py-4 hidden sm:table-cell">
-                            <div className="flex items-center text-sm text-slate-600">
-                              <Calendar className="h-4 w-4 mr-2 text-slate-400" />
-                              <span className="font-medium">
-                                {new Date(quote.createdAt).toLocaleDateString('es-ES', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                                })}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 lg:px-6 py-4">
-                            {getStatusBadge(quote.status)}
-                          </td>
-                          <td className="px-4 lg:px-6 py-4">
-                            <div className="flex items-center">
-                              <span className="text-lg font-bold text-slate-900">
-                                ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 lg:px-6 py-4">
-                            <div className="flex items-center justify-center gap-1 overflow-x-auto">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 px-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
-                                onClick={() => openStatusDialog(quote)}
-                              >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Estado
-                              </Button>
-
-                              {quote.status === 'draft' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="h-8 px-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
-                                  onClick={() => handleEditQuotation(quote)}
-                                >
-                                  <PenLine className="h-3 w-3 mr-1" />
-                                  Editar
-                                </Button>
-                              )}
-
-                              {quote.status === 'in-negotiation' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="h-8 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
-                                  onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
-                                >
-                                  <Zap className="h-3 w-3 mr-1" />
-                                  Recotizar
-                                </Button>
-                              )}
-
-                              <Button 
-                                variant="outline" 
+                            <h3 className="text-lg font-semibold">{quote.projectName}</h3>
+                          </div>
+                          <div className="text-sm text-gray-500 mb-2">
+                            Cliente: {getClientName(quote.clientId)}
+                          </div>
+                          <div className="flex items-center mb-2">
+                            Estado: {getStatusBadge(quote.status)}
+                          </div>
+                          <div className="text-right font-bold text-gray-700">
+                            Total: ${quote.totalAmount.toLocaleString()}
+                          </div>
+                          <div className="flex justify-end mt-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2"
+                              onClick={() => openStatusDialog(quote)}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Estado
+                            </Button>
+                            {quote.status === 'draft' && (
+                              <Button
+                                variant="outline"
                                 size="sm"
-                                className="h-8 px-2 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
-                                onClick={() => navigate(`/quotation/${quote.id}`)}
+                                className="mr-2"
+                                onClick={() => handleEditQuotation(quote)}
                               >
-                                <Eye className="h-3 w-3 mr-1" />
-                                Ver
+                                <PenLine className="h-4 w-4 mr-1" />
+                                Editar
                               </Button>
-
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                className="h-8 px-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
-                                onClick={() => openDeleteDialog(quote)}
-                                disabled={deletingQuoteId === quote.id}
-                              >
-                                {deletingQuoteId === quote.id ? (
-                                  <>
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    <span>...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Trash2 className="h-3 w-3 mr-1" />
-                                    Eliminar
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-2"
+                              onClick={() => navigate(`/quotation/${quote.id}`)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDeleteDialog(quote)}
+                              disabled={deletingQuoteId === quote.id}
+                            >
+                              {deletingQuoteId === quote.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  <span>...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Eliminar
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
+               
               ) : (
                 <div className="text-center py-12">
                   <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
@@ -861,7 +784,7 @@ export default function ManageQuotes() {
                   </div>
                   <div className="border-t border-emerald-200 pt-3 space-y-2">
                     {(() => {
-                      const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
+const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
                       const finalAmount = approvedQuote.totalAmount || 0;
                       const marginAmount = finalAmount - baseCostTotal;
 
