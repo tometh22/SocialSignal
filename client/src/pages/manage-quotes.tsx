@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -83,19 +84,16 @@ export default function ManageQuotes() {
     : [];
 
   const handleStatusChange = async () => {
-
     if (!selectedQuote || !newStatus) {
       return;
     }
 
     try {
-
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
         { status: newStatus }
       );
-
 
       toast({
         title: "Estado actualizado",
@@ -123,7 +121,6 @@ export default function ManageQuotes() {
   const openStatusDialog = (quote: Quotation) => {
     setSelectedQuote(quote);
     setNewStatus(quote.status);
-    // Small delay to ensure state is updated before opening dialog
     setTimeout(() => {
       setDialogOpen(true);
     }, 10);
@@ -134,7 +131,6 @@ export default function ManageQuotes() {
     setCheckingProjects(true);
 
     try {
-      // Check if quotation has associated projects
       const response = await fetch(`/api/active-projects/quotation/${quote.id}`);
       const projects = await response.json();
       setAssociatedProjects(projects || []);
@@ -151,7 +147,6 @@ export default function ManageQuotes() {
     if (!approvedQuote) return;
 
     try {
-      // Crear el proyecto basado en la cotización aprobada
       const projectData = {
         name: approvedQuote.projectName,
         clientId: approvedQuote.clientId,
@@ -160,7 +155,7 @@ export default function ManageQuotes() {
         budget: approvedQuote.totalAmount,
         status: 'active',
         startDate: new Date().toISOString().split('T')[0],
-        estimatedHours: 0 // Se puede calcular basado en el equipo de la cotización
+        estimatedHours: 0
       };
 
       const createdProject = await apiRequest('/api/projects', 'POST', projectData);
@@ -172,10 +167,7 @@ export default function ManageQuotes() {
 
       setCreateProjectDialogOpen(false);
       setApprovedQuote(null);
-
-      // Navegar al nuevo proyecto
       navigate(`/projects/${createdProject.id}`);
-
     } catch (error) {
       console.error('Error al crear proyecto:', error);
       toast({
@@ -200,10 +192,8 @@ export default function ManageQuotes() {
     if (!selectedQuote) return;
 
     try {
-      // Iniciar animación de eliminación
       setDeletingQuoteId(selectedQuote.id);
 
-      // Usamos fetch directamente en lugar de apiRequest para tener más control sobre el manejo de respuestas
       const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -212,19 +202,14 @@ export default function ManageQuotes() {
         }
       });
 
-
-      // Intentamos obtener la respuesta JSON, pero manejamos casos donde no sea posible
       let data;
       try {
         data = await response.json();
       } catch (e) {
         console.error('[CLIENT] Error al parsear respuesta JSON:', e);
-        // Si no hay JSON, creamos un objeto con el estado de la respuesta
         data = { success: response.ok, message: response.statusText };
       }
 
-
-      // Manejar los diferentes casos según el código HTTP
       if (response.status === 409) {
         setDeletingQuoteId(null);
         toast({
@@ -236,7 +221,6 @@ export default function ManageQuotes() {
       }
 
       if (response.ok && data.success) {
-        // Esperar un momento para que se vea la animación
         setTimeout(() => {
           toast({
             title: "Cotización eliminada",
@@ -249,7 +233,6 @@ export default function ManageQuotes() {
         }, 800);
       } else {
         setDeletingQuoteId(null);
-        // Si hay un error del servidor o success: false
         toast({
           title: "Error",
           description: data.message || "No se pudo eliminar la cotización.",
@@ -267,34 +250,49 @@ export default function ManageQuotes() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "approved":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "rejected":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case "pending":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "in-negotiation":
-        return <Edit className="h-4 w-4 text-blue-500" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
-  };
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      'approved': {
+        variant: 'default' as const,
+        className: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200',
+        icon: CheckCircle,
+        label: 'Aprobada'
+      },
+      'pending': {
+        variant: 'secondary' as const,
+        className: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
+        icon: Clock,
+        label: 'Pendiente'
+      },
+      'rejected': {
+        variant: 'destructive' as const,
+        className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200',
+        icon: X,
+        label: 'Rechazada'
+      },
+      'in-negotiation': {
+        variant: 'outline' as const,
+        className: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+        icon: MessageCircle,
+        label: 'En Negociación'
+      },
+      'draft': {
+        variant: 'outline' as const,
+        className: 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200',
+        icon: Edit,
+        label: 'Borrador'
+      }
+    };
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "in-negotiation":
-        return "bg-blue-100 text-blue-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
+    const Icon = config.icon;
+
+    return (
+      <Badge variant={config.variant} className={`${config.className} inline-flex items-center gap-1 font-medium`}>
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    );
   };
 
   const translateStatus = (status: string) => {
@@ -308,236 +306,391 @@ export default function ManageQuotes() {
     return statusMap[status] || status;
   };
 
-  // Función para manejar la edición de cotización
   const handleEditQuotation = (quotation: Quotation) => {
     console.log('🔧 Editando cotización:', quotation.id, quotation.projectName);
-    // Navegar a la página de edición con el ID correcto
     navigate(`/optimized-quote/${quotation.id}`);
+  };
+
+  // Calculate statistics
+  const stats = {
+    total: filteredQuotations.length,
+    approved: filteredQuotations.filter(q => q.status === 'approved').length,
+    pending: filteredQuotations.filter(q => q.status === 'pending').length,
+    totalValue: filteredQuotations.reduce((sum, q) => sum + q.totalAmount, 0),
   };
 
   return (
     <>
-      <div className="page-container">
-        {/* Breadcrumbs unificados */}
-        <div className="breadcrumb-nav">
-          <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
-            <span>Dashboard</span>
-            <span>/</span>
-            <span className="text-foreground font-medium">Gestión de Cotizaciones</span>
-          </nav>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        {/* Header mejorado con gradiente */}
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Breadcrumbs */}
+            <nav className="flex items-center space-x-2 text-sm text-indigo-100 pt-4 pb-2">
+              <span>Dashboard</span>
+              <span>/</span>
+              <span className="text-white font-medium">Gestión de Cotizaciones</span>
+            </nav>
 
-          <div className="flex-between">
-            <div>
-              <h1 className="heading-page">Gestión de Cotizaciones</h1>
+            {/* Title and Action */}
+            <div className="flex items-center justify-between pb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2">
+                  Gestión de Cotizaciones
+                </h1>
+                <p className="text-indigo-100 text-lg">
+                  Administra y da seguimiento a todas las cotizaciones del sistema
+                </p>
+              </div>
+              <Button 
+                onClick={() => navigate("/optimized-quote")}
+                className="bg-white text-indigo-600 hover:bg-gray-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Nueva Cotización
+              </Button>
             </div>
-            <Button onClick={() => navigate("/optimized-quote")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Cotización
-            </Button>
           </div>
         </div>
 
-        {/* Filtros separados */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
-            <Input
-              placeholder="Buscar por nombre de proyecto..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="w-full md:w-64">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los Estados</SelectItem>
-                <SelectItem value="draft">Borrador</SelectItem>
-                <SelectItem value="pending">Pendiente</SelectItem>
-                <SelectItem value="approved">Aprobada</SelectItem>
-                <SelectItem value="rejected">Rechazada</SelectItem>
-                <SelectItem value="in-negotiation">En Negociación</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Total Cotizaciones</p>
+                    <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+                  </div>
+                  <div className="h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-indigo-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="standard-card">
-          <CardContent className="card-content">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Aprobadas</p>
+                    <p className="text-3xl font-bold text-emerald-600">{stats.approved}</p>
+                  </div>
+                  <div className="h-12 w-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-emerald-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader variant="dots" size="md" text="Cargando cotizaciones" />
+            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Pendientes</p>
+                    <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
                   </div>
-                ) : filteredQuotations.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="px-4 py-3 text-left text-label">Nombre del Proyecto</th>
-                          <th className="px-4 py-3 text-left text-label">Cliente</th>
-                          <th className="px-4 py-3 text-left text-label">Tipo de Proyecto</th>
-                          <th className="px-4 py-3 text-left text-label">Creación</th>
-                          <th className="px-4 py-3 text-left text-label">Estado</th>
-                          <th className="px-4 py-3 text-left text-label">Total</th>
-                          <th className="px-4 py-3 text-left text-label">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredQuotations.map((quote) => (
-                          <tr 
-                            key={quote.id} 
-                            className={`border-b hover:bg-muted/50 transition-all duration-300 ${
-                              deletingQuoteId === quote.id 
-                                ? 'opacity-30 scale-95 bg-red-50 animate-pulse' 
-                                : 'opacity-100 scale-100'
-                            }`}
-                          >
-                            <td className="px-4 py-3 text-body font-medium">{quote.projectName}</td>
-                            <td className="px-4 py-3 text-body">{getClientName(quote.clientId)}</td>
-                            <td className="px-4 py-3 text-body">{quote.projectType || "Always On"}</td>
-                            <td className="px-4 py-3 text-body">
-                              {new Date(quote.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3">
-                              {quote.status === 'approved' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                                  {translateStatus(quote.status)}
-                                </span>
-                              )}
-                              {quote.status === 'pending' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                  <Clock className="h-3.5 w-3.5 mr-1" />
-                                  {translateStatus(quote.status)}
-                                </span>
-                              )}
-                              {quote.status === 'rejected' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                  <X className="h-3.5 w-3.5 mr-1" />
-                                  {translateStatus(quote.status)}
-                                </span>
-                              )}
-                              {quote.status === 'in-negotiation' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  <MessageCircle className="h-3.5 w-3.5 mr-1" />
-                                  {translateStatus(quote.status)}
-                                </span>
-                              )}
-                              {quote.status === 'draft' && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                  <Edit className="h-3.5 w-3.5 mr-1" />
-                                  {translateStatus(quote.status)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-stat font-medium">
-                              ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center space-x-2">
-                                <Button variant="outline" size="sm" className="hover-lift" onClick={() => openStatusDialog(quote)}>
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  Estado
-                                </Button>
-                                {quote.status === 'draft' && (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="hover-lift bg-blue-50 hover:bg-blue-100 text-blue-700"
-                                    onClick={() => handleEditQuotation(quote)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Editar
-                                  </Button>
-                                )}
-                                {quote.status === 'in-negotiation' && (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="hover-lift bg-green-50 hover:bg-green-100 text-green-700"
-                                    onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
-                                  >
-                                    <FileText className="h-4 w-4 mr-1" />
-                                    Recotizar
-                                  </Button>
-                                )}
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="hover-lift"
-                                  onClick={() => navigate(`/quotation/${quote.id}`)}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Ver
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="hover-lift text-destructive hover:text-destructive-foreground hover:bg-destructive"
-                                  onClick={() => openDeleteDialog(quote)}
-                                  disabled={deletingQuoteId === quote.id}
-                                >
-                                  {deletingQuoteId === quote.id ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                      Eliminando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Trash2 className="h-4 w-4 mr-1" />
-                                      Eliminar
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="h-12 w-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-amber-600" />
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-neutral-500">
-                    {searchTerm || statusFilter !== "all"
-                      ? "No hay cotizaciones que coincidan con tu búsqueda."
-                      : "No se encontraron cotizaciones."}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Valor Total</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      ${stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
                   </div>
-                )}
+                  <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
+          {/* Filters modernizados */}
+          <Card className="bg-white shadow-lg border-0 mb-8">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-grow">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                  <Input
+                    placeholder="Buscar por nombre de proyecto..."
+                    className="pl-12 h-12 border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-colors"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="w-full md:w-64">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-12 border-gray-200 rounded-xl bg-gray-50 focus:bg-white">
+                      <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                      <SelectValue placeholder="Filtrar por estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los Estados</SelectItem>
+                      <SelectItem value="draft">Borrador</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="approved">Aprobada</SelectItem>
+                      <SelectItem value="rejected">Rechazada</SelectItem>
+                      <SelectItem value="in-negotiation">En Negociación</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Content Card */}
+          <Card className="bg-white shadow-xl border-0 rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <CardTitle className="text-xl font-semibold text-gray-800 flex items-center">
+                <Users className="h-5 w-5 mr-2 text-indigo-600" />
+                Lista de Cotizaciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader variant="dots" size="lg" text="Cargando cotizaciones..." />
+                </div>
+              ) : filteredQuotations.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Proyecto
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Cliente
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Tipo
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Creación
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Estado
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Valor
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredQuotations.map((quote, index) => (
+                        <tr 
+                          key={quote.id} 
+                          className={`hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200 ${
+                            deletingQuoteId === quote.id 
+                              ? 'opacity-30 scale-95 bg-red-50 animate-pulse' 
+                              : 'opacity-100 scale-100'
+                          } ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                        >
+                          <td className="px-6 py-6">
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm mr-4">
+                                {quote.projectName.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900">{quote.projectName}</div>
+                                <div className="text-xs text-gray-500">ID: #{quote.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center">
+                              {(() => {
+                                const client = getClient(quote.clientId);
+                                return client?.logoUrl ? (
+                                  <div className="w-8 h-8 rounded-full overflow-hidden mr-3 border-2 border-gray-200">
+                                    <img 
+                                      src={client.logoUrl} 
+                                      alt={`${client.name} logo`} 
+                                      className="h-full w-full object-cover"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center text-white text-xs font-bold mr-3">
+                                    {getClientName(quote.clientId).charAt(0)}
+                                  </div>
+                                );
+                              })()}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{getClientName(quote.clientId)}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-6">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {quote.projectType || "Always On"}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                              {new Date(quote.createdAt).toLocaleDateString('es-ES', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-6">
+                            {getStatusBadge(quote.status)}
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center">
+                              <DollarSign className="h-4 w-4 mr-1 text-green-600" />
+                              <span className="text-lg font-bold text-gray-900">
+                                {quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-6">
+                            <div className="flex items-center space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 px-3 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                onClick={() => openStatusDialog(quote)}
+                              >
+                                <Edit className="h-3 w-3 mr-1" />
+                                Estado
+                              </Button>
+
+                              {quote.status === 'draft' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="h-8 px-3 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors"
+                                  onClick={() => handleEditQuotation(quote)}
+                                >
+                                  <PenLine className="h-3 w-3 mr-1" />
+                                  Editar
+                                </Button>
+                              )}
+
+                              {quote.status === 'in-negotiation' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="h-8 px-3 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-colors"
+                                  onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
+                                >
+                                  <Zap className="h-3 w-3 mr-1" />
+                                  Recotizar
+                                </Button>
+                              )}
+
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 px-3 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+                                onClick={() => navigate(`/quotation/${quote.id}`)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Ver
+                              </Button>
+
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8 px-3 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+                                onClick={() => openDeleteDialog(quote)}
+                                disabled={deletingQuoteId === quote.id}
+                              >
+                                {deletingQuoteId === quote.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Eliminando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Eliminar
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <FileText className="h-12 w-12 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {searchTerm || statusFilter !== "all"
+                      ? "No hay cotizaciones que coincidan"
+                      : "No hay cotizaciones disponibles"}
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {searchTerm || statusFilter !== "all"
+                      ? "Prueba ajustando los filtros de búsqueda."
+                      : "Comienza creando tu primera cotización."}
+                  </p>
+                  {!searchTerm && statusFilter === "all" && (
+                    <Button onClick={() => navigate("/optimized-quote")} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Crear Primera Cotización
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Dialogs remain the same but with improved styling */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[550px] rounded-2xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-heading">Actualizar Estado de Cotización</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center">
+              <Edit className="h-5 w-5 mr-2 text-indigo-600" />
+              Actualizar Estado de Cotización
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
               Cambia el estado de esta cotización. Actualizarla a "En Negociación" permite realizar ajustes adicionales.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 form-layout">
-            <div className="form-group">
-              <h4 className="text-label mb-2">Estado Actual:</h4>
+          <div className="py-6 space-y-6">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Estado Actual:</h4>
               {selectedQuote && (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  <span className="text-sm font-medium text-gray-900">
-                    {translateStatus(selectedQuote.status)}
-                  </span>
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  {getStatusBadge(selectedQuote.status)}
                 </div>
               )}
             </div>
 
-            <div className="form-group">
-              <h4 className="text-label mb-2">Nuevo Estado:</h4>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Nuevo Estado:</h4>
               <select 
                 value={newStatus || selectedQuote?.status || ""} 
                 onChange={(e) => setNewStatus(e.target.value)}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               >
                 <option value="draft">Borrador</option>
                 <option value="pending">Pendiente</option>
@@ -548,71 +701,86 @@ export default function ManageQuotes() {
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">
               Cancelar
             </Button>
-            <Button className="hover-lift" onClick={handleStatusChange}>
+            <Button 
+              className="rounded-xl bg-indigo-600 hover:bg-indigo-700" 
+              onClick={handleStatusChange}
+            >
               Actualizar Estado
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de confirmación para eliminar cotización */}
+      {/* Delete Dialog with improved styling */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {associatedProjects.length > 0 ? "No se puede eliminar" : "¿Confirmar eliminación?"}
+            <AlertDialogTitle className="flex items-center text-lg font-semibold">
+              {associatedProjects.length > 0 ? (
+                <>
+                  <AlertCircle className="h-5 w-5 mr-2 text-amber-600" />
+                  No se puede eliminar
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-5 w-5 mr-2 text-red-600" />
+                  ¿Confirmar eliminación?
+                </>
+              )}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="text-gray-600">
               {checkingProjects ? (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 animate-spin" />
+                <div className="flex items-center gap-3 py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
                   <span>Verificando proyectos asociados...</span>
                 </div>
               ) : associatedProjects.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm">
+                <div className="space-y-4">
+                  <p>
                     Esta cotización no puede ser eliminada porque tiene {associatedProjects.length} proyecto(s) activo(s) asociado(s):
                   </p>
-                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
-                    {associatedProjects.map((project, index) => (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    {associatedProjects.map((project) => (
                       <div key={project.id} className="flex items-center gap-2 text-sm">
                         <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
                         <span className="font-medium">Proyecto ID {project.id}</span>
-                        <span className="text-muted-foreground">({project.status})</span>
+                        <span className="text-gray-600">({project.status})</span>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-500">
                     Para eliminar esta cotización, primero debe completar o eliminar los proyectos asociados.
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p>Esta acción no se puede deshacer. La cotización será eliminada permanentemente.</p>
+                  <p className="mb-4">Esta acción no se puede deshacer. La cotización será eliminada permanentemente.</p>
                   {selectedQuote && (
-                    <div className="mt-3 p-3 bg-muted rounded-md">
-                      <p className="font-medium text-sm">Detalles de la cotización:</p>
-                      <p className="text-sm mt-1">Proyecto: <span className="font-semibold">{selectedQuote.projectName}</span></p>
-                      <p className="text-sm mt-1">ID: <span className="font-semibold">{selectedQuote.id}</span></p>
-                      <p className="text-sm mt-1">Estado: <span className="font-semibold">{translateStatus(selectedQuote.status)}</span></p>
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <p className="font-medium text-sm mb-2">Detalles de la cotización:</p>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p>Proyecto: <span className="font-semibold text-gray-900">{selectedQuote.projectName}</span></p>
+                        <p>ID: <span className="font-semibold text-gray-900">{selectedQuote.id}</span></p>
+                        <p>Estado: {getStatusBadge(selectedQuote.status)}</p>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-xl">
               {associatedProjects.length > 0 ? "Entendido" : "Cancelar"}
             </AlertDialogCancel>
             {associatedProjects.length === 0 && !checkingProjects && (
               <AlertDialogAction
                 onClick={handleDeleteQuotation}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Eliminar
@@ -622,25 +790,28 @@ export default function ManageQuotes() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal para crear proyecto tras aprobación */}
+      {/* Create Project Dialog with improved styling */}
       <Dialog open={createProjectDialogOpen} onOpenChange={setCreateProjectDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
               Cotización Aprobada
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-gray-600">
               La cotización ha sido aprobada exitosamente. ¿Deseas crear un proyecto basado en esta cotización?
             </DialogDescription>
           </DialogHeader>
 
           {approvedQuote && (
             <div className="py-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-semibold text-green-900 mb-3">Detalles del proyecto a crear:</h4>
-                <div className="space-y-3 text-sm text-green-800">
-                  <div className="flex justify-between">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+                <h4 className="font-semibold text-emerald-900 mb-4 flex items-center">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Detalles del proyecto a crear:
+                </h4>
+                <div className="space-y-3 text-sm text-emerald-800">
+                  <div className="flex justify-between items-center">
                     <span>Nombre del proyecto:</span>
                     <span className="font-medium">{approvedQuote.projectName}</span>
                   </div>
@@ -661,7 +832,7 @@ export default function ManageQuotes() {
                             />
                           </div>
                         ) : (
-                          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                          <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
                             {getClientName(approvedQuote.clientId).charAt(0)}
                           </div>
                         );
@@ -669,12 +840,10 @@ export default function ManageQuotes() {
                       <span className="font-medium">{getClientName(approvedQuote.clientId)}</span>
                     </div>
                   </div>
-                  <div className="border-t border-green-200 pt-2 space-y-2">
+                  <div className="border-t border-emerald-200 pt-3 space-y-2">
                     {(() => {
                       const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustment || 0);
                       const finalAmount = approvedQuote.totalAmount || 0;
-
-                      // Calcular margen simple: precio final menos costo base
                       const marginAmount = finalAmount - baseCostTotal;
 
                       return (
@@ -685,7 +854,7 @@ export default function ManageQuotes() {
                           </div>
                           <div className="flex justify-between">
                             <span>Precio al cliente:</span>
-                            <span className="font-bold text-green-900 font-mono">${finalAmount.toFixed(0)}</span>
+                            <span className="font-bold text-emerald-900 font-mono">${finalAmount.toFixed(0)}</span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span>Margen de ganancia:</span>
@@ -702,11 +871,11 @@ export default function ManageQuotes() {
             </div>
           )}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={handleSkipProjectCreation}>
+          <DialogFooter className="gap-3">
+            <Button variant="outline" onClick={handleSkipProjectCreation} className="rounded-xl">
               Crear más tarde
             </Button>
-            <Button onClick={handleCreateProject} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={handleCreateProject} className="rounded-xl bg-emerald-600 hover:bg-emerald-700">
               <Plus className="h-4 w-4 mr-2" />
               Crear Proyecto Ahora
             </Button>
