@@ -374,17 +374,15 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
     recalculationTrigger
   ]);
 
-  // Calculate costs properly with debugging
+  // Calculate costs with proper recalculation trigger
   useEffect(() => {
     console.log('💰 === COST CALCULATION START ===');
-    console.log('📊 Input data:', {
-      teamMembers: quotationData.teamMembers.length,
-      template: quotationData.template?.name,
-      financials: quotationData.financials
-    });
+    console.log('🔧 Team members:', quotationData.teamMembers);
+    console.log('🔧 Template:', quotationData.template?.name);
+    console.log('🔧 Financials:', quotationData.financials);
+    console.log('🔧 Recalculation trigger:', recalculationTrigger);
 
-    // Don't calculate if no team members
-    if (!quotationData.teamMembers.length) {
+    if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
       console.log('⚠️ No team members, setting costs to 0');
       setBaseCost(0);
       setComplexityAdjustment(0);
@@ -393,85 +391,106 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       return;
     }
 
-    // Step 1: Calculate base team cost
-    const teamBaseCost = quotationData.teamMembers.reduce((total, member) => {
+    // Calculate base cost from team members
+    const calculatedBaseCost = quotationData.teamMembers.reduce((sum, member) => {
       const memberCost = (member.hours || 0) * (member.rate || 0);
-      console.log(`👤 Member cost: ${member.hours}h × $${member.rate} = $${memberCost}`);
-      return total + memberCost;
+      console.log(`👤 ${member.personnelName || 'Unknown'}: ${member.hours}h × $${member.rate} = $${memberCost}`);
+      return sum + memberCost;
     }, 0);
 
-    console.log(`👥 Total team base cost: $${teamBaseCost}`);
+    console.log(`💵 Calculated base cost: $${calculatedBaseCost}`);
+    setBaseCost(calculatedBaseCost);
 
-    // Step 2: Calculate complexity adjustments
-    let totalComplexityAdjustment = 0;
-    quotationData.teamMembers.forEach(member => {
-      const baseHours = member.hours || 0;
-      const hourlyRate = member.rate || 0;
-      const baseCost = baseHours * hourlyRate;
-      let memberComplexityFactor = 0;
+    // Calculate complexity adjustment
+    const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
+    const calculatedComplexityAdjustment = calculatedBaseCost * totalComplexityFactor;
+    console.log(`🔧 Complexity adjustment: $${calculatedBaseCost} × ${totalComplexityFactor} = $${calculatedComplexityAdjustment}`);
+    setComplexityAdjustment(calculatedComplexityAdjustment);
 
-      // Get role information
-      const role = roles.find(r => r.id === member.roleId);
-      const roleName = role?.name?.toLowerCase() || '';
+    // Calculate subtotal after complexity
+    const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
+    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity}`);
 
-      // Apply complexity factors based on role types
-      if (roleName.includes('analista') || roleName.includes('data specialist') || roleName.includes('tech lead')) {
-        memberComplexityFactor += complexityFactors.countriesFactor;
-        memberComplexityFactor += complexityFactors.mentionsVolumeFactor;
-        memberComplexityFactor += complexityFactors.analysisTypeFactor;
-      }
-      else if (roleName.includes('manager') || roleName.includes('director') || 
-               roleName.includes('ceo') || roleName.includes('coo') || 
-               roleName.includes('operations lead') || roleName.includes('account')) {
-        memberComplexityFactor += complexityFactors.clientEngagementFactor;
-        memberComplexityFactor += complexityFactors.analysisTypeFactor * 0.5;
-      }
-      else {
-        memberComplexityFactor = complexityFactors.analysisTypeFactor * 0.3;
-      }
+    // Calculate markup (margin)
+    const marginFactor = quotationData.financials.marginFactor || 2.0;
+    const calculatedMarkup = subtotalWithComplexity * (marginFactor - 1);
+    console.log(`💰 Markup: $${subtotalWithComplexity} × ${marginFactor - 1} = $${calculatedMarkup}`);
+    setMarkupAmount(calculatedMarkup);
 
-      const adjustedHours = baseHours * (1 + memberComplexityFactor);
-      const adjustedMemberCost = adjustedHours * hourlyRate;
-      const memberAdjustment = adjustedMemberCost - baseCost;
+    // Calculate subtotal with markup
+    const subtotalWithMarkup = subtotalWithComplexity + calculatedMarkup;
+    console.log(`📈 Subtotal with markup: $${subtotalWithMarkup}`);
 
-      totalComplexityAdjustment += memberAdjustment;
-      console.log(`🔧 ${roleName}: factor ${memberComplexityFactor.toFixed(3)} → adjustment $${memberAdjustment.toFixed(2)}`);
-    });
-
-    // Step 3: Add template cost
-    const templateCost = quotationData.template?.baseCost || 0;
-    console.log(`📋 Template cost: $${templateCost}`);
-
-    // Step 4: Calculate final costs
-    const newBaseCost = teamBaseCost + templateCost;
-    const adjustedBaseCost = newBaseCost + totalComplexityAdjustment;
-
-    console.log(`💵 Base cost: $${newBaseCost}`);
-    console.log(`⚡ Complexity adjustment: $${totalComplexityAdjustment}`);
-    console.log(`📈 Adjusted base cost: $${adjustedBaseCost}`);
-
-    // Step 5: Apply business factors
+    // Add platform cost
     const platformCost = quotationData.financials.platformCost || 0;
-    const marginPercentage = (quotationData.financials.marginPercentage || 100) / 100;
-    const marginMultiplier = 1 + marginPercentage;
-    const subtotal = (adjustedBaseCost + platformCost) * marginMultiplier;
-    const discountPercentage = (quotationData.financials.discountPercentage || 0) / 100;
-    const discount = subtotal * discountPercentage;
-    const finalTotal = subtotal - discount;
+    const subtotalWithPlatform = subtotalWithMarkup + platformCost;
+    console.log(`🖥️ Platform cost: $${platformCost}, Subtotal: $${subtotalWithPlatform}`);
 
-    console.log(`🏢 Platform cost: $${platformCost}`);
-    console.log(`📊 Margin Percentage: ${marginPercentage * 100}%`);
-    console.log(`📊 Margin factor: ${marginMultiplier}x`);
-    console.log(`💰 Subtotal: $${subtotal}`);
-    console.log(`💸 Discount: $${discount}`);
-    console.log(`🎯 Final total: $${finalTotal}`);
+    // Apply deviation percentage
+    const deviationPercentage = quotationData.financials.deviationPercentage || 0;
+    const deviationAmount = subtotalWithPlatform * (deviationPercentage / 100);
+    const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
+    console.log(`📊 Deviation: ${deviationPercentage}% = $${deviationAmount}, Subtotal: $${subtotalWithDeviation}`);
 
-    // Update states
-    setBaseCost(newBaseCost);
-    setComplexityAdjustment(totalComplexityAdjustment);
-    setMarkupAmount(subtotal - adjustedBaseCost - platformCost);
-    setTotalAmount(finalTotal);
+    // Apply discount
+    const discountPercentage = quotationData.financials.discountPercentage || 0;
+    const discountAmount = subtotalWithDeviation * (discountPercentage / 100);
+    const finalTotal = subtotalWithDeviation - discountAmount;
+    console.log(`💸 Discount: ${discountPercentage}% = $${discountAmount}, Final: $${finalTotal}`);
 
+    // Handle inflation if applicable
+    let finalTotalWithInflation = finalTotal;
+    if (quotationData.inflation.applyInflationAdjustment && quotationData.inflation.projectStartDate) {
+      const startDate = new Date(quotationData.inflation.projectStartDate);
+      const currentDate = new Date();
+      const monthsToProject = (startDate.getFullYear() - currentDate.getFullYear()) * 12 + 
+                             (startDate.getMonth() - currentDate.getMonth());
+
+      if (monthsToProject > 0) {
+        let annualInflationRate;
+        if (quotationData.inflation.inflationMethod === 'manual') {
+          annualInflationRate = quotationData.inflation.manualInflationRate || 25;
+        } else {
+          annualInflationRate = 25; // Default
+        }
+
+        const monthlyRateDecimal = Math.pow(1 + (annualInflationRate / 100), 1/12) - 1;
+        const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
+        finalTotalWithInflation = finalTotal * inflationFactor;
+
+        console.log(`📈 Inflation adjustment: ${annualInflationRate}% annual, ${monthsToProject} months = $${finalTotalWithInflation}`);
+      }
+    }
+
+    // Additional platform cost from template if selected
+    if (quotationData.template) {
+      const templatePlatformCost = quotationData.template.platformCost || 0;
+      if (templatePlatformCost > 0 && quotationData.financials.platformCost === 0) {
+        // Auto-apply template platform cost if no manual cost is set
+        const updatedFinancials = {
+          ...quotationData.financials,
+          platformCost: templatePlatformCost
+        };
+        setQuotationData(prev => ({ 
+          ...prev, 
+          financials: updatedFinancials 
+        }));
+      }
+    }
+
+    // Ensure all values are properly rounded and consistent
+    const finalBaseCost = Math.round(calculatedBaseCost * 100) / 100;
+    const finalComplexityAdjustment = Math.round(calculatedComplexityAdjustment * 100) / 100;
+    const finalMarkupAmount = Math.round(calculatedMarkup * 100) / 100;
+    const finalTotalAmount = Math.round(finalTotalWithInflation * 100) / 100;
+
+    // Set all calculated values
+    setBaseCost(finalBaseCost);
+    setComplexityAdjustment(finalComplexityAdjustment);
+    setMarkupAmount(finalMarkupAmount);
+    setTotalAmount(finalTotalAmount);
+
+    console.log(`💰 FINAL VALUES: Base: $${finalBaseCost}, Complexity: $${finalComplexityAdjustment}, Markup: $${finalMarkupAmount}, Total: $${finalTotalAmount}`);
     console.log('💰 === COST CALCULATION END ===');
 
   }, [quotationData.teamMembers, quotationData.template, quotationData.financials, complexityFactors, roles, recalculationTrigger]);
@@ -643,10 +662,10 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
   const loadQuotation = useCallback(async (quotationId: number) => {
     try {
       console.log('🔍 Loading quotation ID:', quotationId);
-      
+
       const quotation: any = await apiRequest(`/api/quotations/${quotationId}`, 'GET');
       console.log('📄 Quotation data loaded:', quotation);
-      
+
       const teamMembers = await apiRequest(`/api/quotation-team/${quotationId}`, 'GET');
       console.log('👥 Team members loaded:', teamMembers);
 
@@ -724,7 +743,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         console.log('🔄 Triggering recalculation after load');
         forceRecalculate();
       }, 100);
-      
+
     } catch (error) {
       console.error("❌ Error loading quotation:", error);
       throw error;
@@ -758,8 +777,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         clientEngagement: quotationData.clientEngagement || 'medium',
         templateId: quotationData.template?.id || null,
         baseCost: baseCost || 0,
-        complexityAdjustment: complexityAdjustment || 0,
-        markupAmount: markupAmount || 0,
+        complexityAdjustment: complexityAdjustment || 0,markupAmount: markupAmount || 0,
         totalAmount: totalAmount || 0,
         platformCost: quotationData.financials.platformCost || 0,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
@@ -779,7 +797,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       // SOLUCIÓN CRÍTICA: Verificar primero si la cotización existe
       let isEditing = false;
       let quotationExists = false;
-      
+
       if (quotationData.id !== undefined && quotationData.id !== null && quotationData.id > 0) {
         try {
           // Verificar si la cotización realmente existe antes de intentar actualizarla
@@ -800,12 +818,12 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
       }
 
       console.log('🔍 Final decision - Is editing:', isEditing, 'Exists:', quotationExists);
-      
+
       let savedQuotation: any;
       if (isEditing && quotationExists) {
         // Actualizar cotización existente
         console.log(`🔄 Updating existing quotation ID: ${quotationData.id}`);
-        
+
         // Eliminar miembros del equipo existentes antes de agregar nuevos
         try {
           await apiRequest(`/api/quotation-team/${quotationData.id}`, 'DELETE');
@@ -813,7 +831,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         } catch (deleteError) {
           console.warn('⚠️ Could not clear existing team members:', deleteError);
         }
-        
+
         savedQuotation = await apiRequest(`/api/quotations/${quotationData.id}`, 'PUT', quotationPayload);
         console.log('✅ Quotation updated:', savedQuotation);
       } else {
@@ -821,7 +839,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         console.log('➕ Creating new quotation');
         savedQuotation = await apiRequest('/api/quotations', 'POST', quotationPayload);
         console.log('✅ Quotation created:', savedQuotation);
-        
+
         // Actualizar el ID en el contexto después de crear
         setQuotationData(prev => ({ ...prev, id: savedQuotation.id }));
       }

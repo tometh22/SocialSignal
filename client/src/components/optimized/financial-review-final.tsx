@@ -295,7 +295,7 @@ export default function FinancialReviewFinal() {
     } catch (error) {
       console.error("❌ Error al guardar borrador:", error);
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-      
+
       // Verificar si es un error de sesión
       if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
         toast({
@@ -374,7 +374,7 @@ export default function FinancialReviewFinal() {
     } catch (error) {
       console.error("❌ Error al finalizar cotización:", error);
       const errorMessage = error instanceof Error ? error.message : "Error desconocido";
-      
+
       // Verificar si es un error de sesión
       if (errorMessage.includes('No autenticado') || errorMessage.includes('401')) {
         toast({
@@ -771,7 +771,7 @@ export default function FinancialReviewFinal() {
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">
                     La cotización se mantiene en valores actuales sin proyección inflacionaria
-                  </p>
+                  </                  p>
                   <Button
                     onClick={() => updateInflation({ applyInflationAdjustment: true })}
                     className="bg-orange-600 hover:bg-orange-700"
