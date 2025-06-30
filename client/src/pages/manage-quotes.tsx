@@ -355,60 +355,60 @@ export default function ManageQuotes() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Total Cotizaciones</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Total Cotizaciones</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.total}</p>
                   </div>
-                  <div className="h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-indigo-600" />
+                  <div className="h-14 w-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <FileText className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Aprobadas</p>
-                    <p className="text-3xl font-bold text-emerald-600">{stats.approved}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Aprobadas</p>
+                    <p className="text-2xl font-bold text-emerald-600 leading-none">{stats.approved}</p>
                   </div>
-                  <div className="h-12 w-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="h-6 w-6 text-emerald-600" />
+                  <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <CheckCircle className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Pendientes</p>
-                    <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Pendientes</p>
+                    <p className="text-2xl font-bold text-amber-600 leading-none">{stats.pending}</p>
                   </div>
-                  <div className="h-12 w-12 bg-amber-100 rounded-xl flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-amber-600" />
+                  <div className="h-14 w-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Clock className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden">
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Valor Total</p>
-                    <p className="text-3xl font-bold text-blue-600">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Valor Total</p>
+                    <p className="text-2xl font-bold text-blue-600 leading-none">
                       ${stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
                   </div>
-                  <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-blue-600" />
+                  <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <DollarSign className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
@@ -464,58 +464,76 @@ export default function ManageQuotes() {
               ) : filteredQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Proyecto
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <Building2 className="h-4 w-4" />
+                            <span>Proyecto</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Cliente
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <Users className="h-4 w-4" />
+                            <span>Cliente</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Tipo
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <TrendingUp className="h-4 w-4" />
+                            <span>Tipo</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Creación
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>Creación</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Estado
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>Estado</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Valor
+                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          <div className="flex items-center space-x-2">
+                            <DollarSign className="h-4 w-4" />
+                            <span>Valor</span>
+                          </div>
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <th className="px-8 py-5 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           Acciones
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 bg-white">
                       {filteredQuotations.map((quote, index) => (
                         <tr 
                           key={quote.id} 
-                          className={`hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200 ${
+                          className={`hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 transition-all duration-300 group ${
                             deletingQuoteId === quote.id 
                               ? 'opacity-30 scale-95 bg-red-50 animate-pulse' 
                               : 'opacity-100 scale-100'
-                          } ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                          }`}
                         >
-                          <td className="px-6 py-6">
-                            <div className="flex items-center">
-                              <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm mr-4">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-4">
+                              <div className="h-12 w-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
                                 {quote.projectName.charAt(0).toUpperCase()}
                               </div>
-                              <div>
-                                <div className="text-sm font-semibold text-gray-900">{quote.projectName}</div>
-                                <div className="text-xs text-gray-500">ID: #{quote.id}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-bold text-gray-900 truncate">{quote.projectName}</div>
+                                <div className="text-xs text-gray-500 mt-1">ID: #{quote.id}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-6">
-                            <div className="flex items-center">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center space-x-3">
                               {(() => {
                                 const client = getClient(quote.clientId);
                                 return client?.logoUrl ? (
-                                  <div className="w-8 h-8 rounded-full overflow-hidden mr-3 border-2 border-gray-200">
+                                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
                                     <img 
                                       src={client.logoUrl} 
                                       alt={`${client.name} logo`} 
@@ -526,51 +544,52 @@ export default function ManageQuotes() {
                                     />
                                   </div>
                                 ) : (
-                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center text-white text-xs font-bold mr-3">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md">
                                     {getClientName(quote.clientId).charAt(0)}
                                   </div>
                                 );
                               })()}
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{getClientName(quote.clientId)}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold text-gray-900 truncate">{getClientName(quote.clientId)}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-6">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          <td className="px-8 py-6">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
                               {quote.projectType || "Always On"}
                             </Badge>
                           </td>
-                          <td className="px-6 py-6">
+                          <td className="px-8 py-6">
                             <div className="flex items-center text-sm text-gray-600">
                               <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                              {new Date(quote.createdAt).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              })}
-                            </div>
-                          </td>
-                          <td className="px-6 py-6">
-                            {getStatusBadge(quote.status)}
-                          </td>
-                          <td className="px-6 py-6">
-                            <div className="flex items-center">
-                              <DollarSign className="h-4 w-4 mr-1 text-green-600" />
-                              <span className="text-lg font-bold text-gray-900">
-                                {quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              <span className="font-medium">
+                                {new Date(quote.createdAt).toLocaleDateString('es-ES', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })}
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-6">
-                            <div className="flex items-center space-x-2">
+                          <td className="px-8 py-6">
+                            {getStatusBadge(quote.status)}
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center">
+                              <span className="text-xl font-bold text-gray-900">
+                                ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center justify-center space-x-2">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="h-8 px-3 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                className="h-9 px-3 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all duration-200 font-medium"
                                 onClick={() => openStatusDialog(quote)}
                               >
-                                <Edit className="h-3 w-3 mr-1" />
+                                <Edit className="h-3.5 w-3.5 mr-1.5" />
                                 Estado
                               </Button>
 
@@ -578,10 +597,10 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-8 px-3 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors"
+                                  className="h-9 px-3 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium"
                                   onClick={() => handleEditQuotation(quote)}
                                 >
-                                  <PenLine className="h-3 w-3 mr-1" />
+                                  <PenLine className="h-3.5 w-3.5 mr-1.5" />
                                   Editar
                                 </Button>
                               )}
@@ -590,10 +609,10 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-8 px-3 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-colors"
+                                  className="h-9 px-3 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium"
                                   onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
                                 >
-                                  <Zap className="h-3 w-3 mr-1" />
+                                  <Zap className="h-3.5 w-3.5 mr-1.5" />
                                   Recotizar
                                 </Button>
                               )}
@@ -601,28 +620,28 @@ export default function ManageQuotes() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-8 px-3 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+                                className="h-9 px-3 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
                               >
-                                <Eye className="h-3 w-3 mr-1" />
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
                                 Ver
                               </Button>
 
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-8 px-3 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+                                className="h-9 px-3 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
                               >
                                 {deletingQuoteId === quote.id ? (
                                   <>
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    Eliminando...
+                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    <span className="text-xs">Eliminando...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                                     Eliminar
                                   </>
                                 )}
