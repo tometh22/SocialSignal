@@ -30,6 +30,32 @@ export const loginUserSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
+// ==================== TOKENS DE RECUPERACIÓN ====================
+// Tabla para tokens de recuperación de contraseña
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Esquema para solicitar recuperación de contraseña
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Email inválido"),
+});
+
+// Esquema para resetear contraseña
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token requerido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
+});
+
 // ==================== CLIENTES ====================
 // Clients table
 export const clients = pgTable("clients", {

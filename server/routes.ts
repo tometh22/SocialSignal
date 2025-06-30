@@ -25,6 +25,8 @@ import {
   insertQuickTimeEntryDetailSchema,
   insertMonthlyInflationSchema,
   insertSystemConfigSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   exchangeRateHistory,
   projectStatusOptions,
   trackingFrequencyOptions,
