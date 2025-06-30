@@ -26,96 +26,80 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  
+
   // Consulta al servidor para verificar la sesión actual
-  const {
-    data: user,
-    error,
-    isLoading,
-  } = useQuery<UserType | null>({
+  const { data: user, isLoading, error } = useQuery({
     queryKey: ["/api/current-user"],
-    queryFn: async () => {
+    queryFn: async (): Promise<UserType | null> => {
       try {
+        console.log('🔍 Fetching current user...');
         const response = await fetch("/api/current-user", {
           credentials: "include",
           headers: {
-            'Cache-Control': 'no-cache'
-          }
+            'Content-Type': 'application/json',
+          },
         });
-        
-        if (response.status === 401) {
-          // Clear any draft data on session expiry
-          localStorage.removeItem('draft-quotation');
-          return null;
-        }
-        
+
+        console.log('🔍 Response status:', response.status);
+        console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          throw new Error("Error al obtener datos del usuario");
+          if (response.status === 401) {
+            console.log('🔒 User not authenticated');
+            return null;
+          }
+          const errorText = await response.text();
+          console.error('❌ HTTP error:', response.status, errorText);
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        return await response.json();
+
+        const userData = await response.json();
+        console.log('✅ User data fetched:', userData.email);
+        return userData;
       } catch (error) {
-        console.error("Error al obtener sesión:", error);
-        // Try to recover from network errors
-        if (error instanceof TypeError && error.message.includes('fetch')) {
-          console.log("🔄 Network error detected, attempting recovery...");
-          return null;
-        }
+        console.error('❌ Error fetching user:', error);
         return null;
       }
     },
-    staleTime: 2 * 60 * 1000, // 2 minutos
-    refetchInterval: 1 * 60 * 1000, // Refrescar cada minuto para detectar pérdida de sesión más rápido
-    retry: (failureCount, error) => {
-      // Don't retry on 401 (unauthorized)
-      if (error && 'status' in error && error.status === 401) {
-        return false;
-      }
-      return failureCount < 3;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   // Mutación para el inicio de sesión
-  const loginMutation = useMutation<UserType, Error, LoginData>({
-    mutationFn: async (credentials: LoginData) => {
-      try {
-        const response = await fetch("/api/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(credentials),
-          credentials: "include"
-        });
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: { email: string; password: string }): Promise<UserType> => {
+      console.log('🔐 Attempting login for:', credentials.email);
 
-        // Si la respuesta es exitosa, procesar y devolver datos
-        if (response.ok) {
-          const userData = await response.json();
-          return userData;
-        }
-        
-        // Si hay un error, manejarlo adecuadamente
-        const errorData = await response.json().catch(() => ({ message: "Error al iniciar sesión" }));
-        throw new Error(errorData.message || "Error al iniciar sesión");
-      } catch (error) {
-        console.error("Error en petición de login:", error);
-        // Re-lanzar el error para que sea capturado por onError
-        throw error;
-      }
-    },
-    onSuccess: async (user) => {
-      // Actualizar inmediatamente la cache y invalidar para forzar re-fetch
-      queryClient.setQueryData(["/api/current-user"], user);
-      await queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-      
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: `Bienvenido ${user.firstName} ${user.lastName}`,
-        variant: "default",
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(credentials),
+        credentials: "include",
       });
+
+      console.log('🔐 Login response status:', response.status);
+      console.log('🔐 Login response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Login failed" }));
+        console.error('❌ Login failed:', errorData);
+        throw new Error(errorData.error || "Login failed");
+      }
+
+      const userData = await response.json();
+      console.log('✅ Login successful for:', userData.email);
+      console.log('✅ User data:', userData);
+      return userData;
+    },
+    onSuccess: (userData) => {
+      console.log('✅ Login mutation success, invalidating queries...');
+      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
     },
     onError: (error) => {
+      console.error("❌ Login error:", error);
       toast({
         title: "Error al iniciar sesión",
         description: error.message || "Credenciales incorrectas",
@@ -135,12 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(userData),
         credentials: "include"
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Error al registrarse" }));
         throw new Error(errorData.message || "Error al registrarse");
       }
-      
+
       return await response.json();
     },
     onSuccess: (user) => {
@@ -167,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         credentials: "include"
       });
-      
+
       if (!response.ok) {
         throw new Error("Error al cerrar sesión");
       }

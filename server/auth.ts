@@ -31,20 +31,20 @@ async function hashPassword(password: string) {
 
 // Función para comparar contraseñas
 async function comparePasswords(supplied: string, stored: string) {
-  
+
   // Verificar que stored tenga el formato correcto
   if (!stored.includes(".")) {
     console.error("Formato de hash incorrecto, no contiene separador '.'");
     return false;
   }
-  
+
   const [hashed, salt] = stored.split(".");
-  
+
   try {
     const hashedBuf = Buffer.from(hashed, "hex");
-    
+
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    
+
     try {
       const result = timingSafeEqual(hashedBuf, suppliedBuf);
       return result;
@@ -64,7 +64,7 @@ export function setupAuth(app: Express, storage: IStorage) {
   // Configuración de la sesión optimizada para entorno multiusuario y trabajo prolongado
   const isProduction = process.env.NODE_ENV === 'production';
   const isReplit = process.env.REPLIT_DOMAINS || process.env.REPL_ID;
-  
+
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
     resave: true, // Cambiar a true para forzar guardado en cada request
@@ -91,19 +91,19 @@ export function setupAuth(app: Express, storage: IStorage) {
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
     const userId = req.session.userId;
-    
+
     if (!userId) {
       return res.status(401).json({ message: "No autenticado" });
     }
-    
+
     try {
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         req.session.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
-      
+
       req.user = user;
       next();
     } catch (error) {
@@ -116,17 +116,17 @@ export function setupAuth(app: Express, storage: IStorage) {
   app.post("/api/register", async (req, res) => {
     try {
       const { email, password, firstName, lastName } = req.body;
-      
+
       // Verificar si el correo ya existe
       const existingUser = await storage.getUserByEmail(email);
-      
+
       if (existingUser) {
         return res.status(400).json({ message: "El correo electrónico ya está registrado" });
       }
-      
+
       // Crear el usuario
       const hashedPassword = await hashPassword(password);
-      
+
       const user = await storage.createUser({
         email,
         password: hashedPassword,
@@ -134,10 +134,10 @@ export function setupAuth(app: Express, storage: IStorage) {
         lastName,
         isAdmin: false,
       });
-      
+
       // Establecer la sesión
       req.session.userId = user.id;
-      
+
       // Enviar respuesta
       const { password: _, ...userWithoutPassword } = user;
       res.status(201).json(userWithoutPassword);
@@ -150,38 +150,38 @@ export function setupAuth(app: Express, storage: IStorage) {
   app.post("/api/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      
+
       console.log(`🔐 Login attempt for: ${email}`);
-      
+
       // Buscar el usuario
       const user = await storage.getUserByEmail(email);
-      
+
       if (!user) {
         console.log(`❌ User not found: ${email}`);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
-      
-      
+
+
       // SOLUCIÓN PARA VICTORIA PURICELLI
       // Se mantiene esta verificación específica para facilitar el acceso
       let isPasswordValid = false;
-      
+
       if (email === "victoria.puricelli@epical.digital" && password === "epical2025") {
         isPasswordValid = true;
       } else {
         // Verificar la contraseña para otros usuarios
         isPasswordValid = await comparePasswords(password, user.password);
       }
-      
-      
+
+
       if (!isPasswordValid) {
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
-      
+
       // Establecer la sesión
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}`);
-      
+
       // Preparar respuesta sin información sensible
       const userResponse = {
         id: user.id,
@@ -191,7 +191,7 @@ export function setupAuth(app: Express, storage: IStorage) {
         avatar: user.avatar || null,
         isAdmin: user.isAdmin
       };
-      
+
       console.log(`📤 Sending login response for: ${user.email}`);
       // Usar res.json() para evitar problemas de serialización
       // Esta manera es la forma correcta y profesional para devolver JSON
@@ -208,27 +208,27 @@ export function setupAuth(app: Express, storage: IStorage) {
         console.error("Error al cerrar sesión:", err);
         return res.status(500).json({ message: "Error al cerrar sesión" });
       }
-      
+
       res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
 
   app.get("/api/current-user", async (req, res) => {
     console.log(`🔍 Current user check. Session ID: ${req.session.userId}`);
-    
+
     if (!req.session.userId) {
       console.log(`❌ No session found`);
       return res.status(401).json({ message: "No autenticado" });
     }
-    
+
     try {
       const user = await storage.getUser(req.session.userId);
-      
+
       if (!user) {
         console.log(`❌ User not found for session ID: ${req.session.userId}`);
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
-      
+
       console.log(`✅ Current user validated: ${user.email}`);
       const { password, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);

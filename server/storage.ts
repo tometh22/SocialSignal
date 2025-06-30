@@ -248,7 +248,19 @@ export class DatabaseStorage implements IStorage {
         console.error('ERROR CRÍTICO EN SESSION STORE:', err);
       },
       disableTouch: false,
-      ttl: 60 * 60 * 24 * 180,
+      ttl: 60 * 60 * 24 * 30, // 30 días en segundos
+    });
+
+    // Verificar que el store se inicialice correctamente
+    console.log('✅ Session store initialized');
+    
+    // Test de conexión del store
+    this.sessionStore.on?.('connect', () => {
+      console.log('✅ Session store connected to database');
+    });
+
+    this.sessionStore.on?.('disconnect', () => {
+      console.log('❌ Session store disconnected from database');
     });
   }
 
