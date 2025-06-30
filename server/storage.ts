@@ -463,14 +463,17 @@ export class DatabaseStorage implements IStorage {
 
   async getPasswordResetToken(token: string): Promise<{ email: string; used: boolean; expiresAt: Date } | undefined> {
     const [resetToken] = await db
-      .select({
-        email: passwordResetTokens.email,
-        used: passwordResetTokens.used,
-        expiresAt: passwordResetTokens.expiresAt,
-      })
+      .select()
       .from(passwordResetTokens)
       .where(eq(passwordResetTokens.token, token));
-    return resetToken;
+    
+    if (!resetToken) return undefined;
+    
+    return {
+      email: resetToken.email,
+      used: resetToken.used,
+      expiresAt: resetToken.expiresAt,
+    };
   }
 
   async markPasswordResetTokenAsUsed(token: string): Promise<void> {

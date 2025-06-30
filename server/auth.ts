@@ -238,6 +238,79 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
+  // Rutas de recuperación de contraseñas
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      // Verificar si el usuario existe
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Por seguridad, siempre devolvemos éxito incluso si el email no existe
+        return res.status(200).json({ 
+          message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación." 
+        });
+      }
+
+      // Generar token único
+      const resetToken = randomBytes(32).toString('hex');
+      
+      // Token expira en 1 hora
+      const expiresAt = new Date(Date.now() + 3600000);
+
+      // Guardar token en la base de datos
+      await storage.createPasswordResetToken(email, resetToken, expiresAt);
+
+      // En un entorno real, aquí enviarías un email
+      // Por ahora, devolvemos el token para testing
+      console.log(`🔑 Password reset token for ${email}: ${resetToken}`);
+      
+      res.status(200).json({ 
+        message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación.",
+        // En producción, remove esta línea por seguridad
+        token: resetToken 
+      });
+    } catch (error) {
+      console.error("Error en forgot-password:", error);
+      res.status(500).json({ message: "Error en el servidor" });
+    }
+  });
+
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      // Verificar token
+      const resetToken = await storage.getPasswordResetToken(token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ message: "Token inválido o expirado" });
+      }
+
+      if (resetToken.used) {
+        return res.status(400).json({ message: "Este token ya ha sido utilizado" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ message: "Token expirado" });
+      }
+
+      // Hash de la nueva contraseña
+      const hashedPassword = await hashPassword(password);
+
+      // Actualizar contraseña del usuario
+      await storage.updateUserPassword(resetToken.email, hashedPassword);
+
+      // Marcar token como usado
+      await storage.markPasswordResetTokenAsUsed(token);
+
+      res.status(200).json({ message: "Contraseña actualizada correctamente" });
+    } catch (error) {
+      console.error("Error en reset-password:", error);
+      res.status(500).json({ message: "Error en el servidor" });
+    }
+  });
+
   // Exportar el middleware para su uso en otras rutas
   return { requireAuth };
 }
