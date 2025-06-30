@@ -15,6 +15,10 @@ type AuthContextType = {
   loginMutation: UseMutationResult<UserType, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<UserType, Error, InsertUser>;
+  login: (email: string, password: string) => Promise<UserType>;
+  register: (userData: InsertUser) => Promise<UserType>;
+  logout: () => Promise<void>;
+  loading: boolean;
 };
 
 type LoginData = {
@@ -173,6 +177,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Create stable callback functions
+  const login = useCallback(async (email: string, password: string) => {
+    return loginMutation.mutateAsync({ email, password });
+  }, [loginMutation]);
+
+  const register = useCallback(async (userData: InsertUser) => {
+    return registerMutation.mutateAsync(userData);
+  }, [registerMutation]);
+
+  const logout = useCallback(async () => {
+    return logoutMutation.mutateAsync();
+  }, [logoutMutation]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -182,6 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        login,
+        register,
+        logout,
+        loading: isLoading,
       }}
     >
       {children}
