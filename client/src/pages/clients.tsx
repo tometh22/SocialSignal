@@ -8,6 +8,38 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart, Upload, Image } from "lucide-react";
+
+// Componente de imagen robusto para logos
+const ClientLogo = ({ client }: { client: Client }) => {
+  const [hasError, setHasError] = useState(false);
+  
+  if (!client.logoUrl || hasError) {
+    return (
+      <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
+        <span className="text-xs font-medium text-primary">
+          {client.name.substring(0, 2).toUpperCase()}
+        </span>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="h-8 w-8 rounded overflow-hidden flex-shrink-0 bg-white border border-gray-200">
+      <img 
+        src={client.logoUrl} 
+        alt={`${client.name} logo`} 
+        className="h-full w-full object-contain"
+        onError={() => {
+          console.error(`Failed to load logo for ${client.name}:`, client.logoUrl);
+          setHasError(true);
+        }}
+        onLoad={() => {
+          console.log(`Successfully loaded logo for ${client.name}`);
+        }}
+      />
+    </div>
+  );
+};
 import {
   Dialog,
   DialogContent,
@@ -35,6 +67,14 @@ type ClientFormValues = z.infer<typeof clientSchema>;
 export default function Clients() {
   const { data: clients, isLoading, refetch } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    onSuccess: (data) => {
+      // Log de diagnóstico para verificar URLs de logos
+      console.log('Clients loaded:', data?.map(c => ({ 
+        name: c.name, 
+        logoUrl: c.logoUrl,
+        hasLogo: !!c.logoUrl 
+      })));
+    }
   });
   
   const [, navigate] = useLocation();
@@ -282,21 +322,7 @@ export default function Clients() {
                           <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
                             <td className="px-4 py-3 text-sm font-medium text-neutral-900">
                               <div className="flex items-center gap-3">
-                                {client.logoUrl ? (
-                                  <div className="h-8 w-8 rounded overflow-hidden flex-shrink-0">
-                                    <img 
-                                      src={client.logoUrl} 
-                                      alt={`${client.name} logo`} 
-                                      className="h-full w-full object-contain"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-                                    <span className="text-xs font-medium text-primary">
-                                      {client.name.substring(0, 2).toUpperCase()}
-                                    </span>
-                                  </div>
-                                )}
+                                <ClientLogo client={client} />
                                 <span>{client.name}</span>
                               </div>
                             </td>
