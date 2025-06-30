@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText } from "lucide-react";
+import { Loader2, Eye, EyeOff, BarChart, ClockIcon, MessageSquare, FileText, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
 // Importamos componentes y hooks necesarios
 import { Logo } from "@/components/ui/logo";
 
@@ -32,14 +33,34 @@ const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Correo electrónico inválido"),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token requerido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  confirmPassword: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
+});
+
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string>("login");
   const { user, loginMutation, registerMutation, isLoading } = useAuth();
   const [location, navigate] = useLocation();
   const [redirecting, setRedirecting] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  // Estados para forgot password
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<"email" | "token">("email");
+  const [resetToken, setResetToken] = useState<string>("");
 
   // Redireccionar si el usuario ya está autenticado
   useEffect(() => {
@@ -59,6 +80,8 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
 
   // Configuración del formulario de inicio de sesión
   const loginForm = useForm<LoginFormValues>({
@@ -78,6 +101,102 @@ export default function AuthPage() {
       email: "",
       password: "",
       confirmPassword: "",
+    },
+  });
+
+  // Configuración del formulario de forgot password
+  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  // Configuración del formulario de reset password
+  const resetPasswordForm = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      token: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Mutación para solicitar reseteo de contraseña
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async (data: ForgotPasswordFormValues) => {
+      const response = await fetch("/api/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al solicitar recuperación");
+      }
+
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Solicitud enviada",
+        description: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación.",
+      });
+      // Para testing, usar el token devuelto
+      if (data.token) {
+        setResetToken(data.token);
+        resetPasswordForm.setValue("token", data.token);
+        setForgotPasswordStep("token");
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al solicitar recuperación de contraseña",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutación para resetear contraseña
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: ResetPasswordFormValues) => {
+      const response = await fetch("/api/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al resetear contraseña");
+      }
+
+      return await response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contraseña actualizada",
+        description: "Tu contraseña ha sido actualizada correctamente. Ahora puedes iniciar sesión.",
+      });
+      setActiveTab("login");
+      setForgotPasswordStep("email");
+      resetPasswordForm.reset();
+      forgotPasswordForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al resetear la contraseña",
+        variant: "destructive",
+      });
     },
   });
 
@@ -128,6 +247,16 @@ export default function AuthPage() {
         }, 100);
       }
     });
+  }
+
+  // Manejar envío del formulario de forgot password
+  function onForgotPasswordSubmit(data: ForgotPasswordFormValues) {
+    forgotPasswordMutation.mutate(data);
+  }
+
+  // Manejar envío del formulario de reset password
+  function onResetPasswordSubmit(data: ResetPasswordFormValues) {
+    resetPasswordMutation.mutate(data);
   }
 
   return (
