@@ -202,8 +202,8 @@ export default function AuthPage() {
 
   // Manejar envío del formulario de inicio de sesión
   function onLoginSubmit(data: LoginFormValues) {
-    // Limpiar errores previos - eliminando esta línea para evitar el parpadeo
-    // loginForm.setError("root", { message: "" });
+    // Limpiar errores previos
+    loginForm.setError("root", { message: "" });
     
     // Mostrar estado de carga
     setRedirecting(true);
@@ -212,17 +212,13 @@ export default function AuthPage() {
     loginMutation.mutate(data, {
       onSuccess: async (user) => {
         console.log('✅ Login success, updating user state:', user);
-        // Múltiples estrategias para asegurar actualización del estado
-        queryClient.setQueryData(["/api/current-user"], user);
-        await queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-        await queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
         
-        // Redirección con delay para asegurar que el estado se actualice
-        setTimeout(() => {
-          console.log('🚀 Redirecting to dashboard after successful login');
-          navigate("/dashboard");
-          setRedirecting(false);
-        }, 300);
+        // Actualizar el cache inmediatamente
+        queryClient.setQueryData(["/api/current-user"], user);
+        
+        // Usar window.location para redirección más confiable
+        console.log('🚀 Redirecting to dashboard after successful login');
+        window.location.href = "/dashboard";
       },
       onError: (error) => {
         console.error("Error de login:", error);
