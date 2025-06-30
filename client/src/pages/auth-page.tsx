@@ -525,12 +525,12 @@ export default function AuthPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    {forgotPasswordStep === "email" ? "Recuperar Contraseña" : "Nueva Contraseña"}
+                    {forgotPasswordStep === "email" ? "Recuperar Contraseña" : "Token Generado"}
                   </CardTitle>
                   <CardDescription>
                     {forgotPasswordStep === "email" 
-                      ? "Ingresa tu correo electrónico para recibir un enlace de recuperación"
-                      : "Ingresa tu nueva contraseña"
+                      ? "Ingresa tu correo electrónico para generar un token de recuperación"
+                      : "Copia el token generado y úsalo para establecer tu nueva contraseña"
                     }
                   </CardDescription>
                 </CardHeader>
@@ -562,119 +562,148 @@ export default function AuthPage() {
                               Enviando solicitud...
                             </>
                           ) : (
-                            "Enviar enlace de recuperación"
+                            "Generar token de recuperación"
                           )}
                         </Button>
                       </form>
                     </Form>
                   ) : (
-                    <Form {...resetPasswordForm}>
-                      <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
-                        <FormField
-                          control={resetPasswordForm.control}
-                          name="token"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Token de recuperación</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Token recibido por correo" {...field} readOnly />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={resetPasswordForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nueva contraseña</FormLabel>
-                              <div className="relative">
+                    <div className="space-y-4">
+                      {resetToken && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                          <h4 className="font-semibold text-green-800 mb-2">¡Token generado exitosamente!</h4>
+                          <p className="text-sm text-green-700 mb-3">
+                            Tu token de recuperación se ha generado. Cópialo y úsalo en el formulario abajo:
+                          </p>
+                          <div className="bg-white border rounded p-3 font-mono text-sm break-all">
+                            {resetToken}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => {
+                              navigator.clipboard.writeText(resetToken);
+                              toast({
+                                title: "Copiado",
+                                description: "Token copiado al portapapeles",
+                              });
+                            }}
+                          >
+                            📋 Copiar token
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <Form {...resetPasswordForm}>
+                        <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
+                          <FormField
+                            control={resetPasswordForm.control}
+                            name="token"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Token de recuperación</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type={showResetPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
-                                  />
+                                  <Input placeholder="Pega aquí el token generado" {...field} />
                                 </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowResetPassword(!showResetPassword)}
-                                >
-                                  {showResetPassword ? (
-                                    <EyeOff className="h-4 w-4 text-gray-500" />
-                                  ) : (
-                                    <Eye className="h-4 w-4 text-gray-500" />
-                                  )}
-                                </Button>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={resetPasswordForm.control}
-                          name="confirmPassword"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Confirmar nueva contraseña</FormLabel>
-                              <div className="relative">
-                                <FormControl>
-                                  <Input 
-                                    type={showResetConfirmPassword ? "text" : "password"} 
-                                    placeholder="••••••••" 
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowResetConfirmPassword(!showResetConfirmPassword)}
-                                >
-                                  {showResetConfirmPassword ? (
-                                    <EyeOff className="h-4 w-4 text-gray-500" />
-                                  ) : (
-                                    <Eye className="h-4 w-4 text-gray-500" />
-                                  )}
-                                </Button>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button 
-                          type="submit" 
-                          className="w-full bg-gray-900 hover:bg-gray-800" 
-                          disabled={resetPasswordMutation.isPending}
-                        >
-                          {resetPasswordMutation.isPending ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Actualizando contraseña...
-                            </>
-                          ) : (
-                            "Actualizar contraseña"
-                          )}
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            setForgotPasswordStep("email");
-                            resetPasswordForm.reset();
-                          }}
-                        >
-                          <ArrowLeft className="mr-2 h-4 w-4" />
-                          Volver al paso anterior
-                        </Button>
-                      </form>
-                    </Form>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={resetPasswordForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Nueva contraseña</FormLabel>
+                                <div className="relative">
+                                  <FormControl>
+                                    <Input 
+                                      type={showResetPassword ? "text" : "password"} 
+                                      placeholder="••••••••" 
+                                      {...field} 
+                                    />
+                                  </FormControl>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowResetPassword(!showResetPassword)}
+                                  >
+                                    {showResetPassword ? (
+                                      <EyeOff className="h-4 w-4 text-gray-500" />
+                                    ) : (
+                                      <Eye className="h-4 w-4 text-gray-500" />
+                                    )}
+                                  </Button>
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={resetPasswordForm.control}
+                            name="confirmPassword"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Confirmar nueva contraseña</FormLabel>
+                                <div className="relative">
+                                  <FormControl>
+                                    <Input 
+                                      type={showResetConfirmPassword ? "text" : "password"} 
+                                      placeholder="••••••••" 
+                                      {...field} 
+                                    />
+                                  </FormControl>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowResetConfirmPassword(!showResetConfirmPassword)}
+                                  >
+                                    {showResetConfirmPassword ? (
+                                      <EyeOff className="h-4 w-4 text-gray-500" />
+                                    ) : (
+                                      <Eye className="h-4 w-4 text-gray-500" />
+                                    )}
+                                  </Button>
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button 
+                            type="submit" 
+                            className="w-full bg-gray-900 hover:bg-gray-800" 
+                            disabled={resetPasswordMutation.isPending}
+                          >
+                            {resetPasswordMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Actualizando contraseña...
+                              </>
+                            ) : (
+                              "Actualizar contraseña"
+                            )}
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                              setForgotPasswordStep("email");
+                              resetPasswordForm.reset();
+                            }}
+                          >
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Volver al paso anterior
+                          </Button>
+                        </form>
+                      </Form>
+                    </div>
                   )}
                 </CardContent>
                 <CardFooter className="flex justify-center">
