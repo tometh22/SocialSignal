@@ -286,9 +286,10 @@ export default function AuthPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
               <TabsTrigger value="register">Registrarse</TabsTrigger>
+              <TabsTrigger value="forgot-password">Olvidé mi contraseña</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
@@ -515,6 +516,170 @@ export default function AuthPage() {
                 <CardFooter className="flex justify-center">
                   <Button variant="link" onClick={() => setActiveTab("login")}>
                     ¿Ya tienes una cuenta? Inicia sesión
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="forgot-password">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {forgotPasswordStep === "email" ? "Recuperar Contraseña" : "Nueva Contraseña"}
+                  </CardTitle>
+                  <CardDescription>
+                    {forgotPasswordStep === "email" 
+                      ? "Ingresa tu correo electrónico para recibir un enlace de recuperación"
+                      : "Ingresa tu nueva contraseña"
+                    }
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {forgotPasswordStep === "email" ? (
+                    <Form {...forgotPasswordForm}>
+                      <form onSubmit={forgotPasswordForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
+                        <FormField
+                          control={forgotPasswordForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Correo electrónico</FormLabel>
+                              <FormControl>
+                                <Input placeholder="tunombre@epicaldigital.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-gray-900 hover:bg-gray-800" 
+                          disabled={forgotPasswordMutation.isPending}
+                        >
+                          {forgotPasswordMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Enviando solicitud...
+                            </>
+                          ) : (
+                            "Enviar enlace de recuperación"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                  ) : (
+                    <Form {...resetPasswordForm}>
+                      <form onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} className="space-y-4">
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="token"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Token de recuperación</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Token recibido por correo" {...field} readOnly />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nueva contraseña</FormLabel>
+                              <div className="relative">
+                                <FormControl>
+                                  <Input 
+                                    type={showResetPassword ? "text" : "password"} 
+                                    placeholder="••••••••" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowResetPassword(!showResetPassword)}
+                                >
+                                  {showResetPassword ? (
+                                    <EyeOff className="h-4 w-4 text-gray-500" />
+                                  ) : (
+                                    <Eye className="h-4 w-4 text-gray-500" />
+                                  )}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={resetPasswordForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirmar nueva contraseña</FormLabel>
+                              <div className="relative">
+                                <FormControl>
+                                  <Input 
+                                    type={showResetConfirmPassword ? "text" : "password"} 
+                                    placeholder="••••••••" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                  onClick={() => setShowResetConfirmPassword(!showResetConfirmPassword)}
+                                >
+                                  {showResetConfirmPassword ? (
+                                    <EyeOff className="h-4 w-4 text-gray-500" />
+                                  ) : (
+                                    <Eye className="h-4 w-4 text-gray-500" />
+                                  )}
+                                </Button>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button 
+                          type="submit" 
+                          className="w-full bg-gray-900 hover:bg-gray-800" 
+                          disabled={resetPasswordMutation.isPending}
+                        >
+                          {resetPasswordMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Actualizando contraseña...
+                            </>
+                          ) : (
+                            "Actualizar contraseña"
+                          )}
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            setForgotPasswordStep("email");
+                            resetPasswordForm.reset();
+                          }}
+                        >
+                          <ArrowLeft className="mr-2 h-4 w-4" />
+                          Volver al paso anterior
+                        </Button>
+                      </form>
+                    </Form>
+                  )}
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button variant="link" onClick={() => setActiveTab("login")}>
+                    ¿Recordaste tu contraseña? Inicia sesión
                   </Button>
                 </CardFooter>
               </Card>

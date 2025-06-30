@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- June 30, 2025: Implemented complete password recovery functionality with "Forgot Password" feature
+- June 30, 2025: Added password reset tokens database table and API endpoints for secure password recovery
+- June 30, 2025: Created new authentication tab for password recovery with two-step process (email → token → new password)
+- June 30, 2025: Enhanced authentication system with secure token generation and validation
 - June 26, 2025: Implemented complete real-time admin panel functionality with optimistic cache updates
 - June 26, 2025: Added optional email column to personnel database table with validation updates
 - June 26, 2025: Fixed exchange rate updates in inflation tab to show immediate visual feedback
