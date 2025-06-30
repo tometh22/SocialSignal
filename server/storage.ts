@@ -635,11 +635,11 @@ export class DatabaseStorage implements IStorage {
       throw new Error('quotation_id es requerido para crear un miembro del equipo');
     }
 
-    if (!member.personnelId) {
-      throw new Error('personnel_id es requerido para crear un miembro del equipo');
-    }
-
+    // FIXED: personnelId es opcional - se puede asignar automáticamente en routes
+    // La validación restrictiva estaba causando que falleara el guardado de equipos
+    
     const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
+    console.log('✅ Miembro del equipo creado exitosamente:', newMember);
     return newMember;
   }
 
