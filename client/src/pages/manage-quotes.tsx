@@ -42,12 +42,27 @@ interface Client {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
-  const { data: quotations, isLoading, refetch } = useQuery<Quotation[]>({
+  
+  console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
+  
+  const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
+    onSuccess: (data) => {
+      console.log(`[QUOTES] ✅ Cotizaciones cargadas exitosamente: ${data.length} elementos`);
+    },
+    onError: (error) => {
+      console.error(`[QUOTES] ❌ Error al cargar cotizaciones:`, error);
+    }
   });
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], error: clientsError } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    onSuccess: (data) => {
+      console.log(`[QUOTES] ✅ Clientes cargados exitosamente: ${data.length} elementos`);
+    },
+    onError: (error) => {
+      console.error(`[QUOTES] ❌ Error al cargar clientes:`, error);
+    }
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,23 +100,33 @@ export default function ManageQuotes() {
 
   const handleStatusChange = async () => {
     if (!selectedQuote || !newStatus) {
+      console.warn('[QUOTES] Intento de cambio de estado sin cotización o estado seleccionado');
       return;
     }
 
+    console.log(`[QUOTES] Iniciando cambio de estado para cotización ID: ${selectedQuote.id}`);
+    console.log(`[QUOTES] Estado anterior: ${selectedQuote.status} → Nuevo estado: ${newStatus}`);
+
     try {
+      const startTime = performance.now();
+      
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
         { status: newStatus }
       );
 
+      const endTime = performance.now();
+      console.log(`[QUOTES] ✅ Estado actualizado exitosamente en ${(endTime - startTime).toFixed(2)}ms`);
+
       toast({
         title: "Estado actualizado",
-        description: `El estado de la cotización ha sido actualizado a ${translateStatus(newStatus)}.`,
+        description: `El estado de la cotización "${selectedQuote.projectName}" ha sido actualizado a ${translateStatus(newStatus)}.`,
       });
 
       // Si la cotización fue aprobada, mostrar modal para crear proyecto
       if (newStatus === 'approved') {
+        console.log(`[QUOTES] Cotización aprobada, preparando modal de creación de proyecto`);
         setApprovedQuote(selectedQuote);
         setCreateProjectDialogOpen(true);
       }
@@ -109,10 +134,17 @@ export default function ManageQuotes() {
       refetch();
       setDialogOpen(false);
     } catch (error) {
-      console.error(`[CLIENT] Error en actualización de estado:`, error);
+      console.error(`[QUOTES] ❌ Error en actualización de estado:`, {
+        quotationId: selectedQuote.id,
+        oldStatus: selectedQuote.status,
+        newStatus: newStatus,
+        error: error instanceof Error ? error.message : error,
+        timestamp: new Date().toISOString()
+      });
+      
       toast({
-        title: "Error",
-        description: "No se pudo actualizar el estado de la cotización.",
+        title: "Error al actualizar estado",
+        description: `No se pudo actualizar el estado de la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
         variant: "destructive",
       });
     }
@@ -189,10 +221,22 @@ export default function ManageQuotes() {
   };
 
   const handleDeleteQuotation = async () => {
-    if (!selectedQuote) return;
+    if (!selectedQuote) {
+      console.warn('[QUOTES] Intento de eliminación sin cotización seleccionada');
+      return;
+    }
+
+    console.log(`[QUOTES] 🗑️ Iniciando eliminación de cotización:`, {
+      id: selectedQuote.id,
+      projectName: selectedQuote.projectName,
+      status: selectedQuote.status,
+      clientId: selectedQuote.clientId,
+      timestamp: new Date().toISOString()
+    });
 
     try {
       setDeletingQuoteId(selectedQuote.id);
+      const startTime = performance.now();
 
       const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
         method: 'DELETE',
@@ -202,15 +246,20 @@ export default function ManageQuotes() {
         }
       });
 
+      const endTime = performance.now();
+      console.log(`[QUOTES] Respuesta del servidor recibida en ${(endTime - startTime).toFixed(2)}ms`);
+
       let data;
       try {
         data = await response.json();
+        console.log(`[QUOTES] Datos de respuesta parseados:`, data);
       } catch (e) {
-        console.error('[CLIENT] Error al parsear respuesta JSON:', e);
+        console.error('[QUOTES] ❌ Error al parsear respuesta JSON:', e);
         data = { success: response.ok, message: response.statusText };
       }
 
       if (response.status === 409) {
+        console.warn(`[QUOTES] ⚠️ Conflicto al eliminar cotización - Proyectos asociados detectados`);
         setDeletingQuoteId(null);
         toast({
           title: "No se puede eliminar",
@@ -221,10 +270,12 @@ export default function ManageQuotes() {
       }
 
       if (response.ok && data.success) {
+        console.log(`[QUOTES] ✅ Cotización eliminada exitosamente: ${selectedQuote.projectName}`);
+        
         setTimeout(() => {
           toast({
             title: "Cotización eliminada",
-            description: "La cotización ha sido eliminada correctamente.",
+            description: `La cotización "${selectedQuote.projectName}" ha sido eliminada correctamente.`,
           });
 
           refetch();
@@ -232,19 +283,36 @@ export default function ManageQuotes() {
           setDeletingQuoteId(null);
         }, 800);
       } else {
+        console.error(`[QUOTES] ❌ Error en eliminación:`, {
+          status: response.status,
+          statusText: response.statusText,
+          data: data,
+          quotationId: selectedQuote.id
+        });
+        
         setDeletingQuoteId(null);
         toast({
-          title: "Error",
-          description: data.message || "No se pudo eliminar la cotización.",
+          title: "Error al eliminar",
+          description: data.message || `No se pudo eliminar la cotización "${selectedQuote.projectName}".`,
           variant: "destructive",
         });
       }
     } catch (error) {
       setDeletingQuoteId(null);
-      console.error(`[CLIENT] Error al eliminar cotización:`, error);
+      console.error(`[QUOTES] ❌ Error crítico al eliminar cotización:`, {
+        quotationId: selectedQuote.id,
+        quotationName: selectedQuote.projectName,
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error,
+        timestamp: new Date().toISOString()
+      });
+      
       toast({
-        title: "Error",
-        description: "Ocurrió un error al intentar eliminar la cotización.",
+        title: "Error crítico",
+        description: `Ocurrió un error inesperado al intentar eliminar la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
         variant: "destructive",
       });
     }
@@ -501,79 +569,168 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-                  {filteredQuotations.map((quote, index) => (
-                    <Card key={quote.id} className="shadow-md hover:shadow-lg transition-shadow duration-200">
-                      <CardContent className="p-4">
-                        <div className="flex flex-col">
-                          <div className="flex items-center mb-2">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                              <span className="text-blue-600 font-semibold">{quote.projectName.charAt(0).toUpperCase()}</span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
+                  {filteredQuotations.map((quote, index) => {
+                    const client = getClient(quote.clientId);
+                    const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    });
+                    
+                    return (
+                      <Card key={quote.id} className="group relative bg-white border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 rounded-xl overflow-hidden">
+                        <CardContent className="p-0">
+                          {/* Header con gradiente */}
+                          <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 border-b border-gray-100">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-3">
+                                {client?.logoUrl ? (
+                                  <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-gray-200 overflow-hidden flex-shrink-0">
+                                    <img 
+                                      src={client.logoUrl} 
+                                      alt={`${client.name} logo`} 
+                                      className="w-full h-full object-contain p-1"
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl hidden items-center justify-center">
+                                      <span className="text-white font-bold text-lg">
+                                        {quote.projectName.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                                    <span className="text-white font-bold text-lg">
+                                      {quote.projectName.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                                    {quote.projectName}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 flex items-center">
+                                    <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                                    <span className="truncate">{getClientName(quote.clientId)}</span>
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                {getStatusBadge(quote.status)}
+                              </div>
                             </div>
-                            <h3 className="text-lg font-semibold">{quote.projectName}</h3>
                           </div>
-                          <div className="text-sm text-gray-500 mb-2">
-                            Cliente: {getClientName(quote.clientId)}
+
+                          {/* Contenido principal */}
+                          <div className="p-4 space-y-4">
+                            {/* Información financiera */}
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-600">Valor Total</span>
+                                <span className="text-xl font-bold text-gray-900">
+                                  ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between mt-1">
+                                <span className="text-xs text-gray-500">Costo Base</span>
+                                <span className="text-sm text-gray-600">
+                                  ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Metadatos */}
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <div className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Creada: {createdDate}
+                              </div>
+                              <div className="flex items-center">
+                                <TrendingUp className="h-3 w-3 mr-1" />
+                                ID: #{quote.id}
+                              </div>
+                            </div>
+
+                            {/* Log de actividad reciente */}
+                            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                              <div className="flex items-center mb-2">
+                                <Zap className="h-3 w-3 text-blue-600 mr-1" />
+                                <span className="text-xs font-medium text-blue-800">Actividad Reciente</span>
+                              </div>
+                              <div className="text-xs text-blue-700">
+                                {quote.status === 'draft' && 'Cotización en borrador, lista para editar'}
+                                {quote.status === 'pending' && 'Esperando aprobación del cliente'}
+                                {quote.status === 'approved' && 'Aprobada - Lista para crear proyecto'}
+                                {quote.status === 'rejected' && 'Rechazada por el cliente'}
+                                {quote.status === 'in-negotiation' && 'En proceso de negociación'}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center mb-2">
-                            Estado: {getStatusBadge(quote.status)}
-                          </div>
-                          <div className="text-right font-bold text-gray-700">
-                            Total: ${quote.totalAmount.toLocaleString()}
-                          </div>
-                          <div className="flex justify-end mt-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mr-2"
-                              onClick={() => openStatusDialog(quote)}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Estado
-                            </Button>
-                            {quote.status === 'draft' && (
+
+                          {/* Acciones */}
+                          <div className="bg-gray-50 p-4 border-t border-gray-100">
+                            <div className="grid grid-cols-2 gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="mr-2"
-                                onClick={() => handleEditQuotation(quote)}
+                                onClick={() => openStatusDialog(quote)}
+                                className="w-full justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
                               >
-                                <PenLine className="h-4 w-4 mr-1" />
-                                Editar
+                                <Edit className="h-3 w-3 mr-1" />
+                                Estado
                               </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mr-2"
-                              onClick={() => navigate(`/quotation/${quote.id}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Ver
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openDeleteDialog(quote)}
-                              disabled={deletingQuoteId === quote.id}
-                            >
-                              {deletingQuoteId === quote.id ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  <span>...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Trash2 className="h-4 w-4 mr-1" />
-                                  Eliminar
-                                </>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/quotation/${quote.id}`)}
+                                className="w-full justify-center text-xs hover:bg-green-50 hover:border-green-300"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Ver
+                              </Button>
+
+                              {quote.status === 'draft' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditQuotation(quote)}
+                                  className="w-full justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
+                                >
+                                  <PenLine className="h-3 w-3 mr-1" />
+                                  Editar
+                                </Button>
                               )}
-                            </Button>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openDeleteDialog(quote)}
+                                disabled={deletingQuoteId === quote.id}
+                                className="w-full justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                              >
+                                {deletingQuoteId === quote.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Procesando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Eliminar
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
                
               ) : (
