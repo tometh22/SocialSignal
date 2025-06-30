@@ -322,29 +322,29 @@ export default function ManageQuotes() {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pb-16">
-        {/* Header con gradiente más suave */}
-        <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 shadow-lg border-b border-slate-600/20">
+        {/* Header con fondo blanco */}
+        <div className="bg-white shadow-sm border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Breadcrumbs */}
-            <nav className="flex items-center space-x-2 text-sm text-slate-300 pt-4 pb-2">
+            <nav className="flex items-center space-x-2 text-sm text-slate-600 pt-4 pb-2">
               <span>Dashboard</span>
               <span>/</span>
-              <span className="text-white font-medium">Gestión de Cotizaciones</span>
+              <span className="text-slate-900 font-medium">Gestión de Cotizaciones</span>
             </nav>
 
             {/* Title and Action */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">
                   Gestión de Cotizaciones
                 </h1>
-                <p className="text-slate-200 text-lg">
+                <p className="text-slate-600 text-lg">
                   Administra y da seguimiento a todas las cotizaciones del sistema
                 </p>
               </div>
               <Button 
                 onClick={() => navigate("/optimized-quote")}
-                className="bg-white text-slate-700 hover:bg-slate-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 border border-slate-200"
+                className="bg-slate-900 text-white hover:bg-slate-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
               >
                 <Plus className="mr-2 h-5 w-5" />
                 Nueva Cotización
@@ -582,11 +582,11 @@ export default function ManageQuotes() {
                             </div>
                           </td>
                           <td className="px-4 lg:px-6 py-4">
-                            <div className="flex items-center justify-center gap-1 flex-wrap">
+                            <div className="flex items-center justify-center gap-1 overflow-x-auto">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="h-8 px-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 transition-all duration-200 font-medium text-xs"
+                                className="h-8 px-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
                                 onClick={() => openStatusDialog(quote)}
                               >
                                 <Edit className="h-3 w-3 mr-1" />
@@ -597,7 +597,7 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-8 px-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium text-xs"
+                                  className="h-8 px-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
                                   onClick={() => handleEditQuotation(quote)}
                                 >
                                   <PenLine className="h-3 w-3 mr-1" />
@@ -609,7 +609,7 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-8 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium text-xs"
+                                  className="h-8 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
                                   onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
                                 >
                                   <Zap className="h-3 w-3 mr-1" />
@@ -620,7 +620,7 @@ export default function ManageQuotes() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-8 px-2 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium text-xs"
+                                className="h-8 px-2 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
                               >
                                 <Eye className="h-3 w-3 mr-1" />
@@ -630,7 +630,7 @@ export default function ManageQuotes() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-8 px-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium text-xs"
+                                className="h-8 px-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium text-xs whitespace-nowrap flex-shrink-0"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
                               >
