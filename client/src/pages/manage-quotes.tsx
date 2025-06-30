@@ -321,30 +321,30 @@ export default function ManageQuotes() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        {/* Header mejorado con gradiente */}
-        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pb-16">
+        {/* Header con gradiente más suave */}
+        <div className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 shadow-lg border-b border-slate-600/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Breadcrumbs */}
-            <nav className="flex items-center space-x-2 text-sm text-indigo-100 pt-4 pb-2">
+            <nav className="flex items-center space-x-2 text-sm text-slate-300 pt-4 pb-2">
               <span>Dashboard</span>
               <span>/</span>
               <span className="text-white font-medium">Gestión de Cotizaciones</span>
             </nav>
 
             {/* Title and Action */}
-            <div className="flex items-center justify-between pb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">
                   Gestión de Cotizaciones
                 </h1>
-                <p className="text-indigo-100 text-lg">
+                <p className="text-slate-200 text-lg">
                   Administra y da seguimiento a todas las cotizaciones del sistema
                 </p>
               </div>
               <Button 
                 onClick={() => navigate("/optimized-quote")}
-                className="bg-white text-indigo-600 hover:bg-gray-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                className="bg-white text-slate-700 hover:bg-slate-50 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 border border-slate-200"
               >
                 <Plus className="mr-2 h-5 w-5" />
                 Nueva Cotización
@@ -353,9 +353,9 @@ export default function ManageQuotes() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 mb-6 mt-6">
             <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -415,22 +415,22 @@ export default function ManageQuotes() {
             </Card>
           </div>
 
-          {/* Filters modernizados */}
-          <Card className="bg-white shadow-lg border-0 mb-8">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          {/* Filters mejorados */}
+          <Card className="bg-white shadow-lg border-0 mb-6">
+            <CardContent className="p-4 lg:p-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input
                     placeholder="Buscar por nombre de proyecto..."
-                    className="pl-12 h-12 border-gray-200 rounded-xl bg-gray-50 focus:bg-white transition-colors"
+                    className="pl-12 h-11 border-gray-200 rounded-lg bg-gray-50 focus:bg-white transition-colors text-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="w-full md:w-64">
+                <div className="w-full sm:w-56">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-12 border-gray-200 rounded-xl bg-gray-50 focus:bg-white">
+                    <SelectTrigger className="h-11 border-gray-200 rounded-lg bg-gray-50 focus:bg-white text-sm">
                       <Filter className="h-4 w-4 mr-2 text-gray-400" />
                       <SelectValue placeholder="Filtrar por estado" />
                     </SelectTrigger>
@@ -449,10 +449,10 @@ export default function ManageQuotes() {
           </Card>
 
           {/* Main Content Card */}
-          <Card className="bg-white shadow-xl border-0 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-              <CardTitle className="text-xl font-semibold text-gray-800 flex items-center">
-                <Users className="h-5 w-5 mr-2 text-indigo-600" />
+          <Card className="bg-white shadow-lg border-0 rounded-xl overflow-hidden mb-8">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4">
+              <CardTitle className="text-lg font-semibold text-slate-800 flex items-center">
+                <Users className="h-5 w-5 mr-2 text-slate-600" />
                 Lista de Cotizaciones
               </CardTitle>
             </CardHeader>
@@ -463,77 +463,77 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                  <table className="w-full min-w-[800px]">
+                    <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
                       <tr>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           <div className="flex items-center space-x-2">
                             <Building2 className="h-4 w-4" />
                             <span>Proyecto</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           <div className="flex items-center space-x-2">
                             <Users className="h-4 w-4" />
                             <span>Cliente</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           <div className="flex items-center space-x-2">
                             <TrendingUp className="h-4 w-4" />
                             <span>Tipo</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200 hidden sm:table-cell">
                           <div className="flex items-center space-x-2">
                             <Calendar className="h-4 w-4" />
                             <span>Creación</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           <div className="flex items-center space-x-2">
                             <AlertCircle className="h-4 w-4" />
                             <span>Estado</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           <div className="flex items-center space-x-2">
                             <DollarSign className="h-4 w-4" />
                             <span>Valor</span>
                           </div>
                         </th>
-                        <th className="px-8 py-5 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 lg:px-6 py-4 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
                           Acciones
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {filteredQuotations.map((quote, index) => (
                         <tr 
                           key={quote.id} 
-                          className={`hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 transition-all duration-300 group ${
+                          className={`hover:bg-slate-50/50 transition-all duration-300 group ${
                             deletingQuoteId === quote.id 
-                              ? 'opacity-30 scale-95 bg-red-50 animate-pulse' 
-                              : 'opacity-100 scale-100'
+                              ? 'opacity-30 bg-red-50 animate-pulse' 
+                              : 'opacity-100'
                           }`}
                         >
-                          <td className="px-8 py-6">
-                            <div className="flex items-center space-x-4">
-                              <div className="h-12 w-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="h-10 w-10 bg-gradient-to-br from-slate-600 to-slate-700 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md">
                                 {quote.projectName.charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="text-sm font-bold text-gray-900 truncate">{quote.projectName}</div>
-                                <div className="text-xs text-gray-500 mt-1">ID: #{quote.id}</div>
+                                <div className="text-sm font-semibold text-slate-900 truncate">{quote.projectName}</div>
+                                <div className="text-xs text-slate-500 mt-1">ID: #{quote.id}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-8 py-6">
+                          <td className="px-4 lg:px-6 py-4">
                             <div className="flex items-center space-x-3">
                               {(() => {
                                 const client = getClient(quote.clientId);
                                 return client?.logoUrl ? (
-                                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 shadow-sm">
                                     <img 
                                       src={client.logoUrl} 
                                       alt={`${client.name} logo`} 
@@ -544,24 +544,24 @@ export default function ManageQuotes() {
                                     />
                                   </div>
                                 ) : (
-                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-md">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">
                                     {getClientName(quote.clientId).charAt(0)}
                                   </div>
                                 );
                               })()}
                               <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-gray-900 truncate">{getClientName(quote.clientId)}</div>
+                                <div className="text-sm font-medium text-slate-900 truncate">{getClientName(quote.clientId)}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-8 py-6">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
+                          <td className="px-4 lg:px-6 py-4">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium text-xs">
                               {quote.projectType || "Always On"}
                             </Badge>
                           </td>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                          <td className="px-4 lg:px-6 py-4 hidden sm:table-cell">
+                            <div className="flex items-center text-sm text-slate-600">
+                              <Calendar className="h-4 w-4 mr-2 text-slate-400" />
                               <span className="font-medium">
                                 {new Date(quote.createdAt).toLocaleDateString('es-ES', {
                                   day: '2-digit',
@@ -571,25 +571,25 @@ export default function ManageQuotes() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-8 py-6">
+                          <td className="px-4 lg:px-6 py-4">
                             {getStatusBadge(quote.status)}
                           </td>
-                          <td className="px-8 py-6">
+                          <td className="px-4 lg:px-6 py-4">
                             <div className="flex items-center">
-                              <span className="text-xl font-bold text-gray-900">
+                              <span className="text-lg font-bold text-slate-900">
                                 ${quote.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                               </span>
                             </div>
                           </td>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center justify-center space-x-2">
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="flex items-center justify-center gap-1 flex-wrap">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="h-9 px-3 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all duration-200 font-medium"
+                                className="h-8 px-2 bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 transition-all duration-200 font-medium text-xs"
                                 onClick={() => openStatusDialog(quote)}
                               >
-                                <Edit className="h-3.5 w-3.5 mr-1.5" />
+                                <Edit className="h-3 w-3 mr-1" />
                                 Estado
                               </Button>
 
@@ -597,10 +597,10 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-9 px-3 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium"
+                                  className="h-8 px-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 transition-all duration-200 font-medium text-xs"
                                   onClick={() => handleEditQuotation(quote)}
                                 >
-                                  <PenLine className="h-3.5 w-3.5 mr-1.5" />
+                                  <PenLine className="h-3 w-3 mr-1" />
                                   Editar
                                 </Button>
                               )}
@@ -609,10 +609,10 @@ export default function ManageQuotes() {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  className="h-9 px-3 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium"
+                                  className="h-8 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100 transition-all duration-200 font-medium text-xs"
                                   onClick={() => navigate(`/optimized-quote?clone=${quote.id}`)}
                                 >
-                                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                                  <Zap className="h-3 w-3 mr-1" />
                                   Recotizar
                                 </Button>
                               )}
@@ -620,28 +620,28 @@ export default function ManageQuotes() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-9 px-3 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium"
+                                className="h-8 px-2 bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 transition-all duration-200 font-medium text-xs"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
                               >
-                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                <Eye className="h-3 w-3 mr-1" />
                                 Ver
                               </Button>
 
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="h-9 px-3 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium"
+                                className="h-8 px-2 bg-red-50 border-red-200 text-red-700 hover:bg-red-100 transition-all duration-200 font-medium text-xs"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
                               >
                                 {deletingQuoteId === quote.id ? (
                                   <>
-                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                    <span className="text-xs">Eliminando...</span>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    <span>...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                                    <Trash2 className="h-3 w-3 mr-1" />
                                     Eliminar
                                   </>
                                 )}
@@ -654,22 +654,22 @@ export default function ManageQuotes() {
                   </table>
                 </div>
               ) : (
-                <div className="text-center py-16">
-                  <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <FileText className="h-12 w-12 text-gray-400" />
+                <div className="text-center py-12">
+                  <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <FileText className="h-10 w-10 text-slate-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-2">
                     {searchTerm || statusFilter !== "all"
                       ? "No hay cotizaciones que coincidan"
                       : "No hay cotizaciones disponibles"}
                   </h3>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-slate-600 mb-6">
                     {searchTerm || statusFilter !== "all"
                       ? "Prueba ajustando los filtros de búsqueda."
                       : "Comienza creando tu primera cotización."}
                   </p>
                   {!searchTerm && statusFilter === "all" && (
-                    <Button onClick={() => navigate("/optimized-quote")} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Button onClick={() => navigate("/optimized-quote")} className="bg-slate-700 hover:bg-slate-800">
                       <Plus className="mr-2 h-4 w-4" />
                       Crear Primera Cotización
                     </Button>
