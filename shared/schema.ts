@@ -175,8 +175,15 @@ export const quotationTeamMembers = pgTable("quotation_team_members", {
   dedication: doublePrecision("dedication"), // Porcentaje en entero (ej: 50%)
 });
 
-export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers, {
-  personnelId: z.number().nullable().optional()
+export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamMembers).omit({
+  id: true,
+}).extend({
+  personnelId: z.number().nullable().optional(),
+  quotationId: z.number(),
+  roleId: z.number().nullable().optional(),
+  hours: z.number(),
+  rate: z.number(),
+  cost: z.number()
 });
 
 // ==================== ASIGNACIÓN DE ROLES EN PLANTILLAS ====================
