@@ -700,8 +700,11 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
           platformCost: Number(quotation.platformCost || 0),
           deviationPercentage: Number(quotation.deviationPercentage || 0),
           discount: Number(quotation.discountPercentage || 0),
-          marginFactor: Number(quotation.marginFactor || 2.0),
-          marginPercentage: quotation.marginFactor ? (quotation.marginFactor - 1) * 100 : 100,
+          // Calculate marginFactor and marginPercentage from saved values
+          marginFactor: quotation.markupAmount && quotation.baseCost ? 
+            1 + (quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) : 2.0,
+          marginPercentage: quotation.markupAmount && quotation.baseCost ? 
+            ((quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) * 100) : 100,
           discountPercentage: Number(quotation.discountPercentage || 0)
         },
         inflation: {
@@ -760,8 +763,7 @@ export const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ 
         totalAmount: totalAmount || 0,
         platformCost: quotationData.financials.platformCost || 0,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
-        discountPercentage: quotationData.financials.discount || 0,
-        marginFactor: quotationData.financials.marginFactor || 2.0,
+        discountPercentage: quotationData.financials.discountPercentage || 0,
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
