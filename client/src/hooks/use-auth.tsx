@@ -38,7 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         console.log('🔍 Fetching current user...');
         const response = await fetch("/api/current-user", {
-          credentials: "include",
+          credentials: 'include',
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },

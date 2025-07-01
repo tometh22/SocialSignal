@@ -14,7 +14,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
-  console.log('🔍 ProtectedRoute (' + children?.props?.to || 'unknown' + '):', { user: !!user, isLoading: loading });
+  console.log('🔍 ProtectedRoute (' + (path || 'unknown') + '):', { user: !!user, isLoading: loading });
 
   if (loading) {
     return (
