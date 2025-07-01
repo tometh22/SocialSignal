@@ -17,8 +17,20 @@ export const queryClient = new QueryClient({
 export const defaultQueryFn = async ({ queryKey }: { queryKey: string | string[] }) => {
   const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
   
+  // SOLUCIÓN TEMPORAL: Obtener user ID del localStorage
+  const tempUserId = localStorage.getItem('tempUserId');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  
+  if (tempUserId) {
+    headers['Authorization'] = `Bearer ${tempUserId}`;
+    console.log('🔑 Adding Authorization header:', tempUserId);
+  }
+  
   const response = await fetch(url, {
-    credentials: "include" // Asegurar que las cookies se envíen con la solicitud
+    credentials: "include", // Asegurar que las cookies se envíen con la solicitud
+    headers
   });
   
   if (!response.ok) {
@@ -50,8 +62,19 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   return async ({ queryKey }: { queryKey: string | string[] }) => {
     const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
     
+    // SOLUCIÓN TEMPORAL: Obtener user ID del localStorage
+    const tempUserId = localStorage.getItem('tempUserId');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (tempUserId) {
+      headers['Authorization'] = `Bearer ${tempUserId}`;
+    }
+    
     const response = await fetch(url, {
-      credentials: "include" // Asegurar que las cookies se envíen con la solicitud
+      credentials: "include", // Asegurar que las cookies se envíen con la solicitud
+      headers
     });
     
     if (!response.ok) {
@@ -91,13 +114,21 @@ export async function apiRequest(
 ) {
   const url = endpoint;
   
+  // SOLUCIÓN TEMPORAL: Obtener user ID del localStorage
+  const tempUserId = localStorage.getItem('tempUserId');
   
   try {
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    
+    if (tempUserId) {
+      headers['Authorization'] = `Bearer ${tempUserId}`;
+    }
+    
     const options: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       credentials: "include",
     };
     
