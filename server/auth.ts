@@ -67,17 +67,17 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
-    resave: true, // Cambiar a true para forzar guardado en cada request
-    saveUninitialized: true, // Cambiar a true para debug
-    rolling: true, // CRÍTICO: Renovar cookie en cada respuesta para mantener la sesión activa
+    resave: false, // No forzar guardado si no hay cambios
+    saveUninitialized: false, // Solo guardar sesiones modificadas
+    rolling: true, // Renovar cookie en cada respuesta para mantener la sesión activa
     cookie: {
       secure: false, // Desactivar secure para debugging en Replit
-      maxAge: 1000 * 60 * 60 * 24 * 7, // Reducir a 7 días para testing
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
       sameSite: 'lax' as const,
       httpOnly: true,
       path: '/',
     },
-    name: 'epical.session.sid', // Simplificar nombre de cookie
+    name: 'connect.sid', // Usar nombre estándar de cookie
   };
 
   // Agregar el store de sesiones a la configuración
@@ -178,24 +178,32 @@ export function setupAuth(app: Express, storage: IStorage) {
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
 
-      // Establecer la sesión
+      // Establecer la sesión y guardarla explícitamente
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}`);
 
-      // Preparar respuesta sin información sensible
-      const userResponse = {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        avatar: user.avatar || null,
-        isAdmin: user.isAdmin
-      };
+      // Guardar la sesión explícitamente antes de enviar la respuesta
+      req.session.save((saveError) => {
+        if (saveError) {
+          console.error('❌ Error saving session:', saveError);
+          return res.status(500).json({ message: "Error al guardar sesión" });
+        }
 
-      console.log(`📤 Sending login response for: ${user.email}`);
-      // Usar res.json() para evitar problemas de serialización
-      // Esta manera es la forma correcta y profesional para devolver JSON
-      res.status(200).json(userResponse);
+        console.log(`💾 Session saved successfully for user: ${user.id}`);
+
+        // Preparar respuesta sin información sensible
+        const userResponse = {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          avatar: user.avatar || null,
+          isAdmin: user.isAdmin
+        };
+
+        console.log(`📤 Sending login response for: ${user.email}`);
+        res.status(200).json(userResponse);
+      });
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
       res.status(500).json({ message: "Error al iniciar sesión" });
