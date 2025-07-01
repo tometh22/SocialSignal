@@ -105,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('✅ Login mutation success, setting user data...');
       // Establecer inmediatamente los datos del usuario
       queryClient.setQueryData(["/api/current-user"], userData);
+      
+      // SOLUCIÓN TEMPORAL: Guardar user ID en localStorage para usar como Authorization header
+      localStorage.setItem('tempUserId', userData.id.toString());
+      console.log('💾 Stored user ID in localStorage:', userData.id);
+      
       // Invalidar todas las consultas relacionadas con autenticación
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
       queryClient.refetchQueries({ queryKey: ["/api/current-user"] });

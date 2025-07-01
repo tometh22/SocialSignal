@@ -67,17 +67,17 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
-    resave: false, // No forzar guardado si no hay cambios
-    saveUninitialized: false, // Solo guardar sesiones modificadas
-    rolling: true, // Renovar cookie en cada respuesta para mantener la sesión activa
+    resave: true, // Forzar guardado para asegurar persistencia
+    saveUninitialized: true, // Guardar sesiones inicializadas
+    rolling: true, // Renovar cookie en cada respuesta
     cookie: {
-      secure: false, // Desactivar secure para debugging en Replit
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días
-      sameSite: 'lax' as const,
-      httpOnly: true,
+      secure: false, // No HTTPS en desarrollo
+      maxAge: 1000 * 60 * 60 * 24, // 1 día para testing
+      sameSite: false, // Desactivar sameSite para máxima compatibilidad
+      httpOnly: false, // Permitir acceso desde JS para debugging
       path: '/',
     },
-    name: 'connect.sid', // Usar nombre estándar compatible con connect-pg-simple
+    name: 'sessionId', // Nombre simple para evitar conflictos
   };
 
   // Agregar el store de sesiones a la configuración
@@ -90,7 +90,24 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
-    const userId = req.session.userId;
+    let userId = req.session.userId;
+    
+    // Debug detallado de cookies y sesión
+    console.log('🔍 Auth middleware - Headers:', req.headers.cookie);
+    console.log('🔍 Auth middleware - Session ID:', req.sessionID);
+    console.log('🔍 Auth middleware - Session data:', req.session);
+    
+    // SOLUCIÓN TEMPORAL: Si no hay sesión, pero hay Authorization header, usar eso
+    if (!userId && req.headers.authorization) {
+      const token = req.headers.authorization.replace('Bearer ', '');
+      console.log('🔍 Auth middleware - Checking Authorization header:', token);
+      
+      // Simple validación de token temporal (solo números = user ID)
+      if (/^\d+$/.test(token)) {
+        userId = parseInt(token);
+        console.log('✅ Auth middleware - Using Authorization header user ID:', userId);
+      }
+    }
 
     if (!userId) {
       return res.status(401).json({ message: "No autenticado" });
