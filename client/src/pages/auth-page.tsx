@@ -131,7 +131,10 @@ export default function AuthPage() {
         // Asegurar que el usuario está establecido antes de redirigir
         if (userData) {
           console.log('🚀 Login successful, redirecting to dashboard...');
-          setTimeout(() => setLocation('/'), 100); // Pequeño delay para asegurar que el estado se actualice
+          // Forzar actualización inmediata del estado
+          queryClient.setQueryData(["/api/current-user"], userData);
+          // Redirigir inmediatamente
+          setLocation('/');
         }
       } else {
         await registerMutation.mutateAsync({

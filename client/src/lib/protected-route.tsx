@@ -9,14 +9,14 @@ interface ProtectedRouteProps extends RouteProps {
 export function ProtectedRoute({
   path,
   component: Component,
+  children,
   ...rest
 }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
 
-  // Debug logging
-  console.log(`🔍 ProtectedRoute (${path}):`, { user: !!user, isLoading });
+  console.log('🔍 ProtectedRoute (' + children?.props?.to || 'unknown' + '):', { user: !!user, isLoading: loading });
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen">

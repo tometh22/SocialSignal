@@ -97,12 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
-      // Establecer inmediatamente los datos del usuario
-      queryClient.setQueryData(['current-user'], userData);
+      // Establecer inmediatamente los datos del usuario con la clave correcta
+      queryClient.setQueryData(["/api/current-user"], userData);
       // Forzar una nueva consulta para asegurar sincronización
-      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
       // Forzar un refetch inmediato
-      queryClient.refetchQueries({ queryKey: ['current-user'] });
+      queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
     },
     onError: (error) => {
       console.error('❌ Login mutation error:', error);
