@@ -59,7 +59,7 @@ function OptimizedQuoteWrapper() {
 
   // Convertir a números si existen
   const quotationId = idParam ? parseInt(idParam) : undefined;
-  const cloneId = cloneParam ? parseInt(cloneParam) : undefined;
+  const cloneId = cloneParam ? parseInt(cloneId) : undefined;
 
   // Determinar el modo: edición normal o recotización
   const isRequote = !!cloneId;

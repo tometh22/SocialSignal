@@ -9,6 +9,7 @@ import { Loader } from '@/components/ui/loader';
 import { useLocation } from 'wouter';
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail, Lock, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { queryClient } from '@/lib/queryClient';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
