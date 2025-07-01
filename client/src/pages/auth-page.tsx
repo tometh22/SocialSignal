@@ -203,8 +203,12 @@ export default function AuthPage() {
               transition={{ delay: 0.2, type: "spring" }}
               className="mx-auto mb-4"
             >
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">E</span>
+              <div className="w-20 h-20 bg-black rounded-lg flex items-center justify-center shadow-lg p-3">
+                <img 
+                  src="/epical-logo.jpeg" 
+                  alt="Epical Digital Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </motion.div>
 
