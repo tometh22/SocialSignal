@@ -229,12 +229,33 @@ export function setupAuth(app: Express, storage: IStorage) {
   });
 
   app.post("/api/logout", (req, res) => {
+    console.log('🚪 Logout request received');
+    
     req.session.destroy((err) => {
       if (err) {
         console.error("Error al cerrar sesión:", err);
         return res.status(500).json({ message: "Error al cerrar sesión" });
       }
 
+      console.log('✅ Session destroyed successfully');
+      
+      // Limpiar la cookie de sesión
+      res.clearCookie('sessionId', {
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: false
+      });
+      
+      // También limpiar cualquier otra cookie relacionada con sesión
+      res.clearCookie('connect.sid', {
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: false
+      });
+
+      console.log('🍪 Session cookies cleared');
       res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
