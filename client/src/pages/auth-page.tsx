@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
-  const { user, login, register, loading } = useAuth();
+  const { user, loginMutation, registerMutation, loading } = useAuth();
 
   // Estados del formulario
   const [isLogin, setIsLogin] = useState(true);
@@ -124,9 +124,14 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        await login(formData.email, formData.password);
+        await loginMutation.mutateAsync({
+          email: formData.email,
+          password: formData.password
+        });
+        // Si el login es exitoso, redirigir
+        setLocation('/');
       } else {
-        await register({
+        await registerMutation.mutateAsync({
           email: formData.email,
           password: formData.password,
           firstName: formData.firstName,
