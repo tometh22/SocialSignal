@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +62,7 @@ export default function ExecutiveDashboard() {
   const { data: personnel = [] } = useQuery({ queryKey: ['/api/personnel'] });
   const { data: allTimeEntries = [] } = useQuery({ queryKey: ['/api/time-entries'] });
   const { data: allDeliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
-  
+
   const { data: allNpsSurveys = [] } = useQuery({ 
     queryKey: ['/api/nps-surveys'],
     queryFn: async () => {
@@ -124,7 +123,7 @@ export default function ExecutiveDashboard() {
     const timeEntriesArray = (allTimeEntries as any[]) || [];
     const deliverablesArray = (allDeliverables as any[]) || [];
     const npsSurveysArray = (allNpsSurveys as any[]) || [];
-    
+
     // Análisis predictivo avanzado por cliente
     clientsArray.forEach((client: any) => {
       const clientProjects = projectsArray.filter((p: any) => {
@@ -139,11 +138,11 @@ export default function ExecutiveDashboard() {
         const projectTimeEntries = timeEntriesArray.filter((entry: any) => entry.projectId === project.id);
         const totalCost = projectTimeEntries.reduce((sum: number, entry: any) => 
           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || 50)), 0);
-        
+
         const quotation = quotations.find((q: any) => q.id === project.quotationId);
         const budgetLimit = quotation?.totalAmount || 1000;
         const usagePercentage = budgetLimit > 0 ? (totalCost / budgetLimit) * 100 : 0;
-        
+
         if (usagePercentage > 95) {
           alerts.push({
             id: alerts.length + 1,
@@ -177,7 +176,7 @@ export default function ExecutiveDashboard() {
           weekAgo.setDate(weekAgo.getDate() - 7);
           return entryDate >= weekAgo;
         });
-        
+
         const weeklyHours = lastWeekEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
         if (weeklyHours > 60) {
           alerts.push({
@@ -196,7 +195,7 @@ export default function ExecutiveDashboard() {
 
       // 2. Análisis avanzado de calidad de entregables
       const clientDeliverables = deliverablesArray.filter((d: any) => d.clientId === client.id);
-      
+
       if (clientDeliverables.length > 0) {
         // Análisis de tendencia de calidad narrativa
         const recentDeliverables = clientDeliverables
@@ -211,7 +210,7 @@ export default function ExecutiveDashboard() {
         if (recentDeliverables.length >= 3) {
           const narrativeScores = recentDeliverables.slice(0, 3).map((d: any) => d.narrative_quality || 0);
           const avgRecent = narrativeScores.reduce((sum: number, score: number) => sum + score, 0) / narrativeScores.length;
-          
+
           // Detectar tendencia descendente
           const isDescending = narrativeScores.length >= 2 && 
             narrativeScores[0] < narrativeScores[1] && 
@@ -254,19 +253,19 @@ export default function ExecutiveDashboard() {
 
       // 3. Análisis predictivo de NPS y riesgo de churn
       const clientNpsSurveys = npsSurveysArray.filter((survey: any) => survey.clientId === client.id);
-      
+
       if (clientNpsSurveys.length >= 2) {
         const sortedSurveys = clientNpsSurveys.sort((a: any, b: any) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-        
+
         const latestSurvey = sortedSurveys[0];
         const previousSurvey = sortedSurveys[1];
-        
+
         // Análisis de tendencia NPS
         if (latestSurvey.npsScore !== null && previousSurvey.npsScore !== null) {
           const npsDropp = previousSurvey.npsScore - latestSurvey.npsScore;
-          
+
           if (npsDropp >= 4) {
             alerts.push({
               id: alerts.length + 1,
@@ -293,7 +292,7 @@ export default function ExecutiveDashboard() {
             });
           }
         }
-        
+
         // Análisis de métricas específicas del NPS
         if (latestSurvey.reportQuality !== null && latestSurvey.reportQuality <= 4) {
           alerts.push({
@@ -388,18 +387,18 @@ export default function ExecutiveDashboard() {
   // Filtros y búsqueda mejorados
   const filteredAlerts = useMemo(() => {
     let filtered = criticalAlerts;
-    
+
     if (searchTerm) {
       filtered = filtered.filter(alert => 
         alert.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         alert.message.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (selectedFilter !== 'all') {
       filtered = filtered.filter(alert => alert.severity === selectedFilter);
     }
-    
+
     return filtered;
   }, [criticalAlerts, searchTerm, selectedFilter]);
 
@@ -429,7 +428,7 @@ export default function ExecutiveDashboard() {
                   </h1>
                   <p className="text-gray-600 text-sm">Visión estratégica en tiempo real • {format(new Date(), "dd 'de' MMMM, yyyy", { locale: es })}</p>
                 </div>
-                
+
                 {/* Indicadores de salud del sistema */}
                 <div className="flex items-center gap-2 ml-8">
                   <Tooltip>
@@ -443,7 +442,7 @@ export default function ExecutiveDashboard() {
                       <p>Todos los sistemas funcionando correctamente</p>
                     </TooltipContent>
                   </Tooltip>
-                  
+
                   {criticalAlerts.filter(a => a.severity === 'critical').length > 0 && (
                     <Badge variant="destructive" className="animate-pulse">
                       <Bell className="h-3 w-3 mr-1" />
@@ -452,7 +451,7 @@ export default function ExecutiveDashboard() {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
@@ -464,19 +463,19 @@ export default function ExecutiveDashboard() {
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   Actualizar
                 </Button>
-                
+
                 <Button variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
                 </Button>
-                
+
                 <Link href="/optimized-quote">
                   <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                     <Plus className="h-4 w-4 mr-2" />
                     Nueva Cotización
                   </Button>
                 </Link>
-                
+
                 <Link href="/active-projects">
                   <Button variant="outline" size="sm">
                     <Briefcase className="h-4 w-4 mr-2" />
@@ -653,7 +652,7 @@ export default function ExecutiveDashboard() {
                             </Link>
                           )}
                         </div>
-                        
+
                         <div className="mt-2">
                           <p className="text-sm text-gray-700 mb-2">{alert.message}</p>
                           <div className="flex items-center gap-4 text-xs text-gray-600">
@@ -667,14 +666,14 @@ export default function ExecutiveDashboard() {
                         </div>
                       </div>
                     ))}
-                    
-                    {filteredAlerts.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
-                        <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-500" />
-                        <h3 className="font-medium">¡Excelente!</h3>
-                        <p className="text-sm">No hay alertas críticas en este momento.</p>
+
+                    {filteredAlerts.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+                        <CheckCircle className="h-16 w-16 mb-4 text-green-500" />
+                        <h3 className="text-lg font-semibold text-gray-700 mb-2">¡Excelente!</h3>
+                        <p className="text-sm text-gray-500 max-w-xs">No hay alertas críticas en este momento.</p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -717,7 +716,7 @@ export default function ExecutiveDashboard() {
                             </Badge>
                           )}
                         </div>
-                        
+
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs">
                             <span>Estado:</span>
@@ -734,7 +733,7 @@ export default function ExecutiveDashboard() {
                               })}
                             </span>
                           </div>
-                          
+
                           <Link href={`/project-details/${project.id}`}>
                             <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
                               Ver Detalles
@@ -782,7 +781,7 @@ export default function ExecutiveDashboard() {
                             </div>
                             <ArrowRight className="h-4 w-4 text-gray-400" />
                           </div>
-                          
+
                           <div className="space-y-2 text-xs">
                             <div className="flex justify-between">
                               <span>Proyectos Activos:</span>
