@@ -827,6 +827,16 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginUser = z.infer<typeof loginUserSchema>;
 
 export type Client = typeof clients.$inferSelect;
+export const clients = pgTable("clients", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  logoUrl: varchar("logo_url", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+});
 export type InsertClient = z.infer<typeof insertClientSchema>;
 
 export type Role = typeof roles.$inferSelect;
