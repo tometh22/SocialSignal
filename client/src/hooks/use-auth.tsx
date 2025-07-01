@@ -74,41 +74,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (credentials: { email: string; password: string }): Promise<UserType> => {
       console.log('🔐 Attempting login for:', credentials.email);
 
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(credentials),
-        credentials: "include",
       });
 
       console.log('🔐 Login response status:', response.status);
       console.log('🔐 Login response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Login failed" }));
-        console.error('❌ Login failed:', errorData);
-        throw new Error(errorData.error || "Login failed");
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error de autenticación');
       }
 
       const userData = await response.json();
-      console.log('✅ Login successful for:', userData.email);
+      console.log('✅ Login successful for:', credentials.email);
       console.log('✅ User data:', userData);
+
       return userData;
     },
     onSuccess: (userData) => {
-      console.log('✅ Login mutation success, invalidating queries...');
-      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      console.log('✅ Login mutation success, setting user data...');
+      // Establecer inmediatamente los datos del usuario
+      queryClient.setQueryData(['current-user'], userData);
+      // Forzar una nueva consulta para asegurar sincronización
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      // Forzar un refetch inmediato
+      queryClient.refetchQueries({ queryKey: ['current-user'] });
     },
     onError: (error) => {
-      console.error("❌ Login error:", error);
-      toast({
-        title: "Error al iniciar sesión",
-        description: error.message || "Credenciales incorrectas",
-        variant: "destructive",
-      });
+      console.error('❌ Login mutation error:', error);
     },
   });
 

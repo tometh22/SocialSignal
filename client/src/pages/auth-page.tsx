@@ -124,12 +124,15 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        await loginMutation.mutateAsync({
+        const userData = await loginMutation.mutateAsync({
           email: formData.email,
           password: formData.password
         });
-        // Si el login es exitoso, redirigir
-        setLocation('/');
+        // Asegurar que el usuario está establecido antes de redirigir
+        if (userData) {
+          console.log('🚀 Login successful, redirecting to dashboard...');
+          setTimeout(() => setLocation('/'), 100); // Pequeño delay para asegurar que el estado se actualice
+        }
       } else {
         await registerMutation.mutateAsync({
           email: formData.email,
