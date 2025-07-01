@@ -34,12 +34,12 @@ export default function AuthPage() {
 
   // Redirection si ya está autenticado
   useEffect(() => {
-    console.log('🔍 AuthPage useEffect:', { user, redirecting: false });
-    if (user) {
+    console.log('🔍 AuthPage useEffect:', { user: !!user, loading });
+    if (user && !loading) {
       console.log('✅ User authenticated, redirecting to dashboard');
       setLocation('/');
     }
-  }, [user, setLocation]);
+  }, [user, loading, setLocation]);
 
   // Validación en tiempo real
   useEffect(() => {

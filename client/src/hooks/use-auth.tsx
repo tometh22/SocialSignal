@@ -40,13 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const response = await fetch("/api/current-user", {
           credentials: 'include',
           method: 'GET',
+          cache: 'no-cache',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
           },
         });
 
         console.log('🔍 Response status:', response.status);
-        console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           const errorText = await response.text();
           console.error('❌ HTTP error:', response.status, errorText);
-          throw new Error(`HTTP error! status: ${response.status}`);
+          return null; // Return null instead of throwing for better error handling
         }
 
         const userData = await response.json();
@@ -66,8 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    retry: false,
+    retry: 1,
+    retryDelay: 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Mutación para el inicio de sesión
