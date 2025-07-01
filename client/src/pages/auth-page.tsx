@@ -125,18 +125,12 @@ export default function AuthPage() {
 
     try {
       if (isLogin) {
-        const userData = await loginMutation.mutateAsync({
+        await loginMutation.mutateAsync({
           email: formData.email,
           password: formData.password
         });
-        // Asegurar que el usuario está establecido antes de redirigir
-        if (userData) {
-          console.log('🚀 Login successful, redirecting to dashboard...');
-          // Forzar actualización inmediata del estado
-          queryClient.setQueryData(["/api/current-user"], userData);
-          // Redirigir inmediatamente
-          setLocation('/');
-        }
+        // El hook useAuth ya maneja la actualización del estado
+        console.log('🚀 Login successful, letting useAuth handle state...');
       } else {
         await registerMutation.mutateAsync({
           email: formData.email,

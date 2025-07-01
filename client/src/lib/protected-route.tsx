@@ -28,10 +28,6 @@ export function ProtectedRoute({
 
   if (!user) {
     console.log(`🚫 No user found, redirecting to /auth from ${path}`);
-    // Prevent redirect loop if already on auth page
-    if (path === '/auth') {
-      return <Route path={path} component={Component} {...rest} />;
-    }
     return (
       <Route path={path}>
         <Redirect to="/auth" />

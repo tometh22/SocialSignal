@@ -103,12 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
-      // Establecer inmediatamente los datos del usuario con la clave correcta
+      // Establecer inmediatamente los datos del usuario
       queryClient.setQueryData(["/api/current-user"], userData);
-      // Forzar una nueva consulta para asegurar sincronización
-      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-      // Forzar un refetch inmediato
-      queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
+      
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: `Bienvenido ${userData.firstName}`,
+        variant: "default",
+      });
     },
     onError: (error) => {
       console.error('❌ Login mutation error:', error);
@@ -164,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
-      console.log('🚪 Logout successful, clearing user data and redirecting...');
+      console.log('🚪 Logout successful, clearing user data...');
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear(); // Limpiar todo el cache
       
@@ -173,11 +175,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "Has cerrado sesión correctamente",
         variant: "default",
       });
-
-      // Redirigir a la página de login después de un breve delay
-      setTimeout(() => {
-        window.location.href = '/auth';
-      }, 1000);
     },
     onError: (error) => {
       toast({
