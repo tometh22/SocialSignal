@@ -37,10 +37,7 @@ export default function AuthPage() {
     console.log('🔍 AuthPage useEffect:', { user: !!user, loading });
     if (user && !loading) {
       console.log('✅ User authenticated, redirecting to dashboard');
-      // Usar setTimeout para asegurar que el estado se haya actualizado completamente
-      setTimeout(() => {
-        setLocation('/');
-      }, 50);
+      setLocation('/');
     }
   }, [user, loading, setLocation]);
 
@@ -132,8 +129,7 @@ export default function AuthPage() {
           email: formData.email,
           password: formData.password
         });
-        console.log('🚀 Login successful, letting useAuth handle state...');
-        // La redirección se manejará automáticamente por el useEffect cuando user cambie
+        console.log('🚀 Login successful, waiting for redirect...');
       } else {
         await registerMutation.mutateAsync({
           email: formData.email,

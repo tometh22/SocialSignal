@@ -91,17 +91,17 @@ export function setupAuth(app: Express, storage: IStorage) {
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
     let userId = req.session.userId;
-    
+
     // Debug detallado de cookies y sesión
     console.log('🔍 Auth middleware - Headers:', req.headers.cookie);
     console.log('🔍 Auth middleware - Session ID:', req.sessionID);
     console.log('🔍 Auth middleware - Session data:', req.session);
-    
+
     // SOLUCIÓN TEMPORAL: Si no hay sesión, pero hay Authorization header, usar eso
     if (!userId && req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
       console.log('🔍 Auth middleware - Checking Authorization header:', token);
-      
+
       // Simple validación de token temporal (solo números = user ID)
       if (/^\d+$/.test(token)) {
         userId = parseInt(token);
@@ -280,7 +280,7 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       // Generar token único
       const resetToken = randomBytes(32).toString('hex');
-      
+
       // Token expira en 1 hora
       const expiresAt = new Date(Date.now() + 3600000);
 
@@ -290,7 +290,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       // En un entorno real, aquí enviarías un email
       // Por ahora, devolvemos el token para testing
       console.log(`🔑 Password reset token for ${email}: ${resetToken}`);
-      
+
       res.status(200).json({ 
         message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación.",
         // En producción, remove esta línea por seguridad
@@ -308,7 +308,7 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       // Verificar token
       const resetToken = await storage.getPasswordResetToken(token);
-      
+
       if (!resetToken) {
         return res.status(400).json({ message: "Token inválido o expirado" });
       }

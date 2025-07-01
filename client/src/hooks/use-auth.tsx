@@ -38,23 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         console.log('🔍 Fetching current user...');
         
-        // SOLUCIÓN TEMPORAL: Incluir Authorization header si existe
-        const tempUserId = localStorage.getItem('tempUserId');
-        const headers: HeadersInit = {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-        };
-        
-        if (tempUserId) {
-          headers['Authorization'] = `Bearer ${tempUserId}`;
-          console.log('🔑 Using Authorization header for current user check:', tempUserId);
-        }
-        
         const response = await fetch("/api/current-user", {
           credentials: 'include',
           method: 'GET',
           cache: 'no-cache',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
         });
 
         console.log('🔍 Response status:', response.status);
@@ -62,13 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!response.ok) {
           if (response.status === 401) {
             console.log('🔒 User not authenticated');
-            // Limpiar localStorage si la autenticación falla
             localStorage.removeItem('tempUserId');
             return null;
           }
           const errorText = await response.text();
           console.error('❌ HTTP error:', response.status, errorText);
-          return null; // Return null instead of throwing for better error handling
+          return null;
         }
 
         const userData = await response.json();
@@ -81,10 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     retry: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // Cambiar a true para verificar en mount
+    refetchOnMount: true,
     refetchInterval: false,
-    staleTime: 30 * 1000, // Reducir a 30 segundos
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // Mutación para el inicio de sesión
@@ -116,14 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
       
-      // SOLUCIÓN TEMPORAL: Guardar user ID en localStorage para usar como Authorization header
-      localStorage.setItem('tempUserId', userData.id.toString());
-      console.log('💾 Stored user ID in localStorage:', userData.id);
-      
       // Establecer inmediatamente los datos del usuario en el cache
       queryClient.setQueryData(["/api/current-user"], userData);
       
-      // Invalidar y refetch inmediatamente para asegurar sincronización
+      // Invalidar para forzar una nueva consulta
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
       
       console.log('🚀 Login successful, user data set in cache');
@@ -189,8 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       console.log('🚪 Logout successful, clearing user data...');
+      localStorage.removeItem('tempUserId');
       queryClient.setQueryData(["/api/current-user"], null);
-      queryClient.clear(); // Limpiar todo el cache
+      queryClient.clear();
       
       toast({
         title: "Sesión cerrada",
