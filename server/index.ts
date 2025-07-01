@@ -7,10 +7,15 @@ import cors from 'cors';
 
 const app = express();
 
-// Request logging middleware for debugging
+// Request logging middleware for debugging (reduced noise)
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Session ID:', req.headers.cookie);
+  // Only log API requests and errors, not static files
+  if (req.path.startsWith('/api') || req.method !== 'GET') {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    if (req.path.startsWith('/api')) {
+      console.log('Session ID:', req.session?.userId || 'undefined');
+    }
+  }
   next();
 });
 

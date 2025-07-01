@@ -26,7 +26,7 @@ type LoginData = {
   password: string;
 };
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -67,11 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    retry: 1,
-    retryDelay: 1000,
+    retry: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    cacheTime: 15 * 60 * 1000, // 15 minutes
   });
 
   // Mutación para el inicio de sesión

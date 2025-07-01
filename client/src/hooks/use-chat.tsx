@@ -88,7 +88,7 @@ interface ChatContextType {
   isConnecting: boolean;
 }
 
-export const ChatContext = createContext<ChatContextType | null>(null);
+const ChatContext = createContext<ChatContextType | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
