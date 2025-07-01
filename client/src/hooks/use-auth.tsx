@@ -159,12 +159,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
+      console.log('🚪 Logout successful, clearing user data and redirecting...');
       queryClient.setQueryData(["/api/current-user"], null);
+      queryClient.clear(); // Limpiar todo el cache
+      
       toast({
         title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente",
         variant: "default",
       });
+
+      // Redirigir a la página de login después de un breve delay
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 1000);
     },
     onError: (error) => {
       toast({

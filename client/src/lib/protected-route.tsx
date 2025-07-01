@@ -28,6 +28,11 @@ export function ProtectedRoute({
 
   if (!user) {
     console.log(`🚫 No user found, redirecting to /auth from ${path}`);
+    // Forzar redirección inmediata si estamos en una ruta protegida
+    if (window.location.pathname !== '/auth') {
+      window.location.href = '/auth';
+      return null;
+    }
     return (
       <Route path={path}>
         <Redirect to="/auth" />
