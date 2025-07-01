@@ -105,10 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('✅ Login mutation success, setting user data...');
       // Establecer inmediatamente los datos del usuario
       queryClient.setQueryData(["/api/current-user"], userData);
-      // Invalidar las consultas relacionadas con autenticación para forzar refetch
+      // Invalidar todas las consultas relacionadas con autenticación
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
       
-      console.log('🚀 Login successful, letting useAuth handle state...');
+      console.log('🚀 Login successful, user data set in cache');
       
       toast({
         title: "Inicio de sesión exitoso",

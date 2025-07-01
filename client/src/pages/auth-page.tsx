@@ -129,8 +129,11 @@ export default function AuthPage() {
           email: formData.email,
           password: formData.password
         });
-        // El hook useAuth ya maneja la actualización del estado
-        console.log('🚀 Login successful, letting useAuth handle state...');
+        // Forzar redirección inmediata después del login exitoso
+        console.log('🚀 Login successful, redirecting to dashboard...');
+        setTimeout(() => {
+          setLocation('/');
+        }, 100);
       } else {
         await registerMutation.mutateAsync({
           email: formData.email,
