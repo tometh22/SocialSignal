@@ -119,6 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Bienvenido ${userData.firstName}`,
         variant: "default",
       });
+
+      // Redirect automático al dashboard después del login
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 500);
     },
     onError: (error) => {
       console.error('❌ Login mutation error:', error);
@@ -176,16 +181,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       console.log('🚪 Logout successful, clearing user data...');
       
-      // Limpiar datos locales
+      // Limpiar datos locales específicos
       localStorage.removeItem('tempUserId');
-      localStorage.clear(); // Limpiar todo el localStorage
       
       // Limpiar datos del cache de queries
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear();
-      
-      // Forzar la limpieza de cualquier cache restante
-      queryClient.removeQueries();
       
       toast({
         title: "Sesión cerrada",
@@ -196,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Redirect inmediato a la página de autenticación
       setTimeout(() => {
         window.location.href = "/auth";
-      }, 500); // Pequeño delay para mostrar el toast
+      }, 300);
     },
     onError: (error) => {
       toast({
