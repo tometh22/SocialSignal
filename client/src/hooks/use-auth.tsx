@@ -37,14 +37,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: async (): Promise<UserType | null> => {
       try {
         console.log('🔍 Fetching current user...');
+        
+        // SOLUCIÓN TEMPORAL: Incluir Authorization header si existe
+        const tempUserId = localStorage.getItem('tempUserId');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        };
+        
+        if (tempUserId) {
+          headers['Authorization'] = `Bearer ${tempUserId}`;
+          console.log('🔑 Using Authorization header for current user check:', tempUserId);
+        }
+        
         const response = await fetch("/api/current-user", {
           credentials: 'include',
           method: 'GET',
           cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-          },
+          headers,
         });
 
         console.log('🔍 Response status:', response.status);
@@ -110,9 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('tempUserId', userData.id.toString());
       console.log('💾 Stored user ID in localStorage:', userData.id);
       
-      // Invalidar todas las consultas relacionadas con autenticación
-      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-      queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
+      // Forzar actualización inmediata del estado del usuario
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+        queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
+        console.log('🔄 Forced refetch of user data');
+      }, 100);
       
       console.log('🚀 Login successful, user data set in cache');
       
