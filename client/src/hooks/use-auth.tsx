@@ -62,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!response.ok) {
           if (response.status === 401) {
             console.log('🔒 User not authenticated');
+            // Limpiar localStorage si la autenticación falla
+            localStorage.removeItem('tempUserId');
             return null;
           }
           const errorText = await response.text();
@@ -79,10 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     retry: false,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true, // Cambiar a true para verificar en mount
     refetchInterval: false,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes (reemplaza cacheTime en React Query v5)
+    staleTime: 30 * 1000, // Reducir a 30 segundos
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Mutación para el inicio de sesión
@@ -113,19 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
-      // Establecer inmediatamente los datos del usuario
-      queryClient.setQueryData(["/api/current-user"], userData);
       
       // SOLUCIÓN TEMPORAL: Guardar user ID en localStorage para usar como Authorization header
       localStorage.setItem('tempUserId', userData.id.toString());
       console.log('💾 Stored user ID in localStorage:', userData.id);
       
-      // Forzar actualización inmediata del estado del usuario
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-        queryClient.refetchQueries({ queryKey: ["/api/current-user"] });
-        console.log('🔄 Forced refetch of user data');
-      }, 100);
+      // Establecer inmediatamente los datos del usuario en el cache
+      queryClient.setQueryData(["/api/current-user"], userData);
+      
+      // Invalidar y refetch inmediatamente para asegurar sincronización
+      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
       
       console.log('🚀 Login successful, user data set in cache');
       
