@@ -329,19 +329,28 @@ export default function Clients() {
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
                             <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
                             <td className="px-4 py-3">
-                              <div className="flex items-center space-x-2">
-                                <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
-                                  <Edit className="h-4 w-4 mr-1" />
+                              <div className="flex items-center space-x-1">
+                                <Button variant="outline" size="sm" className="hover-lift text-xs" onClick={() => openEditClientDialog(client)}>
+                                  <Edit className="h-3 w-3 mr-1" />
                                   Editar
                                 </Button>
                                 <Button 
                                   variant="default" 
                                   size="sm" 
-                                  className="hover-lift bg-blue-600 hover:bg-blue-700"
+                                  className="hover-lift bg-blue-600 hover:bg-blue-700 text-xs"
                                   onClick={() => navigate(`/client-summary-compact/${client.id}`)}
                                 >
-                                  <BarChart className="h-4 w-4 mr-1" />
-                                  Resumen
+                                  <BarChart className="h-3 w-3 mr-1" />
+                                  Compacto
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="hover-lift text-xs"
+                                  onClick={() => navigate(`/client-summary-redesigned/${client.id}`)}
+                                >
+                                  <BarChart className="h-3 w-3 mr-1" />
+                                  Original
                                 </Button>
                               </div>
                             </td>
