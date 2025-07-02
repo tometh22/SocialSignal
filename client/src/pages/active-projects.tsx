@@ -557,7 +557,7 @@ export default function ActiveProjects() {
       }
     >
 
-      <div className="px-4 sm:px-6 lg:px-8 space-y-4">
+      <div className="space-y-4">
         {/* Estadísticas rápidas */}
         {/* KPI Cards */}
         <div className="kpi-grid">
@@ -1084,7 +1084,6 @@ export default function ActiveProjects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </div>
     </PageLayout>
   );
 }
