@@ -46,7 +46,7 @@ export default function ManageQuotesFixed() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,11 +72,11 @@ export default function ManageQuotesFixed() {
         },
         body: JSON.stringify({ status })
       });
-      
+
       if (!response.ok) {
         throw new Error('Error al actualizar estado');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -105,11 +105,11 @@ export default function ManageQuotesFixed() {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Error al eliminar la cotización');
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -137,7 +137,7 @@ export default function ManageQuotesFixed() {
   const filteredQuotations = quotations?.filter((quote) => {
     const matchesSearch = quote.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          getClientName(quote.clientId).toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     let matchesStatus = true;
     if (statusFilter !== "all") {
       matchesStatus = quote.status === statusFilter;
@@ -151,12 +151,12 @@ export default function ManageQuotesFixed() {
     setNewStatus(quote.status);
     setDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (quote: Quotation) => {
     setSelectedQuote(quote);
     setDeleteDialogOpen(true);
   };
-  
+
   const handleStatusUpdate = () => {
     if (selectedQuote && newStatus) {
       updateStatusMutation.mutate({ id: selectedQuote.id, status: newStatus });
@@ -351,7 +351,7 @@ export default function ManageQuotesFixed() {
               Selecciona el nuevo estado para la cotización "{selectedQuote?.projectName}".
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4">
             <Select value={newStatus} onValueChange={setNewStatus}>
               <SelectTrigger>

@@ -42,9 +42,9 @@ interface Client {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
-  
+
   console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
-  
+
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
     queryKey: ["/api/quotations"],
     onSuccess: (data) => {
@@ -109,7 +109,7 @@ export default function ManageQuotes() {
 
     try {
       const startTime = performance.now();
-      
+
       await apiRequest(
         `/api/quotations/${selectedQuote.id}/status`,
         "PATCH",
@@ -141,7 +141,7 @@ export default function ManageQuotes() {
         error: error instanceof Error ? error.message : error,
         timestamp: new Date().toISOString()
       });
-      
+
       toast({
         title: "Error al actualizar estado",
         description: `No se pudo actualizar el estado de la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
@@ -190,7 +190,7 @@ export default function ManageQuotes() {
         estimatedHours: 0
       };
 
-      const createdProject = await apiRequest('/api/projects', 'POST', projectData);
+      const createdProject = await apiRequest('/api/active-projects', 'POST', projectData);
 
       toast({
         title: "Proyecto creado exitosamente",
@@ -271,7 +271,7 @@ export default function ManageQuotes() {
 
       if (response.ok && data.success) {
         console.log(`[QUOTES] ✅ Cotización eliminada exitosamente: ${selectedQuote.projectName}`);
-        
+
         setTimeout(() => {
           toast({
             title: "Cotización eliminada",
@@ -289,7 +289,7 @@ export default function ManageQuotes() {
           data: data,
           quotationId: selectedQuote.id
         });
-        
+
         setDeletingQuoteId(null);
         toast({
           title: "Error al eliminar",
@@ -309,7 +309,7 @@ export default function ManageQuotes() {
         } : error,
         timestamp: new Date().toISOString()
       });
-      
+
       toast({
         title: "Error crítico",
         description: `Ocurrió un error inesperado al intentar eliminar la cotización "${selectedQuote.projectName}". ${error instanceof Error ? error.message : 'Error desconocido'}`,
@@ -568,7 +568,7 @@ export default function ManageQuotes() {
                   <Loader variant="dots" size="lg" text="Cargando cotizaciones..." />
                 </div>
               ) : filteredQuotations.length > 0 ? (
-                
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
                   {filteredQuotations.map((quote, index) => {
                     const client = getClient(quote.clientId);
@@ -577,7 +577,7 @@ export default function ManageQuotes() {
                       month: '2-digit',
                       year: 'numeric'
                     });
-                    
+
                     return (
                       <Card key={quote.id} className="group relative bg-white border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 rounded-xl overflow-hidden">
                         <CardContent className="p-0">
@@ -683,7 +683,7 @@ export default function ManageQuotes() {
                                 <Edit className="h-3 w-3 mr-1" />
                                 Estado
                               </Button>
-                              
+
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -705,7 +705,7 @@ export default function ManageQuotes() {
                                   Editar
                                 </Button>
                               )}
-                              
+
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -732,7 +732,7 @@ export default function ManageQuotes() {
                     );
                   })}
                 </div>
-               
+
               ) : (
                 <div className="text-center py-12">
                   <div className="mx-auto w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
