@@ -3557,8 +3557,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Verificar si ya existe equipo base
+      const existingTeam = await storage.getProjectBaseTeam(projectId);
+      if (existingTeam.length > 0) {
+        return res.status(200).json({ 
+          message: "El equipo ya existe en este proyecto",
+          alreadyExists: true,
+          team: existingTeam 
+        });
+      }
+
       const baseTeam = await storage.copyQuotationTeamToProject(project.quotationId, projectId);
-      res.json(baseTeam);
+      res.json({ 
+        message: "Equipo copiado exitosamente",
+        created: true,
+        team: baseTeam 
+      });
     } catch (error) {
       console.error("Error copying quotation team to project:", error);
       res.status(500).json({ message: "Failed to copy quotation team" });

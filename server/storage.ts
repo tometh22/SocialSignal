@@ -2160,6 +2160,14 @@ export class DatabaseStorage implements IStorage {
 
   async copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]> {
     try {
+      // Verificar si el proyecto ya tiene equipo base
+      const existingTeam = await db.select().from(projectBaseTeam).where(eq(projectBaseTeam.projectId, projectId));
+      
+      if (existingTeam.length > 0) {
+        // Si ya existe equipo, retornar el equipo existente sin crear duplicados
+        return existingTeam;
+      }
+
       // Obtener el equipo de la cotización
       const quotationTeam = await db.select({
         personnelId: quotationTeamMembers.personnelId,
@@ -2168,15 +2176,17 @@ export class DatabaseStorage implements IStorage {
         rate: quotationTeamMembers.rate
       }).from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
 
-      // Crear el equipo base del proyecto
-      const baseTeam: InsertProjectBaseTeam[] = quotationTeam.map(member => ({
-        projectId,
-        personnelId: member.personnelId,
-        roleId: member.roleId || 1, // Default role if null
-        estimatedHours: member.hours,
-        hourlyRate: member.rate,
-        isActive: true
-      }));
+      // Crear el equipo base del proyecto - filtrar solo miembros con personnelId válido
+      const baseTeam: InsertProjectBaseTeam[] = quotationTeam
+        .filter(member => member.personnelId !== null)
+        .map(member => ({
+          projectId,
+          personnelId: member.personnelId!,
+          roleId: member.roleId || 1, // Default role if null
+          estimatedHours: member.hours,
+          hourlyRate: member.rate,
+          isActive: true
+        }));
 
       if (baseTeam.length > 0) {
         return await db.insert(projectBaseTeam).values(baseTeam).returning();
