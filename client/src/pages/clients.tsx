@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart, Upload, Image } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Componente de imagen robusto para logos
 const ClientLogo = ({ client }: { client: Client }) => {
@@ -270,92 +271,87 @@ export default function Clients() {
   };
 
   return (
-    <div className="page-container">
-      {/* Breadcrumbs unificados */}
-      <div className="breadcrumb-nav mb-6">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
-          <span>Dashboard</span>
-          <span>/</span>
-          <span className="text-foreground font-medium">Clientes</span>
-        </nav>
-        
-        <div className="flex-between">
-          <div>
-            <h1 className="heading-page">Clientes</h1>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <PageHeader
+        title="Clientes"
+        description="Gestiona la información de tus clientes y accede a sus resúmenes"
+        breadcrumbs={[
+          { label: "Clientes", current: true }
+        ]}
+        actions={
           <Button onClick={openNewClientDialog}>
             <UserPlus className="mr-2 h-4 w-4" />
             Añadir Nuevo Cliente
           </Button>
-        </div>
-      </div>
-
-      {/* Buscador separado */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
-        <Input
+        }
+      />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Buscador separado */}
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+          <Input
           placeholder="Buscar clientes..."
           className="pl-10"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+          />
+        </div>
 
-      <Card className="standard-card">
-        <CardContent className="card-content">
-
-          {isLoading ? (
-            <div className="text-center py-8 text-muted">Cargando clientes...</div>
+        <Card className="shadow-sm">
+          <CardContent className="p-6">
+            {isLoading ? (
+              <div className="text-center py-8 text-muted">Cargando clientes...</div>
           ) : filteredClients.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 text-label">Nombre del Cliente</th>
-                    <th className="text-left py-3 text-label">Persona de Contacto</th>
-                    <th className="text-left py-3 text-label">Email</th>
-                    <th className="text-left py-3 text-label">Acciones</th>
-                  </tr>
-                </thead>
-                      <tbody>
-                        {filteredClients.map((client) => (
-                          <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium text-neutral-900">
-                              <div className="flex items-center gap-3">
-                                <ClientLogo client={client} />
-                                <span>{client.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
-                            <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center space-x-2">
-                                <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  Editar
-                                </Button>
-                                <Button 
-                                  variant="default" 
-                                  size="sm" 
-                                  className="hover-lift bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => navigate(`/client-summary/${client.id}`)}
-                                >
-                                  <BarChart className="h-4 w-4 mr-1" />
-                                  Resumen
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 text-label">Nombre del Cliente</th>
+                      <th className="text-left py-3 text-label">Persona de Contacto</th>
+                      <th className="text-left py-3 text-label">Email</th>
+                      <th className="text-left py-3 text-label">Acciones</th>
+                    </tr>
+                  </thead>
+                        <tbody>
+                          {filteredClients.map((client) => (
+                            <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
+                              <td className="px-4 py-3 text-sm font-medium text-neutral-900">
+                                <div className="flex items-center gap-3">
+                                  <ClientLogo client={client} />
+                                  <span>{client.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
+                              <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center space-x-2">
+                                  <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
+                                  <Button 
+                                    variant="default" 
+                                    size="sm" 
+                                    className="hover-lift bg-blue-600 hover:bg-blue-700"
+                                    onClick={() => navigate(`/client-summary/${client.id}`)}
+                                  >
+                                    <BarChart className="h-4 w-4 mr-1" />
+                                    Resumen
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
           ) : (
-            <div className="text-center py-8 text-muted">
-              {searchTerm
-                ? "No hay clientes que coincidan con tu búsqueda."
-                : "No se encontraron clientes. ¡Añade tu primer cliente!"}
-            </div>
+              <div className="text-center py-8 text-muted">
+                {searchTerm
+                  ? "No hay clientes que coincidan con tu búsqueda."
+                  : "No se encontraron clientes. ¡Añade tu primer cliente!"}
+              </div>
           )}
         </CardContent>
       </Card>
@@ -363,12 +359,12 @@ export default function Clients() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="text-heading">{isEditing ? "Editar Cliente" : "Añadir Nuevo Cliente"}</DialogTitle>
-            <DialogDescription>
-              {isEditing 
-                ? "Actualiza la información del cliente a continuación."
-                : "Completa los detalles para añadir un nuevo cliente al sistema."}
-            </DialogDescription>
+              <DialogTitle className="text-heading">{isEditing ? "Editar Cliente" : "Añadir Nuevo Cliente"}</DialogTitle>
+              <DialogDescription>
+                {isEditing 
+                  ? "Actualiza la información del cliente a continuación."
+                  : "Completa los detalles para añadir un nuevo cliente al sistema."}
+              </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
@@ -501,6 +497,7 @@ export default function Clients() {
           </Form>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

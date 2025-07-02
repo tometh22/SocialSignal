@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -436,37 +437,23 @@ export default function ManageQuotes() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 pb-16">
-        {/* Header con fondo blanco */}
-        <div className="bg-white shadow-sm border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center space-x-2 text-sm text-slate-600 pt-4 pb-2">
-              <span>Dashboard</span>
-              <span>/</span>
-              <span className="text-slate-900 font-medium">Gestión de Cotizaciones</span>
-            </nav>
-
-            {/* Title and Action */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-8 gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">
-                  Gestión de Cotizaciones
-                </h1>
-                <p className="text-slate-600 text-lg">
-                  Administra y da seguimiento a todas las cotizaciones del sistema
-                </p>
-              </div>
-              <Button 
-                onClick={() => navigate("/optimized-quote")}
-                className="bg-slate-900 text-white hover:bg-slate-800 font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                Nueva Cotización
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <PageHeader
+          title="Gestión de Cotizaciones"
+          description="Administra y da seguimiento a todas las cotizaciones del sistema"
+          breadcrumbs={[
+            { label: "Gestión de Cotizaciones", current: true }
+          ]}
+          actions={
+            <Button 
+              onClick={() => navigate("/optimized-quote")}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Cotización
+            </Button>
+          }
+        />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Stats Cards */}

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, PenSquare, Building2, Zap, Target, DollarSign } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
@@ -479,37 +480,39 @@ export default function ActiveProjects() {
   }, [filteredProjects, expandedProjects]);
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Gestión de Proyectos</h1>
-          <p className="text-gray-600 mt-1">Administra todos tus proyectos desde un solo lugar</p>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      <PageHeader
+        title="Proyectos Activos"
+        description="Administra todos tus proyectos desde un solo lugar"
+        breadcrumbs={[
+          { label: "Proyectos Activos", current: true }
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setDeleteAllProjectsDialogOpen(true)}
+              size="sm"
+              variant="destructive"
+              className="h-8 text-xs"
+              disabled={!projects || projects.length === 0}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Limpiar Todo
+            </Button>
+            <Button
+              onClick={() => setLocation("/active-projects/new")}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Proyecto
+            </Button>
+          </div>
+        }
+      />
 
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setDeleteAllProjectsDialogOpen(true)}
-            size="sm"
-            variant="destructive"
-            className="h-8 text-xs"
-            disabled={!projects || projects.length === 0}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Limpiar Todo
-          </Button>
-          <Button
-            onClick={() => setLocation("/active-projects/new")}
-            className="bg-indigo-600 hover:bg-indigo-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Proyecto
-          </Button>
-        </div>
-      </div>
-
-      {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 space-y-4">
+        {/* Estadísticas rápidas */}
+        <div className="grid grid-cols-4 gap-4">
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
@@ -1013,6 +1016,7 @@ export default function ActiveProjects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
