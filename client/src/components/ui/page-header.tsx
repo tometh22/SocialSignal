@@ -37,12 +37,12 @@ export function PageHeader({
   };
 
   return (
-    <div className={cn("page-header", className)}>
-      <div className="page-header-content">
+    <div className={cn("page-header bg-white border-b border-gray-200 shadow-sm", className)}>
+      <div className="page-header-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Breadcrumbs */}
         {showBreadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="page-breadcrumbs">
-            <div className="breadcrumb-item">
+          <nav className="flex items-center space-x-1 text-sm text-gray-500 mb-4">
+            <div className="flex items-center">
               <Button
                 variant="ghost"
                 size="sm"
@@ -56,16 +56,16 @@ export function PageHeader({
             
             {breadcrumbs.map((item, index) => (
               <React.Fragment key={index}>
-                <ChevronRight className="h-4 w-4 breadcrumb-separator" />
-                <div className="breadcrumb-item">
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <div className="flex items-center">
                   {item.current ? (
-                    <span className="breadcrumb-current">{item.label}</span>
+                    <span className="text-gray-900 font-medium">{item.label}</span>
                   ) : (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => item.href && handleBreadcrumbClick(item.href)}
-                      className="p-0 h-auto font-normal breadcrumb-link hover:text-gray-900 transition-colors"
+                      className="p-0 h-auto font-normal text-gray-500 hover:text-gray-900 transition-colors"
                     >
                       {item.label}
                     </Button>
@@ -77,20 +77,20 @@ export function PageHeader({
         )}
 
         {/* Title and Actions */}
-        <div className="page-title-section">
-          <div className="page-title-content">
-            <h1 className="page-title">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl sm:truncate">
               {title}
             </h1>
             {description && (
-              <p className="page-description">
+              <p className="mt-1 text-gray-500 text-sm">
                 {description}
               </p>
             )}
           </div>
           
           {actions && (
-            <div className="page-actions">
+            <div className="flex items-center space-x-3 ml-4">
               {actions}
             </div>
           )}

@@ -27,7 +27,7 @@ export function PageLayout({
   contentClassName
 }: PageLayoutProps) {
   return (
-    <div className={cn("page-container", className)}>
+    <div className={cn("min-h-screen bg-gray-50", className)}>
       <PageHeader
         title={title}
         description={description}
@@ -37,7 +37,7 @@ export function PageLayout({
         className={headerClassName}
       />
       
-      <main className={cn("page-content", contentClassName)}>
+      <main className={cn("max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6", contentClassName)}>
         {children}
       </main>
     </div>
