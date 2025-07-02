@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Link, useLocation } from 'wouter';
+import { Link } from 'wouter';
 import { PageLayout } from '@/components/ui/page-layout';
 
 // Interfaces para los datos del cliente
