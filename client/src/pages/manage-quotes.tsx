@@ -438,7 +438,8 @@ export default function ManageQuotes() {
     };
 
   return (
-    <PageLayout
+    <>
+      <PageLayout
       title="Gestión de Cotizaciones"
       description="Administra y da seguimiento a todas las cotizaciones del sistema"
       breadcrumbs={[
@@ -977,6 +978,6 @@ const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustme
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    
+    </>
   );
 }

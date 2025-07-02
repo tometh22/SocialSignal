@@ -67,7 +67,7 @@ function OptimizedQuoteWrapper() {
 
   // Convertir a números si existen
   const quotationId = idParam ? parseInt(idParam) : undefined;
-  const cloneId = cloneParam ? parseInt(cloneId) : undefined;
+  const cloneId = cloneParam ? parseInt(cloneParam) : undefined;
 
   // Determinar el modo: edición normal o recotización
   const isRequote = !!cloneId;
@@ -166,9 +166,39 @@ function AppRoutes() {
                 </div>
               }
             >
-                <KpiRibbon />
-                <DeviationSection />
-                <ChartsSection />
+                <KpiRibbon 
+                  totalHours={0}
+                  billableHours={0}
+                  nonBillableHours={0}
+                  costData={{
+                    actualCost: 0,
+                    estimatedCost: 0,
+                    percentageUsed: 0
+                  }}
+                  timeData={{
+                    daysRemaining: 0,
+                    daysTotal: 0,
+                    progressPercentage: 0
+                  }}
+                  onHelpClick={() => {}}
+                />
+                <DeviationSection 
+                  costVariance={0}
+                  scheduleVariance={0}
+                  riskMetrics={{
+                    budgetRisk: 0,
+                    scheduleRisk: 0,
+                    activeAlerts: 0
+                  }}
+                  onHelpClick={() => {}}
+                />
+                <ChartsSection 
+                  timeByPersonnelData={[]}
+                  billableDistributionData={[]}
+                  timeAndCostData={[]}
+                  onChartExpand={() => {}}
+                  onRegisterHours={() => {}}
+                />
             </PageLayout>
 )} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />

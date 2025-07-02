@@ -873,8 +873,8 @@ body.dark::before {
   --color-gray-500: hsl(210, 8%, 45%);
   --color-gray-600: hsl(210, 10%, 35%);
   --color-gray-700: hsl(210, 12%, 25%);
-  --color-gray-800: hsl(210, 14%, 15%);Fixes a CSS syntax error by removing an extraneous "e-4);" at the end of a media query.```text
---color-gray-900: hsl(210, 16%, 8%);
+  --color-gray-800: hsl(210, 14%, 15%);
+  --color-gray-900: hsl(210, 16%, 8%);
 }
 
 @layer base {
