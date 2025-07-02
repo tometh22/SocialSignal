@@ -737,10 +737,45 @@ export default function ProjectDetails() {
 
 // Component for ProjectTeamSection
 function ProjectTeamSection({ projectId, queryClient }: { projectId: string; queryClient: any }) {
-  const { data: baseTeam = [], isLoading: teamLoading } = useQuery({
+  const { toast } = useToast();
+  
+  const { data: baseTeam = [], isLoading: teamLoading, refetch } = useQuery({
     queryKey: ["/api/projects", projectId, "base-team"],
-    queryFn: () => fetch(`/api/projects/${projectId}/base-team`).then(res => res.json()),
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/base-team`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch team');
+      }
+      return response.json();
+    },
     enabled: !!projectId,
+  });
+
+  const copyTeamMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/copy-quotation-team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to copy team');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Equipo copiado desde la cotización correctamente",
+      });
+      refetch();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar el equipo de la cotización",
+        variant: "destructive",
+      });
+    },
   });
 
   if (teamLoading) {
@@ -761,19 +796,20 @@ function ProjectTeamSection({ projectId, queryClient }: { projectId: string; que
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => {
-            // Trigger copy team from quotation
-            fetch(`/api/projects/${projectId}/copy-quotation-team`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' }
-            }).then(() => {
-              // Refresh the query
-              queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "base-team"] });
-            });
-          }}
+          onClick={() => copyTeamMutation.mutate()}
+          disabled={copyTeamMutation.isPending}
         >
-          <Users className="h-4 w-4 mr-2" />
-          Copiar Equipo de Cotización
+          {copyTeamMutation.isPending ? (
+            <>
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+              Copiando...
+            </>
+          ) : (
+            <>
+              <Users className="h-4 w-4 mr-2" />
+              Copiar Equipo de Cotización
+            </>
+          )}
         </Button>
       </div>
     );
