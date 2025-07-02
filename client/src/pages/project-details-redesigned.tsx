@@ -63,6 +63,242 @@ interface TimeEntry {
   hourlyRate?: number;
 }
 
+// Component for ProjectTeamSection with enhanced functionality
+function ProjectTeamSection({ projectId, timeEntries }: { projectId: string; timeEntries: any[] }) {
+  const { toast } = useToast();
+  
+  const { data: baseTeam = [], isLoading: teamLoading, refetch } = useQuery({
+    queryKey: ["/api/projects", projectId, "base-team"],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/base-team`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch team');
+      }
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const copyTeamMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/copy-quotation-team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to copy team');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Equipo copiado desde la cotización correctamente",
+      });
+      refetch();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo copiar el equipo de la cotización",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Calcular tiempo registrado por miembro
+  const getTimeWorkedByMember = (personnelId: number) => {
+    return timeEntries
+      .filter((entry: any) => entry.personnelId === personnelId)
+      .reduce((total: number, entry: any) => total + (entry.hours || 0), 0);
+  };
+
+  const getProgressPercentage = (workedHours: number, estimatedHours: number) => {
+    if (estimatedHours === 0) return 0;
+    return Math.round((workedHours / estimatedHours) * 100);
+  };
+
+  if (teamLoading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    );
+  }
+
+  if (!baseTeam || baseTeam.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground mb-3">No hay equipo asignado a este proyecto</p>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => copyTeamMutation.mutate()}
+          disabled={copyTeamMutation.isPending}
+        >
+          {copyTeamMutation.isPending ? (
+            <>
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+              Copiando...
+            </>
+          ) : (
+            <>
+              <Users className="h-4 w-4 mr-2" />
+              Copiar Equipo de Cotización
+            </>
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {baseTeam.map((member: any) => {
+        const workedHours = getTimeWorkedByMember(member.personnelId);
+        const progressPercent = getProgressPercentage(workedHours, member.estimatedHours || 0);
+        
+        return (
+          <div key={member.id} className="p-4 border rounded-lg bg-muted/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                    {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('') || 'MB'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{member.personnel?.name || 'Miembro del Equipo'}</p>
+                  <p className="text-xs text-muted-foreground">{member.role?.name || 'Rol no especificado'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    {member.estimatedHours || 0}h est.
+                  </Badge>
+                  <span className="text-sm font-medium">${member.hourlyRate || 0}/h</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {member.isActive ? 'Activo' : 'Inactivo'}
+                </p>
+              </div>
+            </div>
+            
+            {/* Barra de progreso y tiempo registrado */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Registrado: {workedHours}h de {member.estimatedHours || 0}h
+                </span>
+                <span className="font-medium text-blue-600">
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    progressPercent >= 100 ? 'bg-green-500' : 
+                    progressPercent >= 75 ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                />
+              </div>
+              {workedHours > 0 && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Costo real: ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}</span>
+                  <span>
+                    {progressPercent > 100 ? 
+                      `+${(workedHours - (member.estimatedHours || 0)).toFixed(1)}h extra` : 
+                      `${((member.estimatedHours || 0) - workedHours).toFixed(1)}h restantes`
+                    }
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      
+      <div className="pt-3 border-t space-y-2">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Horas Estimadas:</span>
+              <span className="font-medium">
+                {baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0)}h
+              </span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Costo Estimado:</span>
+              <span className="font-medium">
+                ${baseTeam.reduce((sum: number, member: any) => 
+                  sum + ((member.estimatedHours || 0) * (member.hourlyRate || 0)), 0
+                ).toFixed(0)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Horas Trabajadas:</span>
+              <span className="font-medium text-blue-600">
+                {baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0).toFixed(1)}h
+              </span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Costo Real:</span>
+              <span className="font-medium text-blue-600">
+                ${baseTeam.reduce((sum: number, member: any) => {
+                  const workedHours = getTimeWorkedByMember(member.personnelId);
+                  return sum + (workedHours * (member.hourlyRate || 0));
+                }, 0).toFixed(0)}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Progreso general del proyecto */}
+        <div className="pt-2">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-muted-foreground">Progreso General:</span>
+            <span className="font-medium">
+              {(() => {
+                const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                return `${percentage}%`;
+              })()}
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all duration-300 ${
+                (() => {
+                  const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                  return percentage >= 100 ? 'bg-green-500' : 
+                         percentage >= 75 ? 'bg-yellow-500' : 'bg-blue-500';
+                })()
+              }`}
+              style={{ 
+                width: `${Math.min((() => {
+                  const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  return totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                })(), 100)}%` 
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectDetailsRedesigned() {
   const { id: projectId } = useParams();
   const [, setLocation] = useLocation();
@@ -596,49 +832,11 @@ export default function ProjectDetailsRedesigned() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-green-600" />
-                  Rendimiento del Equipo
+                  Equipo del Proyecto
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {teamStats.length > 0 ? (
-                    teamStats.map((member, index) => (
-                      <div key={member.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="relative">
-                            <Avatar className="h-12 w-12">
-                              <AvatarFallback className="bg-blue-100 text-blue-800">
-                                {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {index === 0 && (
-                              <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1">
-                                <Zap className="h-3 w-3 text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-semibold">{member.name}</p>
-                            <p className="text-sm text-gray-500">{member.entries} registros</p>
-                            <p className="text-xs text-gray-400">
-                              Última actividad: {new Date(member.lastActivity).toLocaleDateString('es-ES')}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-blue-600">{member.hours.toFixed(1)}h</p>
-                          <p className="text-sm text-gray-500">Total trabajado</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-12">
-                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Sin actividad del equipo</h3>
-                      <p className="text-gray-600">No hay registros de tiempo del equipo aún.</p>
-                    </div>
-                  )}
-                </div>
+                <ProjectTeamSection projectId={projectId!} timeEntries={timeEntries} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -710,3 +908,4 @@ export default function ProjectDetailsRedesigned() {
     </div>
   );
 }
+
