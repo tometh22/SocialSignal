@@ -443,9 +443,7 @@ export default function ProjectDetails() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Assuming ProjectTeamSection is a component that displays project team */}
-                {/* It should be defined elsewhere in your project */}
-                <ProjectTeamSection projectId={projectId!} />
+                <ProjectTeamSection projectId={projectId!} queryClient={queryClient} />
               </CardContent>
             </Card>
 
@@ -737,12 +735,95 @@ export default function ProjectDetails() {
   );
 }
 
-// Placeholder component for ProjectTeamSection
-function ProjectTeamSection({ projectId }: { projectId: string }) {
+// Component for ProjectTeamSection
+function ProjectTeamSection({ projectId, queryClient }: { projectId: string; queryClient: any }) {
+  const { data: baseTeam = [], isLoading: teamLoading } = useQuery({
+    queryKey: ["/api/projects", projectId, "base-team"],
+    queryFn: () => fetch(`/api/projects/${projectId}/base-team`).then(res => res.json()),
+    enabled: !!projectId,
+  });
+
+  if (teamLoading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    );
+  }
+
+  if (!baseTeam || baseTeam.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground mb-3">No hay equipo asignado a este proyecto</p>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => {
+            // Trigger copy team from quotation
+            fetch(`/api/projects/${projectId}/copy-quotation-team`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            }).then(() => {
+              // Refresh the query
+              queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "base-team"] });
+            });
+          }}
+        >
+          <Users className="h-4 w-4 mr-2" />
+          Copiar Equipo de Cotización
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      {/* Implement your team display logic here */}
-      <p>Team members for project {projectId} will be displayed here.</p>
+    <div className="space-y-4">
+      {baseTeam.map((member: any) => (
+        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('') || 'MB'}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium text-sm">{member.personnel?.name || 'Miembro del Equipo'}</p>
+              <p className="text-xs text-muted-foreground">{member.role?.name || 'Rol no especificado'}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                {member.estimatedHours || 0}h
+              </Badge>
+              <span className="text-sm font-medium">${member.hourlyRate || 0}/h</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {member.isActive ? 'Activo' : 'Inactivo'}
+            </p>
+          </div>
+        </div>
+      ))}
+      
+      <div className="pt-3 border-t">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Total Horas Estimadas:</span>
+          <span className="font-medium">
+            {baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0)}h
+          </span>
+        </div>
+        <div className="flex justify-between text-sm mt-1">
+          <span className="text-muted-foreground">Costo Estimado Total:</span>
+          <span className="font-medium">
+            ${baseTeam.reduce((sum: number, member: any) => 
+              sum + ((member.estimatedHours || 0) * (member.hourlyRate || 0)), 0
+            ).toFixed(0)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
