@@ -2187,6 +2187,27 @@ export class DatabaseStorage implements IStorage {
       console.error("Error al copiar equipo de cotización a proyecto:", error);
       throw error;
     }
+  }amMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
+
+      // Crear el equipo base del proyecto
+      const baseTeam: InsertProjectBaseTeam[] = quotationTeam.map(member => ({
+        projectId,
+        personnelId: member.personnelId,
+        roleId: member.roleId || 1, // Default role if null
+        estimatedHours: member.hours,
+        hourlyRate: member.rate,
+        isActive: true
+      }));
+
+      if (baseTeam.length > 0) {
+        return await db.insert(projectBaseTeam).values(baseTeam).returning();
+      }
+
+      return [];
+    } catch (error) {
+      console.error("Error al copiar equipo de cotización a proyecto:", error);
+      throw error;
+    }
   }
 
   // ==================== QUICK TIME ENTRY OPERATIONS ====================

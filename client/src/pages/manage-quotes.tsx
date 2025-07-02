@@ -192,9 +192,18 @@ export default function ManageQuotes() {
 
       const createdProject = await apiRequest('/api/active-projects', 'POST', projectData);
 
+      // Copiar automáticamente el equipo de la cotización al proyecto
+      try {
+        await apiRequest(`/api/projects/${createdProject.id}/copy-quotation-team`, 'POST');
+        console.log('✅ Equipo copiado automáticamente al proyecto desde la cotización');
+      } catch (teamError) {
+        console.warn('⚠️ Error al copiar equipo de la cotización:', teamError);
+        // No fallar la creación del proyecto si falla la copia del equipo
+      }
+
       toast({
         title: "Proyecto creado exitosamente",
-        description: `El proyecto "${approvedQuote.projectName}" ha sido creado y está listo para comenzar.`,
+        description: `El proyecto "${approvedQuote.projectName}" ha sido creado con su equipo asignado y está listo para comenzar.`,
       });
 
       setCreateProjectDialogOpen(false);
