@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 2, 2025: Implemented automatic team copying from quotation when creating projects from approved quotations
+- July 2, 2025: Enhanced project team section to show both estimated and actual worked hours per team member  
+- July 2, 2025: Added progress bars and completion percentages for individual team members and overall project
+- July 2, 2025: Integrated real-time time tracking visualization in the team tab showing cost comparisons
 - June 30, 2025: Implemented complete password recovery functionality with "Forgot Password" feature
 - June 30, 2025: Added password reset tokens database table and API endpoints for secure password recovery
 - June 30, 2025: Created new authentication tab for password recovery with two-step process (email → token → new password)

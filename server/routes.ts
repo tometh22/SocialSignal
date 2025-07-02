@@ -1625,6 +1625,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const project = await storage.createActiveProject(validatedData);
+      
+      // Copiar automáticamente el equipo de la cotización al proyecto recién creado
+      try {
+        console.log(`📋 Copiando equipo automáticamente desde cotización ${validatedData.quotationId} al proyecto ${project.id}`);
+        const baseTeam = await storage.copyQuotationTeamToProject(Number(validatedData.quotationId), project.id);
+        console.log(`✅ Equipo copiado automáticamente: ${baseTeam.length} miembros`);
+      } catch (teamError) {
+        console.warn('⚠️ Error al copiar equipo automáticamente, pero proyecto creado exitosamente:', teamError);
+        // No fallar la creación del proyecto si hay error copiando el equipo
+      }
+      
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {

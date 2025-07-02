@@ -751,6 +751,19 @@ function ProjectTeamSection({ projectId, queryClient }: { projectId: string; que
     enabled: !!projectId,
   });
 
+  // Obtener registros de tiempo para mostrar progreso por miembro
+  const { data: timeEntries = [] } = useQuery({
+    queryKey: ["/api/time-entries/project", projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/time-entries/project/${projectId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch time entries');
+      }
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
   const copyTeamMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/projects/${projectId}/copy-quotation-team`, {
@@ -815,49 +828,156 @@ function ProjectTeamSection({ projectId, queryClient }: { projectId: string; que
     );
   }
 
+  // Calcular tiempo registrado por miembro
+  const getTimeWorkedByMember = (personnelId: number) => {
+    return timeEntries
+      .filter((entry: any) => entry.personnelId === personnelId)
+      .reduce((total: number, entry: any) => total + (entry.hours || 0), 0);
+  };
+
+  const getProgressPercentage = (workedHours: number, estimatedHours: number) => {
+    if (estimatedHours === 0) return 0;
+    return Math.round((workedHours / estimatedHours) * 100);
+  };
+
   return (
     <div className="space-y-4">
-      {baseTeam.map((member: any) => (
-        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
-                {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('') || 'MB'}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium text-sm">{member.personnel?.name || 'Miembro del Equipo'}</p>
-              <p className="text-xs text-muted-foreground">{member.role?.name || 'Rol no especificado'}</p>
+      {baseTeam.map((member: any) => {
+        const workedHours = getTimeWorkedByMember(member.personnelId);
+        const progressPercent = getProgressPercentage(workedHours, member.estimatedHours || 0);
+        
+        return (
+          <div key={member.id} className="p-4 border rounded-lg bg-muted/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
+                    {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('') || 'MB'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{member.personnel?.name || 'Miembro del Equipo'}</p>
+                  <p className="text-xs text-muted-foreground">{member.role?.name || 'Rol no especificado'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    {member.estimatedHours || 0}h est.
+                  </Badge>
+                  <span className="text-sm font-medium">${member.hourlyRate || 0}/h</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {member.isActive ? 'Activo' : 'Inactivo'}
+                </p>
+              </div>
+            </div>
+            
+            {/* Barra de progreso y tiempo registrado */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Registrado: {workedHours}h de {member.estimatedHours || 0}h
+                </span>
+                <span className="font-medium text-blue-600">
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    progressPercent >= 100 ? 'bg-green-500' : 
+                    progressPercent >= 75 ? 'bg-yellow-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                />
+              </div>
+              {workedHours > 0 && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Costo real: ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}</span>
+                  <span>
+                    {progressPercent > 100 ? 
+                      `+${(workedHours - (member.estimatedHours || 0)).toFixed(1)}h extra` : 
+                      `${((member.estimatedHours || 0) - workedHours).toFixed(1)}h restantes`
+                    }
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-          <div className="text-right">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                {member.estimatedHours || 0}h
-              </Badge>
-              <span className="text-sm font-medium">${member.hourlyRate || 0}/h</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {member.isActive ? 'Activo' : 'Inactivo'}
-            </p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       
-      <div className="pt-3 border-t">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Total Horas Estimadas:</span>
-          <span className="font-medium">
-            {baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0)}h
-          </span>
+      <div className="pt-3 border-t space-y-2">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Horas Estimadas:</span>
+              <span className="font-medium">
+                {baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0)}h
+              </span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Costo Estimado:</span>
+              <span className="font-medium">
+                ${baseTeam.reduce((sum: number, member: any) => 
+                  sum + ((member.estimatedHours || 0) * (member.hourlyRate || 0)), 0
+                ).toFixed(0)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Horas Trabajadas:</span>
+              <span className="font-medium text-blue-600">
+                {baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0).toFixed(1)}h
+              </span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-muted-foreground">Costo Real:</span>
+              <span className="font-medium text-blue-600">
+                ${baseTeam.reduce((sum: number, member: any) => {
+                  const workedHours = getTimeWorkedByMember(member.personnelId);
+                  return sum + (workedHours * (member.hourlyRate || 0));
+                }, 0).toFixed(0)}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-between text-sm mt-1">
-          <span className="text-muted-foreground">Costo Estimado Total:</span>
-          <span className="font-medium">
-            ${baseTeam.reduce((sum: number, member: any) => 
-              sum + ((member.estimatedHours || 0) * (member.hourlyRate || 0)), 0
-            ).toFixed(0)}
-          </span>
+        
+        {/* Progreso general del proyecto */}
+        <div className="pt-2">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-muted-foreground">Progreso General:</span>
+            <span className="font-medium">
+              {(() => {
+                const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                return `${percentage}%`;
+              })()}
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all duration-300 ${
+                (() => {
+                  const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                  return percentage >= 100 ? 'bg-green-500' : 
+                         percentage >= 75 ? 'bg-yellow-500' : 'bg-blue-500';
+                })()
+              }`}
+              style={{ 
+                width: `${Math.min((() => {
+                  const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  return totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
+                })(), 100)}%` 
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
