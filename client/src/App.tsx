@@ -150,6 +150,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
                   <ProtectedRoute path="/projects/:projectId/recurring-templates" component={RecurringTemplatesPage} />
+                  <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
                   <Route component={NotFound} />
                 </Switch>
               </div>
