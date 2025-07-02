@@ -25,6 +25,7 @@ import ProjectAnalyticsView from "@/pages/project-analytics-view";
 import VersionSelector from "@/pages/selector-version";
 import ClientSummary from "@/pages/client-summary";
 import ClientSummaryEnhanced from "@/pages/client-summary-enhanced";
+import ClientSummaryRedesigned from "@/pages/client-summary-redesigned";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
 import AuthPage from "@/pages/auth-page";
@@ -141,6 +142,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryEnhanced} />
+                  <ProtectedRoute path="/client-summary-redesigned/:id" component={ClientSummaryRedesigned} />
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} />
                   <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
