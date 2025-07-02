@@ -180,9 +180,9 @@ export default function ProjectDetails() {
       "paused": { className: "bg-amber-100 text-amber-700 hover:bg-amber-100", label: "Pausado" },
       "cancelled": { className: "bg-red-100 text-red-700 hover:bg-red-100", label: "Cancelado" }
     };
-    
+
     const statusConfig = config[status as keyof typeof config] || config.pending;
-    
+
     return (
       <Badge variant="secondary" className={`text-sm font-medium px-3 py-1 ${statusConfig.className}`}>
         {statusConfig.label}
@@ -227,7 +227,7 @@ export default function ProjectDetails() {
                 </div>
               </div>
             </div>
-            
+
             {/* Botones de Acción Principales */}
             <div className="flex items-center gap-3">
               <Button 
@@ -313,7 +313,7 @@ export default function ProjectDetails() {
                       <Clock className="h-8 w-8 text-blue-500" />
                     </div>
                   </div>
-                  
+
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between">
                       <div>
@@ -323,7 +323,7 @@ export default function ProjectDetails() {
                       <DollarSign className="h-8 w-8 text-green-500" />
                     </div>
                   </div>
-                  
+
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between">
                       <div>
@@ -333,7 +333,7 @@ export default function ProjectDetails() {
                       <Target className="h-8 w-8 text-orange-500" />
                     </div>
                   </div>
-                  
+
                   <div className="bg-white p-4 rounded-lg border">
                     <div className="flex items-center justify-between">
                       <div>
@@ -434,6 +434,21 @@ export default function ProjectDetails() {
 
           {/* COLUMNA 2: Información del Proyecto y Acciones */}
           <div className="space-y-6">
+            {/* Equipo del Proyecto */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Equipo Asignado
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Assuming ProjectTeamSection is a component that displays project team */}
+                {/* It should be defined elsewhere in your project */}
+                <ProjectTeamSection projectId={projectId!} />
+              </CardContent>
+            </Card>
+
             {/* Información del Proyecto */}
             <Card>
               <CardHeader>
@@ -463,9 +478,9 @@ export default function ProjectDetails() {
                     {getCompletionStatusBadge(projectData?.completionStatus || "in_progress")}
                   </div>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div>
                   <h4 className="text-sm font-medium mb-2">Descripción</h4>
                   <p className="text-sm text-muted-foreground">
@@ -492,7 +507,7 @@ export default function ProjectDetails() {
                   <Clock className="h-4 w-4 mr-2" />
                   Registrar Tiempo
                 </Button>
-                
+
                 <Button 
                   className="w-full justify-start" 
                   variant="outline"
@@ -501,7 +516,7 @@ export default function ProjectDetails() {
                   <BarChart3 className="h-4 w-4 mr-2" />
                   Ver Análisis Detallado
                 </Button>
-                
+
                 <Button 
                   className="w-full justify-start" 
                   variant="outline"
@@ -528,7 +543,7 @@ export default function ProjectDetails() {
                   </div>
                   <div className="text-sm text-gray-600">Entradas de Tiempo</div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <div className="text-lg font-bold text-blue-600">
@@ -571,7 +586,7 @@ export default function ProjectDetails() {
               Configuración del Proyecto
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             {/* Información básica */}
             <div className="space-y-4">
@@ -587,7 +602,7 @@ export default function ProjectDetails() {
                   placeholder="Nombre del entregable"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="project-status" className="text-sm font-medium">
                   Estado del Proyecto
@@ -630,7 +645,7 @@ export default function ProjectDetails() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="project-description" className="text-sm font-medium">
                   Descripción
@@ -690,7 +705,7 @@ export default function ProjectDetails() {
               </div>
             </div>
           </div>
-          
+
           <div className="flex justify-end space-x-2 pt-6 border-t">
             <Button 
               variant="outline" 
@@ -718,6 +733,16 @@ export default function ProjectDetails() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Placeholder component for ProjectTeamSection
+function ProjectTeamSection({ projectId }: { projectId: string }) {
+  return (
+    <div>
+      {/* Implement your team display logic here */}
+      <p>Team members for project {projectId} will be displayed here.</p>
     </div>
   );
 }
