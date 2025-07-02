@@ -56,11 +56,11 @@ const OptimizedQuote: React.FC<OptimizedQuoteProps> = ({ quotationId, isRequote 
 
   return (
     <PageLayout
-      title="Nueva Cotización"
+      title={isEditing ? 'Editar Cotización' : 'Nueva Cotización'}
       description="Crea una cotización optimizada siguiendo el proceso paso a paso"
       breadcrumbs={[
         { label: "Gestión de Cotizaciones", href: "/manage-quotes" },
-        { label: "Nueva Cotización", current: true }
+        { label: isEditing ? 'Editar Cotización' : 'Nueva Cotización', current: true }
       ]}
       actions={
         <div className="flex items-center gap-2">

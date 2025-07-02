@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { PageLayout } from "@/components/ui/page-layout";
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
@@ -200,54 +201,47 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const isLastStep = currentStep === steps[steps.length - 1].num;
 
   return (
-    <div className="page-container">
-      {/* Breadcrumbs */}
-      <div className="breadcrumb-nav">
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
-          <span>Dashboard</span>
-          <span>/</span>
-          <span>Gestión de Cotizaciones</span>
-          <span>/</span>
-          <span className="text-foreground font-medium">{isEditing ? 'Editar Cotización' : 'Nueva Cotización'}</span>
-        </nav>
+    <PageLayout
+      title={isEditing ? 'Editar Cotización' : 'Nueva Cotización'}
+      description="Crea y gestiona cotizaciones de manera optimizada"
+      breadcrumbs={[
+        { label: "Gestión de Cotizaciones", href: "/manage-quotes" },
+        { label: isEditing ? 'Editar Cotización' : 'Nueva Cotización', current: true }
+      ]}
+      actions={
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/manage-quotes")}
+            className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Volver
+          </Button>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="heading-page">{isEditing ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/manage-quotes")}
-              className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Volver
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSave}
-              disabled={isSaving}
-              className="text-primary hover:text-primary-dark hover:bg-primary/5"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-1" />
-                  Guardar
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="text-primary hover:text-primary-dark hover:bg-primary/5"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-1" />
+                Guardar
+              </>
+            )}
+          </Button>
         </div>
-      </div>
+      }
+    >
 
       {/* Progress indicator */}
       <div className="standard-card mb-6">
@@ -407,7 +401,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 };
 
