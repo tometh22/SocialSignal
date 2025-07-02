@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import {
   Dialog,
@@ -31,7 +31,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'wouter';
-import { PageLayout } from '@/components/ui/page-layout';
 
 // Interfaces para los datos del cliente
 interface Client {

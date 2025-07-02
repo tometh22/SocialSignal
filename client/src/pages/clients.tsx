@@ -1,118 +1,91 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useRef } from "react";
-import { useLocation } from "wouter";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Client, InsertClient } from "@shared/schema";
+import { queryClient } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, UserPlus, Users, Mail, Phone, Edit, Trash, BarChart, Upload, Image } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { Search, UserPlus, Users, Mail, Phone, Edit, Trash, Upload, Image } from "lucide-react";
+import { PageLayout } from "@/components/ui/page-layout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import type { Client, InsertClient } from "@shared/schema";
 
 // Componente de imagen robusto para logos
 const ClientLogo = ({ client }: { client: Client }) => {
   const [hasError, setHasError] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(true);
+
   if (!client.logoUrl || hasError) {
     return (
-      <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center flex-shrink-0">
-        <span className="text-xs font-medium text-primary">
-          {client.name.substring(0, 2).toUpperCase()}
-        </span>
+      <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center border-2 border-blue-200/50">
+        <Users className="w-8 h-8 text-blue-600" />
       </div>
     );
   }
-  
+
   return (
-    <div className="h-8 w-8 rounded overflow-hidden flex-shrink-0 bg-white border border-gray-200">
-      <img 
-        src={client.logoUrl} 
-        alt={`${client.name} logo`} 
-        className="h-full w-full object-contain"
+    <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200/50 bg-white">
+      {isLoading && (
+        <div className="w-full h-full bg-gray-100 animate-pulse flex items-center justify-center">
+          <Image className="w-6 h-6 text-gray-400" />
+        </div>
+      )}
+      <img
+        src={client.logoUrl}
+        alt={`${client.name} logo`}
+        className={`w-full h-full object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        onLoad={() => setIsLoading(false)}
         onError={() => {
-          console.error(`Failed to load logo for ${client.name}:`, client.logoUrl);
           setHasError(true);
-        }}
-        onLoad={() => {
-          console.log(`Successfully loaded logo for ${client.name}`);
+          setIsLoading(false);
         }}
       />
     </div>
   );
 };
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
+// Schema de validación para el formulario
 const clientSchema = z.object({
-  name: z.string().min(1, "Client name is required"),
+  name: z.string().min(1, "El nombre del cliente es requerido"),
   contactName: z.string().optional(),
-  contactEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
+  contactEmail: z.string().email("Email inválido").optional().or(z.literal("")),
   contactPhone: z.string().optional(),
-  logoUrl: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
 
 export default function Clients() {
-  const { data: clients, isLoading, refetch } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    onSuccess: (data) => {
-      // Log de diagnóstico para verificar URLs de logos
-      console.log('Clients loaded:', data?.map(c => ({ 
-        name: c.name, 
-        logoUrl: c.logoUrl,
-        hasLogo: !!c.logoUrl 
-      })));
-    }
-  });
-  
-  const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentClient, setCurrentClient] = useState<Client | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { toast } = useToast();
 
-  const form = useForm<ClientFormValues>({
-    resolver: zodResolver(clientSchema),
-    defaultValues: {
-      name: "",
-      contactName: "",
-      contactEmail: "",
-      contactPhone: "",
-      logoUrl: "",
-    },
+  // Query para obtener clientes
+  const { data: clients = [], isLoading, error } = useQuery({
+    queryKey: ['/api/clients'],
   });
 
+  // Mutación para crear cliente
   const createMutation = useMutation({
     mutationFn: (client: InsertClient) => 
-      apiRequest("/api/clients", "POST", client),
-    onSuccess: async () => {
-      // Invalidar la caché de consultas
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      // Forzar una actualización inmediata
-      await refetch();
-      toast({
-        title: "Éxito",
-        description: "El cliente ha sido creado correctamente.",
-      });
+      fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(client),
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       setDialogOpen(false);
       form.reset();
+      toast({
+        title: "Cliente creado",
+        description: "El cliente ha sido creado exitosamente.",
+      });
     },
     onError: () => {
       toast({
@@ -123,30 +96,26 @@ export default function Clients() {
     },
   });
 
+  // Mutación para actualizar cliente
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertClient> }) => {
-      try {
-        const response = await apiRequest(`/api/clients/${id}`, "PATCH", data);
-        return response;
-      } catch (error) {
-        console.error("Error detallado:", error);
-        throw error;
-      }
-    },
-    onSuccess: async () => {
-      // Invalidar la caché de consultas
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      // Forzar una actualización inmediata
-      await refetch();
-      toast({
-        title: "Éxito",
-        description: "El cliente ha sido actualizado correctamente.",
-      });
+    mutationFn: ({ id, client }: { id: number; client: Partial<InsertClient> }) =>
+      fetch(`/api/clients/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(client),
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       setDialogOpen(false);
       form.reset();
+      setIsEditing(false);
+      setEditingClient(null);
+      toast({
+        title: "Cliente actualizado",
+        description: "El cliente ha sido actualizado exitosamente.",
+      });
     },
-    onError: (error) => {
-      console.error("Error en updateMutation:", error);
+    onError: () => {
       toast({
         title: "Error",
         description: "No se pudo actualizar el cliente.",
@@ -154,229 +123,281 @@ export default function Clients() {
       });
     },
   });
-  
-  // Mutación para cargar el logo del cliente
+
+  // Mutación para eliminar cliente
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      fetch(`/api/clients/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      toast({
+        title: "Cliente eliminado",
+        description: "El cliente ha sido eliminado exitosamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el cliente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutación para subir logo
   const uploadLogoMutation = useMutation({
     mutationFn: async ({ clientId, file }: { clientId: number; file: File }) => {
-      setIsUploadingLogo(true);
       const formData = new FormData();
       formData.append('logo', file);
       
       const response = await fetch(`/api/clients/${clientId}/logo`, {
         method: 'POST',
         body: formData,
-        credentials: 'include'
       });
       
       if (!response.ok) {
-        throw new Error('Error al cargar el logo');
+        throw new Error('Failed to upload logo');
       }
       
-      return await response.json();
+      return response.json();
     },
-    onSuccess: async (data) => {
-      // Actualizar el formulario con la nueva URL del logo
-      form.setValue('logoUrl', data.logoUrl);
-      setLogoPreview(data.logoUrl);
-      
-      // Invalidar la caché de consultas para actualizar los datos
-      await queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       toast({
-        title: "Éxito",
-        description: "Logo cargado correctamente.",
+        title: "Logo subido",
+        description: "El logo ha sido subido exitosamente.",
       });
-      setIsUploadingLogo(false);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "No se pudo cargar el logo.",
+        description: "No se pudo subir el logo.",
         variant: "destructive",
       });
-      setIsUploadingLogo(false);
     },
   });
 
-  // Filter clients based on search term
-  const filteredClients = clients
-    ? clients.filter((client) => 
-        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    : [];
+  // Configuración del formulario
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientSchema),
+    defaultValues: {
+      name: "",
+      contactName: "",
+      contactEmail: "",
+      contactPhone: "",
+    },
+  });
+
+  // Filtrar clientes según término de búsqueda
+  const filteredClients = Array.isArray(clients) ? clients.filter((client: Client) =>
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
+  ) : [];
 
   const openNewClientDialog = () => {
+    setIsEditing(false);
+    setEditingClient(null);
     form.reset({
       name: "",
       contactName: "",
       contactEmail: "",
       contactPhone: "",
-      logoUrl: "",
     });
-    setCurrentClient(null);
-    setIsEditing(false);
-    setLogoPreview(null);
     setDialogOpen(true);
   };
 
   const openEditClientDialog = (client: Client) => {
+    setIsEditing(true);
+    setEditingClient(client);
     form.reset({
       name: client.name,
       contactName: client.contactName || "",
       contactEmail: client.contactEmail || "",
       contactPhone: client.contactPhone || "",
-      logoUrl: client.logoUrl || "",
     });
-    setCurrentClient(client);
-    setIsEditing(true);
-    setLogoPreview(client.logoUrl || null);
     setDialogOpen(true);
-  };
-  
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !currentClient) return;
-    
-    // Crear URL de objeto para vista previa local
-    const objectUrl = URL.createObjectURL(file);
-    setLogoPreview(objectUrl);
-    
-    // Subir el archivo
-    uploadLogoMutation.mutate({ 
-      clientId: currentClient.id,
-      file 
-    });
-    
-    // Limpiar el campo de archivo
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const onSubmit = (values: ClientFormValues) => {
-    if (isEditing && currentClient) {
-      // Si se ha cargado un logo nuevo, usamos la URL que ya está en el form
-      // Esto asegura que no perdemos la URL del logo actualizada
-      const dataToUpdate = {
-        ...values,
-        logoUrl: logoPreview || values.logoUrl // Usar logoPreview si existe, o mantener la URL actual
-      };
-      
-      updateMutation.mutate({ id: currentClient.id, data: dataToUpdate });
+    if (isEditing && editingClient) {
+      updateMutation.mutate({ id: editingClient.id, client: values });
     } else {
       createMutation.mutate(values);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader
+  const handleLogoUpload = (clientId: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadLogoMutation.mutate({ clientId, file });
+    }
+  };
+
+  const handleDeleteClient = (client: Client) => {
+    if (confirm(`¿Estás seguro de que quieres eliminar el cliente ${client.name}?`)) {
+      deleteMutation.mutate(client.id);
+    }
+  };
+
+  if (error) {
+    return (
+      <PageLayout
         title="Clientes"
         description="Gestiona la información de tus clientes y accede a sus resúmenes"
-        breadcrumbs={[
-          { label: "Clientes", current: true }
-        ]}
+        breadcrumbs={[{ label: "Clientes", current: true }]}
+      >
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-red-500 mb-2">Error al cargar los clientes</div>
+            <Button onClick={() => window.location.reload()}>Reintentar</Button>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <>
+      <PageLayout
+        title="Clientes"
+        description="Gestiona la información de tus clientes y accede a sus resúmenes"
+        breadcrumbs={[{ label: "Clientes", current: true }]}
         actions={
           <Button onClick={openNewClientDialog}>
             <UserPlus className="mr-2 h-4 w-4" />
             Añadir Nuevo Cliente
           </Button>
         }
-      />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Buscador separado */}
+      >
+        {/* Buscador */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={18} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
           <Input
-          placeholder="Buscar clientes..."
-          className="pl-10"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar clientes..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
+        {/* Lista de clientes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Clientes ({filteredClients.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             {isLoading ? (
-              <div className="text-center py-8 text-muted">Cargando clientes...</div>
-          ) : filteredClients.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 text-label">Nombre del Cliente</th>
-                      <th className="text-left py-3 text-label">Persona de Contacto</th>
-                      <th className="text-left py-3 text-label">Email</th>
-                      <th className="text-left py-3 text-label">Acciones</th>
-                    </tr>
-                  </thead>
-                        <tbody>
-                          {filteredClients.map((client) => (
-                            <tr key={client.id} className="border-b border-neutral-200 hover:bg-neutral-50 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium text-neutral-900">
-                                <div className="flex items-center gap-3">
-                                  <ClientLogo client={client} />
-                                  <span>{client.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-neutral-700">{client.contactName || "-"}</td>
-                              <td className="px-4 py-3 text-sm text-neutral-700">{client.contactEmail || "-"}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center space-x-2">
-                                  <Button variant="outline" size="sm" className="hover-lift" onClick={() => openEditClientDialog(client)}>
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Editar
-                                  </Button>
-                                  <Button 
-                                    variant="default" 
-                                    size="sm" 
-                                    className="hover-lift bg-blue-600 hover:bg-blue-700"
-                                    onClick={() => navigate(`/client-summary/${client.id}`)}
-                                  >
-                                    <BarChart className="h-4 w-4 mr-1" />
-                                    Resumen
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="bg-gray-200 h-32 rounded-lg"></div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredClients.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredClients.map((client: Client) => (
+                  <div key={client.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <ClientLogo client={client} />
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditClientDialog(client)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteClient(client)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id={`logo-${client.id}`}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            accept="image/*"
+                            onChange={(e) => handleLogoUpload(client.id, e)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={uploadLogoMutation.isPending}
+                          >
+                            <Upload className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-          ) : (
-              <div className="text-center py-8 text-muted">
+                    
+                    <h3 className="font-semibold text-lg mb-2">{client.name}</h3>
+                    
+                    {client.contactName && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        <strong>Contacto:</strong> {client.contactName}
+                      </p>
+                    )}
+                    
+                    {client.contactEmail && (
+                      <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {client.contactEmail}
+                      </p>
+                    )}
+                    
+                    {client.contactPhone && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {client.contactPhone}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
                 {searchTerm
                   ? "No hay clientes que coincidan con tu búsqueda."
                   : "No se encontraron clientes. ¡Añade tu primer cliente!"}
               </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </PageLayout>
 
+      {/* Dialog para crear/editar cliente */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-              <DialogTitle className="text-heading">{isEditing ? "Editar Cliente" : "Añadir Nuevo Cliente"}</DialogTitle>
-              <DialogDescription>
-                {isEditing 
-                  ? "Actualiza la información del cliente a continuación."
-                  : "Completa los detalles para añadir un nuevo cliente al sistema."}
-              </DialogDescription>
+            <DialogTitle>
+              {isEditing ? "Editar Cliente" : "Añadir Nuevo Cliente"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditing 
+                ? "Actualiza la información del cliente a continuación."
+                : "Completa los detalles para añadir un nuevo cliente al sistema."}
+            </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="form-layout py-2">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
-                  <FormItem className="form-group">
-                    <FormLabel className="text-label">Nombre del Cliente</FormLabel>
+                  <FormItem>
+                    <FormLabel>Nombre del Cliente *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Introduce el nombre del cliente" {...field} />
+                      <Input placeholder="Nombre de la empresa o cliente" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -387,10 +408,10 @@ export default function Clients() {
                 control={form.control}
                 name="contactName"
                 render={({ field }) => (
-                  <FormItem className="form-group">
-                    <FormLabel className="text-label">Persona de Contacto</FormLabel>
+                  <FormItem>
+                    <FormLabel>Nombre del Contacto</FormLabel>
                     <FormControl>
-                      <Input placeholder="Introduce el nombre de contacto" {...field} />
+                      <Input placeholder="Nombre de la persona de contacto" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -401,86 +422,26 @@ export default function Clients() {
                 control={form.control}
                 name="contactEmail"
                 render={({ field }) => (
-                  <FormItem className="form-group">
-                    <FormLabel className="text-label">Email</FormLabel>
+                  <FormItem>
+                    <FormLabel>Email de Contacto</FormLabel>
                     <FormControl>
-                      <Input placeholder="Introduce el email" {...field} />
+                      <Input type="email" placeholder="email@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Campo de teléfono eliminado por solicitud del usuario */}
-              
               <FormField
                 control={form.control}
-                name="logoUrl"
+                name="contactPhone"
                 render={({ field }) => (
-                  <FormItem className="form-group">
-                    <FormLabel className="text-label">Logo del Cliente</FormLabel>
-                    
-                    {/* Si estamos editando, mostramos el uploader de archivo */}
-                    {isEditing && currentClient && (
-                      <div className="mb-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            className="h-9 flex gap-1 items-center" 
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploadingLogo}
-                          >
-                            <Upload className="h-4 w-4" />
-                            <span>{isUploadingLogo ? "Subiendo..." : "Subir logo"}</span>
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            Formatos aceptados: JPEG, PNG, GIF, SVG, WEBP
-                          </p>
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/svg+xml,image/webp"
-                          className="hidden"
-                          onChange={handleLogoUpload}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* URL del logo (modo fallback o para ver la URL actual) */}
+                  <FormItem>
+                    <FormLabel>Teléfono de Contacto</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="https://example.com/logo.png" 
-                        {...field} 
-                        className={isEditing ? "text-sm text-muted-foreground" : ""}
-                        readOnly={isEditing} 
-                      />
+                      <Input placeholder="+1 234 567 8900" {...field} />
                     </FormControl>
                     <FormMessage />
-                    
-                    {/* Vista previa del logo */}
-                    {(field.value || logoPreview) && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-16 w-16 rounded overflow-hidden border shadow-sm">
-                          <img 
-                            src={logoPreview || field.value} 
-                            alt="Logo preview" 
-                            className="h-full w-full object-contain"
-                            onError={(e) => {
-                              // Manejo de error si la imagen no se puede cargar
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium">Vista previa</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {isUploadingLogo ? "Subiendo logo..." : "Logo del cliente"}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </FormItem>
                 )}
               />
@@ -489,7 +450,10 @@ export default function Clients() {
                 <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="hover-lift" disabled={createMutation.isPending || updateMutation.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
                   {isEditing ? "Actualizar Cliente" : "Añadir Cliente"}
                 </Button>
               </DialogFooter>
@@ -497,7 +461,6 @@ export default function Clients() {
           </Form>
         </DialogContent>
       </Dialog>
-      </div>
-    </div>
+    </>
   );
 }

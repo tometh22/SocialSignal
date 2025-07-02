@@ -14,14 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, PenSquare, Building2, Zap, Target, DollarSign, Briefcase, Activity } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageLayout } from "@/components/ui/page-layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from 'framer-motion';
 import { Link } from 'wouter';
-import { PageLayout } from '@/components/ui/page-layout';
 
 // Definición de tipos
 interface Client {
