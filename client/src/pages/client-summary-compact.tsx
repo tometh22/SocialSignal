@@ -54,19 +54,37 @@ import {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
-const mockData = {
-  totalDeliverables: 24,
-  onTimePercentage: 92,
-  npsScore: 47,
-  totalHours: 156,
-  activeProjects: 3,
-  completedProjects: 8,
-  totalBudget: 85000,
-  spentBudget: 62000,
-  teamEfficiency: 94,
-  clientSatisfaction: 4.8,
-  avgDeliveryTime: 3.2,
-  qualityScore: 8.7
+// Helper function to calculate real metrics from data
+const calculateMetrics = (activeProjects: any[] = [], quotations: any[] = [], deliverables: any[] = []) => {
+  const totalBudget = quotations.reduce((sum: number, q: any) => sum + (q.totalCost || 0), 0);
+  const activeProjectsCount = activeProjects.length;
+  const completedDeliverables = deliverables.filter((d: any) => d.status === 'completed').length;
+  const avgQuality = deliverables.length > 0 
+    ? deliverables.reduce((sum: number, d: any) => sum + (d.qualityScore || 0), 0) / deliverables.length 
+    : 0;
+  const onTimeDeliverables = deliverables.filter((d: any) => d.deliveredOnTime).length;
+  const onTimePercentage = deliverables.length > 0 ? (onTimeDeliverables / deliverables.length) * 100 : 0;
+
+  return {
+    totalBudget,
+    activeProjectsCount,
+    activeProjects: activeProjectsCount, // Alias for compatibility
+    completedDeliverables,
+    completedProjects: completedDeliverables, // Alias for compatibility
+    avgQuality: Math.round(avgQuality * 10) / 10,
+    totalQuotations: quotations.length,
+    totalDeliverables: deliverables.length,
+    onTimePercentage: Math.round(onTimePercentage),
+    hasData: activeProjects.length > 0 || quotations.length > 0 || deliverables.length > 0,
+    // Mock values for now until time tracking is implemented
+    totalHours: 0,
+    npsScore: 0,
+    spentBudget: 0,
+    teamEfficiency: 0,
+    clientSatisfaction: 0,
+    avgDeliveryTime: 0,
+    qualityScore: avgQuality
+  };
 };
 
 export default function ClientSummaryCompact() {
@@ -96,6 +114,26 @@ export default function ClientSummaryCompact() {
     enabled: !!clientId,
     retry: false,
   });
+
+  // Calculate real metrics from actual data
+  const deliverables = (deliverablesData as any[]) || [];
+  const metrics = calculateMetrics((activeProjects as any[]) || [], (quotations as any[]) || [], deliverables);
+
+  // Helper function to display data or "Sin datos"
+  const displayValue = (value: any, fallback = "Sin datos") => {
+    if (value === 0) return "0";
+    return value || fallback;
+  };
+
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    if (!amount || amount === 0) return "Sin datos";
+    return new Intl.NumberFormat('es-CL', { 
+      style: 'currency', 
+      currency: 'CLP',
+      minimumFractionDigits: 0 
+    }).format(amount);
+  };
 
   if (clientLoading) {
     return (
@@ -169,7 +207,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-blue-700">Entregables</p>
-                  <p className="text-sm font-bold text-blue-900">{mockData.totalDeliverables}</p>
+                  <p className="text-sm font-bold text-blue-900">{displayValue(metrics.totalDeliverables)}</p>
                 </div>
                 <FileText className="h-4 w-4 text-blue-500" />
               </div>
@@ -179,7 +217,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-green-700">A Tiempo</p>
-                  <p className="text-sm font-bold text-green-900">{mockData.onTimePercentage}%</p>
+                  <p className="text-sm font-bold text-green-900">{displayValue(metrics.onTimePercentage, "0")}%</p>
                 </div>
                 <CheckCircle className="h-4 w-4 text-green-500" />
               </div>
@@ -189,7 +227,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-purple-700">NPS</p>
-                  <p className="text-sm font-bold text-purple-900">+{mockData.npsScore}</p>
+                  <p className="text-sm font-bold text-purple-900">{displayValue("Sin datos", "+0")}</p>
                 </div>
                 <Star className="h-4 w-4 text-purple-500" />
               </div>
@@ -199,7 +237,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-orange-700">Horas</p>
-                  <p className="text-sm font-bold text-orange-900">{mockData.totalHours}h</p>
+                  <p className="text-sm font-bold text-orange-900">{displayValue("Sin datos")}</p>
                 </div>
                 <Clock className="h-4 w-4 text-orange-500" />
               </div>
@@ -209,7 +247,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-emerald-700">Proyectos</p>
-                  <p className="text-sm font-bold text-emerald-900">{mockData.activeProjects}</p>
+                  <p className="text-sm font-bold text-emerald-900">{metrics.activeProjects}</p>
                 </div>
                 <Briefcase className="h-4 w-4 text-emerald-500" />
               </div>
@@ -219,7 +257,7 @@ export default function ClientSummaryCompact() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-medium text-rose-700">Calidad</p>
-                  <p className="text-sm font-bold text-rose-900">{mockData.qualityScore}</p>
+                  <p className="text-sm font-bold text-rose-900">{metrics.qualityScore}</p>
                 </div>
                 <Award className="h-4 w-4 text-rose-500" />
               </div>
@@ -280,16 +318,16 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-blue-700">Eficiencia Equipo</span>
                         <Target className="h-3 w-3 text-blue-600" />
                       </div>
-                      <div className="text-lg font-bold text-blue-900">{mockData.teamEfficiency}%</div>
-                      <Progress value={mockData.teamEfficiency} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-blue-900">{metrics.teamEfficiency}%</div>
+                      <Progress value={metrics.teamEfficiency} className="h-1 mt-1" />
                     </div>
                     <div className="bg-green-50 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-green-700">Satisfacción</span>
                         <Star className="h-3 w-3 text-green-600" />
                       </div>
-                      <div className="text-lg font-bold text-green-900">{mockData.clientSatisfaction}/5</div>
-                      <Progress value={mockData.clientSatisfaction * 20} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-green-900">{metrics.clientSatisfaction}/5</div>
+                      <Progress value={metrics.clientSatisfaction * 20} className="h-1 mt-1" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -298,7 +336,7 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-purple-700">Tiempo Promedio</span>
                         <Clock className="h-3 w-3 text-purple-600" />
                       </div>
-                      <div className="text-lg font-bold text-purple-900">{mockData.avgDeliveryTime}d</div>
+                      <div className="text-lg font-bold text-purple-900">{metrics.avgDeliveryTime}d</div>
                       <div className="text-xs text-purple-600">días por entregable</div>
                     </div>
                     <div className="bg-orange-50 rounded-lg p-3">
@@ -306,8 +344,8 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-orange-700">Score Calidad</span>
                         <Award className="h-3 w-3 text-orange-600" />
                       </div>
-                      <div className="text-lg font-bold text-orange-900">{mockData.qualityScore}/10</div>
-                      <Progress value={mockData.qualityScore * 10} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-orange-900">{metrics.qualityScore}/10</div>
+                      <Progress value={metrics.qualityScore * 10} className="h-1 mt-1" />
                     </div>
                   </div>
                 </CardContent>
@@ -323,7 +361,7 @@ export default function ClientSummaryCompact() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{mockData.activeProjects}</div>
+                    <div className="text-2xl font-bold text-green-600">{metrics.activeProjects}</div>
                     <div className="text-xs text-gray-600">Proyectos Activos</div>
                   </div>
                   <div className="space-y-2">
@@ -354,24 +392,24 @@ export default function ClientSummaryCompact() {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-gray-700">Presupuesto Total</div>
-                      <div className="text-lg font-bold text-gray-900">${mockData.totalBudget.toLocaleString()}</div>
+                      <div className="text-lg font-bold text-gray-900">${metrics.totalBudget.toLocaleString()}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-700">Ejecutado</div>
-                      <div className="text-lg font-bold text-emerald-600">${mockData.spentBudget.toLocaleString()}</div>
+                      <div className="text-lg font-bold text-emerald-600">${metrics.spentBudget.toLocaleString()}</div>
                     </div>
                   </div>
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span>Progreso de Gasto</span>
-                      <span>{Math.round((mockData.spentBudget / mockData.totalBudget) * 100)}%</span>
+                      <span>{Math.round((metrics.spentBudget / metrics.totalBudget) * 100)}%</span>
                     </div>
-                    <Progress value={(mockData.spentBudget / mockData.totalBudget) * 100} className="h-2" />
+                    <Progress value={(metrics.spentBudget / metrics.totalBudget) * 100} className="h-2" />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-gray-50 rounded p-2">
                       <div className="font-medium">Disponible</div>
-                      <div className="text-blue-600 font-bold">${(mockData.totalBudget - mockData.spentBudget).toLocaleString()}</div>
+                      <div className="text-blue-600 font-bold">${(metrics.totalBudget - metrics.spentBudget).toLocaleString()}</div>
                     </div>
                     <div className="bg-gray-50 rounded p-2">
                       <div className="font-medium">Burn Rate</div>
@@ -454,7 +492,7 @@ export default function ClientSummaryCompact() {
                   <CardTitle className="text-base flex items-center justify-between">
                     <span className="flex items-center">
                       <Briefcase className="h-4 w-4 mr-2 text-blue-600" />
-                      Proyectos Activos ({mockData.activeProjects})
+                      Proyectos Activos ({metrics.activeProjects})
                     </span>
                     <Button size="sm" variant="outline" className="text-xs">Nuevo Proyecto</Button>
                   </CardTitle>
@@ -521,7 +559,7 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-blue-700">Proyectos Completados</span>
                         <CheckCircle className="h-3 w-3 text-blue-600" />
                       </div>
-                      <div className="text-lg font-bold text-blue-900">{mockData.completedProjects}</div>
+                      <div className="text-lg font-bold text-blue-900">{metrics.completedProjects}</div>
                       <div className="text-xs text-blue-600">este año</div>
                     </div>
                     
@@ -530,8 +568,8 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-green-700">Entregas Puntuales</span>
                         <Clock className="h-3 w-3 text-green-600" />
                       </div>
-                      <div className="text-lg font-bold text-green-900">{mockData.onTimePercentage}%</div>
-                      <Progress value={mockData.onTimePercentage} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-green-900">{metrics.onTimePercentage}%</div>
+                      <Progress value={metrics.onTimePercentage} className="h-1 mt-1" />
                     </div>
                     
                     <div className="bg-purple-50 rounded-lg p-3">
@@ -539,8 +577,8 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-purple-700">Calidad Promedio</span>
                         <Award className="h-3 w-3 text-purple-600" />
                       </div>
-                      <div className="text-lg font-bold text-purple-900">{mockData.qualityScore}/10</div>
-                      <Progress value={mockData.qualityScore * 10} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-purple-900">{metrics.qualityScore}/10</div>
+                      <Progress value={metrics.qualityScore * 10} className="h-1 mt-1" />
                     </div>
                     
                     <div className="bg-orange-50 rounded-lg p-3">
@@ -548,8 +586,8 @@ export default function ClientSummaryCompact() {
                         <span className="text-xs font-medium text-orange-700">Eficiencia</span>
                         <TrendingUp className="h-3 w-3 text-orange-600" />
                       </div>
-                      <div className="text-lg font-bold text-orange-900">{mockData.teamEfficiency}%</div>
-                      <Progress value={mockData.teamEfficiency} className="h-1 mt-1" />
+                      <div className="text-lg font-bold text-orange-900">{metrics.teamEfficiency}%</div>
+                      <Progress value={metrics.teamEfficiency} className="h-1 mt-1" />
                     </div>
                   </div>
 
