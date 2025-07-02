@@ -1,6 +1,4 @@
-The code modification ensures that the discount percentage is correctly saved along with other quotation details in the database.
-```
-```replit_final_file
+
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -493,8 +491,6 @@ export default function FinancialReviewFinal() {
     }
   };
 
-
-
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
       {/* Level 1: Compact Success Header */}
@@ -858,7 +854,7 @@ export default function FinancialReviewFinal() {
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">
                     La cotización se mantiene en valores actuales sin proyección inflacionaria
-                  </                  p>
+                  </p>
                   <Button
                     onClick={() => updateInflation({ applyInflationAdjustment: true })}
                     className="bg-orange-600 hover:bg-orange-700"
@@ -1084,7 +1080,7 @@ export default function FinancialReviewFinal() {
                   </span>
                 </div>
                 <p className="text-sm text-emerald-700 mt-1">
-                  {quotationData.inflation.quotationCurrency} • 6 miembros • {quotationData.client?.name}
+                  {quotationData.inflation.quotationCurrency} • {quotationData.teamMembers.length} miembros • {quotationData.client?.name}
                 </p>
               </div>
 
