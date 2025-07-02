@@ -1,7 +1,9 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Home } from "lucide-react";
 import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 
 interface BreadcrumbItem {
   label: string;
@@ -15,6 +17,7 @@ interface PageHeaderProps {
   breadcrumbs?: BreadcrumbItem[];
   actions?: React.ReactNode;
   className?: string;
+  showBreadcrumbs?: boolean;
 }
 
 export function PageHeader({
@@ -22,7 +25,8 @@ export function PageHeader({
   description,
   breadcrumbs = [],
   actions,
-  className = ""
+  className = "",
+  showBreadcrumbs = true
 }: PageHeaderProps) {
   const [, navigate] = useLocation();
 
@@ -33,56 +37,60 @@ export function PageHeader({
   };
 
   return (
-    <div className={`bg-white border-b border-gray-200 ${className}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className={cn("page-header", className)}>
+      <div className="page-header-content">
         {/* Breadcrumbs */}
-        {breadcrumbs.length > 0 && (
-          <nav className="flex items-center space-x-2 text-sm py-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="p-0 h-auto font-normal text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              <Home className="h-4 w-4 mr-1" />
-              Inicio
-            </Button>
+        {showBreadcrumbs && breadcrumbs.length > 0 && (
+          <nav className="page-breadcrumbs">
+            <div className="breadcrumb-item">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="p-0 h-auto font-normal breadcrumb-link hover:text-gray-900 transition-colors"
+              >
+                <Home className="h-4 w-4 mr-1" />
+                Dashboard
+              </Button>
+            </div>
             
             {breadcrumbs.map((item, index) => (
               <React.Fragment key={index}>
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-                {item.current ? (
-                  <span className="text-gray-900 font-medium">{item.label}</span>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => item.href && handleBreadcrumbClick(item.href)}
-                    className="p-0 h-auto font-normal text-gray-500 hover:text-gray-900 transition-colors"
-                  >
-                    {item.label}
-                  </Button>
-                )}
+                <ChevronRight className="h-4 w-4 breadcrumb-separator" />
+                <div className="breadcrumb-item">
+                  {item.current ? (
+                    <span className="breadcrumb-current">{item.label}</span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => item.href && handleBreadcrumbClick(item.href)}
+                      className="p-0 h-auto font-normal breadcrumb-link hover:text-gray-900 transition-colors"
+                    >
+                      {item.label}
+                    </Button>
+                  )}
+                </div>
               </React.Fragment>
             ))}
           </nav>
         )}
 
         {/* Title and Actions */}
-        <div className="flex items-center justify-between py-6">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:leading-9">
+        <div className="page-title-section">
+          <div className="page-title-content">
+            <h1 className="page-title">
               {title}
             </h1>
             {description && (
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="page-description">
                 {description}
               </p>
             )}
           </div>
           
           {actions && (
-            <div className="flex items-center space-x-3 ml-4">
+            <div className="page-actions">
               {actions}
             </div>
           )}
@@ -116,10 +124,10 @@ export function useBreadcrumbs(customBreadcrumbs?: BreadcrumbItem[]) {
       { label: "Clientes", current: true }
     ],
     "/statistics": [
-      { label: "Estadísticas", current: true }
+      { label: "Estadísticas y Análisis", current: true }
     ],
     "/admin": [
-      { label: "Administración", current: true }
+      { label: "Panel de Administración", current: true }
     ]
   };
 

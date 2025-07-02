@@ -13,12 +13,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, PenSquare, Building2, Zap, Target, DollarSign } from "lucide-react";
+import { Plus, Search, Calendar, Clock, BarChart2, UserPlus, Trash2, LineChart, PenSquare, Building2, Zap, Target, DollarSign, Briefcase, Activity } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from 'framer-motion';
+import { Link } from 'wouter';
+import { PageLayout } from '@/components/ui/page-layout';
 
 // Definición de tipos
 interface Client {
@@ -180,6 +183,64 @@ export default function ActiveProjects() {
       }
     });
   }, [projects, clients, activeTab, searchTerm, filterClient, sortBy]);
+
+    const filteredActiveProjects = useMemo(() => {
+        if (!projects) return [];
+
+        let filtered = projects;
+
+        switch (activeTab) {
+            case "always-on":
+                filtered = projects.filter(p =>
+                    p.isAlwaysOnMacro ||
+                    p.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                    p.quotation?.projectName?.toLowerCase().includes('modo') ||
+                    p.macroMonthlyBudget ||
+                    (p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'))
+                );
+                break;
+            case "unicos":
+                filtered = projects.filter(p =>
+                    !p.isAlwaysOnMacro &&
+                    !p.quotation?.projectName?.toLowerCase().includes('always-on') &&
+                    !p.quotation?.projectName?.toLowerCase().includes('modo') &&
+                    !p.macroMonthlyBudget &&
+                    !(p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'))
+                );
+                break;
+            case "completados":
+                filtered = projects.filter(p => p.status === 'completed' || p.status === 'cancelled');
+                break;
+            default: // "todos"
+                filtered = projects;
+        }
+
+        filtered = filtered.filter(project => {
+            const client = clients.find(c => c.id === project.quotation?.clientId);
+            const projectName = project.quotation?.projectName || "";
+            const clientName = client?.name || "";
+
+            const matchesSearch = searchTerm === "" ||
+                projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                clientName.toLowerCase().includes(searchTerm.toLowerCase());
+
+            const matchesClient = filterClient === "all" || project.quotation?.clientId?.toString() === filterClient;
+
+            return matchesSearch && matchesClient;
+        });
+
+        return filtered;
+    }, [projects, clients, activeTab, searchTerm, filterClient]);
+
+    const activeCount = useMemo(() => {
+        return filteredActiveProjects.filter(p => p.status === 'active').length;
+    }, [filteredActiveProjects]);
+
+    const totalBudget = useMemo(() => {
+        return filteredActiveProjects.reduce((acc, p) => acc + (p.quotation?.totalAmount || 0), 0);
+    }, [filteredActiveProjects]);
+
+    const totalHours = 1250;
 
   // Estadísticas por tipo
   const stats = useMemo(() => {
@@ -480,79 +541,87 @@ export default function ActiveProjects() {
   }, [filteredProjects, expandedProjects]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader
-        title="Proyectos Activos"
-        description="Administra todos tus proyectos desde un solo lugar"
-        breadcrumbs={[
-          { label: "Proyectos Activos", current: true }
-        ]}
-        actions={
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setDeleteAllProjectsDialogOpen(true)}
-              size="sm"
-              variant="destructive"
-              className="h-8 text-xs"
-              disabled={!projects || projects.length === 0}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Limpiar Todo
-            </Button>
-            <Button
-              onClick={() => setLocation("/active-projects/new")}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Proyecto
-            </Button>
-          </div>
-        }
-      />
+    <PageLayout
+      title="Proyectos Activos"
+      description="Gestión integral de proyectos y seguimiento en tiempo real"
+      breadcrumbs={[
+        { label: "Proyectos Activos", current: true }
+      ]}
+      actions={
+        <Button 
+          onClick={() => setLocation('/new-active-project')}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Proyecto
+        </Button>
+      }
+    >
 
       <div className="px-4 sm:px-6 lg:px-8 space-y-4">
         {/* Estadísticas rápidas */}
-        <div className="grid grid-cols-4 gap-4">
-        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
-              <div className="text-sm text-blue-700">Total Proyectos</div>
+        {/* KPI Cards */}
+        <div className="kpi-grid">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="kpi-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
+                <Briefcase className="h-5 w-5 text-blue-600" />
+              </div>
             </div>
-            <Building2 className="h-8 w-8 text-blue-600" />
-          </div>
-        </div>
+            <div className="kpi-label">Total Proyectos</div>
+            <div className="kpi-value">{filteredActiveProjects.length}</div>
+          </motion.div>
 
-        <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-purple-900">{stats.alwaysOn}</div>
-              <div className="text-sm text-purple-700">Always-On</div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="kpi-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
+                <Activity className="h-5 w-5 text-green-600" />
+              </div>
             </div>
-            <Zap className="h-8 w-8 text-purple-600" />
-          </div>
-        </div>
+            <div className="kpi-label">Activos</div>
+            <div className="kpi-value">{activeCount}</div>
+          </motion.div>
 
-        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-green-900">{stats.unicos}</div>
-              <div className="text-sm text-green-700">Únicos</div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="kpi-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-purple-100">
+                <DollarSign className="h-5 w-5 text-purple-600" />
+              </div>
             </div>
-            <Target className="h-8 w-8 text-green-600" />
-          </div>
-        </div>
+            <div className="kpi-label">Presupuesto Total</div>
+            <div className="kpi-value">${totalBudget.toLocaleString()}</div>
+          </motion.div>
 
-        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{stats.completados}</div>
-              <div className="text-sm text-gray-700">Completados</div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="kpi-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-orange-100">
+                <Clock className="h-5 w-5 text-orange-600" />
+              </div>
             </div>
-            <Clock className="h-8 w-8 text-gray-600" />
-          </div>
+            <div className="kpi-label">Horas Registradas</div>
+            <div className="kpi-value">{totalHours}h</div>
+          </motion.div>
         </div>
-      </div>
 
       {/* Filtros */}
       <div className="flex gap-4 items-center bg-white p-4 rounded-lg border">
@@ -774,7 +843,7 @@ export default function ActiveProjects() {
                             </Button>
 
                             {isAlwaysOn && project.isAlwaysOnMacro ? (
-                              <Button
+<Button
                                 variant="destructive"
                                 size="sm"
                                 className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700"
@@ -1017,6 +1086,6 @@ export default function ActiveProjects() {
         </DialogContent>
       </Dialog>
       </div>
-    </div>
+    </PageLayout>
   );
 }

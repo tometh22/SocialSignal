@@ -47,6 +47,13 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useEffect } from "react";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { PageLayout } from '@/components/ui/page-layout';
+import { Download, Eye, Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { KpiRibbon } from "@/components/dashboard/kpi-ribbon";
+import { DeviationSection } from "@/components/dashboard/deviation-section";
+import { ChartsSection } from "@/components/dashboard/charts-section";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -88,6 +95,7 @@ function OptimizedQuotePathWrapper({ params }: { params: { id: string } }) {
 
 function AppRoutes() {
   // Set document title - permite modo claro para contenido principal pero mantiene sidebar oscura
+  const setLocation = useLocation()[1];
   useEffect(() => {
     document.title = "Mind | Epical";
     // Remover dark mode del documento general (para contenido principal)
@@ -110,7 +118,59 @@ function AppRoutes() {
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
                   <ProtectedRoute path="/recurring-templates" component={AlwaysOnLanding} />
-                  <ProtectedRoute path="/" component={ExecutiveDashboard} />
+                  <Route path="/" component={() => (
+            <PageLayout
+              title="Panel Ejecutivo"
+              description={`Visión estratégica en tiempo real • ${new Date().toLocaleDateString('es-ES', { 
+                day: '2-digit', 
+                month: 'long', 
+                year: 'numeric' 
+              })}`}
+              showBreadcrumbs={false}
+              actions={
+                <div className="flex items-center space-x-3">
+                  <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    Sistema Operativo
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.reload()}
+                    className="flex items-center space-x-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Actualizar</span>
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Exportar</span>
+                  </Button>
+                  <Button 
+                    onClick={() => setLocation('/optimized-quote')}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Nueva Cotización</span>
+                  </Button>
+                  <Button 
+                    onClick={() => setLocation('/active-projects')}
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Ver Proyectos</span>
+                  </Button>
+                </div>
+              }
+            >
+                <KpiRibbon />
+                <DeviationSection />
+                <ChartsSection />
+            </PageLayout>
+)} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />

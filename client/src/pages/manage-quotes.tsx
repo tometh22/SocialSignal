@@ -30,6 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Link, useLocation } from 'wouter';
+import { PageLayout } from '@/components/ui/page-layout';
 
 // Interfaces para los datos del cliente
 interface Client {
@@ -436,24 +438,22 @@ export default function ManageQuotes() {
     };
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50">
-        <PageHeader
-          title="Gestión de Cotizaciones"
-          description="Administra y da seguimiento a todas las cotizaciones del sistema"
-          breadcrumbs={[
-            { label: "Gestión de Cotizaciones", current: true }
-          ]}
-          actions={
-            <Button 
-              onClick={() => navigate("/optimized-quote")}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Cotización
-            </Button>
-          }
-        />
+    <PageLayout
+      title="Gestión de Cotizaciones"
+      description="Administra y da seguimiento a todas las cotizaciones del sistema"
+      breadcrumbs={[
+        { label: "Gestión de Cotizaciones", current: true }
+      ]}
+      actions={
+        <Button
+          onClick={() => navigate("/optimized-quote")}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva Cotización
+        </Button>
+      }
+    >
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Stats Cards */}
@@ -755,7 +755,7 @@ export default function ManageQuotes() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageLayout>
 
       {/* Dialogs remain the same but with improved styling */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -977,6 +977,6 @@ const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustme
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    
   );
 }

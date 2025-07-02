@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 /* ========================================
-   SISTEMA DE DISEÑO UNIFICADO
+   SISTEMA DE DISEÑO UNIFICADO - EPICAL
    ======================================== */
 
-/* Variables tipográficas consistentes */
+/* Variables tipográficas y espaciado consistentes */
 :root {
   /* Escala tipográfica estandarizada */
   --text-xs: 0.75rem;     /* 12px */
@@ -15,6 +15,7 @@
   --text-lg: 1.125rem;    /* 18px */
   --text-xl: 1.25rem;     /* 20px */
   --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
   
   /* Pesos de fuente estándar */
   --font-normal: 400;
@@ -27,29 +28,308 @@
   --space-2: 0.5rem;      /* 8px */
   --space-3: 0.75rem;     /* 12px */
   --space-4: 1rem;        /* 16px */
+  --space-5: 1.25rem;     /* 20px */
   --space-6: 1.5rem;      /* 24px */
   --space-8: 2rem;        /* 32px */
+  --space-12: 3rem;       /* 48px */
+  
+  /* Layout estándar */
+  --page-header-height: 80px;
+  --content-max-width: 1200px;
+  --sidebar-width: 280px;
 }
 
 /* ========================================
-   TIPOGRAFÍA ESTÁNDAR PARA TODA LA APP
+   ESTRUCTURA DE PÁGINA ESTÁNDAR
    ======================================== */
 
-/* Títulos principales */
-.heading-page {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  line-height: 1.25;
-  color: hsl(var(--foreground));
-  margin-bottom: var(--space-6);
+/* Contenedor principal de página */
+.page-container {
+  min-height: 100vh;
+  background-color: #f8fafc;
 }
 
-.heading-section {
+/* Header de página unificado */
+.page-header {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.page-header-content {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+/* Breadcrumbs estándar */
+.page-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: #64748b;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.breadcrumb-separator {
+  color: #94a3b8;
+}
+
+.breadcrumb-link {
+  color: #64748b;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.breadcrumb-link:hover {
+  color: #334155;
+}
+
+.breadcrumb-current {
+  color: #0f172a;
+  font-weight: var(--font-medium);
+}
+
+/* Título y descripción de página */
+.page-title-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) 0;
+}
+
+.page-title-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.page-title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  line-height: 1.2;
+  color: #0f172a;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.page-description {
+  font-size: var(--text-base);
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: var(--space-4);
+}
+
+/* Contenido principal de página */
+.page-content {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+/* ========================================
+   TIPOGRAFÍA ESTÁNDAR
+   ======================================== */
+
+/* Títulos de sección */
+.section-title {
   font-size: var(--text-xl);
   font-weight: var(--font-semibold);
   line-height: 1.3;
-  color: hsl(var(--foreground));
-  margin-bottom: var(--space-4);
+  color: #0f172a;
+  margin: 0 0 var(--space-4) 0;
+}
+
+.section-subtitle {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  line-height: 1.4;
+  color: #334155;
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* Texto descriptivo */
+.section-description {
+  font-size: var(--text-base);
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 var(--space-6) 0;
+}
+
+/* ========================================
+   COMPONENTES DE ESTADÍSTICAS (KPI)
+   ======================================== */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  padding: var(--space-6);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.kpi-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-2);
+}
+
+.kpi-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: #0f172a;
+  margin-bottom: var(--space-1);
+}
+
+.kpi-change {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.kpi-change.positive {
+  color: #059669;
+}
+
+.kpi-change.negative {
+  color: #dc2626;
+}
+
+.kpi-change.neutral {
+  color: #64748b;
+}
+
+/* ========================================
+   FILTROS Y BÚSQUEDA
+   ======================================== */
+
+.filters-section {
+  background: white;
+  border-radius: 12px;
+  padding: var(--space-6);
+  margin-bottom: var(--space-8);
+  border: 1px solid #e2e8f0;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  align-items: end;
+}
+
+/* ========================================
+   TABLAS Y LISTAS
+   ======================================== */
+
+.data-table {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.table-header {
+  background: #f8fafc;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: #0f172a;
+  margin: 0;
+}
+
+/* ========================================
+   ESTADOS VACÍOS
+   ======================================== */
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  color: #64748b;
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--space-4) auto;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: #334155;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.empty-state-description {
+  font-size: var(--text-base);
+  color: #64748b;
+  margin: 0 0 var(--space-6) 0;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 768px) {
+  .page-title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  
+  .page-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .page-title {
+    font-size: var(--text-2xl);
+  }
+  
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}e-4);
 }
 
 .heading-card {
