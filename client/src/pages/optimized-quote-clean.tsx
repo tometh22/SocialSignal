@@ -4,7 +4,7 @@ import { OptimizedQuoteProvider, useOptimizedQuote } from '@/context/optimized-q
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, Plus, CheckCircle } from 'lucide-react';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection-redesigned';
