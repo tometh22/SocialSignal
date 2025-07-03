@@ -68,8 +68,8 @@ export default function Sidebar2025() {
       priority: "high",
       items: [
         { 
-          href: "/", 
-          title: "Dashboard", 
+          href: "/dashboard", 
+          title: "Panel Ejecutivo", 
           icon: LayoutDashboard, 
           description: "Vista general",
           shortcut: "⌘1",
