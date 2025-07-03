@@ -98,6 +98,7 @@ interface OptimizedQuoteContextType {
   saveQuotation: (status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation') => Promise<void>;
   calculateTotalCost: () => void;
   resetQuotation: () => void;
+  setQuotationData: (data: QuotationData) => void;
   loadRoles: () => void;
   loadPersonnel: () => void;
   forceRecalculate: () => void;
@@ -325,11 +326,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     return () => clearInterval(saveInterval);
   }, [quotationData]);
 
-  // Enhanced draft loading with user notification
+  // Simplified draft detection - only store draft info for banner display
   useEffect(() => {
     const draft = localStorage.getItem('draft-quotation');
     const backup = localStorage.getItem('draft-quotation-backup');
     const emergency = sessionStorage.getItem('emergency-draft');
+    const lastQuotationStatus = localStorage.getItem('last-quotation-status');
     
     if (draft || backup || emergency) {
       try {
@@ -351,16 +353,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           timestamp = backupParsed.timestamp;
           source = 'respaldo';
         }
-        // Last resort: emergency data
+        // Last resort: emergency data - only log it
         else if (emergency) {
           const emergencyParsed = JSON.parse(emergency);
           console.log('🆘 Datos de emergencia encontrados:', emergencyParsed);
-          alert(`Se encontraron datos de emergencia de un formulario anterior:\n` +
-                `Cliente: ${emergencyParsed.client || 'No guardado'}\n` +
-                `Proyecto: ${emergencyParsed.project || 'No guardado'}\n` +
-                `Miembros del equipo: ${emergencyParsed.teamCount || 0}\n` +
-                `Hora: ${new Date(emergencyParsed.timestamp).toLocaleString()}\n\n` +
-                `Por favor, contacta al soporte técnico para recuperar estos datos.`);
           sessionStorage.removeItem('emergency-draft');
           return;
         }
@@ -368,50 +364,34 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000; // Extended to 48 hours
         const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60)); // minutes ago
         
-        if (isRecent && savedData && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
-          setQuotationData(savedData);
-          console.log(`📋 Borrador restaurado del ${source}:`, {
-            cliente: savedData.client?.name || 'Sin cliente',
-            proyecto: savedData.project?.name || 'Sin proyecto',
-            miembros: savedData.teamMembers?.length || 0,
-            minutosAtras: timeAgo
-          });
-          
-          // Show user notification
-          const userConfirm = confirm(
-            `🔄 BORRADOR ENCONTRADO\n\n` +
-            `Se encontró un borrador de ${timeAgo} minuto(s) atrás:\n` +
-            `Cliente: ${savedData.client?.name || 'Sin seleccionar'}\n` +
-            `Proyecto: ${savedData.project?.name || 'Sin nombre'}\n` +
-            `Equipo: ${savedData.teamMembers?.length || 0} miembros\n\n` +
-            `¿Deseas continuar con este borrador?`
-          );
-          
-          if (!userConfirm) {
-            // User chose not to restore, clear the form
-            setQuotationData(initialQuotationData);
-            console.log('👤 Usuario rechazó restaurar el borrador');
-          }
+        // Only auto-restore if: 
+        // 1. Draft is recent
+        // 2. Current form is empty
+        // 3. Last quotation wasn't successfully completed (not 'approved', 'pending', or 'in-negotiation')
+        const shouldAutoRestore = isRecent && 
+                                  savedData && 
+                                  (!quotationData.project.name && quotationData.teamMembers.length === 0) &&
+                                  (!lastQuotationStatus || !['approved', 'pending', 'in-negotiation'].includes(lastQuotationStatus));
+        
+        if (shouldAutoRestore) {
+          // Store draft info for banner component to handle
+          localStorage.setItem('pending-draft-restore', JSON.stringify({
+            data: savedData,
+            timestamp: timestamp,
+            source: source,
+            timeAgo: timeAgo
+          }));
+          console.log(`📋 Borrador detectado, guardado para mostrar banner`);
         } else if (!isRecent && savedData) {
           console.log(`⏰ Borrador encontrado pero es muy antiguo (${timeAgo} minutos)`);
-          // Optionally clean up old drafts
+          // Clean up old drafts
           if (timeAgo > 2880) { // Older than 48 hours
             localStorage.removeItem('draft-quotation');
             localStorage.removeItem('draft-quotation-backup');
           }
         }
       } catch (error) {
-        console.error('❌ Error cargando borrador:', error);
-        // Try to load from backup
-        try {
-          if (backup) {
-            const backupData = JSON.parse(backup);
-            setQuotationData(backupData.quotationData);
-            console.log('📋 Borrador restaurado desde respaldo');
-          }
-        } catch (backupError) {
-          console.error('❌ Error cargando respaldo:', backupError);
-        }
+        console.error('❌ Error detectando borrador:', error);
       }
     }
   }, []);
@@ -488,7 +468,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Calculate base cost from team members
     const calculatedBaseCost = quotationData.teamMembers.reduce((sum, member) => {
       const memberCost = (member.hours || 0) * (member.rate || 0);
-      console.log(`👤 ${member.personnelName || 'Unknown'}: ${member.hours}h × $${member.rate} = $${memberCost}`);
+      console.log(`👤 Member ${member.id}: ${member.hours}h × $${member.rate} = $${memberCost}`);
       return sum + memberCost;
     }, 0);
 
@@ -963,6 +943,16 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         }
       }
 
+      // Track successful quotation completion for draft management
+      if (status !== 'draft') {
+        localStorage.setItem('last-quotation-status', status);
+        // Clear draft when quotation is successfully completed
+        localStorage.removeItem('draft-quotation');
+        localStorage.removeItem('draft-quotation-backup');
+        localStorage.removeItem('pending-draft-restore');
+        console.log(`✅ Quotation completed with status: ${status}, drafts cleared`);
+      }
+
       console.log('🎉 Quotation and team saved successfully');
       return savedQuotation;
     } catch (error) {
@@ -984,6 +974,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     setTotalAmount(0);
     setCurrentStep(1);
   }, []);
+
+  const setQuotationDataDirect = useCallback((data: QuotationData) => {
+    setQuotationData(data);
+    forceRecalculate();
+  }, [forceRecalculate]);
 
   const updateDeliverables = useCallback((deliverables: any[]) => {
     setQuotationData(prev => ({ ...prev, deliverables }));
@@ -1067,6 +1062,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     saveQuotation,
     calculateTotalCost,
     resetQuotation,
+    setQuotationData: setQuotationDataDirect,
     loadRoles,
     loadPersonnel,
     forceRecalculate,
