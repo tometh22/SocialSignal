@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import {
   TrendingUp, TrendingDown, Users, Building2, Clock, DollarSign, 
   Target, AlertTriangle, CheckCircle, Plus, ArrowRight, Calendar,
   BarChart3, PieChart, Activity, Briefcase, Star, Zap, Settings,
-  Filter, RefreshCw, Download, Bell, Search, ChevronRight
+  Filter, RefreshCw, Download, Bell, Search, ChevronRight, Shield
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
