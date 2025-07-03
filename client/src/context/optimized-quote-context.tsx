@@ -270,54 +270,148 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     setRecalculationTrigger(prev => prev + 1);
   }, []);
 
-  // Auto-save draft to localStorage with error handling
+  // Enhanced auto-save draft to localStorage with error handling
   useEffect(() => {
     const saveInterval = setInterval(() => {
-      if (quotationData.project.name || quotationData.teamMembers.length > 0) {
+      if (quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client) {
         try {
           const draftData = {
             quotationData,
             timestamp: Date.now(),
-            version: '1.0'
+            version: '2.0',
+            userAgent: navigator.userAgent,
+            url: window.location.href
           };
 
           localStorage.setItem('draft-quotation', JSON.stringify(draftData));
           localStorage.setItem('draft-quotation-backup', JSON.stringify(draftData));
-          console.log('📝 Draft auto-saved at', new Date().toLocaleTimeString());
+          localStorage.setItem('last-autosave-time', Date.now().toString());
+          console.log('💾 Autoguardado completo:', new Date().toLocaleTimeString(), 
+                     `- Cliente: ${quotationData.client?.name || 'Sin cliente'}`,
+                     `- Proyecto: ${quotationData.project.name || 'Sin nombre'}`,
+                     `- Equipo: ${quotationData.teamMembers.length} miembros`);
         } catch (error) {
           console.error('❌ Error saving draft:', error);
-          // Try to clear some space
+          // Try to clear some space and save essential data only
           try {
             localStorage.removeItem('draft-quotation-backup');
-            localStorage.setItem('draft-quotation', JSON.stringify({
-              quotationData,
+            const essentialData = {
+              quotationData: {
+                client: quotationData.client,
+                project: quotationData.project,
+                teamMembers: quotationData.teamMembers,
+                template: quotationData.template
+              },
               timestamp: Date.now()
-            }));
-            console.log('📝 Draft saved after cleanup');
+            };
+            localStorage.setItem('draft-quotation', JSON.stringify(essentialData));
+            console.log('💾 Guardado de emergencia realizado');
           } catch (secondError) {
-            console.error('❌ Critical: Cannot save draft data');
+            console.error('❌ CRÍTICO: No se puede guardar datos del formulario');
+            // Last resort: try to save to sessionStorage
+            try {
+              sessionStorage.setItem('emergency-draft', JSON.stringify({
+                client: quotationData.client?.name,
+                project: quotationData.project.name,
+                teamCount: quotationData.teamMembers.length,
+                timestamp: Date.now()
+              }));
+            } catch {}
           }
         }
       }
-    }, 15000); // Save every 15 seconds (more frequent)
+    }, 10000); // Save every 10 seconds (más frecuente)
 
     return () => clearInterval(saveInterval);
   }, [quotationData]);
 
-  // Load draft on mount
+  // Enhanced draft loading with user notification
   useEffect(() => {
     const draft = localStorage.getItem('draft-quotation');
-    if (draft) {
+    const backup = localStorage.getItem('draft-quotation-backup');
+    const emergency = sessionStorage.getItem('emergency-draft');
+    
+    if (draft || backup || emergency) {
       try {
-        const { quotationData: savedData, timestamp } = JSON.parse(draft);
-        const isRecent = Date.now() - timestamp < 24 * 60 * 60 * 1000; // 24 hours
+        let savedData = null;
+        let timestamp = 0;
+        let source = '';
 
-        if (isRecent && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
+        // Try to load from primary draft first
+        if (draft) {
+          const draftParsed = JSON.parse(draft);
+          savedData = draftParsed.quotationData;
+          timestamp = draftParsed.timestamp;
+          source = 'autoguardado';
+        }
+        // Fallback to backup if primary is corrupted
+        else if (backup) {
+          const backupParsed = JSON.parse(backup);
+          savedData = backupParsed.quotationData;
+          timestamp = backupParsed.timestamp;
+          source = 'respaldo';
+        }
+        // Last resort: emergency data
+        else if (emergency) {
+          const emergencyParsed = JSON.parse(emergency);
+          console.log('🆘 Datos de emergencia encontrados:', emergencyParsed);
+          alert(`Se encontraron datos de emergencia de un formulario anterior:\n` +
+                `Cliente: ${emergencyParsed.client || 'No guardado'}\n` +
+                `Proyecto: ${emergencyParsed.project || 'No guardado'}\n` +
+                `Miembros del equipo: ${emergencyParsed.teamCount || 0}\n` +
+                `Hora: ${new Date(emergencyParsed.timestamp).toLocaleString()}\n\n` +
+                `Por favor, contacta al soporte técnico para recuperar estos datos.`);
+          sessionStorage.removeItem('emergency-draft');
+          return;
+        }
+
+        const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000; // Extended to 48 hours
+        const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60)); // minutes ago
+        
+        if (isRecent && savedData && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
           setQuotationData(savedData);
-          console.log('📋 Draft restored from auto-save');
+          console.log(`📋 Borrador restaurado del ${source}:`, {
+            cliente: savedData.client?.name || 'Sin cliente',
+            proyecto: savedData.project?.name || 'Sin proyecto',
+            miembros: savedData.teamMembers?.length || 0,
+            minutosAtras: timeAgo
+          });
+          
+          // Show user notification
+          const userConfirm = confirm(
+            `🔄 BORRADOR ENCONTRADO\n\n` +
+            `Se encontró un borrador de ${timeAgo} minuto(s) atrás:\n` +
+            `Cliente: ${savedData.client?.name || 'Sin seleccionar'}\n` +
+            `Proyecto: ${savedData.project?.name || 'Sin nombre'}\n` +
+            `Equipo: ${savedData.teamMembers?.length || 0} miembros\n\n` +
+            `¿Deseas continuar con este borrador?`
+          );
+          
+          if (!userConfirm) {
+            // User chose not to restore, clear the form
+            setQuotationData(initialQuotationData);
+            console.log('👤 Usuario rechazó restaurar el borrador');
+          }
+        } else if (!isRecent && savedData) {
+          console.log(`⏰ Borrador encontrado pero es muy antiguo (${timeAgo} minutos)`);
+          // Optionally clean up old drafts
+          if (timeAgo > 2880) { // Older than 48 hours
+            localStorage.removeItem('draft-quotation');
+            localStorage.removeItem('draft-quotation-backup');
+          }
         }
       } catch (error) {
-        console.error('Error loading draft:', error);
+        console.error('❌ Error cargando borrador:', error);
+        // Try to load from backup
+        try {
+          if (backup) {
+            const backupData = JSON.parse(backup);
+            setQuotationData(backupData.quotationData);
+            console.log('📋 Borrador restaurado desde respaldo');
+          }
+        } catch (backupError) {
+          console.error('❌ Error cargando respaldo:', backupError);
+        }
       }
     }
   }, []);

@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
+import AutosaveIndicator from '@/components/ui/autosave-indicator';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
@@ -45,6 +47,25 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const isEditing = Boolean(effectiveQuotationId);
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const isOnline = useOnlineStatus();
+
+  // Prevent accidental page refresh/close when there's unsaved data
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const lastSave = localStorage.getItem('last-autosave-time');
+      const hasData = quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client;
+      const timeSinceLastSave = lastSave ? Date.now() - parseInt(lastSave) : Infinity;
+      
+      if (hasData && timeSinceLastSave > 5000) { // If more than 5 seconds since last save
+        e.preventDefault();
+        e.returnValue = 'Tienes cambios sin guardar en tu cotización. ¿Estás seguro de que quieres salir?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [quotationData]);
 
   // Load quotation if editing
   useEffect(() => {
@@ -275,6 +296,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                 </div>
               ))}
             </div>
+          </div>
+          
+          {/* Autosave indicator */}
+          <div className="flex justify-center mt-4">
+            <AutosaveIndicator 
+              lastSaveTime={localStorage.getItem('last-autosave-time') ? parseInt(localStorage.getItem('last-autosave-time')!) : undefined}
+              hasUnsavedChanges={Date.now() - (parseInt(localStorage.getItem('last-autosave-time') || '0')) > 10000}
+              isOnline={isOnline}
+            />
           </div>
         </div>
       </div>
