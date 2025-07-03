@@ -74,123 +74,142 @@ export default function ExecutiveDashboard() {
     const clientsArray = Array.isArray(clients) ? clients : [];
     const quotationsArray = Array.isArray(quotations) ? quotations : [];
 
-    // Alerta 1: Proyectos en riesgo presupuestario
-    const budgetRiskProjects = projectsArray.filter(project => {
-      if (!project.quotation?.totalAmount) return false;
-      
-      const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
-      const actualCost = projectEntries.reduce((sum, entry) => {
-        const rate = entry.hourlyRateAtTime || 50;
-        return sum + ((entry.hours || 0) * rate);
-      }, 0);
-      
-      const budget = project.quotation.totalAmount;
-      const budgetUsagePercentage = budget > 0 ? (actualCost / budget) * 100 : 0;
-      
-      return budgetUsagePercentage > 80;
-    });
-
-    if (budgetRiskProjects.length > 0) {
-      alerts.push({
-        id: 'budget-risk',
-        type: 'critical',
-        title: 'Riesgo Presupuestario Crítico',
-        message: `${budgetRiskProjects.length} proyecto(s) han superado el 80% del presupuesto`,
-        action: 'Revisar costos',
-        projects: budgetRiskProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
-        priority: 'high',
-        impact: 'financial'
-      });
+    // Solo generar alertas si hay datos reales
+    if (projectsArray.length === 0 && timeEntriesArray.length === 0 && clientsArray.length === 0) {
+      return [];
     }
 
-    // Alerta 2: Clientes con alto riesgo de churn (sin actividad reciente)
-    const highRiskClients = clientsArray.filter(client => {
-      const clientProjects = projectsArray.filter(p => p.quotation?.clientId === client.id);
-      
-      if (clientProjects.length === 0) return true; // Cliente sin proyectos = alto riesgo
-      
-      const lastActivity = clientProjects.reduce((latest, project) => {
-        const projectEntries = timeEntriesArray
-          .filter(entry => entry.projectId === project.id)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Alerta 1: Proyectos en riesgo presupuestario (solo si hay proyectos activos)
+    if (projectsArray.length > 0) {
+      const budgetRiskProjects = projectsArray.filter(project => {
+        if (!project.quotation?.totalAmount) return false;
         
-        if (projectEntries.length > 0) {
-          const lastEntryDate = new Date(projectEntries[0].date);
-          return lastEntryDate > latest ? lastEntryDate : latest;
-        }
-        return latest;
-      }, new Date(0));
-      
-      const daysSinceLastActivity = (new Date().getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24);
-      return daysSinceLastActivity > 15;
-    });
-
-    if (highRiskClients.length > 0) {
-      alerts.push({
-        id: 'churn-risk',
-        type: 'warning',
-        title: 'Riesgo de Churn de Clientes',
-        message: `${highRiskClients.length} cliente(s) sin actividad reciente`,
-        action: 'Contactar clientes',
-        clients: highRiskClients.map(c => c.name),
-        priority: 'medium',
-        impact: 'retention'
+        const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
+        if (projectEntries.length === 0) return false; // Sin entradas de tiempo, no hay riesgo calculable
+        
+        const actualCost = projectEntries.reduce((sum, entry) => {
+          const rate = entry.hourlyRateAtTime || 50;
+          return sum + ((entry.hours || 0) * rate);
+        }, 0);
+        
+        const budget = project.quotation.totalAmount;
+        const budgetUsagePercentage = budget > 0 ? (actualCost / budget) * 100 : 0;
+        
+        return budgetUsagePercentage > 80;
       });
+
+      if (budgetRiskProjects.length > 0) {
+        alerts.push({
+          id: 'budget-risk',
+          type: 'critical',
+          title: 'Riesgo Presupuestario Crítico',
+          message: `${budgetRiskProjects.length} proyecto(s) han superado el 80% del presupuesto`,
+          action: 'Revisar costos',
+          projects: budgetRiskProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
+          priority: 'high',
+          impact: 'financial'
+        });
+      }
     }
 
-    // Alerta 3: Deadlines en peligro
-    const upcomingDeadlines = projectsArray.filter(project => {
-      if (!project.expectedEndDate) return false;
-      
-      const endDate = new Date(project.expectedEndDate);
-      const now = new Date();
-      const daysUntilDeadline = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      return daysUntilDeadline <= 7 && daysUntilDeadline > 0;
-    });
-
-    if (upcomingDeadlines.length > 0) {
-      alerts.push({
-        id: 'deadline-risk',
-        type: 'urgent',
-        title: 'Deadlines Próximos',
-        message: `${upcomingDeadlines.length} proyecto(s) vencen en los próximos 7 días`,
-        action: 'Revisar cronograma',
-        projects: upcomingDeadlines.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
-        priority: 'high',
-        impact: 'delivery'
+    // Alerta 2: Clientes con alto riesgo de churn (solo si hay clientes y proyectos)
+    if (clientsArray.length > 0 && projectsArray.length > 0) {
+      const highRiskClients = clientsArray.filter(client => {
+        const clientProjects = projectsArray.filter(p => p.quotation?.clientId === client.id);
+        
+        if (clientProjects.length === 0) return false; // Solo alertar si tenía proyectos pero ahora no tiene actividad
+        
+        const lastActivity = clientProjects.reduce((latest, project) => {
+          const projectEntries = timeEntriesArray
+            .filter(entry => entry.projectId === project.id)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          if (projectEntries.length > 0) {
+            const lastEntryDate = new Date(projectEntries[0].date);
+            return lastEntryDate > latest ? lastEntryDate : latest;
+          }
+          return latest;
+        }, new Date(0));
+        
+        const daysSinceLastActivity = (new Date().getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24);
+        return daysSinceLastActivity > 15 && lastActivity.getTime() > 0; // Solo si hubo actividad previa
       });
+
+      if (highRiskClients.length > 0) {
+        alerts.push({
+          id: 'churn-risk',
+          type: 'warning',
+          title: 'Riesgo de Churn de Clientes',
+          message: `${highRiskClients.length} cliente(s) sin actividad reciente`,
+          action: 'Contactar clientes',
+          clients: highRiskClients.map(c => c.name),
+          priority: 'medium',
+          impact: 'retention'
+        });
+      }
     }
 
-    // Alerta 4: Proyectos con baja actividad
-    const lowActivityProjects = projectsArray.filter(project => {
-      const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
-      
-      // Calcular actividad en los últimos 7 días
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      const recentEntries = projectEntries.filter(entry => 
-        new Date(entry.date) >= sevenDaysAgo
-      );
-      
-      const recentHours = recentEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-      
-      // Si es un proyecto activo pero con menos de 5 horas en la última semana
-      return project.status === 'active' && recentHours < 5;
-    });
-
-    if (lowActivityProjects.length > 0) {
-      alerts.push({
-        id: 'low-activity',
-        type: 'warning',
-        title: 'Baja Actividad en Proyectos',
-        message: `${lowActivityProjects.length} proyecto(s) con menos de 5 horas en la última semana`,
-        action: 'Revisar asignación',
-        projects: lowActivityProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
-        priority: 'medium',
-        impact: 'productivity'
+    // Alerta 3: Deadlines en peligro (solo si hay proyectos con fechas)
+    if (projectsArray.length > 0) {
+      const upcomingDeadlines = projectsArray.filter(project => {
+        if (!project.expectedEndDate) return false;
+        
+        const endDate = new Date(project.expectedEndDate);
+        const now = new Date();
+        const daysUntilDeadline = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return daysUntilDeadline <= 7 && daysUntilDeadline > 0;
       });
+
+      if (upcomingDeadlines.length > 0) {
+        alerts.push({
+          id: 'deadline-risk',
+          type: 'urgent',
+          title: 'Deadlines Próximos',
+          message: `${upcomingDeadlines.length} proyecto(s) vencen en los próximos 7 días`,
+          action: 'Revisar cronograma',
+          projects: upcomingDeadlines.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
+          priority: 'high',
+          impact: 'delivery'
+        });
+      }
+    }
+
+    // Alerta 4: Proyectos con baja actividad (solo si hay proyectos activos y entradas de tiempo)
+    if (projectsArray.length > 0 && timeEntriesArray.length > 0) {
+      const lowActivityProjects = projectsArray.filter(project => {
+        if (project.status !== 'active') return false;
+        
+        const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
+        if (projectEntries.length === 0) return false; // Sin historial, no se puede evaluar
+        
+        // Calcular actividad en los últimos 7 días
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const recentEntries = projectEntries.filter(entry => 
+          new Date(entry.date) >= sevenDaysAgo
+        );
+        
+        const recentHours = recentEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+        
+        // Solo alertar si tenía actividad previa pero ahora es baja
+        const totalHours = projectEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+        return totalHours > 0 && recentHours < 5;
+      });
+
+      if (lowActivityProjects.length > 0) {
+        alerts.push({
+          id: 'low-activity',
+          type: 'warning',
+          title: 'Baja Actividad en Proyectos',
+          message: `${lowActivityProjects.length} proyecto(s) con menos de 5 horas en la última semana`,
+          action: 'Revisar asignación',
+          projects: lowActivityProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
+          priority: 'medium',
+          impact: 'productivity'
+        });
+      }
     }
 
     return alerts;
@@ -450,7 +469,7 @@ export default function ExecutiveDashboard() {
         )}
 
         {/* Alertas Inteligentes Críticas */}
-        {intelligentAlerts.length > 0 && (
+        {intelligentAlerts.length > 0 ? (
           <div className="mb-6 space-y-3">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -515,6 +534,30 @@ export default function ExecutiveDashboard() {
                 </Alert>
               ))}
             </div>
+          </div>
+        ) : !isLoading && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Sistema Operando Correctamente</h2>
+              <Badge variant="secondary" className="ml-2">
+                Sin Alertas
+              </Badge>
+            </div>
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-green-700 font-medium">No se detectaron alertas críticas</p>
+                  <p className="text-green-600 text-sm mt-1">
+                    {(activeProjects?.length || 0) === 0 ? 
+                      "No hay proyectos activos que monitorear" : 
+                      "Todos los proyectos están operando dentro de los parámetros normales"
+                    }
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
