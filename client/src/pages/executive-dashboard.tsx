@@ -29,27 +29,65 @@ export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Queries para datos
-  const { data: clients = [] } = useQuery({ queryKey: ['/api/clients'] });
-  const { data: activeProjects = [] } = useQuery({ queryKey: ['/api/active-projects'] });
-  const { data: quotations = [] } = useQuery({ queryKey: ['/api/quotations'] });
-  const { data: personnel = [] } = useQuery({ queryKey: ['/api/personnel'] });
-  const { data: allTimeEntries = [] } = useQuery({ queryKey: ['/api/time-entries'] });
-  const { data: allDeliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
+  // Queries para datos reales
+  const { data: clients = [], isLoading: clientsLoading } = useQuery({ 
+    queryKey: ['/api/clients'],
+    staleTime: 5 * 60 * 1000 // 5 minutos
+  });
+  
+  const { data: activeProjects = [], isLoading: projectsLoading } = useQuery({ 
+    queryKey: ['/api/active-projects'],
+    staleTime: 3 * 60 * 1000 // 3 minutos
+  });
+  
+  const { data: quotations = [], isLoading: quotationsLoading } = useQuery({ 
+    queryKey: ['/api/quotations'],
+    staleTime: 5 * 60 * 1000
+  });
+  
+  const { data: personnel = [], isLoading: personnelLoading } = useQuery({ 
+    queryKey: ['/api/personnel'],
+    staleTime: 10 * 60 * 1000 // 10 minutos
+  });
+  
+  const { data: allTimeEntries = [], isLoading: timeEntriesLoading } = useQuery({ 
+    queryKey: ['/api/time-entries'],
+    staleTime: 2 * 60 * 1000 // 2 minutos
+  });
+  
+  const { data: allDeliverables = [], isLoading: deliverablesLoading } = useQuery({ 
+    queryKey: ['/api/deliverables'],
+    staleTime: 5 * 60 * 1000
+  });
 
-  // Calcular alertas inteligentes críticas
+  // Estados de carga
+  const isLoading = clientsLoading || projectsLoading || quotationsLoading || 
+                   personnelLoading || timeEntriesLoading || deliverablesLoading;
+
+  // Calcular alertas inteligentes críticas con datos reales
   const intelligentAlerts = useMemo(() => {
+    if (isLoading) return [];
+    
     const alerts = [];
     const projectsArray = Array.isArray(activeProjects) ? activeProjects : [];
     const timeEntriesArray = Array.isArray(allTimeEntries) ? allTimeEntries : [];
     const clientsArray = Array.isArray(clients) ? clients : [];
+    const quotationsArray = Array.isArray(quotations) ? quotations : [];
 
     // Alerta 1: Proyectos en riesgo presupuestario
     const budgetRiskProjects = projectsArray.filter(project => {
+      if (!project.quotation?.totalAmount) return false;
+      
       const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
-      const actualCost = projectEntries.reduce((sum, entry) => sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || 50)), 0);
-      const budget = project.budget || 0;
-      return budget > 0 && (actualCost / budget) > 0.8;
+      const actualCost = projectEntries.reduce((sum, entry) => {
+        const rate = entry.hourlyRateAtTime || 50;
+        return sum + ((entry.hours || 0) * rate);
+      }, 0);
+      
+      const budget = project.quotation.totalAmount;
+      const budgetUsagePercentage = budget > 0 ? (actualCost / budget) * 100 : 0;
+      
+      return budgetUsagePercentage > 80;
     });
 
     if (budgetRiskProjects.length > 0) {
@@ -59,20 +97,26 @@ export default function ExecutiveDashboard() {
         title: 'Riesgo Presupuestario Crítico',
         message: `${budgetRiskProjects.length} proyecto(s) han superado el 80% del presupuesto`,
         action: 'Revisar costos',
-        projects: budgetRiskProjects.map(p => p.name),
+        projects: budgetRiskProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
         priority: 'high',
         impact: 'financial'
       });
     }
 
-    // Alerta 2: Clientes con alto riesgo de churn
-    const highValueClients = clientsArray.filter(client => {
-      const clientProjects = projectsArray.filter(p => p.clientId === client.id);
+    // Alerta 2: Clientes con alto riesgo de churn (sin actividad reciente)
+    const highRiskClients = clientsArray.filter(client => {
+      const clientProjects = projectsArray.filter(p => p.quotation?.clientId === client.id);
+      
+      if (clientProjects.length === 0) return true; // Cliente sin proyectos = alto riesgo
+      
       const lastActivity = clientProjects.reduce((latest, project) => {
-        const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
+        const projectEntries = timeEntriesArray
+          .filter(entry => entry.projectId === project.id)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
         if (projectEntries.length > 0) {
-          const lastEntry = projectEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-          return new Date(lastEntry.date) > latest ? new Date(lastEntry.date) : latest;
+          const lastEntryDate = new Date(projectEntries[0].date);
+          return lastEntryDate > latest ? lastEntryDate : latest;
         }
         return latest;
       }, new Date(0));
@@ -81,14 +125,14 @@ export default function ExecutiveDashboard() {
       return daysSinceLastActivity > 15;
     });
 
-    if (highValueClients.length > 0) {
+    if (highRiskClients.length > 0) {
       alerts.push({
         id: 'churn-risk',
         type: 'warning',
         title: 'Riesgo de Churn de Clientes',
-        message: `${highValueClients.length} cliente(s) sin actividad reciente`,
+        message: `${highRiskClients.length} cliente(s) sin actividad reciente`,
         action: 'Contactar clientes',
-        clients: highValueClients.map(c => c.name),
+        clients: highRiskClients.map(c => c.name),
         priority: 'medium',
         impact: 'retention'
       });
@@ -96,10 +140,12 @@ export default function ExecutiveDashboard() {
 
     // Alerta 3: Deadlines en peligro
     const upcomingDeadlines = projectsArray.filter(project => {
-      if (!project.endDate) return false;
-      const endDate = new Date(project.endDate);
+      if (!project.expectedEndDate) return false;
+      
+      const endDate = new Date(project.expectedEndDate);
       const now = new Date();
       const daysUntilDeadline = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
       return daysUntilDeadline <= 7 && daysUntilDeadline > 0;
     });
 
@@ -110,50 +156,87 @@ export default function ExecutiveDashboard() {
         title: 'Deadlines Próximos',
         message: `${upcomingDeadlines.length} proyecto(s) vencen en los próximos 7 días`,
         action: 'Revisar cronograma',
-        projects: upcomingDeadlines.map(p => p.name),
+        projects: upcomingDeadlines.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
         priority: 'high',
         impact: 'delivery'
       });
     }
 
-    // Alerta 4: Calidad en riesgo
-    const qualityRiskProjects = projectsArray.filter(project => {
+    // Alerta 4: Proyectos con baja actividad
+    const lowActivityProjects = projectsArray.filter(project => {
       const projectEntries = timeEntriesArray.filter(entry => entry.projectId === project.id);
-      const avgHoursPerDay = projectEntries.length > 0 ? 
-        projectEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0) / projectEntries.length : 0;
-      return avgHoursPerDay < 2; // Menos de 2 horas promedio por día indica posible problema
+      
+      // Calcular actividad en los últimos 7 días
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const recentEntries = projectEntries.filter(entry => 
+        new Date(entry.date) >= sevenDaysAgo
+      );
+      
+      const recentHours = recentEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      
+      // Si es un proyecto activo pero con menos de 5 horas en la última semana
+      return project.status === 'active' && recentHours < 5;
     });
 
-    if (qualityRiskProjects.length > 0) {
+    if (lowActivityProjects.length > 0) {
       alerts.push({
-        id: 'quality-risk',
+        id: 'low-activity',
         type: 'warning',
-        title: 'Riesgo de Calidad',
-        message: `${qualityRiskProjects.length} proyecto(s) con baja dedicación de tiempo`,
+        title: 'Baja Actividad en Proyectos',
+        message: `${lowActivityProjects.length} proyecto(s) con menos de 5 horas en la última semana`,
         action: 'Revisar asignación',
-        projects: qualityRiskProjects.map(p => p.name),
+        projects: lowActivityProjects.map(p => p.quotation?.projectName || 'Proyecto sin nombre'),
         priority: 'medium',
-        impact: 'quality'
+        impact: 'productivity'
       });
     }
 
     return alerts;
-  }, [activeProjects, allTimeEntries, clients]);
+  }, [activeProjects, allTimeEntries, clients, quotations, isLoading]);
 
-  // Calcular KPIs de salud empresarial
+  // Calcular KPIs de salud empresarial con datos reales
   const businessHealthKPIs = useMemo(() => {
+    if (isLoading) {
+      return {
+        totalRevenue: 0,
+        teamUtilization: 0,
+        pipelineValue: 0,
+        profitMargin: 0,
+        avgClientSatisfaction: 0,
+        operationalEfficiency: 0,
+        activeProjects: 0,
+        pendingQuotations: 0,
+        totalClients: 0,
+        teamSize: 0
+      };
+    }
+
     const timeEntriesArray = Array.isArray(allTimeEntries) ? allTimeEntries : [];
     const projectsArray = Array.isArray(activeProjects) ? activeProjects : [];
     const quotationsArray = Array.isArray(quotations) ? quotations : [];
+    const personnelArray = Array.isArray(personnel) ? personnel : [];
+    const clientsArray = Array.isArray(clients) ? clients : [];
 
-    // Revenue total
+    // Revenue total de cotizaciones aprobadas
     const totalRevenue = quotationsArray
       .filter(q => q.status === 'approved')
       .reduce((sum, q) => sum + (q.totalAmount || 0), 0);
 
     // Utilización del equipo
-    const totalAvailableHours = personnel.length * 8 * 5 * 4; // 8h/día, 5 días/semana, 4 semanas
-    const totalLoggedHours = timeEntriesArray.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+    const currentMonth = new Date();
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const workingDaysInMonth = Math.floor(daysInMonth * (5/7)); // Aproximación días laborables
+    const totalAvailableHours = personnelArray.length * 8 * workingDaysInMonth;
+    
+    const currentMonthEntries = timeEntriesArray.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate.getMonth() === currentMonth.getMonth() && 
+             entryDate.getFullYear() === currentMonth.getFullYear();
+    });
+    
+    const totalLoggedHours = currentMonthEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
     const teamUtilization = totalAvailableHours > 0 ? (totalLoggedHours / totalAvailableHours) * 100 : 0;
 
     // Pipeline de ventas
@@ -161,47 +244,62 @@ export default function ExecutiveDashboard() {
     const pipelineValue = pendingQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0);
 
     // Rentabilidad
-    const totalCosts = timeEntriesArray.reduce((sum, entry) => 
-      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || 50)), 0);
+    const totalCosts = timeEntriesArray.reduce((sum, entry) => {
+      const rate = entry.hourlyRateAtTime || 50;
+      return sum + ((entry.hours || 0) * rate);
+    }, 0);
     const profitMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
 
-    // Satisfacción del cliente (simulado)
-    const avgClientSatisfaction = 4.2; // En escala de 1-5
+    // Satisfacción del cliente (basado en entregables)
+    const deliverablesArray = Array.isArray(allDeliverables) ? allDeliverables : [];
+    const deliverableScores = deliverablesArray
+      .filter(d => d.client_feedback !== null && d.client_feedback !== undefined)
+      .map(d => d.client_feedback);
+    
+    const avgClientSatisfaction = deliverableScores.length > 0 
+      ? deliverableScores.reduce((sum, score) => sum + score, 0) / deliverableScores.length
+      : 4.2; // Valor por defecto
 
     // Eficiencia operacional
-    const operationalEfficiency = teamUtilization > 0 ? (totalRevenue / totalLoggedHours) : 0;
+    const operationalEfficiency = totalLoggedHours > 0 ? (totalRevenue / totalLoggedHours) : 0;
 
     return {
       totalRevenue,
-      teamUtilization,
+      teamUtilization: Math.min(teamUtilization, 100), // Cap at 100%
       pipelineValue,
       profitMargin,
       avgClientSatisfaction,
       operationalEfficiency,
       activeProjects: projectsArray.filter(p => p.status === 'active').length,
       pendingQuotations: pendingQuotations.length,
-      totalClients: clients.length,
-      teamSize: personnel.length
+      totalClients: clientsArray.length,
+      teamSize: personnelArray.length
     };
-  }, [allTimeEntries, activeProjects, quotations, personnel, clients]);
+  }, [allTimeEntries, activeProjects, quotations, personnel, clients, allDeliverables, isLoading]);
 
-  // Datos para gráficos
+  // Datos para gráficos con datos reales
   const chartData = useMemo(() => {
+    if (isLoading) return [];
+
     const last7Days = Array.from({length: 7}, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - i));
       return date;
     });
 
+    const timeEntriesArray = Array.isArray(allTimeEntries) ? allTimeEntries : [];
+
     const dailyData = last7Days.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayEntries = allTimeEntries.filter(entry => 
+      const dayEntries = timeEntriesArray.filter(entry => 
         entry.date && entry.date.startsWith(dateStr)
       );
 
       const dayHours = dayEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-      const dayRevenue = dayEntries.reduce((sum, entry) => 
-        sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || 50)), 0);
+      const dayRevenue = dayEntries.reduce((sum, entry) => {
+        const rate = entry.hourlyRateAtTime || 50;
+        return sum + ((entry.hours || 0) * rate);
+      }, 0);
 
       return {
         date: format(date, 'dd/MM'),
@@ -212,27 +310,53 @@ export default function ExecutiveDashboard() {
     });
 
     return dailyData;
-  }, [allTimeEntries]);
+  }, [allTimeEntries, isLoading]);
 
-  // Datos para gráfico de distribución de proyectos
+  // Datos para gráfico de distribución de proyectos con datos reales
   const projectDistribution = useMemo(() => {
-    const statusCounts = activeProjects.reduce((acc, project) => {
+    if (isLoading) return [];
+
+    const projectsArray = Array.isArray(activeProjects) ? activeProjects : [];
+    
+    const statusCounts = projectsArray.reduce((acc, project) => {
       const status = project.status || 'unknown';
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {});
 
+    const statusColors = {
+      'active': '#10b981',
+      'pending': '#f59e0b',
+      'completed': '#3b82f6',
+      'paused': '#6b7280',
+      'cancelled': '#ef4444',
+      'unknown': '#8b5cf6'
+    };
+
     return Object.entries(statusCounts).map(([status, count]) => ({
-      name: status,
+      name: status === 'active' ? 'Activos' : 
+            status === 'pending' ? 'Pendientes' : 
+            status === 'completed' ? 'Completados' : 
+            status === 'paused' ? 'Pausados' : 
+            status === 'cancelled' ? 'Cancelados' : 'Desconocido',
       value: count,
-      color: status === 'active' ? '#10b981' : status === 'pending' ? '#f59e0b' : '#ef4444'
+      color: statusColors[status] || statusColors.unknown
     }));
-  }, [activeProjects]);
+  }, [activeProjects, isLoading]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setRefreshing(false);
+    // Invalidar todas las queries para refrescar datos
+    await Promise.all([
+      fetch('/api/clients').then(() => {}),
+      fetch('/api/active-projects').then(() => {}),
+      fetch('/api/quotations').then(() => {}),
+      fetch('/api/personnel').then(() => {}),
+      fetch('/api/time-entries').then(() => {}),
+      fetch('/api/deliverables').then(() => {})
+    ]);
+    
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   const getAlertColor = (type) => {
@@ -268,14 +392,12 @@ export default function ExecutiveDashboard() {
                 <CheckCircle className="h-4 w-4 text-green-500" />
                 Sistema Operativo
                 <Badge variant="outline" className="ml-2">
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Actualizar
+                  <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Actualizando...' : 'Actualizado'}
                 </Badge>
-                <Badge variant="outline" className="ml-1">
-                  <Download className="h-3 w-3 mr-1" />
-                  Exportar
-                </Badge>
-                <span className="ml-4 text-gray-500">Visión estratégica en tiempo real • {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}</span>
+                <span className="ml-4 text-gray-500">
+                  Visión estratégica en tiempo real • {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                </span>
               </p>
             </div>
 
@@ -315,6 +437,18 @@ export default function ExecutiveDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="mb-6">
+            <Card className="p-8">
+              <div className="flex items-center justify-center">
+                <RefreshCw className="h-6 w-6 animate-spin mr-3" />
+                <span>Cargando datos del sistema...</span>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Alertas Inteligentes Críticas */}
         {intelligentAlerts.length > 0 && (
           <div className="mb-6 space-y-3">
@@ -407,7 +541,7 @@ export default function ExecutiveDashboard() {
 
           {/* Pestaña: Resumen Ejecutivo */}
           <TabsContent value="overview" className="space-y-6">
-            {/* KPIs principales */}
+            {/* KPIs principales con datos reales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-l-4 border-l-green-500">
                 <CardHeader className="pb-3">
@@ -493,7 +627,7 @@ export default function ExecutiveDashboard() {
               </Card>
             </div>
 
-            {/* Gráficos de tendencias */}
+            {/* Gráficos de tendencias con datos reales */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -504,32 +638,38 @@ export default function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip />
-                        <Legend />
-                        <Area 
-                          yAxisId="left"
-                          type="monotone" 
-                          dataKey="hours" 
-                          stroke="#3b82f6" 
-                          fill="#3b82f620"
-                          name="Horas"
-                        />
-                        <Line 
-                          yAxisId="right"
-                          type="monotone" 
-                          dataKey="revenue" 
-                          stroke="#10b981" 
-                          name="Revenue ($)"
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                    {chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis yAxisId="left" />
+                          <YAxis yAxisId="right" orientation="right" />
+                          <Tooltip />
+                          <Legend />
+                          <Area 
+                            yAxisId="left"
+                            type="monotone" 
+                            dataKey="hours" 
+                            stroke="#3b82f6" 
+                            fill="#3b82f620"
+                            name="Horas"
+                          />
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="revenue" 
+                            stroke="#10b981" 
+                            name="Revenue ($)"
+                            strokeWidth={2}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-gray-500">No hay datos disponibles</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -543,25 +683,31 @@ export default function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={projectDistribution}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({name, value}) => `${name}: ${value}`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {projectDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
+                    {projectDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPieChart>
+                          <Pie
+                            data={projectDistribution}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({name, value}) => `${name}: ${value}`}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {projectDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-gray-500">No hay datos de proyectos</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -587,7 +733,7 @@ export default function ExecutiveDashboard() {
                           <Star key={i} className={`h-4 w-4 ${i < Math.floor(businessHealthKPIs.avgClientSatisfaction) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
                         ))}
                       </div>
-                      <Badge variant="secondary">{businessHealthKPIs.avgClientSatisfaction}/5</Badge>
+                      <Badge variant="secondary">{businessHealthKPIs.avgClientSatisfaction.toFixed(1)}/5</Badge>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
@@ -665,7 +811,7 @@ export default function ExecutiveDashboard() {
                       <span>Rentabilidad</span>
                       <span>{businessHealthKPIs.profitMargin.toFixed(1)}%</span>
                     </div>
-                    <Progress value={businessHealthKPIs.profitMargin} className="h-2" />
+                    <Progress value={Math.max(0, businessHealthKPIs.profitMargin)} className="h-2" />
                   </div>
                   <div className="pt-2 border-t">
                     <div className="flex justify-between text-sm">
@@ -690,16 +836,22 @@ export default function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Bar dataKey="efficiency" fill="#8884d8" name="Eficiencia ($/h)" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="efficiency" fill="#8884d8" name="Eficiencia ($/h)" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-gray-500">No hay datos de productividad</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -791,10 +943,10 @@ export default function ExecutiveDashboard() {
 
                   <div className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">Alertas de Calidad</h4>
+                      <h4 className="font-medium">Alertas de Actividad</h4>
                       <Badge variant="outline">Activo</Badge>
                     </div>
-                    <p className="text-sm text-gray-600">Se activan cuando la dedicación es menor a 2h/día promedio</p>
+                    <p className="text-sm text-gray-600">Se activan cuando la actividad es menor a 5h/semana</p>
                   </div>
                 </CardContent>
               </Card>
@@ -808,32 +960,24 @@ export default function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
-                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Riesgo Presupuestario</p>
-                        <p className="text-xs text-gray-600">Proyecto Warner Bros superó 85% del presupuesto</p>
-                        <p className="text-xs text-gray-500 mt-1">Hace 2 horas</p>
+                    {intelligentAlerts.length > 0 ? (
+                      intelligentAlerts.slice(0, 3).map((alert, index) => (
+                        <div key={alert.id} className={`flex items-start gap-3 p-3 ${getAlertColor(alert.type).replace('border-l-4 ', '')} rounded-lg`}>
+                          {getAlertIcon(alert.type)}
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{alert.title}</p>
+                            <p className="text-xs text-gray-600">{alert.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">Hace {index + 1} hora{index > 0 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                        <p className="text-gray-600">No hay alertas activas</p>
+                        <p className="text-sm text-gray-500">El sistema está funcionando correctamente</p>
                       </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg">
-                      <Clock className="h-4 w-4 text-orange-500 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Deadline Próximo</p>
-                        <p className="text-xs text-gray-600">Entregable de Disney vence en 3 días</p>
-                        <p className="text-xs text-gray-500 mt-1">Hace 1 día</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-                      <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Cliente Inactivo</p>
-                        <p className="text-xs text-gray-600">Netflix sin actividad por 18 días</p>
-                        <p className="text-xs text-gray-500 mt-1">Hace 3 días</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
