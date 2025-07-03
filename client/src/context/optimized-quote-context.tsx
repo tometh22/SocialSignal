@@ -96,7 +96,7 @@ interface OptimizedQuoteContextType {
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
   saveQuotation: (status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation') => Promise<void>;
-  loadFromDraft: (draftData: any) => void;
+
   calculateTotalCost: () => void;
   resetQuotation: () => void;
   loadRoles: () => void;
@@ -845,20 +845,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
   }, [forceRecalculate]);
 
-  const loadFromDraft = useCallback((draftData: any) => {
-    console.log('📄 Loading from draft data:', draftData);
-    
-    // Restore the quotation data from the draft
-    setQuotationData(prevData => ({
-      ...prevData,
-      ...draftData
-    }));
-    
-    // Trigger recalculation
-    forceRecalculate();
-    
-    console.log('✅ Draft loaded successfully');
-  }, [forceRecalculate]);
+
 
   const saveQuotation = useCallback(async (status: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation' = 'draft') => {
     try {
@@ -1081,7 +1068,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     updateInflation,
     loadQuotation,
     saveQuotation,
-    loadFromDraft,
     calculateTotalCost,
     resetQuotation,
     loadRoles,
