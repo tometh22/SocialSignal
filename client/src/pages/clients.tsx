@@ -247,8 +247,8 @@ export default function Clients() {
         description="Gestiona la información de tus clientes y accede a sus resúmenes"
         breadcrumbs={[{ label: "Clientes", current: true }]}
       >
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
+        <div className="flex items-start justify-start h-64 p-6">
+          <div className="text-left">
             <div className="text-red-500 mb-2">Error al cargar los clientes</div>
             <Button onClick={() => window.location.reload()}>Reintentar</Button>
           </div>
@@ -364,7 +364,7 @@ export default function Clients() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="py-8 text-gray-500">
                 {searchTerm
                   ? "No hay clientes que coincidan con tu búsqueda."
                   : "No se encontraron clientes. ¡Añade tu primer cliente!"}
