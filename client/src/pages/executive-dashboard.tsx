@@ -599,10 +599,10 @@ export default function ExecutiveDashboard() {
             </div>
             <Card className="border-green-200 bg-green-50">
               <CardContent className="p-4">
-                <div className="text-center">
+                <div className="text-center" style={{ textAlign: 'center' }}>
                   <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-green-700 font-medium">No se detectaron alertas críticas</p>
-                  <p className="text-green-600 text-sm mt-1">
+                  <p className="text-green-700 font-medium" style={{ textAlign: 'center' }}>No se detectaron alertas críticas</p>
+                  <p className="text-green-600 text-sm mt-1" style={{ textAlign: 'center' }}>
                     {(activeProjects?.length || 0) === 0 ? 
                       "No hay proyectos activos que monitorear" : 
                       "Todos los proyectos están operando dentro de los parámetros normales"
