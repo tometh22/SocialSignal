@@ -521,96 +521,7 @@ export default function ExecutiveDashboard() {
           </div>
         )}
 
-        {/* Alertas Inteligentes Críticas */}
-        {intelligentAlerts.length > 0 ? (
-          <div className="mb-6 space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              <h2 className="text-lg font-semibold text-gray-900">Alertas Inteligentes Críticas</h2>
-              <Badge variant="destructive" className="ml-2">
-                {intelligentAlerts.length}
-              </Badge>
-              <div className="flex ml-4 gap-2">
-                {intelligentAlerts.filter(a => a.type === 'critical').length > 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    {intelligentAlerts.filter(a => a.type === 'critical').length} Críticas
-                  </Badge>
-                )}
-                {intelligentAlerts.filter(a => a.type === 'urgent').length > 0 && (
-                  <Badge className="bg-orange-500 text-xs">
-                    {intelligentAlerts.filter(a => a.type === 'urgent').length} Urgentes
-                  </Badge>
-                )}
-                {intelligentAlerts.filter(a => a.type === 'warning').length > 0 && (
-                  <Badge className="bg-yellow-500 text-xs">
-                    {intelligentAlerts.filter(a => a.type === 'warning').length} Advertencias
-                  </Badge>
-                )}
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {intelligentAlerts.map((alert) => (
-                <Alert key={alert.id} className={`border-l-4 ${getAlertColor(alert.type)}`}>
-                  {getAlertIcon(alert.type)}
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{alert.title}</p>
-                        <Badge variant="outline" className="text-xs">
-                          {alert.priority}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600">{alert.message}</p>
-                      {alert.projects && (
-                        <p className="text-xs text-gray-500">
-                          Proyectos: {alert.projects.slice(0, 2).join(', ')}
-                          {alert.projects.length > 2 && ` +${alert.projects.length - 2} más`}
-                        </p>
-                      )}
-                      {alert.clients && (
-                        <p className="text-xs text-gray-500">
-                          Clientes: {alert.clients.slice(0, 2).join(', ')}
-                          {alert.clients.length > 2 && ` +${alert.clients.length - 2} más`}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between pt-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {alert.impact}
-                        </Badge>
-                        <Button size="sm" variant="outline" className="text-xs">
-                          {alert.action}
-                        </Button>
-                      </div>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              ))}
-            </div>
-          </div>
-        ) : !isLoading && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              <h2 className="text-lg font-semibold text-gray-900">Sistema Operando Correctamente</h2>
-              <Badge variant="secondary" className="ml-2">
-                Sin Alertas
-              </Badge>
-            </div>
-            <Card className="border-green-200 bg-green-50">
-              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-                <CheckCircle className="h-8 w-8 text-green-500 mb-3" />
-                <p className="text-green-700 font-medium mb-1">No se detectaron alertas críticas</p>
-                <p className="text-green-600 text-sm">
-                  {(activeProjects?.length || 0) === 0 ? 
-                    "No hay proyectos activos que monitorear" : 
-                    "Todos los proyectos están operando dentro de los parámetros normales"
-                  }
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+
 
         {/* Pestañas principales */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -720,6 +631,68 @@ export default function ExecutiveDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Alertas del Sistema */}
+            {intelligentAlerts.length > 0 ? (
+              <div className="mb-6 space-y-3">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  <h2 className="text-lg font-semibold text-gray-900">Alertas Inteligentes Críticas</h2>
+                  <Badge variant="destructive" className="ml-2">
+                    {intelligentAlerts.length}
+                  </Badge>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {intelligentAlerts.map((alert) => (
+                    <Alert key={alert.id} className={`border-l-4 ${getAlertColor(alert.type)}`}>
+                      {getAlertIcon(alert.type)}
+                      <AlertDescription>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium">{alert.title}</p>
+                            <Badge variant="outline" className="text-xs">
+                              {alert.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{alert.message}</p>
+                          <div className="flex items-center justify-between pt-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {alert.impact}
+                            </Badge>
+                            <Button size="sm" variant="outline" className="text-xs">
+                              {alert.action}
+                            </Button>
+                          </div>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              </div>
+            ) : !isLoading && (
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <h2 className="text-lg font-semibold text-gray-900">Sistema Operando Correctamente</h2>
+                  <Badge variant="secondary" className="ml-2">
+                    Sin Alertas
+                  </Badge>
+                </div>
+                <Card className="border-green-200 bg-green-50">
+                  <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                    <CheckCircle className="h-8 w-8 text-green-500 mb-3" />
+                    <p className="text-green-700 font-medium mb-1">No se detectaron alertas críticas</p>
+                    <p className="text-green-600 text-sm">
+                      {(activeProjects?.length || 0) === 0 ? 
+                        "No hay proyectos activos que monitorear" : 
+                        "Todos los proyectos están operando dentro de los parámetros normales"
+                      }
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Gráficos de tendencias con datos reales */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
