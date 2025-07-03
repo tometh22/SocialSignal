@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, Plus } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { useDraftRecovery, type DraftData } from '@/hooks/use-draft-recovery';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
@@ -36,7 +37,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     saveQuotation,
     loadQuotation,
     updateDeliverables,
-    updateAdditionalDeliverableCost
+    updateAdditionalDeliverableCost,
+    loadFromDraft
   } = useOptimizedQuote();
 
   // Get quotation ID from URL if not passed as prop
@@ -48,6 +50,36 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const isOnline = useOnlineStatus();
+  
+  // Draft recovery state
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [hasCheckedDrafts, setHasCheckedDrafts] = useState(false);
+  const { availableDrafts, isLoading: draftsLoading, hasDrafts, deleteDraft, getDraftData } = useDraftRecovery();
+
+  // Handlers for draft recovery
+  const handleContinueDraft = (draft: DraftData) => {
+    const draftData = getDraftData(draft.timestamp);
+    if (draftData) {
+      loadFromDraft(draftData);
+      setShowWelcome(false);
+      toast({
+        title: "Borrador restaurado",
+        description: `Continuando con la cotización de ${draft.clientName || 'cliente'}`,
+      });
+    }
+  };
+
+  const handleStartNew = () => {
+    setShowWelcome(false);
+    // Clear any existing drafts for a clean start
+    localStorage.removeItem('optimized-quote-draft');
+    localStorage.removeItem('optimized-quote-draft-backup');
+    localStorage.removeItem('optimized-quote-draft-emergency');
+  };
+
+  const handleDeleteDraft = (timestamp: number) => {
+    deleteDraft(timestamp);
+  };
 
   // Prevent accidental page refresh/close when there's unsaved data
   useEffect(() => {
@@ -66,6 +98,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [quotationData]);
+
+  // Check for drafts on initial load (only for new quotations)
+  useEffect(() => {
+    if (!effectiveQuotationId && !hasCheckedDrafts && !draftsLoading) {
+      setHasCheckedDrafts(true);
+      if (hasDrafts) {
+        setShowWelcome(true);
+      }
+    }
+  }, [effectiveQuotationId, hasCheckedDrafts, draftsLoading, hasDrafts]);
 
   // Load quotation if editing
   useEffect(() => {
@@ -221,6 +263,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const steps = getSteps();
   const isLastStep = currentStep === steps[steps.length - 1].num;
 
+  // Show draft recovery section at the top if drafts are available
+  const showDraftRecovery = !effectiveQuotationId && hasDrafts && showWelcome;
+
   return (
     <PageLayout
       title={isEditing ? 'Editar Cotización' : 'Nueva Cotización'}
@@ -308,6 +353,79 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </div>
       </div>
+
+      {/* Draft Recovery Section */}
+      {showDraftRecovery && (
+        <Card className="border-l-4 border-l-blue-500 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <FileText className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-medium text-blue-900 mb-2">
+                  Borradores Encontrados
+                </h3>
+                <p className="text-sm text-blue-800 mb-3">
+                  Se encontraron {availableDrafts.length} borrador(es) guardado(s). ¿Deseas continuar con alguno o empezar desde cero?
+                </p>
+                
+                <div className="space-y-2 mb-4">
+                  {availableDrafts.slice(0, 2).map((draft) => (
+                    <div key={draft.timestamp} className="flex items-center justify-between p-2 bg-white rounded border">
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-900">
+                          {draft.clientName || 'Cliente sin nombre'}
+                        </span>
+                        {draft.projectName && (
+                          <span className="text-xs text-gray-600 ml-2">
+                            - {draft.projectName}
+                          </span>
+                        )}
+                        <div className="text-xs text-gray-500">
+                          {new Date(draft.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleContinueDraft(draft)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1"
+                        >
+                          Continuar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteDraft(draft.timestamp)}
+                          className="text-red-600 hover:text-red-700 text-xs px-2 py-1"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleStartNew}
+                    className="bg-green-600 hover:bg-green-700 text-white text-sm"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Empezar de Cero
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setHasCheckedDrafts(true)}
+                    className="text-gray-600 text-sm"
+                  >
+                    Decidir después
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main content */}
       <div className="space-y-6">

@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 3, 2025: Redesigned draft recovery with elegant integrated UX - replaced intrusive popups with seamless in-page alerts
+- July 3, 2025: Created intelligent draft detection system that only shows recovery options when relevant
+- July 3, 2025: Implemented user-friendly draft management with inline preview and one-click restoration
+- July 3, 2025: Added "start fresh" and "decide later" options for optimal user control over draft recovery
 - July 3, 2025: Implemented comprehensive form data protection system to prevent data loss during quotation creation
 - July 3, 2025: Enhanced autoguardado (auto-save) functionality with 10-second intervals and visual feedback indicators
 - July 3, 2025: Added real-time autosave status indicator showing save time, connection status, and unsaved changes
