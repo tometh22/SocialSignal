@@ -238,55 +238,93 @@ export default function ExecutiveDashboard() {
     const personnelArray = Array.isArray(personnel) ? personnel : [];
     const clientsArray = Array.isArray(clients) ? clients : [];
 
+    // Si no hay datos, retornar valores en cero
+    if (timeEntriesArray.length === 0 && projectsArray.length === 0 && 
+        quotationsArray.length === 0 && personnelArray.length === 0 && 
+        clientsArray.length === 0) {
+      return {
+        totalRevenue: 0,
+        teamUtilization: 0,
+        pipelineValue: 0,
+        profitMargin: 0,
+        avgClientSatisfaction: 0,
+        operationalEfficiency: 0,
+        activeProjects: 0,
+        pendingQuotations: 0,
+        totalClients: 0,
+        teamSize: 0
+      };
+    }
+
     // Revenue total de cotizaciones aprobadas
-    const totalRevenue = quotationsArray
-      .filter(q => q.status === 'approved')
-      .reduce((sum, q) => sum + (q.totalAmount || 0), 0);
+    const totalRevenue = quotationsArray.length > 0 
+      ? quotationsArray
+          .filter(q => q.status === 'approved')
+          .reduce((sum, q) => sum + (q.totalAmount || 0), 0)
+      : 0;
 
     // Utilización del equipo
-    const currentMonth = new Date();
-    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-    const workingDaysInMonth = Math.floor(daysInMonth * (5/7)); // Aproximación días laborables
-    const totalAvailableHours = personnelArray.length * 8 * workingDaysInMonth;
-    
-    const currentMonthEntries = timeEntriesArray.filter(entry => {
-      const entryDate = new Date(entry.date);
-      return entryDate.getMonth() === currentMonth.getMonth() && 
-             entryDate.getFullYear() === currentMonth.getFullYear();
-    });
-    
-    const totalLoggedHours = currentMonthEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-    const teamUtilization = totalAvailableHours > 0 ? (totalLoggedHours / totalAvailableHours) * 100 : 0;
+    let teamUtilization = 0;
+    if (personnelArray.length > 0 && timeEntriesArray.length > 0) {
+      const currentMonth = new Date();
+      const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+      const workingDaysInMonth = Math.floor(daysInMonth * (5/7)); // Aproximación días laborables
+      const totalAvailableHours = personnelArray.length * 8 * workingDaysInMonth;
+      
+      const currentMonthEntries = timeEntriesArray.filter(entry => {
+        if (!entry.date) return false;
+        const entryDate = new Date(entry.date);
+        return entryDate.getMonth() === currentMonth.getMonth() && 
+               entryDate.getFullYear() === currentMonth.getFullYear();
+      });
+      
+      const totalLoggedHours = currentMonthEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      teamUtilization = totalAvailableHours > 0 ? (totalLoggedHours / totalAvailableHours) * 100 : 0;
+    }
 
     // Pipeline de ventas
-    const pendingQuotations = quotationsArray.filter(q => q.status === 'pending');
-    const pipelineValue = pendingQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0);
+    const pendingQuotations = quotationsArray.length > 0 
+      ? quotationsArray.filter(q => q.status === 'pending')
+      : [];
+    const pipelineValue = pendingQuotations.length > 0
+      ? pendingQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0)
+      : 0;
 
     // Rentabilidad
-    const totalCosts = timeEntriesArray.reduce((sum, entry) => {
-      const rate = entry.hourlyRateAtTime || 50;
-      return sum + ((entry.hours || 0) * rate);
-    }, 0);
-    const profitMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+    let profitMargin = 0;
+    if (timeEntriesArray.length > 0 && totalRevenue > 0) {
+      const totalCosts = timeEntriesArray.reduce((sum, entry) => {
+        const rate = entry.hourlyRateAtTime || 50;
+        return sum + ((entry.hours || 0) * rate);
+      }, 0);
+      profitMargin = ((totalRevenue - totalCosts) / totalRevenue) * 100;
+    }
 
     // Satisfacción del cliente (basado en entregables)
+    let avgClientSatisfaction = 0;
     const deliverablesArray = Array.isArray(allDeliverables) ? allDeliverables : [];
-    const deliverableScores = deliverablesArray
-      .filter(d => d.client_feedback !== null && d.client_feedback !== undefined)
-      .map(d => d.client_feedback);
-    
-    const avgClientSatisfaction = deliverableScores.length > 0 
-      ? deliverableScores.reduce((sum, score) => sum + score, 0) / deliverableScores.length
-      : 4.2; // Valor por defecto
+    if (deliverablesArray.length > 0) {
+      const deliverableScores = deliverablesArray
+        .filter(d => d.client_feedback !== null && d.client_feedback !== undefined)
+        .map(d => d.client_feedback);
+      
+      avgClientSatisfaction = deliverableScores.length > 0 
+        ? deliverableScores.reduce((sum, score) => sum + score, 0) / deliverableScores.length
+        : 0;
+    }
 
     // Eficiencia operacional
-    const operationalEfficiency = totalLoggedHours > 0 ? (totalRevenue / totalLoggedHours) : 0;
+    let operationalEfficiency = 0;
+    if (timeEntriesArray.length > 0 && totalRevenue > 0) {
+      const totalLoggedHours = timeEntriesArray.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      operationalEfficiency = totalLoggedHours > 0 ? (totalRevenue / totalLoggedHours) : 0;
+    }
 
     return {
       totalRevenue,
-      teamUtilization: Math.min(teamUtilization, 100), // Cap at 100%
+      teamUtilization: Math.min(Math.max(teamUtilization, 0), 100), // Entre 0 y 100%
       pipelineValue,
-      profitMargin,
+      profitMargin: Math.max(profitMargin, 0), // No menor a 0
       avgClientSatisfaction,
       operationalEfficiency,
       activeProjects: projectsArray.filter(p => p.status === 'active').length,
@@ -300,13 +338,18 @@ export default function ExecutiveDashboard() {
   const chartData = useMemo(() => {
     if (isLoading) return [];
 
+    const timeEntriesArray = Array.isArray(allTimeEntries) ? allTimeEntries : [];
+    
+    // Si no hay datos de tiempo, retornar array vacío para mostrar "No hay datos"
+    if (timeEntriesArray.length === 0) {
+      return [];
+    }
+
     const last7Days = Array.from({length: 7}, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - i));
       return date;
     });
-
-    const timeEntriesArray = Array.isArray(allTimeEntries) ? allTimeEntries : [];
 
     const dailyData = last7Days.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
@@ -337,11 +380,21 @@ export default function ExecutiveDashboard() {
 
     const projectsArray = Array.isArray(activeProjects) ? activeProjects : [];
     
+    // Si no hay proyectos, retornar array vacío para mostrar "No hay datos"
+    if (projectsArray.length === 0) {
+      return [];
+    }
+    
     const statusCounts = projectsArray.reduce((acc, project) => {
       const status = project.status || 'unknown';
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {});
+
+    // Solo retornar datos si realmente hay proyectos con status
+    if (Object.keys(statusCounts).length === 0) {
+      return [];
+    }
 
     const statusColors = {
       'active': '#10b981',
@@ -773,10 +826,12 @@ export default function ExecutiveDashboard() {
                     <div className="flex items-center gap-2">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`h-4 w-4 ${i < Math.floor(businessHealthKPIs.avgClientSatisfaction) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                          <Star key={i} className={`h-4 w-4 ${businessHealthKPIs.avgClientSatisfaction > 0 && i < Math.floor(businessHealthKPIs.avgClientSatisfaction) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
                         ))}
                       </div>
-                      <Badge variant="secondary">{businessHealthKPIs.avgClientSatisfaction.toFixed(1)}/5</Badge>
+                      <Badge variant="secondary">
+                        {businessHealthKPIs.avgClientSatisfaction > 0 ? businessHealthKPIs.avgClientSatisfaction.toFixed(1) : '0.0'}/5
+                      </Badge>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
@@ -915,7 +970,9 @@ export default function ExecutiveDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-green-600">
-                          ${businessHealthKPIs.totalClients > 0 ? (businessHealthKPIs.totalRevenue / businessHealthKPIs.totalClients).toFixed(0) : 0}
+                          ${businessHealthKPIs.totalClients > 0 && businessHealthKPIs.totalRevenue > 0 
+                            ? (businessHealthKPIs.totalRevenue / businessHealthKPIs.totalClients).toFixed(0) 
+                            : '0'}
                         </p>
                       </div>
                     </div>
@@ -927,7 +984,9 @@ export default function ExecutiveDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-blue-600">
-                          {businessHealthKPIs.totalClients > 0 ? (businessHealthKPIs.activeProjects / businessHealthKPIs.totalClients).toFixed(1) : 0}
+                          {businessHealthKPIs.totalClients > 0 && businessHealthKPIs.activeProjects > 0
+                            ? (businessHealthKPIs.activeProjects / businessHealthKPIs.totalClients).toFixed(1) 
+                            : '0.0'}
                         </p>
                       </div>
                     </div>
@@ -939,7 +998,9 @@ export default function ExecutiveDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-purple-600">
-                          {quotations.length > 0 ? ((businessHealthKPIs.activeProjects / quotations.length) * 100).toFixed(1) : 0}%
+                          {Array.isArray(quotations) && quotations.length > 0 && businessHealthKPIs.activeProjects > 0 
+                            ? ((businessHealthKPIs.activeProjects / quotations.length) * 100).toFixed(1) 
+                            : '0.0'}%
                         </p>
                       </div>
                     </div>
