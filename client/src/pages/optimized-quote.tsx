@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
-
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
@@ -37,8 +36,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     saveQuotation,
     loadQuotation,
     updateDeliverables,
-    updateAdditionalDeliverableCost,
-
+    updateAdditionalDeliverableCost
   } = useOptimizedQuote();
 
   // Get quotation ID from URL if not passed as prop
@@ -50,8 +48,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const isOnline = useOnlineStatus();
-  
-  // No draft recovery functionality - clean start
 
   // Prevent accidental page refresh/close when there's unsaved data
   useEffect(() => {
@@ -70,8 +66,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [quotationData]);
-
-  // Removed draft checking functionality
 
   // Load quotation if editing
   useEffect(() => {
@@ -227,8 +221,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const steps = getSteps();
   const isLastStep = currentStep === steps[steps.length - 1].num;
 
-  // No draft recovery functionality
-
   return (
     <PageLayout
       title={isEditing ? 'Editar Cotización' : 'Nueva Cotización'}
@@ -316,8 +308,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </div>
       </div>
-
-
 
       {/* Main content */}
       <div className="space-y-6">
