@@ -352,47 +352,25 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           timestamp = backupParsed.timestamp;
           source = 'respaldo';
         }
-        // Last resort: emergency data
+        // Last resort: emergency data (silent cleanup)
         else if (emergency) {
           const emergencyParsed = JSON.parse(emergency);
-          console.log('🆘 Datos de emergencia encontrados:', emergencyParsed);
-          alert(`Se encontraron datos de emergencia de un formulario anterior:\n` +
-                `Cliente: ${emergencyParsed.client || 'No guardado'}\n` +
-                `Proyecto: ${emergencyParsed.project || 'No guardado'}\n` +
-                `Miembros del equipo: ${emergencyParsed.teamCount || 0}\n` +
-                `Hora: ${new Date(emergencyParsed.timestamp).toLocaleString()}\n\n` +
-                `Por favor, contacta al soporte técnico para recuperar estos datos.`);
+          console.log('🆘 Datos de emergencia encontrados y limpiados silenciosamente:', emergencyParsed);
           sessionStorage.removeItem('emergency-draft');
-          return;
         }
 
         const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000; // Extended to 48 hours
         const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60)); // minutes ago
         
+        // Silent auto-restore for recent drafts without popup
         if (isRecent && savedData && (!quotationData.project.name && quotationData.teamMembers.length === 0)) {
           setQuotationData(savedData);
-          console.log(`📋 Borrador restaurado del ${source}:`, {
+          console.log(`📋 Borrador restaurado silenciosamente del ${source}:`, {
             cliente: savedData.client?.name || 'Sin cliente',
             proyecto: savedData.project?.name || 'Sin proyecto',
             miembros: savedData.teamMembers?.length || 0,
             minutosAtras: timeAgo
           });
-          
-          // Show user notification
-          const userConfirm = confirm(
-            `🔄 BORRADOR ENCONTRADO\n\n` +
-            `Se encontró un borrador de ${timeAgo} minuto(s) atrás:\n` +
-            `Cliente: ${savedData.client?.name || 'Sin seleccionar'}\n` +
-            `Proyecto: ${savedData.project?.name || 'Sin nombre'}\n` +
-            `Equipo: ${savedData.teamMembers?.length || 0} miembros\n\n` +
-            `¿Deseas continuar con este borrador?`
-          );
-          
-          if (!userConfirm) {
-            // User chose not to restore, clear the form
-            setQuotationData(initialQuotationData);
-            console.log('👤 Usuario rechazó restaurar el borrador');
-          }
         } else if (!isRecent && savedData) {
           console.log(`⏰ Borrador encontrado pero es muy antiguo (${timeAgo} minutos)`);
           // Optionally clean up old drafts
