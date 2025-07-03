@@ -598,17 +598,15 @@ export default function ExecutiveDashboard() {
               </Badge>
             </div>
             <Card className="border-green-200 bg-green-50">
-              <CardContent className="p-4">
-                <div className="text-center" style={{ textAlign: 'center' }}>
-                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-green-700 font-medium" style={{ textAlign: 'center' }}>No se detectaron alertas críticas</p>
-                  <p className="text-green-600 text-sm mt-1" style={{ textAlign: 'center' }}>
-                    {(activeProjects?.length || 0) === 0 ? 
-                      "No hay proyectos activos que monitorear" : 
-                      "Todos los proyectos están operando dentro de los parámetros normales"
-                    }
-                  </p>
-                </div>
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <CheckCircle className="h-8 w-8 text-green-500 mb-3" />
+                <p className="text-green-700 font-medium mb-1">No se detectaron alertas críticas</p>
+                <p className="text-green-600 text-sm">
+                  {(activeProjects?.length || 0) === 0 ? 
+                    "No hay proyectos activos que monitorear" : 
+                    "Todos los proyectos están operando dentro de los parámetros normales"
+                  }
+                </p>
               </CardContent>
             </Card>
           </div>
