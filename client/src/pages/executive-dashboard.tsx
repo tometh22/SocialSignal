@@ -21,7 +21,7 @@ import { es } from "date-fns/locale";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, Legend, ReferenceLine, BarChart, Bar, 
-  PieChart as RechartsPieChart, Cell, AreaChart, Area
+  PieChart as RechartsPieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
