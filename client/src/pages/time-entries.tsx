@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
@@ -16,7 +17,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -56,16 +56,18 @@ import {
   CalendarIcon, 
   Loader2, 
   ArrowLeft, 
-  PlusCircle, 
+  Plus,
   Trash2,
   Clock,
   Search,
   Filter,
   MoreHorizontal,
   User,
-  DollarSign
+  DollarSign,
+  Timer,
+  Calendar as CalendarIconLucide
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -109,7 +111,7 @@ const formSchema = z.object({
 });
 
 // Componente de Avatar optimizado
-const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, className = "h-8 w-8" }) => {
+const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, className = "h-6 w-6" }) => {
   const initials = name
     .split(" ")
     .map((n) => n[0])
@@ -126,8 +128,8 @@ const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, cl
   );
 };
 
-// Formulario de registro simplificado
-const TimeRegistrationForm: React.FC<{
+// Formulario de registro compacto
+const CompactTimeForm: React.FC<{
   personnel: Personnel[] | undefined;
   projectId: number;
   onSuccess: () => void;
@@ -192,196 +194,199 @@ const TimeRegistrationForm: React.FC<{
   const isPending = createTimeEntryMutation.isPending;
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Fila 1: Persona y Fecha */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="personnelId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-medium">Persona</FormLabel>
-                <Select
-                  onValueChange={(value) => field.onChange(parseInt(value))}
-                  defaultValue={field.value?.toString()}
-                >
-                  <FormControl>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Selecciona una persona" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {personnel?.map((p) => (
-                      <SelectItem key={p.id} value={p.id.toString()} className="py-2">
-                        <div className="flex items-center gap-2">
-                          <PersonAvatar name={p.name} className="h-6 w-6" />
-                          <span>{p.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-medium">Fecha</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
+    <div className="space-y-4">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {/* Línea 1: Persona y Calendario en una sola línea */}
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="personnelId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Persona</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    defaultValue={field.value?.toString()}
+                  >
                     <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full h-10 justify-start text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? (
-                          format(field.value, "EEEE, dd 'de' MMMM yyyy", { locale: es })
-                        ) : (
-                          <span>Seleccionar fecha</span>
-                        )}
-                      </Button>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
                     </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      locale={es}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+                    <SelectContent>
+                      {personnel?.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <PersonAvatar name={p.name} className="h-5 w-5" />
+                            <span className="text-sm">{p.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        {/* Fila 2: Horas y Tipo */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="hours"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-medium">Horas</FormLabel>
-                <div className="relative">
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      min="0.5"
-                      max="24"
-                      className="h-10 pl-8"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                    />
-                  </FormControl>
-                  <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Fecha</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full h-9 justify-start text-left font-normal text-sm",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIconLucide className="mr-2 h-4 w-4" />
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy")
+                          ) : (
+                            <span>Fecha</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-          <FormField
-            control={form.control}
-            name="billable"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-medium">Tipo</FormLabel>
-                <div className="flex items-center h-10 space-x-2 px-3 border rounded-md">
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="text-sm">
-                    {field.value ? (
-                      <span className="text-green-700 font-medium">Facturable</span>
-                    ) : (
-                      <span className="text-amber-700 font-medium">No facturable</span>
-                    )}
+          {/* Línea 2: Horas y Tipo */}
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="hours"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Horas</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        min="0.5"
+                        max="24"
+                        className="h-9 pl-8 text-sm"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                      />
+                    </FormControl>
+                    <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   </div>
-                </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="billable"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Tipo</FormLabel>
+                  <div className="flex items-center h-9 space-x-2 px-3 border rounded-md">
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="scale-75"
+                      />
+                    </FormControl>
+                    <div className="text-xs">
+                      {field.value ? (
+                        <span className="text-green-700 font-medium">Facturable</span>
+                      ) : (
+                        <span className="text-amber-700 font-medium">No facturable</span>
+                      )}
+                    </div>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Línea 3: Componente */}
+          <FormField
+            control={form.control}
+            name="componentId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm">Componente (opcional)</FormLabel>
+                <FormControl>
+                  <ComponentSelector
+                    projectId={projectId}
+                    value={field.value || null}
+                    onChange={field.onChange}
+                    disabled={isPending}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
 
-        {/* Componente */}
-        <FormField
-          control={form.control}
-          name="componentId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-sm font-medium">Componente (opcional)</FormLabel>
-              <FormControl>
-                <ComponentSelector
-                  projectId={projectId}
-                  value={field.value || null}
-                  onChange={field.onChange}
-                  disabled={isPending}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Descripción */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-sm font-medium">Descripción (opcional)</FormLabel>
-              <FormControl>
-                <Textarea 
-                  className="resize-none h-20" 
-                  placeholder="Describe el trabajo realizado..."
-                  {...field}
-                  value={field.value || ""}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <DialogFooter>
-          <Button variant="outline" type="button" onClick={onCancel}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Registrar Horas
-              </>
+          {/* Línea 4: Descripción */}
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm">Descripción (opcional)</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    className="resize-none h-16 text-sm" 
+                    placeholder="Describe el trabajo realizado..."
+                    {...field}
+                    value={field.value || ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Form>
+          />
+
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={onCancel} size="sm">
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending} size="sm">
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Registrar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Form>
+    </div>
   );
 };
 
@@ -511,71 +516,75 @@ const TimeEntries: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/30">
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
+      <div className="max-w-5xl mx-auto p-6 space-y-6">
         {projectLoading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
           <>
-            {/* Header */}
+            {/* Header compacto */}
             <div className="flex items-center justify-between">
               <div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setLocation("/active-projects")}
-                  className="mb-2"
+                  className="mb-3 text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Volver
+                  Volver a proyectos
                 </Button>
-                <h1 className="text-2xl font-bold">Registro de Horas</h1>
-                <p className="text-sm text-muted-foreground">
-                  {project?.quotation?.projectName || "Proyecto"}
-                </p>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    ⏱️ Registro de Horas
+                  </h1>
+                  <p className="text-muted-foreground mt-1">
+                    {project?.quotation?.projectName || "Proyecto"}
+                  </p>
+                </div>
               </div>
-              <Button onClick={() => setDialogOpen(true)} size="lg">
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Registrar Horas
+              <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-5 w-5" />
+                Nuevo Registro
               </Button>
             </div>
 
-            {/* Estadísticas y controles */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  {/* Estadísticas */}
-                  <div className="flex items-center gap-6">
+            {/* Panel de estadísticas y controles */}
+            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                  {/* Estadísticas compactas */}
+                  <div className="flex items-center gap-8">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{totalHours}</div>
-                      <div className="text-xs text-muted-foreground">Total horas</div>
+                      <div className="text-2xl font-bold text-blue-600">{totalHours}h</div>
+                      <div className="text-xs text-muted-foreground">Total</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{billableHours}</div>
+                      <div className="text-2xl font-bold text-green-600">{billableHours}h</div>
                       <div className="text-xs text-muted-foreground">Facturables</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600">{totalHours - billableHours}</div>
+                      <div className="text-2xl font-bold text-amber-600">{totalHours - billableHours}h</div>
                       <div className="text-xs text-muted-foreground">No facturables</div>
                     </div>
                   </div>
 
-                  {/* Controles */}
+                  {/* Controles de búsqueda y filtro */}
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Buscar registros..."
+                        placeholder="Buscar..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 w-64"
+                        className="pl-9 w-48 h-9"
                       />
                     </div>
 
                     <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-                      <SelectTrigger className="w-40">
+                      <SelectTrigger className="w-36 h-9">
                         <Filter className="mr-2 h-4 w-4" />
                         <SelectValue />
                       </SelectTrigger>
@@ -590,45 +599,45 @@ const TimeEntries: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Lista de registros */}
-            <Card>
-              <CardHeader>
+            {/* Lista de registros compacta */}
+            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
+              <CardHeader className="pb-4">
                 <CardTitle className="flex items-center justify-between">
-                  <span>Registros de Tiempo ({filteredEntries.length})</span>
+                  <span className="text-xl">Registros ({filteredEntries.length})</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : filteredEntries.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <div className="text-center py-16">
+                    <Timer className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                     <h3 className="text-lg font-medium mb-2">No hay registros</h3>
-                    <p className="text-muted-foreground mb-4">
+                    <p className="text-muted-foreground mb-6">
                       {search ? "No se encontraron registros con esos criterios." : "Aún no hay registros de tiempo para este proyecto."}
                     </p>
-                    <Button onClick={() => setDialogOpen(true)}>
-                      <PlusCircle className="mr-2 h-4 w-4" />
+                    <Button onClick={() => setDialogOpen(true)} variant="outline">
+                      <Plus className="mr-2 h-4 w-4" />
                       Crear primer registro
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                  <div className="divide-y divide-gray-100">
                     {filteredEntries.map((entry) => {
                       const person = personnel?.find(p => p.id === entry.personnelId);
                       return (
-                        <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50/50 transition-colors">
+                        <div key={entry.id} className="flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors">
                           <div className="flex items-center gap-4">
-                            <PersonAvatar name={person?.name || "Usuario"} />
+                            <PersonAvatar name={person?.name || "Usuario"} className="h-10 w-10" />
                             <div>
-                              <div className="font-medium">{person?.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {format(new Date(entry.date), "EEEE, dd 'de' MMMM", { locale: es })}
+                              <div className="font-medium text-sm">{person?.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {format(new Date(entry.date), "EEEE, dd MMM", { locale: es })}
                               </div>
                               {entry.description && (
-                                <div className="text-sm text-muted-foreground truncate max-w-md">
+                                <div className="text-xs text-muted-foreground truncate max-w-md mt-1">
                                   {entry.description}
                                 </div>
                               )}
@@ -680,14 +689,14 @@ const TimeEntries: React.FC = () => {
 
             {/* Diálogo de nuevo registro */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-lg">
                 <DialogHeader>
-                  <DialogTitle>Nuevo Registro de Horas</DialogTitle>
+                  <DialogTitle>📝 Nuevo Registro de Horas</DialogTitle>
                   <DialogDescription>
                     Registra el tiempo trabajado en el proyecto
                   </DialogDescription>
                 </DialogHeader>
-                <TimeRegistrationForm
+                <CompactTimeForm
                   personnel={personnel}
                   projectId={projectId}
                   onSuccess={() => {
