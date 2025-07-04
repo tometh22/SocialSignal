@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjustment-card";
+import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
@@ -237,36 +238,10 @@ export default function FinancialReviewFinal() {
         return;
       }
 
-      // Preparar datos de cotización para guardar
-      const quotationToSave = {
-        ...quotationData.project,
-        ...quotationData.client && { clientId: quotationData.client.id },
-        ...quotationData.template && { templateId: quotationData.template.id },
 
-        // Costos base en USD (como se calculan internamente)
-        baseCost: teamBaseCostUSD,
-        complexityAdjustment: teamComplexityAdjustmentUSD,
-        markupAmount: marginAmountUSD,
-        platformCost: platformCostUSD,
-        totalAmount: finalTotalUSD,
-
-        // Configuraciones financieras (incluyendo el descuento)
-        ...quotationData.financials,
-        marginFactor: markupMultiplier,
-        discountPercentage: discountPercentage,
-
-        // Configuraciones de inflación
-        ...quotationData.inflation,
-        inflationAdjustmentAmount: inflationAdjustmentUSD,
-
-        // Metadatos
-        status: 'pending' as const,
-        adjustmentReason: quotationData.financials.adjustmentReason || `Margen: ${((markupMultiplier - 1) * 100).toFixed(1)}%, Descuento: ${discountPercentage}%`,
-        additionalNotes: quotationData.financials.additionalNotes
-      };
 
       // Usar la función de guardado del contexto con estado 'pending'
-      await saveQuotation('pending', quotationToSave);
+      await saveQuotation('pending');
 
       toast({
         title: "Cotización guardada",
@@ -313,36 +288,8 @@ export default function FinancialReviewFinal() {
         return;
       }
 
-      // Preparar datos de cotización para guardar
-      const quotationToSave = {
-        ...quotationData.project,
-        ...quotationData.client && { clientId: quotationData.client.id },
-        ...quotationData.template && { templateId: quotationData.template.id },
-
-        // Costos base en USD (como se calculan internamente)
-        baseCost: teamBaseCostUSD,
-        complexityAdjustment: teamComplexityAdjustmentUSD,
-        markupAmount: marginAmountUSD,
-        platformCost: platformCostUSD,
-        totalAmount: finalTotalUSD,
-
-        // Configuraciones financieras (incluyendo el descuento)
-        ...quotationData.financials,
-        marginFactor: markupMultiplier,
-        discountPercentage: discountPercentage,
-
-        // Configuraciones de inflación
-        ...quotationData.inflation,
-        inflationAdjustmentAmount: inflationAdjustmentUSD,
-
-        // Metadatos
-        status: 'draft' as const,
-        adjustmentReason: quotationData.financials.adjustmentReason || `Margen: ${((markupMultiplier - 1) * 100).toFixed(1)}%, Descuento: ${discountPercentage}%`,
-        additionalNotes: quotationData.financials.additionalNotes
-      };
-
-      // Usar la función de guardado del contexto pero como borrador
-      await saveQuotation('draft', quotationToSave);
+      // Usar la función de guardado del contexto como borrador
+      await saveQuotation('draft');
 
       toast({
         title: "Borrador guardado",
@@ -419,36 +366,8 @@ export default function FinancialReviewFinal() {
         return;
       }
 
-      // Preparar datos de cotización para guardar
-      const quotationToSave = {
-        ...quotationData.project,
-        ...quotationData.client && { clientId: quotationData.client.id },
-        ...quotationData.template && { templateId: quotationData.template.id },
-
-        // Costos base en USD (como se calculan internamente)
-        baseCost: teamBaseCostUSD,
-        complexityAdjustment: teamComplexityAdjustmentUSD,
-        markupAmount: marginAmountUSD,
-        platformCost: platformCostUSD,
-        totalAmount: finalTotalUSD,
-
-        // Configuraciones financieras (incluyendo el descuento)
-        ...quotationData.financials,
-        marginFactor: markupMultiplier,
-        discountPercentage: discountPercentage,
-
-        // Configuraciones de inflación
-        ...quotationData.inflation,
-        inflationAdjustmentAmount: inflationAdjustmentUSD,
-
-        // Metadatos
-        status: 'pending' as const,
-        adjustmentReason: quotationData.financials.adjustmentReason || `Margen: ${((markupMultiplier - 1) * 100).toFixed(1)}%, Descuento: ${discountPercentage}%`,
-        additionalNotes: quotationData.financials.additionalNotes
-      };
-
       // Usar la función de guardado del contexto como cotización finalizada
-      await saveQuotation('pending', quotationToSave);
+      await saveQuotation('pending');
 
       toast({
         title: "Cotización finalizada",
@@ -1134,6 +1053,9 @@ export default function FinancialReviewFinal() {
           </div>
         </div>
       </div>
+
+      {/* Level 4: Tools and Pricing Configuration */}
+      <ToolsAndPricing />
     </div>
   );
 }
