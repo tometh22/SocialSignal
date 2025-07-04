@@ -103,16 +103,16 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 4, 2025: **MAJOR UX ENHANCEMENT** - Completely redesigned QuickTimeRegister component with modern, user-friendly interface
+- July 4, 2025: Implemented historical hourly rate functionality for accurate cost tracking of previous months
+- July 4, 2025: Added editable tariff fields with visual indicators for historical vs current rates
+- July 4, 2025: Enhanced UI with gradient backgrounds, improved typography, and intuitive card-based layout
+- July 4, 2025: Added avatar initials, better spacing, and professional color scheme throughout time registration
+- July 4, 2025: Implemented smart cost calculation with automatic updates based on custom hourly rates
+- July 4, 2025: Enhanced form validation and user feedback with clear visual states and indicators
 - July 3, 2025: **MAJOR UX IMPROVEMENT** - Completely removed ugly browser popup for draft restoration
 - July 3, 2025: Implemented elegant banner-style draft restoration with subtle user interface
 - July 3, 2025: Added intelligent draft detection that only shows restore options when last quotation wasn't completed successfully
-- July 3, 2025: Enhanced draft management to automatically clear drafts when quotations are completed (approved/pending/in-negotiation)
-- July 3, 2025: Created sophisticated draft restoration banner with client, project, and team information display
-- July 3, 2025: Implemented comprehensive form data protection system to prevent data loss during quotation creation
-- July 3, 2025: Enhanced autoguardado (auto-save) functionality with 10-second intervals and visual feedback indicators
-- July 3, 2025: Added real-time autosave status indicator showing save time, connection status, and unsaved changes
-- July 3, 2025: Implemented page refresh/close prevention with user warnings when unsaved data exists
-- July 3, 2025: Created multi-layer draft recovery system with primary, backup, and emergency data storage
 - July 2, 2025: Implemented automatic team copying from quotation when creating projects from approved quotations
 - July 2, 2025: Enhanced project team section to show both estimated and actual worked hours per team member  
 - July 2, 2025: Added progress bars and completion percentages for individual team members and overall project
