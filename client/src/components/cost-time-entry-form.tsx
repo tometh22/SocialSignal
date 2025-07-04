@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { parseDecimalInput, formatNumberForInput } from "@/lib/number-utils";
 
 interface CostTimeEntryFormProps {
   projectId: string;
@@ -152,7 +153,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
     let finalCost: number;
 
     if (entryType === "hours") {
-      if (!hours || parseFloat(hours) <= 0) {
+      if (!hours || hours.trim() === "") {
         toast({
           variant: "destructive",
           title: "Campo requerido",
@@ -160,10 +161,18 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
         });
         return;
       }
-      finalHours = parseFloat(hours);
+      finalHours = parseDecimalInput(hours, 0);
+      if (finalHours <= 0) {
+        toast({
+          variant: "destructive",
+          title: "Horas inválidas",
+          description: "Por favor ingresa un número de horas válido mayor a 0",
+        });
+        return;
+      }
       finalCost = finalHours * currentHourlyRate;
     } else {
-      if (!totalCost || parseFloat(totalCost) <= 0) {
+      if (!totalCost || totalCost.trim() === "") {
         toast({
           variant: "destructive",
           title: "Campo requerido", 
@@ -171,7 +180,15 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
         });
         return;
       }
-      finalCost = parseFloat(totalCost);
+      finalCost = parseDecimalInput(totalCost, 0);
+      if (finalCost <= 0) {
+        toast({
+          variant: "destructive",
+          title: "Costo inválido",
+          description: "Por favor ingresa un costo válido mayor a 0",
+        });
+        return;
+      }
       finalHours = finalCost / currentHourlyRate;
     }
 
@@ -305,10 +322,8 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                 <div className="relative">
                   <Input
                     id="hours"
-                    type="number"
-                    step="0.25"
-                    min="0"
-                    placeholder="8.0"
+                    type="text"
+                    placeholder="Ej: 8,5 o 8.5"
                     value={hours}
                     onChange={(e) => handleHoursChange(e.target.value)}
                     className="h-10 text-right bg-white border border-slate-300 focus:border-blue-500"
@@ -330,10 +345,8 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                   <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     id="cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="400.00"
+                    type="text"
+                    placeholder="Ej: 425,00 o 425.00"
                     value={totalCost}
                     onChange={(e) => handleCostChange(e.target.value)}
                     className="h-10 text-right pl-8 bg-white border border-slate-300 focus:border-emerald-500"
@@ -439,7 +452,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                 {/* Botones rápidos organizados */}
                 <div className="space-y-3">
                   <div className="text-sm font-medium text-gray-700 mb-2">Períodos rápidos:</div>
-                  
+
                   {/* Períodos mensuales */}
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Mensual</div>
@@ -518,7 +531,7 @@ export default function CostTimeEntryForm({ projectId, open, onOpenChange }: Cos
                         Sem. pasada
                       </Button>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-2">
                       <Button
                         type="button"

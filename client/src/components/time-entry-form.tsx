@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar as CalendarIcon, Clock, User, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDecimalInput, formatNumberForInput } from "@/lib/number-utils";
 
 interface TimeEntryFormProps {
   projectId: string;
@@ -85,12 +86,24 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
       return;
     }
 
+    // Usar parseDecimalInput para procesar las horas con coma o punto
+    const parsedHours = parseDecimalInput(hours, 0);
+    
+    if (parsedHours <= 0) {
+      toast({
+        title: "Horas inválidas",
+        description: "Por favor ingresa un número de horas válido mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const selectedPerson = personnel.find((p: any) => p.id.toString() === selectedPersonnel);
     
     createTimeEntry.mutate({
       projectId: parseInt(projectId),
       personnelId: parseInt(selectedPersonnel),
-      hours: parseFloat(hours),
+      hours: parsedHours,
       description,
       date: startDate.toISOString().split('T')[0], // Solo la fecha
       startDate: startDate.toISOString(),
@@ -100,7 +113,8 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
   };
 
   const selectedPerson = personnel.find((p: any) => p.id.toString() === selectedPersonnel);
-  const totalCost = selectedPerson && hours ? (parseFloat(hours) * selectedPerson.hourlyRate).toFixed(2) : "0";
+  const parsedHours = hours ? parseDecimalInput(hours, 0) : 0;
+  const totalCost = selectedPerson && parsedHours > 0 ? (parsedHours * selectedPerson.hourlyRate).toFixed(2) : "0";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,9 +160,8 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
             <Label htmlFor="hours">Horas Trabajadas</Label>
             <Input
               id="hours"
-              type="number"
-              step="0.1"
-              placeholder="8.0"
+              type="text"
+              placeholder="8,0 o 8.0"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
             />
@@ -219,7 +232,7 @@ export default function TimeEntryForm({ projectId, open, onOpenChange }: TimeEnt
                 <span className="text-lg font-bold text-blue-600">${totalCost}</span>
               </div>
               <div className="text-xs text-blue-700 mt-1">
-                {hours}h × ${selectedPerson.hourlyRate}/h = ${totalCost}
+                {parsedHours}h × ${selectedPerson.hourlyRate}/h = ${totalCost}
               </div>
             </div>
           )}
