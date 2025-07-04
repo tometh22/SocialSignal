@@ -662,21 +662,35 @@ export default function FinancialReviewFinal() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-900">
-                    Multiplicador de Markup
+                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                      ? "Markup Calculado (Automático)"
+                      : "Multiplicador de Markup"}
                   </Label>
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    {markupMultiplier}x
+                    {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x calc.`
+                      : `${markupMultiplier}x`}
                   </Badge>
                 </div>
                 <div className="space-y-3">
-                  <Slider
-                    value={[markupMultiplier]}
-                    onValueChange={(value) => setMarkupMultiplier(value[0])}
-                    min={1.0}
-                    max={6.0}
-                    step={0.1}
-                    className="w-full"
-                  />
+                  {(() => {
+                    const isManualMode = quotationData.financials.priceMode === 'manual' && Boolean(quotationData.financials.manualPrice);
+                    const currentMarkup = isManualMode 
+                      ? (subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1
+                      : markupMultiplier;
+                    
+                    return (
+                      <Slider
+                        value={[currentMarkup]}
+                        onValueChange={(value) => setMarkupMultiplier(value[0])}
+                        min={1.0}
+                        max={6.0}
+                        step={0.1}
+                        className="w-full"
+                        disabled={isManualMode}
+                      />
+                    );
+                  })()}
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>1.0x (Sin ganancia)</span>
                     <span>3.5x</span>
