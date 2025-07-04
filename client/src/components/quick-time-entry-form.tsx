@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -95,14 +94,14 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
       const end = new Date(watchedEndDate);
       const startMonth = format(start, "MMMM", { locale: es });
       const endMonth = format(end, "MMMM", { locale: es });
-      
+
       let suggestedName = "";
       if (startMonth === endMonth) {
         suggestedName = `${startMonth} ${start.getFullYear()}`;
       } else {
         suggestedName = `${startMonth} - ${endMonth} ${start.getFullYear()}`;
       }
-      
+
       if (!form.getValues("periodName")) {
         form.setValue("periodName", suggestedName);
       }
@@ -155,7 +154,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     onSuccess: (_, variables) => {
       setOptimisticUpdates(prev => ({ ...prev, [variables.data.personnelId]: true }));
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/quick-time-entries`] });
-      
+
       setTimeout(() => {
         setOptimisticUpdates(prev => ({ ...prev, [variables.data.personnelId]: false }));
       }, 1000);
@@ -191,7 +190,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     if (!currentQuickEntryId) return;
 
     const validEntries = Object.entries(teamHours).filter(([_, data]) => data.hours > 0);
-    
+
     if (validEntries.length === 0) {
       toast({
         title: "⚠️ Sin registros",
@@ -269,11 +268,11 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     const roleName = member.role?.name || '';
     const matchesFilter = personnelName.toLowerCase().includes(filterTeam.toLowerCase()) ||
                          roleName.toLowerCase().includes(filterTeam.toLowerCase());
-    
+
     if (!matchesFilter && filterTeam) {
       console.log(`🔍 Filtered out: ${personnelName} - ${roleName}`);
     }
-    
+
     return matchesFilter;
   }) : [];
 
@@ -303,7 +302,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
 
   if (!Array.isArray(baseTeam) || baseTeam.length === 0) {
     console.log('⚠️ No base team found or invalid data:', { baseTeam, isArray: Array.isArray(baseTeam), length: baseTeam?.length });
-    
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -385,9 +384,9 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
               </div>
             </div>
           </div>
-          
+
           <ArrowRight className="w-5 h-5 text-gray-400" />
-          
+
           <div className="flex items-center space-x-3">
             <motion.div
               className={cn(
@@ -468,14 +467,14 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                     )}
                                   >
                                     {field.value ? (
-                                      <div className="flex items-center gap-2">
-                                        <CalendarIcon className="w-4 h-4 text-blue-600" />
-                                        {format(new Date(field.value), "dd/MM/yyyy", { locale: es })}
+                                      <div className="flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3 text-blue-600" />
+                                        <span className="text-sm">{format(new Date(field.value), "dd/MM/yyyy", { locale: es })}</span>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2">
-                                        <CalendarIcon className="w-4 h-4 text-gray-400" />
-                                        <span>Seleccionar fecha</span>
+                                      <div className="flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3 text-gray-400" />
+                                        <span className="text-sm">Seleccionar fecha</span>
                                       </div>
                                     )}
                                   </Button>
@@ -517,14 +516,14 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                     )}
                                   >
                                     {field.value ? (
-                                      <div className="flex items-center gap-2">
-                                        <CalendarIcon className="w-4 h-4 text-blue-600" />
-                                        {format(new Date(field.value), "dd/MM/yyyy", { locale: es })}
+                                      <div className="flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3 text-blue-600" />
+                                        <span className="text-sm">{format(new Date(field.value), "dd/MM/yyyy", { locale: es })}</span>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center gap-2">
-                                        <CalendarIcon className="w-4 h-4 text-gray-400" />
-                                        <span>Seleccionar fecha</span>
+                                      <div className="flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3 text-gray-400" />
+                                        <span className="text-sm">Seleccionar fecha</span>
                                       </div>
                                     )}
                                   </Button>
@@ -751,8 +750,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <motion.div 
+                        <div className="text-right"><motion.div 
                             className="text-3xl font-bold text-green-600"
                             key={teamHours[member.personnelId]?.hours || 0}
                             initial={{ scale: 1.2 }}
@@ -872,7 +870,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16" />
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12" />
-                    
+
                     <div className="relative">
                       <div className="flex items-center justify-between mb-6">
                         <div>
@@ -901,7 +899,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             {getTotalHours()}h
                           </motion.p>
                         </div>
-                        
+
                         <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
                           <div className="flex items-center justify-center gap-2 mb-2">
                             <DollarSign className="h-5 w-5 text-green-300" />
@@ -917,7 +915,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             ${getTotalCost().toLocaleString()}
                           </motion.p>
                         </div>
-                        
+
                         <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
                           <div className="flex items-center justify-center gap-2 mb-2">
                             <TrendingUp className="h-5 w-5 text-purple-300" />
@@ -927,7 +925,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(2) : '0'}/h
                           </p>
                         </div>
-                        
+
                         <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
                           <div className="flex items-center justify-center gap-2 mb-2">
                             <Target className="h-5 w-5 text-orange-300" />
