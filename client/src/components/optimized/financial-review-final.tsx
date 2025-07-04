@@ -688,7 +688,11 @@ export default function FinancialReviewFinal() {
                       <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
-                      Base: {formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMarginDisplay)}
+                      {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice ? (
+                        `Markup calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
+                      ) : (
+                        `Base: ${formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} × ${markupMultiplier} = ${formatFinalCurrency(subtotalWithMarginDisplay)}`
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1056,7 +1060,11 @@ export default function FinancialReviewFinal() {
 
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-green-900">5. + Margen ({markupMultiplier}x)</span>
+                  <span className="text-sm font-medium text-green-900">
+                    5. + Margen ({quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x calc.`
+                      : `${markupMultiplier}x`})
+                  </span>
                   <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                 </div>
               </div>
