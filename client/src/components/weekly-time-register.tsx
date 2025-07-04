@@ -92,23 +92,15 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     }
   }, [startDate, endDate]);
 
-  // Crear entrada rápida de tiempo
-  const createQuickEntry = useMutation({
+  // Crear entradas de tiempo individuales
+  const createTimeEntry = useMutation({
     mutationFn: (data: any) =>
-      apiRequest(`/api/projects/${projectId}/quick-time-entries`, "POST", data),
-    onSuccess: (newEntry) => {
-      setStep('team');
-      toast({
-        title: "Período configurado",
-        description: "Ahora puedes registrar las horas del equipo",
-      });
+      apiRequest(`/api/time-entries`, "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error al crear período",
-        description: error.message || "Intenta nuevamente",
-        variant: "destructive"
-      });
+      console.error('Error creating time entry:', error);
     }
   });
 
@@ -122,11 +114,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       return;
     }
 
-    createQuickEntry.mutate({
-      periodName,
-      startDate,
-      endDate,
-      notes
+    setStep('team');
+    toast({
+      title: "Período configurado",
+      description: "Ahora puedes registrar las horas del equipo",
     });
   };
 
@@ -149,15 +140,42 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       return;
     }
 
-    // Aquí implementarías la lógica para guardar las horas
-    // Por ahora simulamos el guardado
-    toast({
-      title: "Horas guardadas exitosamente",
-      description: `Se registraron ${validEntries.length} entradas de tiempo`,
+    // Crear las entradas de tiempo individuales
+    const promises = validEntries.map(([personnelId, data]) => {
+      const member = teamMembers.find(m => m.personnelId === parseInt(personnelId));
+      if (member) {
+        const effectiveRate = data.customRate !== undefined ? data.customRate : member.hourlyRate;
+        
+        return createTimeEntry.mutateAsync({
+          projectId: projectId,
+          personnelId: parseInt(personnelId),
+          date: startDate, // Usar la fecha de inicio del período
+          hours: data.hours,
+          description: `${periodName}: ${data.description || 'Trabajo realizado'}`,
+          entryType: "hours",
+          hourlyRate: effectiveRate,
+          totalCost: data.hours * effectiveRate
+        });
+      }
+      return Promise.resolve();
     });
-    
-    queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-    onSuccess?.();
+
+    try {
+      await Promise.all(promises);
+      toast({
+        title: "Horas guardadas exitosamente",
+        description: `Se registraron ${validEntries.length} entradas de tiempo`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: "Error al guardar",
+        description: "Algunos registros no pudieron guardarse",
+        variant: "destructive"
+      });
+    }
   };
 
   const getTotalHours = () => {
@@ -251,11 +269,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 onClick={handleCreatePeriod}
-                disabled={createQuickEntry.isPending}
                 className="gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                {createQuickEntry.isPending ? 'Creando...' : 'Continuar al Registro'}
+                Continuar al Registro
               </Button>
             </div>
           </CardContent>
@@ -469,9 +486,13 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         <Button variant="outline" onClick={() => setTeamHours({})}>
           Limpiar Todo
         </Button>
-        <Button onClick={handleSaveAllHours} className="gap-2">
+        <Button 
+          onClick={handleSaveAllHours} 
+          disabled={createTimeEntry.isPending}
+          className="gap-2"
+        >
           <Send className="w-4 h-4" />
-          Guardar Registro Semanal
+          {createTimeEntry.isPending ? 'Guardando...' : 'Guardar Registro Semanal'}
         </Button>
       </div>
     </div>
