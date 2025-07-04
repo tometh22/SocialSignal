@@ -1006,40 +1006,35 @@ const TimeEntries: React.FC = () => {
                   <div 
                     className="border rounded-md" 
                     style={{
-                      height: "450px",
-                      maxHeight: "70vh",
+                      height: "300px",
+                      maxHeight: "50vh",
                       position: "relative",
                       overflowY: "auto",
-                      marginBottom: "20px"
+                      marginBottom: "12px"
                     }}
                   >
-                    <Table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                    <Table className="w-full text-xs" style={{ tableLayout: "fixed" }}>
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                        <TableRow className="h-8">
-                          <TableHead className="py-2 text-xs font-medium">Fecha</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">Personal</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">Horas</TableHead>
-                          <TableHead className="py-2 text-xs font-medium hidden md:table-cell">Descripción</TableHead>
-                          <TableHead className="py-2 text-xs font-medium">Tipo</TableHead>
-                          <TableHead className="py-2 text-xs font-medium text-right">Acciones</TableHead>
+                        <TableRow className="h-6">
+                          <TableHead className="py-1 text-xs font-medium w-20">Fecha</TableHead>
+                          <TableHead className="py-1 text-xs font-medium">Personal</TableHead>
+                          <TableHead className="py-1 text-xs font-medium w-16">Horas</TableHead>
+                          <TableHead className="py-1 text-xs font-medium hidden md:table-cell">Descripción</TableHead>
+                          <TableHead className="py-1 text-xs font-medium w-12">Tipo</TableHead>
+                          <TableHead className="py-1 text-xs font-medium text-right w-12">Acc.</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredEntries.map((entry) => {
                           const person = personnel?.find(p => p.id === entry.personnelId);
                           return (
-                            <TableRow key={entry.id} className="h-12 hover:bg-muted/50">
-                              <TableCell className="py-1.5">
-                                <div className="flex flex-col">
-                                  <span className="text-xs font-medium">{formatDate(entry.date)}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {format(new Date(entry.date), "EEEE", { locale: es })}
-                                  </span>
-                                </div>
+                            <TableRow key={entry.id} className="h-8 hover:bg-muted/50">
+                              <TableCell className="py-0.5 px-2">
+                                <div className="text-xs font-medium">{formatDate(entry.date)}</div>
                               </TableCell>
-                              <TableCell className="py-1.5">
-                                <div className="flex items-center gap-2">
-                                  <Avatar className="h-6 w-6">
+                              <TableCell className="py-0.5 px-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Avatar className="h-4 w-4">
                                     <AvatarFallback className="bg-primary/10 text-primary text-xs">
                                       {person?.name
                                         ?.split(" ")
@@ -1049,29 +1044,13 @@ const TimeEntries: React.FC = () => {
                                         .substring(0, 2) || "U"}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-medium truncate">{person?.name}</div>
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {getRoleNameById(person?.roleId || 0)}
-                                    </div>
-                                  </div>
+                                  <span className="text-xs font-medium truncate">{person?.name}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="py-1.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs font-medium">{entry.hours}h</span>
-                                  {entry.billable ? (
-                                    <Badge className="h-4 text-xs px-1 bg-green-100 text-green-800 hover:bg-green-200">
-                                      Fact.
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="h-4 text-xs px-1">
-                                      No fact.
-                                    </Badge>
-                                  )}
-                                </div>
+                              <TableCell className="py-0.5 px-2">
+                                <span className="text-xs font-medium">{entry.hours}h</span>
                               </TableCell>
-                              <TableCell className="py-1.5 max-w-[150px] truncate hidden md:table-cell">
+                              <TableCell className="py-0.5 px-2 max-w-[120px] truncate hidden md:table-cell">
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger className="cursor-help">
@@ -1080,44 +1059,37 @@ const TimeEntries: React.FC = () => {
                                       </span>
                                     </TooltipTrigger>
                                     {entry.description && (
-                                      <TooltipContent className="max-w-[300px] p-4">
-                                        <p>{entry.description}</p>
+                                      <TooltipContent className="max-w-[300px] p-3">
+                                        <p className="text-xs">{entry.description}</p>
                                       </TooltipContent>
                                     )}
                                   </Tooltip>
                                 </TooltipProvider>
                               </TableCell>
-                              <TableCell className="py-1.5">
+                              <TableCell className="py-0.5 px-2">
                                 {entry.billable ? (
-                                  <div className="flex items-center gap-1">
-                                    <DollarSign className="h-3 w-3 text-green-600" />
-                                    <span className="text-xs">Fact.</span>
-                                  </div>
+                                  <div className="h-2 w-2 bg-green-500 rounded-full" title="Facturable" />
                                 ) : (
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-amber-600" />
-                                    <span className="text-xs">No fact.</span>
-                                  </div>
+                                  <div className="h-2 w-2 bg-amber-500 rounded-full" title="No facturable" />
                                 )}
                               </TableCell>
-                              <TableCell className="py-1.5 text-right">
+                              <TableCell className="py-0.5 px-1 text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
                                       <MoreHorizontal className="h-3 w-3" />
                                       <span className="sr-only">Opciones</span>
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel className="text-xs">Acciones</DropdownMenuLabel>
                                     <DropdownMenuItem 
                                       onClick={() => {
                                         setEntryToDelete(entry.id);
                                         setDeleteDialogOpen(true);
                                       }}
-                                      className="text-red-600 text-xs"
+                                      className="text-red-600 text-xs py-1"
                                     >
-                                      <Trash2 className="mr-2 h-3 w-3" />
+                                      <Trash2 className="mr-1 h-3 w-3" />
                                       Eliminar
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
