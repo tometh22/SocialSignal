@@ -199,15 +199,15 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <FormField
                   control={form.control}
                   name="startDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Fecha Inicio</FormLabel>
+                      <FormLabel className="text-xs font-medium">Fecha Inicio</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} className="h-9 text-sm" />
+                        <Input type="date" {...field} className="h-8 text-xs border-2 border-blue-300" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -219,9 +219,9 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                   name="endDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Fecha Fin</FormLabel>
+                      <FormLabel className="text-xs font-medium">Fecha Fin</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} className="h-9 text-sm" />
+                        <Input type="date" {...field} className="h-8 text-xs border-2 border-blue-300" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -250,7 +250,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                   ) : (
                     <>
                       <Users className="h-4 w-4 mr-2" />
-                      Configurar Horas del Equipo
+                      🔥 VERSIÓN COMPACTA
                     </>
                   )}
                 </Button>
@@ -268,7 +268,7 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                   
                   <div className="grid gap-3">
                     {Array.isArray(baseTeam) && baseTeam.map((member: any, index) => (
-                      <div key={member.personnelId} className="group relative bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                      <div key={member.personnelId} className="group relative bg-white rounded-md p-2 border border-gray-300 hover:border-blue-400 hover:shadow-sm transition-all duration-200">
                         {/* Header con nombre y costo total */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
