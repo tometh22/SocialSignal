@@ -728,6 +728,9 @@ export default function FinancialReviewFinal() {
             </CardContent>
           </Card>
 
+          {/* Tools and Pricing Card */}
+          <ToolsAndPricing />
+
           {/* Inflation Card */}
           <Card className="shadow-sm border-0 bg-white">
             <CardHeader className="pb-4 border-b border-gray-100">
@@ -1054,8 +1057,7 @@ export default function FinancialReviewFinal() {
         </div>
       </div>
 
-      {/* Level 4: Tools and Pricing Configuration */}
-      <ToolsAndPricing />
+
     </div>
   );
 }
