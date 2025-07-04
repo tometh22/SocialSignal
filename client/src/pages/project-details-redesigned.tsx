@@ -40,7 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import QuickTimeRegister from "@/components/quick-time-register";
+import WeeklyTimeRegister from "@/components/weekly-time-register";
 
 interface ProjectMetric {
   label: string;
@@ -611,7 +611,7 @@ export default function ProjectDetailsRedesigned() {
       {/* Registro rápido de tiempo */}
       {showQuickRegister && (
         <div className="px-6 py-4 bg-white border-b border-gray-200">
-          <QuickTimeRegister
+          <WeeklyTimeRegister
             projectId={Number(projectId)}
             onSuccess={() => {
               setShowQuickRegister(false);
