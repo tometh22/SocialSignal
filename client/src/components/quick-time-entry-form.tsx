@@ -32,7 +32,19 @@ import {
   Star,
   Award,
   Sparkles,
-  Timer
+  Timer,
+  Eye,
+  Edit3,
+  BarChart3,
+  Filter,
+  Search,
+  ArrowRight,
+  PlayCircle,
+  PauseCircle,
+  StopCircle,
+  Maximize2,
+  Minimize2,
+  RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -59,6 +71,9 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   const [teamHours, setTeamHours] = useState<Record<number, { hours: number; description: string; customRate?: number }>>({});
   const [currentStep, setCurrentStep] = useState<'period' | 'team'>('period');
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<number, boolean>>({});
+  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
+  const [filterTeam, setFilterTeam] = useState<string>('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const form = useForm<z.infer<typeof quickTimeEntrySchema>>({
     resolver: zodResolver(quickTimeEntrySchema),
@@ -108,8 +123,8 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
       setCurrentQuickEntryId(newEntry.id);
       setCurrentStep('team');
       toast({
-        title: "✨ Período creado exitosamente",
-        description: "Ahora puedes configurar las horas del equipo",
+        title: "🎯 Período configurado exitosamente",
+        description: "Ahora puedes registrar las horas del equipo",
       });
     },
     onError: (error: any) => {
@@ -141,7 +156,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
       apiRequest(`/api/quick-time-entries/${entryId}/submit`, "POST"),
     onSuccess: () => {
       toast({
-        title: "🎉 ¡Registro enviado exitosamente!",
+        title: "🚀 ¡Registro enviado exitosamente!",
         description: "Tu registro ha sido enviado para aprobación",
       });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/quick-time-entries`] });
@@ -237,6 +252,11 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     return (membersWithHours / baseTeam.length) * 100;
   };
 
+  const filteredTeam = Array.isArray(baseTeam) ? baseTeam.filter((member: any) => 
+    member.personnel?.name?.toLowerCase().includes(filterTeam.toLowerCase()) ||
+    member.role?.name?.toLowerCase().includes(filterTeam.toLowerCase())
+  ) : [];
+
   if (loadingTeam) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -300,50 +320,68 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
 
   return (
     <div className="space-y-6">
-      {/* Progress indicator */}
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
+      {/* Header con navegación mejorada */}
+      <div className="relative bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-100">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
-            <motion.div
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
-                currentStep === 'period' || currentQuickEntryId 
-                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg" 
-                  : "bg-gray-200 text-gray-600"
-              )}
-              whileHover={{ scale: 1.05 }}
-            >
-              {currentQuickEntryId ? <CheckCircle2 className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />}
-            </motion.div>
-            <span className={cn(
-              "font-medium transition-colors",
-              currentStep === 'period' || currentQuickEntryId ? "text-gray-900" : "text-gray-500"
-            )}>
-              Configurar Período
-            </span>
+            <div className="flex items-center space-x-3">
+              <motion.div
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg",
+                  currentStep === 'period' || currentQuickEntryId 
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white" 
+                    : "bg-white text-gray-400 border-2 border-gray-200"
+                )}
+                whileHover={{ scale: 1.05 }}
+              >
+                {currentQuickEntryId ? <CheckCircle2 className="w-5 h-5" /> : "1"}
+              </motion.div>
+              <div>
+                <span className={cn(
+                  "font-semibold transition-colors",
+                  currentStep === 'period' || currentQuickEntryId ? "text-gray-900" : "text-gray-500"
+                )}>
+                  Configurar Período
+                </span>
+                <p className="text-sm text-gray-600">Define las fechas y nombre del período</p>
+              </div>
+            </div>
           </div>
           
-          <div className="flex-1 h-px bg-gradient-to-r from-blue-500 to-purple-600 mx-4 opacity-30" />
+          <ArrowRight className="w-5 h-5 text-gray-400" />
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <motion.div
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
+                "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg",
                 currentStep === 'team' 
-                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg" 
-                  : "bg-gray-200 text-gray-600"
+                  ? "bg-gradient-to-r from-green-500 to-blue-600 text-white" 
+                  : "bg-white text-gray-400 border-2 border-gray-200"
               )}
               whileHover={{ scale: 1.05 }}
             >
-              <Users className="w-5 h-5" />
+              {currentStep === 'team' ? <Users className="w-5 h-5" /> : "2"}
             </motion.div>
-            <span className={cn(
-              "font-medium transition-colors",
-              currentStep === 'team' ? "text-gray-900" : "text-gray-500"
-            )}>
-              Registrar Horas del Equipo
-            </span>
+            <div>
+              <span className={cn(
+                "font-semibold transition-colors",
+                currentStep === 'team' ? "text-gray-900" : "text-gray-500"
+              )}>
+                Registrar Horas
+              </span>
+              <p className="text-sm text-gray-600">Configura las horas del equipo</p>
+            </div>
           </div>
+        </div>
+
+        {/* Barra de progreso */}
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-600"
+            initial={{ width: currentStep === 'period' ? '0%' : '50%' }}
+            animate={{ width: currentStep === 'period' ? '50%' : '100%' }}
+            transition={{ duration: 0.5 }}
+          />
         </div>
       </div>
 
@@ -357,42 +395,51 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50/30">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <CalendarIcon className="h-5 w-5 text-white" />
+            <Card className="border-0 shadow-2xl bg-white overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+                <CardTitle className="flex items-center gap-3 text-2xl font-bold">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                    <CalendarIcon className="h-6 w-6" />
                   </div>
-                  Definir Período de Registro
+                  Registro Rápido de Horas por Período
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
+                <p className="text-blue-100 mt-2">Define el período de tiempo para registrar las horas del equipo</p>
+              </div>
+              <CardContent className="p-8">
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(handleCreateQuickEntry)} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
+                  <form onSubmit={form.handleSubmit(handleCreateQuickEntry)} className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
                       <FormField
                         control={form.control}
                         name="startDate"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel className="text-sm font-medium text-gray-700">Fecha de Inicio</FormLabel>
+                          <FormItem className="flex flex-col space-y-3">
+                            <FormLabel className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                              <PlayCircle className="w-4 h-4 text-green-600" />
+                              Fecha de Inicio
+                            </FormLabel>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <FormControl>
                                   <Button
                                     variant="outline"
                                     className={cn(
-                                      "w-full pl-3 text-left font-normal h-11 border-2 transition-all duration-200",
+                                      "w-full pl-4 text-left font-medium h-12 border-2 transition-all duration-200 bg-gray-50 hover:bg-white",
                                       !field.value && "text-muted-foreground",
-                                      "hover:border-blue-300 focus:border-blue-500"
+                                      "hover:border-blue-300 focus:border-blue-500 focus:bg-white"
                                     )}
                                   >
                                     {field.value ? (
-                                      format(new Date(field.value), "dd/MM/yyyy", { locale: es })
+                                      <div className="flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4 text-blue-600" />
+                                        {format(new Date(field.value), "dd/MM/yyyy", { locale: es })}
+                                      </div>
                                     ) : (
-                                      <span>Seleccionar fecha</span>
+                                      <div className="flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4 text-gray-400" />
+                                        <span>Seleccionar fecha</span>
+                                      </div>
                                     )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
@@ -415,25 +462,33 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                         control={form.control}
                         name="endDate"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel className="text-sm font-medium text-gray-700">Fecha de Fin</FormLabel>
+                          <FormItem className="flex flex-col space-y-3">
+                            <FormLabel className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                              <StopCircle className="w-4 h-4 text-red-600" />
+                              Fecha de Fin
+                            </FormLabel>
                             <Popover>
                               <PopoverTrigger asChild>
                                 <FormControl>
                                   <Button
                                     variant="outline"
                                     className={cn(
-                                      "w-full pl-3 text-left font-normal h-11 border-2 transition-all duration-200",
+                                      "w-full pl-4 text-left font-medium h-12 border-2 transition-all duration-200 bg-gray-50 hover:bg-white",
                                       !field.value && "text-muted-foreground",
-                                      "hover:border-blue-300 focus:border-blue-500"
+                                      "hover:border-blue-300 focus:border-blue-500 focus:bg-white"
                                     )}
                                   >
                                     {field.value ? (
-                                      format(new Date(field.value), "dd/MM/yyyy", { locale: es })
+                                      <div className="flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4 text-blue-600" />
+                                        {format(new Date(field.value), "dd/MM/yyyy", { locale: es })}
+                                      </div>
                                     ) : (
-                                      <span>Seleccionar fecha</span>
+                                      <div className="flex items-center gap-2">
+                                        <CalendarIcon className="w-4 h-4 text-gray-400" />
+                                        <span>Seleccionar fecha</span>
+                                      </div>
                                     )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
@@ -457,12 +512,15 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                       control={form.control}
                       name="periodName"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700">Nombre del Período</FormLabel>
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Edit3 className="w-4 h-4 text-purple-600" />
+                            Nombre del Período
+                          </FormLabel>
                           <FormControl>
                             <Input 
                               placeholder="Ej: Enero 2025, Primera quincena marzo" 
-                              className="h-11 border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200"
+                              className="h-12 border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white text-base font-medium"
                               {...field} 
                             />
                           </FormControl>
@@ -475,13 +533,16 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                       control={form.control}
                       name="notes"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700">Notas (opcional)</FormLabel>
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Edit3 className="w-4 h-4 text-gray-600" />
+                            Notas Adicionales (opcional)
+                          </FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Notas adicionales sobre este período..." 
-                              className="border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200 resize-none"
-                              rows={3}
+                              placeholder="Agrega cualquier información relevante sobre este período..." 
+                              className="border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white resize-none text-base"
+                              rows={4}
                               {...field} 
                             />
                           </FormControl>
@@ -490,30 +551,30 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                       )}
                     />
 
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex gap-4 pt-6 border-t border-gray-100">
                       <Button 
                         type="submit" 
                         disabled={createQuickEntry.isPending}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 h-11 font-medium"
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                       >
                         {createQuickEntry.isPending ? (
                           <>
                             <motion.div 
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                              className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
                             />
                             Creando período...
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Continuar al Registro
+                            <ArrowRight className="w-5 h-5 mr-3" />
+                            Continuar al Registro de Horas
                           </>
                         )}
                       </Button>
                       {onCancel && (
-                        <Button type="button" variant="outline" onClick={onCancel} className="h-11">
+                        <Button type="button" variant="outline" onClick={onCancel} className="h-14 px-6 border-2">
                           Cancelar
                         </Button>
                       )}
@@ -533,84 +594,149 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-green-50/30">
-              <CardHeader className="pb-4">
+            <Card className="border-0 shadow-2xl bg-white overflow-hidden">
+              <div className="bg-gradient-to-r from-green-600 to-blue-600 p-6 text-white">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <Users className="h-5 w-5 text-white" />
-                    </div>
-                    Registrar Horas del Equipo
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm text-gray-600">Progreso:</div>
-                    <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-gradient-to-r from-green-500 to-blue-600"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${getProgressPercentage()}%` }}
-                        transition={{ duration: 0.5 }}
-                      />
-                    </div>
-                    <div className="text-sm font-medium text-gray-700">
-                      {Math.round(getProgressPercentage())}%
+                  <div>
+                    <CardTitle className="flex items-center gap-3 text-2xl font-bold">
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        <Users className="h-6 w-6" />
+                      </div>
+                      Registro de Horas del Equipo
+                    </CardTitle>
+                    <p className="text-green-100 mt-2">Configura las horas trabajadas para cada miembro del equipo</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-green-100 mb-1">Progreso del equipo</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 h-3 bg-white/20 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-white rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${getProgressPercentage()}%` }}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </div>
+                      <span className="text-xl font-bold">{Math.round(getProgressPercentage())}%</span>
                     </div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {Array.isArray(baseTeam) && baseTeam.map((member: any) => (
+              </div>
+
+              <CardContent className="p-8">
+                {/* Controles de vista y filtros */}
+                <div className="flex items-center justify-between mb-8 p-4 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Search className="w-4 h-4 text-gray-500" />
+                      <Input
+                        placeholder="Buscar miembro del equipo..."
+                        value={filterTeam}
+                        onChange={(e) => setFilterTeam(e.target.value)}
+                        className="w-64 h-10 border-2 bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant={viewMode === 'compact' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('compact')}
+                        className="h-10"
+                      >
+                        <Minimize2 className="w-4 h-4 mr-2" />
+                        Compacto
+                      </Button>
+                      <Button
+                        variant={viewMode === 'detailed' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('detailed')}
+                        className="h-10"
+                      >
+                        <Maximize2 className="w-4 h-4 mr-2" />
+                        Detallado
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-sm px-3 py-1">
+                      <Users className="w-4 h-4 mr-1" />
+                      {filteredTeam.length} miembros
+                    </Badge>
+                    <Badge variant="outline" className="text-sm px-3 py-1">
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      {Object.values(teamHours).filter(data => data.hours > 0).length} con horas
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {filteredTeam.map((member: any) => (
                     <motion.div 
                       key={member.personnelId} 
-                      className="relative p-6 bg-white rounded-xl border-2 border-gray-100 hover:border-blue-200 transition-all duration-300 hover:shadow-lg"
+                      className="relative p-6 bg-gradient-to-r from-gray-50 to-white rounded-2xl border-2 border-gray-100 hover:border-blue-200 transition-all duration-300 hover:shadow-lg group"
                       whileHover={{ y: -2 }}
+                      layout
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                            {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                              {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                            </div>
+                            <AnimatePresence>
+                              {optimisticUpdates[member.personnelId] && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0 }}
+                                  className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg"
+                                >
+                                  <CheckCircle2 className="w-5 h-5 text-white" />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                           <div>
-                            <span className="text-lg font-semibold text-gray-900">{member.personnel?.name}</span>
-                            <p className="text-sm text-gray-600">{member.role?.name}</p>
+                            <h3 className="text-xl font-bold text-gray-900">{member.personnel?.name}</h3>
+                            <p className="text-gray-600 font-medium">{member.role?.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="secondary" className="text-xs">
+                                <DollarSign className="w-3 h-3 mr-1" />
+                                ${member.hourlyRate}/hora
+                              </Badge>
+                              {teamHours[member.personnelId]?.hours > 0 && (
+                                <Badge variant="outline" className="text-xs text-green-700 border-green-200 bg-green-50">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {teamHours[member.personnelId]?.hours}h registradas
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <motion.p 
-                            className="text-2xl font-bold text-green-600"
+                          <motion.div 
+                            className="text-3xl font-bold text-green-600"
                             key={teamHours[member.personnelId]?.hours || 0}
                             initial={{ scale: 1.2 }}
                             animate={{ scale: 1 }}
                             transition={{ duration: 0.2 }}
                           >
                             ${((teamHours[member.personnelId]?.hours || 0) * (teamHours[member.personnelId]?.customRate || member.hourlyRate)).toLocaleString()}
-                          </motion.p>
-                          <p className="text-sm text-gray-500">costo total</p>
-                          <AnimatePresence>
-                            {optimisticUpdates[member.personnelId] && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0 }}
-                                className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"
-                              >
-                                <CheckCircle2 className="w-4 h-4 text-white" />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                          </motion.div>
+                          <p className="text-sm text-gray-500 font-medium">costo total</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-12 gap-4 items-end">
-                        <div className="col-span-3">
-                          <Label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
+                        <div className="col-span-2">
+                          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                            <Clock className="h-4 w-4 text-blue-600" />
                             Horas
                           </Label>
                           <Input
                             type="number"
                             min="0"
+                            max="500"
                             step="0.5"
                             placeholder="0"
                             value={teamHours[member.personnelId]?.hours || ''}
@@ -620,13 +746,13 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                               teamHours[member.personnelId]?.description || '',
                               teamHours[member.personnelId]?.customRate
                             )}
-                            className="h-11 text-lg font-mono text-center border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200"
+                            className="h-12 text-xl font-mono text-center border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200 bg-white"
                           />
                         </div>
 
                         <div className="col-span-3">
-                          <Label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                            <DollarSign className="h-4 w-4" />
+                          <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                            <DollarSign className="h-4 w-4 text-green-600" />
                             Tarifa/Hora
                           </Label>
                           <div className="relative">
@@ -643,7 +769,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                 parseFloat(e.target.value) || undefined
                               )}
                               className={cn(
-                                "h-11 text-lg font-mono text-center pr-10 border-2 transition-all duration-200",
+                                "h-12 text-lg font-mono text-center pr-12 border-2 transition-all duration-200 bg-white",
                                 teamHours[member.personnelId]?.customRate 
                                   ? "border-amber-300 bg-amber-50 hover:border-amber-400 focus:border-amber-500" 
                                   : "hover:border-blue-300 focus:border-blue-500"
@@ -660,29 +786,31 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                   teamHours[member.personnelId]?.description || '',
                                   undefined
                                 )}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
                                 title="Restaurar tarifa actual"
                               >
-                                <X className="h-3 w-3" />
+                                <RefreshCw className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
                           {teamHours[member.personnelId]?.customRate ? (
-                            <Badge variant="secondary" className="mt-1 text-xs bg-amber-100 text-amber-800 border-amber-200">
+                            <Badge variant="secondary" className="mt-2 text-xs bg-amber-100 text-amber-800 border-amber-200">
                               <Award className="w-3 h-3 mr-1" />
                               Tarifa histórica
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="mt-1 text-xs">
+                            <Badge variant="outline" className="mt-2 text-xs">
                               Actual: ${member.hourlyRate}
                             </Badge>
                           )}
                         </div>
 
-                        <div className="col-span-6">
-                          <Label className="text-sm font-medium text-gray-700">Descripción del trabajo</Label>
+                        <div className="col-span-7">
+                          <Label className="text-sm font-semibold text-gray-700 mb-2 block">
+                            Descripción del trabajo realizado
+                          </Label>
                           <Input
-                            placeholder="Describe las actividades realizadas..."
+                            placeholder="Describe las actividades, entregables o tareas realizadas..."
                             value={teamHours[member.personnelId]?.description || ''}
                             onChange={(e) => handleUpdateTeamHours(
                               member.personnelId, 
@@ -690,29 +818,43 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                               e.target.value,
                               teamHours[member.personnelId]?.customRate
                             )}
-                            className="h-11 border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200"
+                            className="h-12 border-2 hover:border-blue-300 focus:border-blue-500 transition-all duration-200 bg-white text-base"
                           />
                         </div>
                       </div>
                     </motion.div>
                   ))}
 
-                  {/* Resumen mejorado */}
+                  {/* Resumen financiero mejorado */}
                   <motion.div 
-                    className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 text-white p-6 rounded-2xl shadow-2xl"
-                    whileHover={{ scale: 1.02 }}
+                    className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 text-white p-8 rounded-3xl shadow-2xl"
+                    whileHover={{ scale: 1.01 }}
                     transition={{ duration: 0.2 }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-                    <div className="relative flex justify-between items-center">
-                      <div className="flex items-center gap-6">
-                        <div className="text-center">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Clock className="h-4 w-4" />
-                            <p className="text-xs font-medium opacity-90 uppercase tracking-wide">Total Horas</p>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12" />
+                    
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-2xl font-bold mb-2">Resumen del Período</h3>
+                          <p className="text-white/80">Métricas y totales del registro</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-6 h-6" />
+                          <span className="text-sm font-medium">Dashboard</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-6">
+                        <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <Clock className="h-5 w-5 text-blue-300" />
+                            <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">Total Horas</p>
                           </div>
                           <motion.p 
-                            className="text-3xl font-bold"
+                            className="text-4xl font-bold"
                             key={getTotalHours()}
                             initial={{ scale: 1.2 }}
                             animate={{ scale: 1 }}
@@ -721,13 +863,14 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             {getTotalHours()}h
                           </motion.p>
                         </div>
-                        <div className="text-center">
-                          <div className="flex items-center gap-2 mb-1">
-                            <DollarSign className="h-4 w-4" />
-                            <p className="text-xs font-medium opacity-90 uppercase tracking-wide">Costo Total</p>
+                        
+                        <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <DollarSign className="h-5 w-5 text-green-300" />
+                            <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">Costo Total</p>
                           </div>
                           <motion.p 
-                            className="text-3xl font-bold"
+                            className="text-4xl font-bold"
                             key={getTotalCost()}
                             initial={{ scale: 1.2 }}
                             animate={{ scale: 1 }}
@@ -736,56 +879,61 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                             ${getTotalCost().toLocaleString()}
                           </motion.p>
                         </div>
-                        <div className="text-center">
-                          <div className="flex items-center gap-2 mb-1">
-                            <TrendingUp className="h-4 w-4" />
-                            <p className="text-xs font-medium opacity-90 uppercase tracking-wide">Tarifa Promedio</p>
+                        
+                        <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <TrendingUp className="h-5 w-5 text-purple-300" />
+                            <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">Tarifa Promedio</p>
                           </div>
-                          <p className="text-xl font-semibold">
+                          <p className="text-3xl font-bold">
                             ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(2) : '0'}/h
                           </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-5 w-5" />
-                          <span className="text-sm font-medium">Equipo registrado</span>
+                        
+                        <div className="text-center p-4 bg-white/10 rounded-2xl backdrop-blur-sm">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <Target className="h-5 w-5 text-orange-300" />
+                            <p className="text-xs font-semibold opacity-90 uppercase tracking-wide">Progreso</p>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-2xl font-bold">{Math.round(getProgressPercentage())}%</p>
+                            <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                              <motion.div
+                                className="h-full bg-gradient-to-r from-orange-400 to-pink-400 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${getProgressPercentage()}%` }}
+                                transition={{ duration: 0.5 }}
+                              />
+                            </div>
+                            <p className="text-xs opacity-80">
+                              {Object.values(teamHours).filter(data => data.hours > 0).length} de {baseTeam.length} miembros
+                            </p>
+                          </div>
                         </div>
-                        <div className="w-24 h-2 bg-white/20 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-white rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${getProgressPercentage()}%` }}
-                            transition={{ duration: 0.5 }}
-                          />
-                        </div>
-                        <p className="text-xs mt-1 opacity-90">
-                          {Object.values(teamHours).filter(data => data.hours > 0).length} de {baseTeam.length} miembros
-                        </p>
                       </div>
                     </div>
                   </motion.div>
 
                   {/* Botones de acción mejorados */}
-                  <div className="flex gap-3 pt-6">
+                  <div className="flex gap-4 pt-8 border-t border-gray-100">
                     <Button 
                       onClick={handleSaveAllHours}
                       disabled={addTimeDetail.isPending || getTotalHours() === 0}
-                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white h-12 font-medium"
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                     >
                       {addTimeDetail.isPending ? (
                         <>
                           <motion.div 
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                            className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
                           />
                           Guardando...
                         </>
                       ) : (
                         <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Guardar Horas ({Object.values(teamHours).filter(data => data.hours > 0).length})
+                          <Save className="h-5 w-5 mr-3" />
+                          Guardar Todas las Horas ({Object.values(teamHours).filter(data => data.hours > 0).length})
                         </>
                       )}
                     </Button>
@@ -793,29 +941,33 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                     <Button 
                       onClick={handleSubmitForApproval}
                       disabled={submitQuickEntry.isPending || getTotalHours() === 0}
-                      variant="outline"
-                      className="flex-1 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50 h-12 font-medium"
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                     >
                       {submitQuickEntry.isPending ? (
                         <>
                           <motion.div 
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"
+                            className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
                           />
                           Enviando...
                         </>
                       ) : (
                         <>
-                          <Send className="h-4 w-4 mr-2" />
+                          <Send className="h-5 w-5 mr-3" />
                           Enviar para Aprobación
                         </>
                       )}
                     </Button>
 
                     {onCancel && (
-                      <Button type="button" variant="ghost" onClick={onCancel} className="h-12">
-                        <X className="h-4 w-4 mr-2" />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={onCancel} 
+                        className="h-14 px-6 border-2 hover:bg-gray-50"
+                      >
+                        <X className="h-5 w-5 mr-2" />
                         Cancelar
                       </Button>
                     )}
