@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -272,7 +273,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                 )}
                               >
                                 {field.value ? (
-                                  format(new Date(field.value), "PPP", { locale: es })
+                                  format(new Date(field.value), "dd/MM/yyyy", { locale: es })
                                 ) : (
                                   <span>Seleccionar fecha</span>
                                 )}
@@ -312,7 +313,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                                 )}
                               >
                                 {field.value ? (
-                                  format(new Date(field.value), "PPP", { locale: es })
+                                  format(new Date(field.value), "dd/MM/yyyy", { locale: es })
                                 ) : (
                                   <span>Seleccionar fecha</span>
                                 )}
@@ -379,127 +380,127 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
             <div className="space-y-4">
               {Array.isArray(baseTeam) && baseTeam.map((member: any) => (
                 <div key={member.personnelId} className="space-y-3 p-4 bg-slate-50 rounded-lg border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-sm font-medium text-slate-700">{member.personnel?.name}</span>
-                            <p className="text-xs text-slate-500">{member.role?.name}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-semibold text-emerald-600">
-                              ${((teamHours[member.personnelId]?.hours || 0) * (teamHours[member.personnelId]?.customRate || member.hourlyRate)).toFixed(2)}
-                            </p>
-                            <p className="text-xs text-slate-500">costo total</p>
-                          </div>
-                        </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-slate-700">{member.personnel?.name}</span>
+                      <p className="text-xs text-slate-500">{member.role?.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-emerald-600">
+                        ${((teamHours[member.personnelId]?.hours || 0) * (teamHours[member.personnelId]?.customRate || member.hourlyRate)).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-slate-500">costo total</p>
+                    </div>
+                  </div>
 
-                        <div className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-3">
-                            <Label className="text-xs text-slate-600">Horas</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              placeholder="0"
-                              value={teamHours[member.personnelId]?.hours || ''}
-                              onChange={(e) => handleUpdateTeamHours(
-                                member.personnelId, 
-                                parseFloat(e.target.value) || 0, 
-                                teamHours[member.personnelId]?.description || '',
-                                teamHours[member.personnelId]?.customRate
-                              )}
-                              className="h-9 text-sm font-mono text-right"
-                            />
-                          </div>
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-3">
+                      <Label className="text-xs text-slate-600">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        placeholder="0"
+                        value={teamHours[member.personnelId]?.hours || ''}
+                        onChange={(e) => handleUpdateTeamHours(
+                          member.personnelId, 
+                          parseFloat(e.target.value) || 0, 
+                          teamHours[member.personnelId]?.description || '',
+                          teamHours[member.personnelId]?.customRate
+                        )}
+                        className="h-9 text-sm font-mono text-right"
+                      />
+                    </div>
 
-                          <div className="col-span-3">
-                            <Label className="text-xs text-slate-600 flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              Tarifa/Hora
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                placeholder={member.hourlyRate.toString()}
-                                value={teamHours[member.personnelId]?.customRate || ''}
-                                onChange={(e) => handleUpdateTeamHours(
-                                  member.personnelId, 
-                                  teamHours[member.personnelId]?.hours || 0, 
-                                  teamHours[member.personnelId]?.description || '',
-                                  parseFloat(e.target.value) || undefined
-                                )}
-                                className={cn(
-                                  "h-9 text-sm font-mono text-right pr-8",
-                                  teamHours[member.personnelId]?.customRate ? "border-amber-300 bg-amber-50" : "border-slate-300"
-                                )}
-                              />
-                              {teamHours[member.personnelId]?.customRate && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateTeamHours(
-                                    member.personnelId, 
-                                    teamHours[member.personnelId]?.hours || 0, 
-                                    teamHours[member.personnelId]?.description || '',
-                                    undefined
-                                  )}
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-600 hover:text-amber-800"
-                                  title="Restaurar tarifa actual"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              {teamHours[member.personnelId]?.customRate ? (
-                                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
-                                  Tarifa histórica
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs">
-                                  Tarifa actual: ${member.hourlyRate}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="col-span-6">
-                            <Label className="text-xs text-slate-600">Descripción del trabajo</Label>
-                            <Input
-                              placeholder="Describe las actividades realizadas..."
-                              value={teamHours[member.personnelId]?.description || ''}
-                              onChange={(e) => handleUpdateTeamHours(
-                                member.personnelId, 
-                                teamHours[member.personnelId]?.hours || 0, 
-                                e.target.value,
-                                teamHours[member.personnelId]?.customRate
-                              )}
-                              className="h-9 text-sm"
-                            />
-                          </div>
-                        </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs text-slate-600 flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                        Tarifa/Hora
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder={member.hourlyRate.toString()}
+                          value={teamHours[member.personnelId]?.customRate || ''}
+                          onChange={(e) => handleUpdateTeamHours(
+                            member.personnelId, 
+                            teamHours[member.personnelId]?.hours || 0, 
+                            teamHours[member.personnelId]?.description || '',
+                            parseFloat(e.target.value) || undefined
+                          )}
+                          className={cn(
+                            "h-9 text-sm font-mono text-right pr-8",
+                            teamHours[member.personnelId]?.customRate ? "border-amber-300 bg-amber-50" : "border-slate-300"
+                          )}
+                        />
+                        {teamHours[member.personnelId]?.customRate && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateTeamHours(
+                              member.personnelId, 
+                              teamHours[member.personnelId]?.hours || 0, 
+                              teamHours[member.personnelId]?.description || '',
+                              undefined
+                            )}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-600 hover:text-amber-800"
+                            title="Restaurar tarifa actual"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        {teamHours[member.personnelId]?.customRate ? (
+                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
+                            Tarifa histórica
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Tarifa actual: ${member.hourlyRate}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-span-6">
+                      <Label className="text-xs text-slate-600">Descripción del trabajo</Label>
+                      <Input
+                        placeholder="Describe las actividades realizadas..."
+                        value={teamHours[member.personnelId]?.description || ''}
+                        onChange={(e) => handleUpdateTeamHours(
+                          member.personnelId, 
+                          teamHours[member.personnelId]?.hours || 0, 
+                          e.target.value,
+                          teamHours[member.personnelId]?.customRate
+                        )}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
               ))}
 
               {/* Resumen */}
               <div className="flex justify-between items-center pt-4 border-t border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Horas</p>
-                  <p className="text-2xl font-bold text-blue-600">{getTotalHours()}h</p>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Total Horas</p>
+                    <p className="text-2xl font-bold text-blue-600">{getTotalHours()}h</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Costo Total</p>
+                    <p className="text-2xl font-bold text-emerald-600">${getTotalCost().toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Costo Total</p>
-                  <p className="text-2xl font-bold text-emerald-600">${getTotalCost().toLocaleString()}</p>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500">Tarifa promedio</p>
+                  <p className="text-lg font-semibold text-slate-700">
+                    ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(2) : '0'}/h
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-500">Tarifa promedio</p>
-                <p className="text-lg font-semibold text-slate-700">
-                  ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(2) : '0'}/h
-                </p>
-              </div>
-            </div>
 
               {/* Botones de acción */}
               <div className="flex gap-2 pt-4">
