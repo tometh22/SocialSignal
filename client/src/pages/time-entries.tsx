@@ -5,14 +5,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "../lib/queryClient";
-import Calendar from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
 import ComponentSelector from "@/components/project/component-selector";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -37,17 +34,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -61,8 +49,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   CalendarIcon, 
   Loader2, 
@@ -70,37 +59,22 @@ import {
   PlusCircle, 
   Trash2,
   Clock,
-  ClipboardList,
-  Calendar as CalendarSquare,
-  BarChart3,
-  Briefcase,
-  DollarSign,
-  FolderKanban,
-  MoreHorizontal,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  User
+  Filter,
+  MoreHorizontal,
+  User,
+  DollarSign
 } from "lucide-react";
-import { format, addDays, startOfWeek, endOfWeek, addMonths, subMonths, isSameDay, isSameMonth, parse, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as UICalendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
-// Interfaces de datos
+// Interfaces
 interface Personnel {
   id: number;
   name: string;
   roleId: number;
   hourlyRate: number;
-}
-
-interface Role {
-  id: number;
-  name: string;
-  description: string | null;
-  defaultHourlyRate: number;
 }
 
 interface TimeEntry {
@@ -118,7 +92,7 @@ interface TimeEntry {
   createdAt: string;
 }
 
-// Esquema del formulario
+// Schema del formulario
 const formSchema = z.object({
   personnelId: z.number({
     required_error: "Selecciona una persona",
@@ -134,8 +108,8 @@ const formSchema = z.object({
   componentId: z.number().nullable().optional(),
 });
 
-// Componentes personalizados
-const PersonAvatar: React.FC<{ name: string; size?: "sm" | "md" }> = ({ name, size = "md" }) => {
+// Componente de Avatar optimizado
+const PersonAvatar: React.FC<{ name: string; className?: string }> = ({ name, className = "h-8 w-8" }) => {
   const initials = name
     .split(" ")
     .map((n) => n[0])
@@ -143,112 +117,35 @@ const PersonAvatar: React.FC<{ name: string; size?: "sm" | "md" }> = ({ name, si
     .toUpperCase()
     .substring(0, 2);
 
-  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8";
-  const textSize = size === "sm" ? "text-xs" : "text-xs";
-
   return (
-    <Avatar className={sizeClasses}>
-      <AvatarFallback className={`bg-primary/10 text-primary ${textSize}`}>
+    <Avatar className={className}>
+      <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
         {initials}
       </AvatarFallback>
     </Avatar>
   );
 };
 
-const DaySummary: React.FC<{
-  date: Date;
-  entries: TimeEntry[];
-  personnel: Personnel[] | undefined;
-  projectComponents?: {id: number; name: string; projectId: number}[] | undefined;
-}> = ({ date, entries, personnel, projectComponents }) => {
-  const dateStr = format(date, "yyyy-MM-dd");
-  const dayEntries = entries.filter(
-    (entry) => entry.date.substring(0, 10) === dateStr
-  );
-  const totalHours = dayEntries.reduce((sum, entry) => sum + entry.hours, 0);
-
-  if (dayEntries.length === 0) return null;
-
-  return (
-    <div className="space-y-2 mb-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium">
-          {format(date, "EEEE dd 'de' MMMM", { locale: es })}
-        </h4>
-        <Badge variant="outline" className="font-normal">
-          {totalHours} {totalHours === 1 ? "hora" : "horas"}
-        </Badge>
-      </div>
-      <div className="space-y-2">
-        {dayEntries.map((entry) => {
-          const person = personnel?.find((p) => p.id === entry.personnelId);
-          const component = projectComponents?.find(c => c.id === entry.componentId);
-          return (
-            <div
-              key={entry.id}
-              className="flex items-center justify-between bg-muted/30 p-2 rounded-md"
-            >
-              <div className="flex items-center space-x-2">
-                <PersonAvatar name={person?.name || "Usuario"} />
-                <div>
-                  <div className="font-medium text-sm">{person?.name}</div>
-                  <div className="flex items-center gap-2">
-                    {component && (
-                      <Badge variant="secondary" className="h-5 text-xs mr-1">
-                        {component.name}
-                      </Badge>
-                    )}
-                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                      {entry.description || "Sin descripción"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-sm font-medium">{entry.hours} h</div>
-                {!entry.billable && (
-                  <Badge variant="outline" className="h-5 text-xs">
-                    No facturable
-                  </Badge>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// Función para formatear fecha legible
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return format(date, "dd 'de' MMM", { locale: es });
-};
-
+// Formulario de registro simplificado
 const TimeRegistrationForm: React.FC<{
   personnel: Personnel[] | undefined;
   projectId: number;
   onSuccess: () => void;
   onCancel: () => void;
-  isLoading: boolean;
   updateLocalEntries: (entry: TimeEntry) => void;
-}> = ({ personnel, projectId, onSuccess, onCancel, isLoading, updateLocalEntries }) => {
-  // Configuración del formulario
+}> = ({ personnel, projectId, onSuccess, onCancel, updateLocalEntries }) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       date: new Date(),
-      hours: 1,
+      hours: 8,
       billable: true,
       componentId: null,
     },
   });
 
-  // Mutación para crear entrada de tiempo
   const createTimeEntryMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      // Convertir fecha a formato ISO String para que el servidor la procese correctamente
       return apiRequest("/api/time-entries", "POST", {
         ...data,
         projectId,
@@ -256,39 +153,33 @@ const TimeRegistrationForm: React.FC<{
       });
     },
     onSuccess: (newEntry) => {
-      // Actualizar el estado local directamente para mostrar inmediatamente
       updateLocalEntries(newEntry);
-      
-      // Actualizamos la caché de forma optimista
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
         return [...oldData, newEntry];
       });
-      
-      // Forzamos una recarga completa de los datos
+
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       }, 300);
-      
+
       toast({
-        title: "Tiempo registrado",
-        description: "El registro de horas ha sido creado con éxito",
+        title: "✅ Tiempo registrado",
+        description: "El registro se ha creado exitosamente",
       });
-      
+
       form.reset({
         date: new Date(),
-        hours: 1,
+        hours: 8,
         billable: true,
         componentId: null,
       });
-      
-      // Cerramos el diálogo después de procesar todo
+
       onSuccess();
     },
     onError: (error: any) => {
-      console.error("Error creating time entry:", error);
       toast({
-        title: "Error",
-        description: error.message || "Ha ocurrido un error al crear el registro",
+        title: "❌ Error",
+        description: error.message || "No se pudo crear el registro",
         variant: "destructive",
       });
     },
@@ -298,175 +189,39 @@ const TimeRegistrationForm: React.FC<{
     createTimeEntryMutation.mutate(data);
   };
 
-  const isPending = createTimeEntryMutation.isPending || isLoading;
-
-  // Obtener la semana actual como rango preseleccionado
-  const weekStart = startOfWeek(new Date(), { locale: es });
-  const weekEnd = endOfWeek(new Date(), { locale: es });
-  const defaultWeek = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const isPending = createTimeEntryMutation.isPending;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="personnelId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Persona</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                    defaultValue={field.value?.toString()}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Selecciona una persona" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {personnel?.map((p) => (
-                        <SelectItem key={p.id} value={p.id.toString()} className="py-3">
-                          <div className="flex items-center gap-2">
-                            <PersonAvatar name={p.name} />
-                            <span>{p.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Fecha</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={
-                            "w-full h-11 pl-3 text-left font-normal flex justify-between items-center"
-                          }
-                        >
-                          {field.value ? (
-                            <span>
-                              {format(field.value, "EEEE, dd MMM yyyy", { locale: es })}
-                            </span>
-                          ) : (
-                            <span>Seleccionar fecha</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <div className="bg-muted/30 p-2 border-b flex items-center justify-center">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs">
-                          Esta semana
-                        </Button>
-                      </div>
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        locale={es}
-                        className="rounded-md border"
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="hours"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Horas trabajadas</FormLabel>
-                  <div className="flex flex-col space-y-2">
-                    <div className="relative">
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          min="0.5"
-                          max="24"
-                          className="h-11 pl-8"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        />
-                      </FormControl>
-                      <Clock className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="billable"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Tipo de horas</FormLabel>
-                  <div className="flex items-center h-11 space-x-2">
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-sm">
-                        {field.value ? "Facturable" : "No facturable"}
-                      </FormLabel>
-                      <FormDescription className="text-xs">
-                        {field.value
-                          ? "Estas horas se facturarán al cliente"
-                          : "Estas horas son para uso interno"}
-                      </FormDescription>
-                    </div>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Selector de componente */}
+        {/* Fila 1: Persona y Fecha */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="componentId"
+            name="personnelId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Componente (opcional)</FormLabel>
-                <div className="relative">
+                <FormLabel className="text-sm font-medium">Persona</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(parseInt(value))}
+                  defaultValue={field.value?.toString()}
+                >
                   <FormControl>
-                    <ComponentSelector
-                      projectId={projectId}
-                      value={field.value || null}
-                      onChange={field.onChange}
-                      disabled={isPending}
-                    />
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecciona una persona" />
+                    </SelectTrigger>
                   </FormControl>
-                </div>
-                <FormDescription className="text-xs">
-                  Selecciona un componente específico para este registro de horas
-                </FormDescription>
+                  <SelectContent>
+                    {personnel?.map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()} className="py-2">
+                        <div className="flex items-center gap-2">
+                          <PersonAvatar name={p.name} className="h-6 w-6" />
+                          <span>{p.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -474,23 +229,139 @@ const TimeRegistrationForm: React.FC<{
 
           <FormField
             control={form.control}
-            name="description"
+            name="date"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Descripción (opcional)</FormLabel>
-                <FormControl>
-                  <Textarea 
-                    className="resize-none h-[100px]" 
-                    placeholder="Describe brevemente el trabajo realizado..."
-                    {...field}
-                    value={field.value || ""}
-                  />
-                </FormControl>
+                <FormLabel className="text-sm font-medium">Fecha</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full h-10 justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? (
+                          format(field.value, "EEEE, dd 'de' MMMM yyyy", { locale: es })
+                        ) : (
+                          <span>Seleccionar fecha</span>
+                        )}
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      locale={es}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
+
+        {/* Fila 2: Horas y Tipo */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="hours"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium">Horas</FormLabel>
+                <div className="relative">
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      max="24"
+                      className="h-10 pl-8"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+                  <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="billable"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium">Tipo</FormLabel>
+                <div className="flex items-center h-10 space-x-2 px-3 border rounded-md">
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="text-sm">
+                    {field.value ? (
+                      <span className="text-green-700 font-medium">Facturable</span>
+                    ) : (
+                      <span className="text-amber-700 font-medium">No facturable</span>
+                    )}
+                  </div>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Componente */}
+        <FormField
+          control={form.control}
+          name="componentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-sm font-medium">Componente (opcional)</FormLabel>
+              <FormControl>
+                <ComponentSelector
+                  projectId={projectId}
+                  value={field.value || null}
+                  onChange={field.onChange}
+                  disabled={isPending}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Descripción */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-sm font-medium">Descripción (opcional)</FormLabel>
+              <FormControl>
+                <Textarea 
+                  className="resize-none h-20" 
+                  placeholder="Describe el trabajo realizado..."
+                  {...field}
+                  value={field.value || ""}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <DialogFooter>
           <Button variant="outline" type="button" onClick={onCancel}>
             Cancelar
@@ -514,49 +385,40 @@ const TimeRegistrationForm: React.FC<{
   );
 };
 
+// Componente principal
 const TimeEntries: React.FC = () => {
   const [, setLocation] = useLocation();
   const params = useParams();
-  
-  // Manejar ambos patrones de URL:
-  // 1. /time-entries/project/:projectId
-  // 2. /active-projects/:projectId/time-entries
+
   let projectId: number = 0;
-  
+
   if (params.projectId) {
     projectId = parseInt(params.projectId);
   } else if (window.location.pathname.includes('/active-projects/')) {
-    // Extraer el ID del proyecto de la URL utilizando una expresión regular
     const match = window.location.pathname.match(/\/active-projects\/(\d+)\/time-entries/);
     if (match && match[1]) {
       projectId = parseInt(match[1]);
     }
   }
-  
-  const [activeTab, setActiveTab] = useState<string>("all");
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
-  const [calendarView, setCalendarView] = useState<"day" | "week" | "fortnight" | "month">("month");
   const [search, setSearch] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  // Estado local para actualización en tiempo real
+  const [filterType, setFilterType] = useState<"all" | "billable" | "non-billable">("all");
+
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
-  
-  // Función para actualizar estado local, pasada a componentes hijos
+
   const updateLocalEntries = (entry: TimeEntry) => {
     setLocalTimeEntries(prev => [...prev, entry]);
   };
 
-  // Obtener datos del proyecto
+  // Queries
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: projectId > 0
   });
 
-  // Obtener datos de entradas de tiempo
   const { data: timeEntries, isLoading } = useQuery({
     queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: projectId > 0
@@ -568,27 +430,11 @@ const TimeEntries: React.FC = () => {
     }
   }, [timeEntries]);
 
-  // Obtener datos de personal
   const { data: personnel } = useQuery({
     queryKey: ['/api/personnel'],
   });
-  
-  // Obtener datos de roles
-  const { data: roles } = useQuery({
-    queryKey: ['/api/roles'],
-  });
-  
-  // Obtener componentes del proyecto
-  const { data: projectComponents } = useQuery({
-    queryKey: ['/api/project-components', projectId],
-    queryFn: async () => {
-      const response = await apiRequest('GET', `/api/project-components/${projectId}`);
-      return response.json();
-    },
-    enabled: projectId > 0,
-  });
 
-  // Mutación para eliminar registro de tiempo
+  // Mutación para eliminar
   const deleteTimeEntryMutation = useMutation({
     mutationFn: async (entryId: number) => {
       return apiRequest(`/api/time-entries/${entryId}`, "DELETE");
@@ -596,26 +442,19 @@ const TimeEntries: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       toast({
-        title: "Registro eliminado",
-        description: "El registro de horas ha sido eliminado con éxito"
+        title: "✅ Registro eliminado",
+        description: "El registro se ha eliminado correctamente"
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Ha ocurrido un error al eliminar el registro",
+        title: "❌ Error",
+        description: error.message || "No se pudo eliminar el registro",
         variant: "destructive"
       });
     }
   });
-  
-  const getRoleNameById = (roleId: number): string => {
-    if (!roles) return "Rol Desconocido";
-    const role = roles.find(r => r.id === roleId);
-    return role ? role.name : "Rol Desconocido";
-  };
 
-  // Confirmación para eliminar un registro
   const confirmDelete = () => {
     if (entryToDelete) {
       deleteTimeEntryMutation.mutate(entryToDelete);
@@ -624,724 +463,273 @@ const TimeEntries: React.FC = () => {
     }
   };
 
-  // Filtrar entradas según criterios
+  // Filtrado de entradas
   const filteredEntries = localTimeEntries
     ? localTimeEntries.filter(entry => {
-        // Filtro por tipo (facturable/no facturable)
-        if (activeTab === "billable" && !entry.billable) return false;
-        if (activeTab === "non-billable" && entry.billable) return false;
-        
+        // Filtro por tipo
+        if (filterType === "billable" && !entry.billable) return false;
+        if (filterType === "non-billable" && entry.billable) return false;
+
         // Filtro por búsqueda
         if (search) {
           const person = personnel?.find(p => p.id === entry.personnelId);
           const personName = person?.name?.toLowerCase() || "";
           const description = entry.description?.toLowerCase() || "";
           const searchLower = search.toLowerCase();
-          
+
           return personName.includes(searchLower) || 
                  description.includes(searchLower) || 
                  format(new Date(entry.date), "dd/MM/yyyy").includes(searchLower);
         }
-        
+
         return true;
-      })
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     : [];
 
-  // Funciones auxiliares para la fecha
-  const startOfDay = (date: Date): Date => {
-    const newDate = new Date(date);
-    newDate.setHours(0, 0, 0, 0);
-    return newDate;
-  };
+  // Estadísticas rápidas
+  const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0);
+  const billableHours = filteredEntries.filter(e => e.billable).reduce((sum, entry) => sum + entry.hours, 0);
 
-  const endOfDay = (date: Date): Date => {
-    const newDate = new Date(date);
-    newDate.setHours(23, 59, 59, 999);
-    return newDate;
-  };
-
-  const startOfWeek = (date: Date): Date => {
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para que la semana empiece el lunes
-    return startOfDay(new Date(date.setDate(diff)));
-  };
-
-  const endOfWeek = (date: Date): Date => {
-    const startDate = startOfWeek(new Date(date));
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 6);
-    return endOfDay(endDate);
-  };
-
-  const startOfFortnight = (date: Date): Date => {
-    const day = date.getDate();
-    // Primera quincena: días 1-15, Segunda quincena: días 16-fin de mes
-    const newDate = new Date(date);
-    newDate.setDate(day <= 15 ? 1 : 16);
-    return startOfDay(newDate);
-  };
-
-  const endOfFortnight = (date: Date): Date => {
-    const day = date.getDate();
-    const newDate = new Date(date);
-    if (day <= 15) {
-      // Fin de la primera quincena es el día 15
-      newDate.setDate(15);
-    } else {
-      // Fin de la segunda quincena es el último día del mes
-      newDate.setMonth(newDate.getMonth() + 1);
-      newDate.setDate(0);
-    }
-    return endOfDay(newDate);
-  };
-
-  const startOfMonth = (date: Date): Date => {
-    const newDate = new Date(date);
-    newDate.setDate(1);
-    return startOfDay(newDate);
-  };
-
-  const endOfMonth = (date: Date): Date => {
-    const newDate = new Date(date);
-    newDate.setMonth(newDate.getMonth() + 1);
-    newDate.setDate(0);
-    return endOfDay(newDate);
-  };
-
-  // Filtrar entradas según el período seleccionado
-  const getEntriesForPeriod = (): TimeEntry[] => {
-    if (!filteredEntries || filteredEntries.length === 0) return [];
-    
-    switch (calendarView) {
-      case "day":
-        return filteredEntries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= startOfDay(selectedDate) && entryDate <= endOfDay(selectedDate);
-        });
-      
-      case "week":
-        return filteredEntries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= startOfWeek(selectedDate) && entryDate <= endOfWeek(selectedDate);
-        });
-      
-      case "fortnight":
-        return filteredEntries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= startOfFortnight(selectedDate) && entryDate <= endOfFortnight(selectedDate);
-        });
-      
-      case "month":
-      default:
-        return filteredEntries.filter(entry => {
-          const entryDate = new Date(entry.date);
-          return entryDate >= startOfMonth(selectedDate) && entryDate <= endOfMonth(selectedDate);
-        });
-    }
-  };
-
-  // Agrupar entradas por fecha para la vista de calendario
-  const groupEntriesByDate = () => {
-    const grouped = new Map<string, TimeEntry[]>();
-    const entriesForPeriod = getEntriesForPeriod();
-    
-    if (entriesForPeriod.length > 0) {
-      entriesForPeriod.forEach(entry => {
-        // Obtener solo la fecha (sin hora)
-        const dateStr = entry.date.split('T')[0];
-        
-        if (!grouped.has(dateStr)) {
-          grouped.set(dateStr, []);
-        }
-        
-        grouped.get(dateStr)?.push(entry);
-      });
-    }
-    
-    return grouped;
-  };
-
-  // Si no se encuentra el ID del proyecto, mostrar mensaje de error
   if (!projectId) {
     return (
-      <div className="container max-w-6xl mx-auto py-6">
-        <Card>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle>Proyecto no encontrado</CardTitle>
             <CardDescription>
-              No se ha especificado un proyecto válido para registrar horas.
+              No se ha especificado un proyecto válido.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Por favor, selecciona un proyecto activo desde el panel de proyectos.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={() => setLocation("/active-projects")}>
-              Ver todos los proyectos
+            <Button onClick={() => setLocation("/active-projects")} className="w-full">
+              Ver Proyectos
             </Button>
-          </CardFooter>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="container max-w-6xl mx-auto py-6">
-      {projectLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <>
-          <div className="mb-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-4"
-              onClick={() => setLocation("/active-projects")}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver a Proyectos
-            </Button>
-            
-            <div className="mb-6 bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="p-6 md:flex md:items-center md:justify-between">
-                <div className="mb-4 md:mb-0">
-                  <h1 className="text-2xl font-bold tracking-tight mb-1">Registro de Horas</h1>
-                  <p className="text-muted-foreground flex items-center">
-                    <Briefcase className="h-4 w-4 mr-1.5 text-primary/70" />
-                    <span>Proyecto: <span className="font-medium text-foreground">{project?.quotation?.projectName || "Sin nombre"}</span></span>
-                  </p>
-                </div>
-                <div className="flex gap-2 mt-2 md:mt-0">
-                  <Button 
-                    variant="outline" 
-                    className="h-9 px-3 border-muted-foreground/20 hover:bg-muted/20" 
-                    onClick={() => setLocation(`/project-summary/${projectId}`)}
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Ver resumen
-                  </Button>
-                  <Button 
-                    className="h-9 px-4" 
-                    onClick={() => setDialogOpen(true)}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Registrar Horas
-                  </Button>
-                </div>
+    <div className="min-h-screen bg-gray-50/30">
+      <div className="max-w-6xl mx-auto p-4 space-y-6">
+        {projectLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLocation("/active-projects")}
+                  className="mb-2"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver
+                </Button>
+                <h1 className="text-2xl font-bold">Registro de Horas</h1>
+                <p className="text-sm text-muted-foreground">
+                  {project?.quotation?.projectName || "Proyecto"}
+                </p>
               </div>
-              
-              <CardContent>
-                <div className="flex flex-wrap gap-3 mb-4">
-                  {/* Barra de acciones principal */}
-                  <div className="flex justify-between w-full bg-card rounded-md border shadow-sm p-2">
-                    <div className="flex items-center gap-3">
-                      <div className="relative w-[260px]">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="search"
-                          placeholder="Buscar registros..."
-                          className="pl-9 h-9"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="flex h-9 border rounded-md p-0.5 bg-muted/5">
-                        <Button
-                          variant={viewMode === "list" ? "default" : "ghost"}
-                          size="sm"
-                          className="h-full rounded-r-none"
-                          onClick={() => setViewMode("list")}
-                        >
-                          <ClipboardList className="h-4 w-4 mr-1" />
-                          Lista
-                        </Button>
-                        <Button
-                          variant={viewMode === "calendar" ? "default" : "ghost"}
-                          size="sm"
-                          className="h-full rounded-l-none"
-                          onClick={() => setViewMode("calendar")}
-                        >
-                          <CalendarSquare className="h-4 w-4 mr-1" />
-                          Calendario
-                        </Button>
-                      </div>
+              <Button onClick={() => setDialogOpen(true)} size="lg">
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Registrar Horas
+              </Button>
+            </div>
+
+            {/* Estadísticas y controles */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  {/* Estadísticas */}
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary">{totalHours}</div>
+                      <div className="text-xs text-muted-foreground">Total horas</div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Tabs 
-                        defaultValue="all" 
-                        className="h-9" 
-                        value={activeTab} 
-                        onValueChange={setActiveTab}
-                      >
-                        <TabsList className="h-9 bg-muted/5">
-                          <TabsTrigger value="all" className="px-3 h-7">Todos</TabsTrigger>
-                          <TabsTrigger value="billable" className="px-3 h-7">Facturables</TabsTrigger>
-                          <TabsTrigger value="non-billable" className="px-3 h-7">No Facturables</TabsTrigger>
-                        </TabsList>
-                      </Tabs>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{billableHours}</div>
+                      <div className="text-xs text-muted-foreground">Facturables</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-amber-600">{totalHours - billableHours}</div>
+                      <div className="text-xs text-muted-foreground">No facturables</div>
                     </div>
                   </div>
-                  
-                  {/* Controles de vista de calendario, solo visibles cuando calendario está activo */}
-                  {viewMode === "calendar" && (
-                    <div className="w-full flex flex-col md:flex-row gap-3">
-                      {/* Control de vista de período */}
-                      <div className="flex-none">
-                        <div className="flex items-center border rounded-md overflow-hidden">
-                          <div className="text-xs font-medium text-muted-foreground px-3 py-2 border-r bg-muted/5">
-                            Vista:
-                          </div>
-                          <div className="flex">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-9 rounded-none px-3 ${calendarView === "day" ? "bg-primary/10 text-primary" : ""}`}
-                              onClick={() => setCalendarView("day")}
-                            >
-                              Día
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-9 rounded-none px-3 ${calendarView === "week" ? "bg-primary/10 text-primary" : ""}`}
-                              onClick={() => setCalendarView("week")}
-                            >
-                              Semana
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-9 rounded-none px-3 ${calendarView === "fortnight" ? "bg-primary/10 text-primary" : ""}`}
-                              onClick={() => setCalendarView("fortnight")}
-                            >
-                              Quincena
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-9 rounded-none px-3 ${calendarView === "month" ? "bg-primary/10 text-primary" : ""}`}
-                              onClick={() => setCalendarView("month")}
-                            >
-                              Mes
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Navegador de períodos */}
-                      <div className="flex-grow">
-                        <div className="flex items-center h-full border rounded-md p-2 bg-card">
-                          <div className="flex items-center">
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              className="h-7 w-7 mr-2 rounded-full"
-                              onClick={() => setSelectedDate(subMonths(selectedDate, 1))}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            
-                            <span className="font-medium text-base">
-                              {format(selectedDate, "MMMM yyyy", { locale: es })}
-                            </span>
-                            
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              className="h-7 w-7 ml-2 rounded-full"
-                              onClick={() => setSelectedDate(addMonths(selectedDate, 1))}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          
-                          <div className="ml-auto flex items-center gap-2">
-                            <div className="text-xs text-muted-foreground mr-2">
-                              {calendarView === "day" ? format(selectedDate, "EEEE dd", { locale: es }) : ""}
-                              {calendarView === "week" ? `Semana ${format(startOfWeek(selectedDate), "dd")} - ${format(endOfWeek(selectedDate), "dd")}` : ""}
-                              {calendarView === "fortnight" ? `${selectedDate.getDate() <= 15 ? "1ª" : "2ª"} quincena` : ""}
-                              {calendarView === "month" ? "Mes completo" : ""}
-                            </div>
-                            
-                            <Badge variant="outline" className="h-6">
-                              {getEntriesForPeriod().length} {getEntriesForPeriod().length === 1 ? "registro" : "registros"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
 
+                  {/* Controles */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar registros..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9 w-64"
+                      />
+                    </div>
+
+                    <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
+                      <SelectTrigger className="w-40">
+                        <Filter className="mr-2 h-4 w-4" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="billable">Facturables</SelectItem>
+                        <SelectItem value="non-billable">No facturables</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lista de registros */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Registros de Tiempo ({filteredEntries.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 {isLoading ? (
-                  <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : filteredEntries.length === 0 ? (
-                  <div className="text-center py-16 border rounded-md">
-                    <Clock className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No hay registros de tiempo</h3>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      {search 
-                        ? "No se encontraron registros que coincidan con tu búsqueda."
-                        : activeTab !== "all"
-                          ? `No hay registros de horas en la categoría seleccionada.`
-                          : "No se han registrado horas para este proyecto todavía."}
+                  <div className="text-center py-12">
+                    <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No hay registros</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {search ? "No se encontraron registros con esos criterios." : "Aún no hay registros de tiempo para este proyecto."}
                     </p>
-                    <Button
-                      className="mt-6"
-                      onClick={() => setDialogOpen(true)}
-                    >
+                    <Button onClick={() => setDialogOpen(true)}>
                       <PlusCircle className="mr-2 h-4 w-4" />
-                      Registrar Horas
+                      Crear primer registro
                     </Button>
                   </div>
-                ) : viewMode === "list" ? (
-                  <div 
-                    className="border rounded-md" 
-                    style={{
-                      height: "300px",
-                      maxHeight: "50vh",
-                      position: "relative",
-                      overflowY: "auto",
-                      marginBottom: "12px"
-                    }}
-                  >
-                    <Table className="w-full text-xs" style={{ tableLayout: "fixed" }}>
-                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                        <TableRow className="h-6">
-                          <TableHead className="py-1 text-xs font-medium w-20">Fecha</TableHead>
-                          <TableHead className="py-1 text-xs font-medium">Personal</TableHead>
-                          <TableHead className="py-1 text-xs font-medium w-16">Horas</TableHead>
-                          <TableHead className="py-1 text-xs font-medium hidden md:table-cell">Descripción</TableHead>
-                          <TableHead className="py-1 text-xs font-medium w-12">Tipo</TableHead>
-                          <TableHead className="py-1 text-xs font-medium text-right w-12">Acc.</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredEntries.map((entry) => {
-                          const person = personnel?.find(p => p.id === entry.personnelId);
-                          return (
-                            <TableRow key={entry.id} className="h-8 hover:bg-muted/50">
-                              <TableCell className="py-0.5 px-2">
-                                <div className="text-xs font-medium">{formatDate(entry.date)}</div>
-                              </TableCell>
-                              <TableCell className="py-0.5 px-2">
-                                <div className="flex items-center gap-1.5">
-                                  <Avatar className="h-4 w-4">
-                                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                      {person?.name
-                                        ?.split(" ")
-                                        .map((n) => n[0])
-                                        .join("")
-                                        .toUpperCase()
-                                        .substring(0, 2) || "U"}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-xs font-medium truncate">{person?.name}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-0.5 px-2">
-                                <span className="text-xs font-medium">{entry.hours}h</span>
-                              </TableCell>
-                              <TableCell className="py-0.5 px-2 max-w-[120px] truncate hidden md:table-cell">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger className="cursor-help">
-                                      <span className="text-xs truncate block">
-                                        {entry.description || "-"}
-                                      </span>
-                                    </TooltipTrigger>
-                                    {entry.description && (
-                                      <TooltipContent className="max-w-[300px] p-3">
-                                        <p className="text-xs">{entry.description}</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell className="py-0.5 px-2">
-                                {entry.billable ? (
-                                  <div className="h-2 w-2 bg-green-500 rounded-full" title="Facturable" />
-                                ) : (
-                                  <div className="h-2 w-2 bg-amber-500 rounded-full" title="No facturable" />
-                                )}
-                              </TableCell>
-                              <TableCell className="py-0.5 px-1 text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                                      <MoreHorizontal className="h-3 w-3" />
-                                      <span className="sr-only">Opciones</span>
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem 
-                                      onClick={() => {
-                                        setEntryToDelete(entry.id);
-                                        setDeleteDialogOpen(true);
-                                      }}
-                                      className="text-red-600 text-xs py-1"
-                                    >
-                                      <Trash2 className="mr-1 h-3 w-3" />
-                                      Eliminar
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
                 ) : (
-                  // Vista de calendario tipo grid
-                  <div 
-                    className="border rounded-md"
-                    style={{
-                      maxHeight: "70vh",
-                      position: "relative",
-                      overflowY: "auto",
-                      marginBottom: "20px"
-                    }}
-                  >
-                    {/* Vista de calendario semanal */}
-                    <div className="p-4">
-                      {calendarView === "month" ? (
-                        <div>
-                          {/* Cabecera con los días de la semana - Estilo mejorado */}
-                          <div className="grid grid-cols-7 gap-0 mb-2 border-b pb-2 bg-muted/5">
-                            {["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"].map((dayName, idx) => (
-                              <div 
-                                key={idx} 
-                                className="text-center text-xs font-semibold py-2 text-muted-foreground"
-                              >
-                                {dayName}
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {filteredEntries.map((entry) => {
+                      const person = personnel?.find(p => p.id === entry.personnelId);
+                      return (
+                        <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <PersonAvatar name={person?.name || "Usuario"} />
+                            <div>
+                              <div className="font-medium">{person?.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {format(new Date(entry.date), "EEEE, dd 'de' MMMM", { locale: es })}
                               </div>
-                            ))}
-                          </div>
-                          
-                          {/* Rejilla del calendario - Estilo mejorado */}
-                          <div className="grid grid-cols-7 gap-[1px] bg-muted/10 rounded-md overflow-hidden">
-                            {/* Generación dinámica de los días del mes */}
-                            {(() => {
-                              const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-                              const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-                              
-                              // Ajustar el día de inicio (0=domingo, 1=lunes, etc.) para que comience en lunes
-                              let startDay = firstDayOfMonth.getDay() - 1;
-                              if (startDay === -1) startDay = 6; // Si es domingo (0), ajustar a 6
-                              
-                              const totalDays = lastDayOfMonth.getDate();
-                              const totalCells = Math.ceil((totalDays + startDay) / 7) * 7;
-                              
-                              const days = [];
-                              
-                              // Mapeo de entradas por fecha para rápida búsqueda
-                              const entriesByDate = new Map<string, TimeEntry[]>();
-                              
-                              filteredEntries.forEach(entry => {
-                                const dateStr = entry.date.split('T')[0];
-                                if (!entriesByDate.has(dateStr)) {
-                                  entriesByDate.set(dateStr, []);
-                                }
-                                entriesByDate.get(dateStr)?.push(entry);
-                              });
-                              
-                              const isToday = (date: Date) => {
-                                const today = new Date();
-                                return date.getDate() === today.getDate() && 
-                                       date.getMonth() === today.getMonth() && 
-                                       date.getFullYear() === today.getFullYear();
-                              };
-                              
-                              // Generar celdas para el calendario
-                              for (let i = 0; i < totalCells; i++) {
-                                const dayNumber = i - startDay + 1;
-                                const isCurrentMonth = dayNumber > 0 && dayNumber <= totalDays;
-                                
-                                if (isCurrentMonth) {
-                                  const currentDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), dayNumber);
-                                  const dateStr = format(currentDate, "yyyy-MM-dd");
-                                  const entries = entriesByDate.get(dateStr) || [];
-                                  const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
-                                  const today = isToday(currentDate);
-                                  
-                                  days.push(
-                                    <div 
-                                      key={i} 
-                                      className={`min-h-[100px] bg-white ${
-                                        today ? 'ring-2 ring-primary/20 ring-inset' : ''
-                                      }`}
-                                    >
-                                      <div className="flex justify-between items-center p-1 border-b">
-                                        <span className={`text-sm font-medium flex items-center justify-center ${
-                                          today ? 'text-primary' : 'text-gray-700'
-                                        }`}>
-                                          <span className={`h-6 w-6 flex items-center justify-center rounded-full ${
-                                            today ? 'bg-primary text-white' : ''
-                                          }`}>
-                                            {dayNumber}
-                                          </span>
-                                        </span>
-                                        {entries.length > 0 && (
-                                          <Badge variant="outline" className="text-xs h-5">
-                                            {totalHours}h
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      
-                                      {/* Mostrar entradas para este día - Estilo mejorado */}
-                                      <div className="p-1">
-                                        {entries.slice(0, 3).map(entry => {
-                                          const person = personnel?.find(p => p.id === entry.personnelId);
-                                          return (
-                                            <div 
-                                              key={entry.id} 
-                                              className={`
-                                                text-xs mb-1 py-1 px-1.5 rounded flex items-center gap-1.5 overflow-hidden
-                                                ${entry.billable 
-                                                  ? 'bg-green-50 border-l-[3px] border-green-400 text-green-700' 
-                                                  : 'bg-amber-50 border-l-[3px] border-amber-400 text-amber-700'
-                                                }
-                                              `}
-                                              title={`${person?.name || 'Usuario'} - ${entry.hours}h - ${entry.description || 'Sin descripción'}`}
-                                            >
-                                              <div className="flex-shrink-0 w-2 h-2 rounded-full bg-current" />
-                                              <span className="truncate font-medium">{person?.name || 'Usuario'}</span>
-                                              <span className="ml-auto font-semibold">{entry.hours}h</span>
-                                            </div>
-                                          );
-                                        })}
-                                        
-                                        {entries.length > 3 && (
-                                          <div className="text-xs text-center py-0.5 px-1 bg-muted/5 rounded text-muted-foreground">
-                                            + {entries.length - 3} más
-                                          </div>
-                                        )}
-                                        
-                                        {entries.length === 0 && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full h-6 text-xs text-muted-foreground opacity-0 hover:opacity-100 transition-opacity"
-                                            onClick={() => {
-                                              const dateObj = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), dayNumber);
-                                              setDialogOpen(true);
-                                            }}
-                                          >
-                                            <PlusCircle className="h-3 w-3 mr-1" />
-                                            Agregar
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                } else {
-                                  // Días fuera del mes actual - Estilo mejorado
-                                  days.push(
-                                    <div key={i} className="min-h-[100px] bg-gray-50/50" />
-                                  );
-                                }
-                              }
-                              
-                              return days;
-                            })()}
-                          </div>
-                        </div>
-                      ) : (
-                        // Vista agrupada para otras vistas (día, semana, quincena)
-                        <div className="space-y-6">
-                          <h3 className="font-medium text-sm mb-3">Registros Agrupados por Fecha</h3>
-                          {groupEntriesByDate().size > 0 ? (
-                            Array.from(groupEntriesByDate().entries())
-                              .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                              .map(([dateStr, entries]) => (
-                                <DaySummary
-                                  key={dateStr}
-                                  date={new Date(dateStr)}
-                                  entries={entries}
-                                  personnel={personnel}
-                                  projectComponents={projectComponents}
-                                />
-                              ))
-                          ) : (
-                            <div className="text-center py-10 text-muted-foreground">
-                              No hay registros para mostrar en el período seleccionado
+                              {entry.description && (
+                                <div className="text-sm text-muted-foreground truncate max-w-md">
+                                  {entry.description}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="font-bold text-lg">{entry.hours}h</div>
+                              {entry.billable ? (
+                                <Badge variant="default" className="text-xs">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  Facturable
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">
+                                  No facturable
+                                </Badge>
+                              )}
+                            </div>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    setEntryToDelete(entry.id);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
-            </div>
-          </div>
+            </Card>
 
-          {/* Diálogo de nuevo registro de tiempo */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Nuevo Registro de Horas</DialogTitle>
-                <DialogDescription>
-                  Registra el tiempo trabajado en el proyecto
-                </DialogDescription>
-              </DialogHeader>
-              <TimeRegistrationForm
-                personnel={personnel}
-                projectId={projectId}
-                onSuccess={() => {
-                  setTimeout(() => {
-                    setDialogOpen(false);
-                  }, 300);
-                }}
-                onCancel={() => setDialogOpen(false)}
-                isLoading={isLoading}
-                updateLocalEntries={updateLocalEntries}
-              />
-            </DialogContent>
-          </Dialog>
+            {/* Diálogo de nuevo registro */}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Nuevo Registro de Horas</DialogTitle>
+                  <DialogDescription>
+                    Registra el tiempo trabajado en el proyecto
+                  </DialogDescription>
+                </DialogHeader>
+                <TimeRegistrationForm
+                  personnel={personnel}
+                  projectId={projectId}
+                  onSuccess={() => {
+                    setTimeout(() => {
+                      setDialogOpen(false);
+                    }, 300);
+                  }}
+                  onCancel={() => setDialogOpen(false)}
+                  updateLocalEntries={updateLocalEntries}
+                />
+              </DialogContent>
+            </Dialog>
 
-          {/* Diálogo de confirmación para eliminar */}
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Confirmar eliminación</DialogTitle>
-                <DialogDescription>
-                  ¿Estás seguro de que deseas eliminar este registro de horas?
-                  Esta acción no se puede deshacer.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={confirmDelete}
-                  disabled={deleteTimeEntryMutation.isPending}
-                >
-                  {deleteTimeEntryMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Eliminar
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
+            {/* Diálogo de confirmación para eliminar */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirmar eliminación</DialogTitle>
+                  <DialogDescription>
+                    ¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={confirmDelete}
+                    disabled={deleteTimeEntryMutation.isPending}
+                  >
+                    {deleteTimeEntryMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Eliminar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      </div>
     </div>
   );
 };
