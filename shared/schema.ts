@@ -154,6 +154,10 @@ export const quotations = pgTable("quotations", {
   deviationPercentage: doublePrecision("deviation_percentage").default(0), // Porcentaje de desviación
   discountPercentage: doublePrecision("discount_percentage").default(0), // Porcentaje de descuento
   totalAmount: doublePrecision("total_amount").notNull(),
+  // Nuevos campos para costos de herramientas y pricing manual
+  toolsCost: doublePrecision("tools_cost").default(0), // Costo de herramientas
+  priceMode: text("price_mode").default("auto"), // 'auto' | 'manual'
+  manualPrice: doublePrecision("manual_price"), // Precio manual cuando priceMode = 'manual'
   adjustmentReason: text("adjustment_reason"),
   additionalNotes: text("additional_notes"),
   status: text("status").notNull().default("draft"), // 'draft', 'pending', 'approved', 'rejected', 'in-negotiation'

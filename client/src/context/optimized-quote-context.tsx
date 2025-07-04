@@ -32,6 +32,10 @@ interface QuotationFinancials {
   marginFactor: number;
   marginPercentage?: number;
   discountPercentage?: number;
+  // Nuevos campos para herramientas y pricing manual
+  toolsCost: number;
+  priceMode: 'auto' | 'manual';
+  manualPrice?: number;
 }
 
 export interface QuotationData {
@@ -92,6 +96,10 @@ interface OptimizedQuoteContextType {
   removeTeamMember: (id: string) => void;
   updateFinancials: (financials: Partial<QuotationData['financials']>) => void;
   updateInflation: (inflation: Partial<QuotationData['inflation']>) => void;
+  // Nuevas funciones para herramientas y pricing manual
+  updateToolsCost: (cost: number) => void;
+  updatePriceMode: (mode: 'auto' | 'manual') => void;
+  updateManualPrice: (price: number) => void;
 
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
@@ -135,7 +143,11 @@ const initialQuotationData: QuotationData = {
     discount: 0,
     marginFactor: 2.0,
     marginPercentage: 100,
-    discountPercentage: 0
+    discountPercentage: 0,
+    // Nuevos campos inicializados
+    toolsCost: 0,
+    priceMode: 'auto' as const,
+    manualPrice: undefined
   },
   inflation: {
     applyInflationAdjustment: false,
@@ -485,15 +497,51 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
     console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity}`);
 
-    // Calculate markup (margin)
-    const marginFactor = quotationData.financials.marginFactor || 2.0;
-    const calculatedMarkup = subtotalWithComplexity * (marginFactor - 1);
-    console.log(`💰 Markup: $${subtotalWithComplexity} × ${marginFactor - 1} = $${calculatedMarkup}`);
-    setMarkupAmount(calculatedMarkup);
+    // Add tools cost
+    const toolsCost = quotationData.financials.toolsCost || 0;
+    const subtotalWithTools = subtotalWithComplexity + toolsCost;
+    console.log(`🔧 Tools cost: $${toolsCost}, Subtotal with tools: $${subtotalWithTools}`);
 
-    // Calculate subtotal with markup
-    const subtotalWithMarkup = subtotalWithComplexity + calculatedMarkup;
-    console.log(`📈 Subtotal with markup: $${subtotalWithMarkup}`);
+    // Declare variables for calculated values
+    let calculatedMarkup = 0;
+    let subtotalWithMarkup = 0;
+
+    // Check if we're in manual pricing mode
+    if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
+      console.log(`✏️ Manual pricing mode: Target price $${quotationData.financials.manualPrice}`);
+      
+      // Calculate what margin would be needed to reach the manual price
+      const manualPrice = quotationData.financials.manualPrice;
+      calculatedMarkup = manualPrice - subtotalWithTools;
+      const marginFactor = subtotalWithTools > 0 ? (manualPrice / subtotalWithTools) : 1;
+      
+      console.log(`✏️ Manual price markup: $${calculatedMarkup}, Effective margin: ${marginFactor}x`);
+      setMarkupAmount(calculatedMarkup);
+      
+      // Update margin factor in the context for display purposes
+      const updatedFinancials = {
+        ...quotationData.financials,
+        marginFactor: marginFactor,
+        marginPercentage: ((marginFactor - 1) * 100)
+      };
+      
+      setQuotationData(prev => ({ 
+        ...prev, 
+        financials: updatedFinancials 
+      }));
+      
+      subtotalWithMarkup = manualPrice;
+      console.log(`📈 Manual subtotal with markup: $${subtotalWithMarkup}`);
+    } else {
+      // Calculate markup (margin) normally
+      const marginFactor = quotationData.financials.marginFactor || 2.0;
+      calculatedMarkup = subtotalWithTools * (marginFactor - 1);
+      console.log(`💰 Auto markup: $${subtotalWithTools} × ${marginFactor - 1} = $${calculatedMarkup}`);
+      setMarkupAmount(calculatedMarkup);
+      
+      subtotalWithMarkup = subtotalWithTools + calculatedMarkup;
+      console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup}`);
+    }
 
     // Add platform cost
     const platformCost = quotationData.financials.platformCost || 0;
@@ -798,7 +846,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
             1 + (quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) : 2.0,
           marginPercentage: quotation.markupAmount && quotation.baseCost ? 
             ((quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) * 100) : 100,
-          discountPercentage: Number(quotation.discountPercentage || 0)
+          discountPercentage: Number(quotation.discountPercentage || 0),
+          // Nuevos campos cargados de la base de datos
+          toolsCost: Number(quotation.toolsCost || 0),
+          priceMode: (quotation.priceMode as 'auto' | 'manual') || 'auto',
+          manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined
         },
         inflation: {
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
@@ -856,6 +908,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         platformCost: quotationData.financials.platformCost || 0,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
         discountPercentage: quotationData.financials.discountPercentage || 0,
+        // Nuevos campos para herramientas y pricing manual
+        toolsCost: quotationData.financials.toolsCost || 0,
+        priceMode: quotationData.financials.priceMode || 'auto',
+        manualPrice: quotationData.financials.manualPrice || null,
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment || false,
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
@@ -1020,6 +1076,39 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     forceRecalculate();
   }, [forceRecalculate]);
 
+  // Nuevas funciones para herramientas y pricing manual
+  const updateToolsCost = useCallback((cost: number) => {
+    console.log('🔧 Updating tools cost:', cost);
+    setQuotationData(prev => ({
+      ...prev,
+      financials: { ...prev.financials, toolsCost: cost }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const updatePriceMode = useCallback((mode: 'auto' | 'manual') => {
+    console.log('💰 Updating price mode:', mode);
+    setQuotationData(prev => ({
+      ...prev,
+      financials: { 
+        ...prev.financials, 
+        priceMode: mode,
+        // Limpiar precio manual si volvemos a modo automático
+        manualPrice: mode === 'auto' ? undefined : prev.financials.manualPrice
+      }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
+  const updateManualPrice = useCallback((price: number) => {
+    console.log('✏️ Updating manual price:', price);
+    setQuotationData(prev => ({
+      ...prev,
+      financials: { ...prev.financials, manualPrice: price }
+    }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
   const loadRoles = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
   }, [queryClient]);
@@ -1070,7 +1159,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     addDeliverable,
     updateDeliverable,
     removeDeliverable,
-    updateAdditionalDeliverableCost
+    updateAdditionalDeliverableCost,
+    // Nuevas funciones para herramientas y pricing manual
+    updateToolsCost,
+    updatePriceMode,
+    updateManualPrice
   };
 
   return (
