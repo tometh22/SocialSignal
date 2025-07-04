@@ -335,7 +335,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         </Card>
       </div>
 
-      {/* Lista de miembros del equipo */}
+      {/* Tabla compacta de miembros del equipo */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -343,18 +343,19 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             Registro de Horas por Miembro
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-0">
           {loadingTeam ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl animate-pulse">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+            <div className="p-6">
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4 animate-pulse">
+                    <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
+                    <div className="flex-1 h-4 bg-gray-300 rounded"></div>
+                    <div className="w-20 h-4 bg-gray-300 rounded"></div>
+                    <div className="w-20 h-4 bg-gray-300 rounded"></div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : teamMembers.length === 0 ? (
             <div className="text-center py-8">
@@ -363,35 +364,44 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
               <p className="text-sm text-gray-400">Añade miembros del equipo desde la configuración del proyecto</p>
             </div>
           ) : (
-            teamMembers.map((member, index) => {
-              const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
-              const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : member.hourlyRate;
-              
-              return (
-                <motion.div
-                  key={member.personnelId}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="p-4 border rounded-xl bg-white hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start gap-4">
-                    <Avatar className="w-12 h-12">
-                      <AvatarFallback className="bg-blue-600 text-white font-semibold">
-                        {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Miembro</th>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Horas</th>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Tarifa</th>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Costo</th>
+                    <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Descripción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {teamMembers.map((member, index) => {
+                    const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
+                    const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : member.hourlyRate;
                     
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{member.name}</h3>
-                        <p className="text-sm text-gray-500">{member.role}</p>
-                        <p className="text-xs text-gray-400">Tarifa: ${effectiveRate}/hora</p>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs text-gray-600">Horas trabajadas</Label>
+                    return (
+                      <motion.tr
+                        key={member.personnelId}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback className="bg-blue-600 text-white text-xs font-semibold">
+                                {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm">{member.name}</div>
+                              <div className="text-xs text-gray-500">{member.role}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
                           <Input
                             type="number"
                             step="0.5"
@@ -404,11 +414,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                               memberHours.description,
                               memberHours.customRate
                             )}
+                            className="w-20 h-8 text-sm"
                           />
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <Label className="text-xs text-gray-600">Tarifa personalizada (opcional)</Label>
+                        </td>
+                        <td className="px-4 py-3">
                           <Input
                             type="number"
                             step="0.1"
@@ -421,38 +430,36 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                               memberHours.description,
                               parseFloat(e.target.value) || undefined
                             )}
+                            className="w-20 h-8 text-sm"
                           />
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <Label className="text-xs text-gray-600">Costo total</Label>
-                          <div className="h-10 flex items-center px-3 bg-gray-50 rounded-md border">
-                            <span className="text-sm font-medium text-gray-900">
-                              ${(memberHours.hours * effectiveRate).toFixed(2)}
-                            </span>
+                          <div className="text-xs text-gray-400 mt-1">
+                            ${effectiveRate}/h
                           </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <Label className="text-xs text-gray-600">Descripción del trabajo</Label>
-                        <Textarea
-                          placeholder="Describe las tareas realizadas durante este período..."
-                          value={memberHours.description}
-                          onChange={(e) => handleUpdateHours(
-                            member.personnelId,
-                            memberHours.hours,
-                            e.target.value,
-                            memberHours.customRate
-                          )}
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-900 text-sm">
+                            ${(memberHours.hours * effectiveRate).toFixed(2)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Input
+                            placeholder="Descripción del trabajo..."
+                            value={memberHours.description}
+                            onChange={(e) => handleUpdateHours(
+                              member.personnelId,
+                              memberHours.hours,
+                              e.target.value,
+                              memberHours.customRate
+                            )}
+                            className="min-w-[200px] h-8 text-sm"
+                          />
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
