@@ -181,25 +181,36 @@ export default function FinancialReviewFinal() {
     finalBaseAfterInflationUSD = subtotalWithComplexityUSD;
   }
 
-  // Platform cost - keep in USD
+  // Platform cost and tools cost - keep in USD
   const platformCostUSD = quotationData.financials.platformCost || 0;
-  const subtotalWithPlatformUSD = finalBaseAfterInflationUSD + platformCostUSD;
+  const toolsCostUSD = quotationData.financials.toolsCost || 0;
+  const subtotalWithPlatformAndToolsUSD = finalBaseAfterInflationUSD + platformCostUSD + toolsCostUSD;
 
-  // Apply dynamic markup multiplier
-  const subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
-  const marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
-
-  // Apply dynamic discount
-  const discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
-  const finalTotalUSD = subtotalWithMarginUSD - discountAmountUSD;
+  // Check if we're in manual pricing mode
+  let finalTotalUSD, marginAmountUSD, discountAmountUSD, subtotalWithMarginUSD;
+  
+  if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
+    // Manual pricing mode - work backwards from final price
+    finalTotalUSD = quotationData.financials.manualPrice;
+    discountAmountUSD = finalTotalUSD * (discountPercentage / 100);
+    subtotalWithMarginUSD = finalTotalUSD + discountAmountUSD; // Before discount
+    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformAndToolsUSD;
+  } else {
+    // Automatic pricing mode - work forwards from costs
+    subtotalWithMarginUSD = subtotalWithPlatformAndToolsUSD * markupMultiplier;
+    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformAndToolsUSD;
+    discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
+    finalTotalUSD = subtotalWithMarginUSD - discountAmountUSD;
+  }
 
   // Convert final amounts to display currency (for UI display only)
   const teamBaseCostDisplay = convertToDisplayCurrency(teamBaseCostUSD);
   const teamComplexityAdjustmentDisplay = convertToDisplayCurrency(teamComplexityAdjustmentUSD);
   const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
   const platformCostDisplay = convertToDisplayCurrency(platformCostUSD);
+  const toolsCostDisplay = convertToDisplayCurrency(toolsCostUSD);
   const finalBaseAfterInflationDisplay = convertToDisplayCurrency(finalBaseAfterInflationUSD);
-  const subtotalWithPlatformDisplay = convertToDisplayCurrency(subtotalWithPlatformUSD);
+  const subtotalWithPlatformAndToolsDisplay = convertToDisplayCurrency(subtotalWithPlatformAndToolsUSD);
   const subtotalWithMarginDisplay = convertToDisplayCurrency(subtotalWithMarginUSD);
   const marginAmountDisplay = convertToDisplayCurrency(marginAmountUSD);
   const discountAmountDisplay = convertToDisplayCurrency(discountAmountUSD);
@@ -677,7 +688,7 @@ export default function FinancialReviewFinal() {
                       <span className="text-lg font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                     </div>
                     <p className="text-xs text-green-700 mt-1">
-                      Base: {formatFinalCurrency(subtotalWithPlatformDisplay)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMarginDisplay)}
+                      Base: {formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} × {markupMultiplier} = {formatFinalCurrency(subtotalWithMarginDisplay)}
                     </p>
                   </div>
                 </div>
@@ -724,12 +735,73 @@ export default function FinancialReviewFinal() {
                     </div>
                   )}
                 </div>
+
+                {/* Tools Cost Section */}
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Costos de Herramientas (USD)
+                  </Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={quotationData.financials.toolsCost || 0}
+                    onChange={(e) => updateFinancials({ toolsCost: Number(e.target.value) || 0 })}
+                    className="text-right font-mono"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Costos adicionales de software, licencias o herramientas específicas
+                  </p>
+                </div>
+
+                {/* Price Mode Section */}
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Modo de Cálculo
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant={quotationData.financials.priceMode === 'auto' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => updateFinancials({ priceMode: 'auto' })}
+                      className="flex-1"
+                    >
+                      Automático
+                    </Button>
+                    <Button
+                      variant={quotationData.financials.priceMode === 'manual' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => updateFinancials({ priceMode: 'manual' })}
+                      className="flex-1"
+                    >
+                      Manual
+                    </Button>
+                  </div>
+                  
+                  {quotationData.financials.priceMode === 'manual' && (
+                    <div className="space-y-2">
+                      <Label className="text-sm text-gray-600">Precio Final Manual (USD)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={quotationData.financials.manualPrice || 0}
+                        onChange={(e) => updateFinancials({ manualPrice: Number(e.target.value) || 0 })}
+                        className="text-right font-mono"
+                      />
+                      <p className="text-xs text-gray-500">
+                        El sistema calculará automáticamente el markup necesario
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Tools and Pricing Card */}
-          <ToolsAndPricing />
+
 
           {/* Inflation Card */}
           <Card className="shadow-sm border-0 bg-white">
@@ -965,6 +1037,22 @@ export default function FinancialReviewFinal() {
                   </div>
                 </div>
               )}
+
+              {toolsCostDisplay > 0 && (
+                <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-cyan-900">+ Costos de Herramientas</span>
+                    <span className="font-bold text-cyan-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">Subtotal (Base Total)</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)}</span>
+                </div>
+              </div>
 
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex justify-between items-center">
