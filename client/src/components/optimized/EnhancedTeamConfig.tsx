@@ -51,7 +51,6 @@ const EnhancedTeamConfig: React.FC = () => {
 
   // Estados para la nueva UI
   const [draggedMembers, setDraggedMembers] = useState<DragDropTeamMember[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editingMember, setEditingMember] = useState<string | null>(null);
 
   // Estados para agregar miembros rápidamente
@@ -61,13 +60,7 @@ const EnhancedTeamConfig: React.FC = () => {
   const [selectedQuickRoles, setSelectedQuickRoles] = useState<Set<number>>(new Set());
   const [selectedQuickPersonnel, setSelectedQuickPersonnel] = useState<Set<number>>(new Set());
 
-  // Estado para el formulario de nuevo miembro
-  const [newMember, setNewMember] = useState({
-    roleId: 0,
-    personnelId: null as number | null,
-    hours: 40,
-    rate: 0
-  });
+
 
   // Estados para edición inline
   const [editValues, setEditValues] = useState<Record<string, {hours: number, rate: number}>>({});
@@ -208,22 +201,7 @@ const EnhancedTeamConfig: React.FC = () => {
   };
 
 
-  // Agregar miembro completo
-  const handleAddMember = () => {
-    if (newMember.roleId > 0) {
-      addTeamMember({
-        ...newMember,
-        cost: 0 // Will be recalculated by the context
-      });
-      setNewMember({
-        roleId: 0,
-        personnelId: null,
-        hours: 40,
-        rate: 0
-      });
-      setShowAddForm(false);
-    }
-  };
+
 
   // Iniciar edición
   const startEditing = (memberId: string, currentHours: number, currentRate: number) => {
@@ -326,13 +304,6 @@ const EnhancedTeamConfig: React.FC = () => {
           <User className="h-4 w-4" />
           Agregar Personas
         </Button>
-        <Button 
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2"
-        >
-          <UserPlus className="h-4 w-4" />
-          Configurar Miembro
-        </Button>
       </div>
 
       {/* Modo de agregado rápido */}
@@ -412,120 +383,84 @@ const EnhancedTeamConfig: React.FC = () => {
           </div>
         )}
 
-      {/* Formulario completo */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <Card className="border-blue-200 bg-blue-50/30">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Configurar Nuevo Miembro</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Rol *</Label>
-                    <Select 
-                      value={newMember.roleId > 0 ? newMember.roleId.toString() : "0"} 
-                      onValueChange={(value) => {
-                        const roleId = parseInt(value) || 0;
-                        const role = getRoleInfo(roleId);
-                        setNewMember(prev => ({
-                          ...prev,
-                          roleId,
-                          rate: role?.defaultRate || prev.rate
-                        }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar rol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Seleccionar rol</SelectItem>
-                        {availableRoles.map(role => (
-                          <SelectItem key={role.id} value={role.id.toString()}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{role.name}</span>
-                              {recommendedRoleIds.includes(role.id) && (
-                                <Star className="h-3 w-3 text-yellow-500 ml-2" />
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="personnel">Personal (opcional)</Label>
-                    <Select 
-                      value={newMember.personnelId?.toString() || "0"} 
-                      onValueChange={(value) => setNewMember(prev => ({
-                        ...prev,
-                        personnelId: value && value !== "0" ? parseInt(value) : null
-                      }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar persona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Sin asignar</SelectItem>
-                        {availablePersonnel.map(person => (
-                          <SelectItem key={person.id} value={person.id.toString()}>
-                            {person.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="hours">Horas</Label>
-                    <Input
-                      id="hours"
-                      type="number"
-                      value={newMember.hours}
-                      onChange={(e) => setNewMember(prev => ({
-                        ...prev,
-                        hours: parseInt(e.target.value) || 0
-                      }))}
-                      placeholder="40"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="rate">Tarifa ($/h)</Label>
-                    <Input
-                      id="rate"
-                      type="number"
-                      step="0.01"
-                      value={newMember.rate}
-                      onChange={(e) => setNewMember(prev => ({
-                        ...prev,
-                        rate: parseDecimalInput(e.target.value)
-                      }))}
-                      placeholder="50.00"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button variant="outline" onClick={() => setShowAddForm(false)}>
-                    Cancelar
+      {/* Modo de agregado rápido de personal */}
+        {quickPersonnelMode && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="text-sm font-medium text-green-900">Selecciona personas para agregar rápidamente:</h4>
+                <p className="text-xs text-green-600 mt-1">
+                  {selectedQuickPersonnel.size > 0 
+                    ? `${selectedQuickPersonnel.size} persona${selectedQuickPersonnel.size > 1 ? 's' : ''} seleccionada${selectedQuickPersonnel.size > 1 ? 's' : ''}`
+                    : 'Haz clic en las personas que deseas agregar'
+                  }
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {selectedQuickPersonnel.size > 0 && (
+                  <Button 
+                    size="sm"
+                    onClick={handleQuickAddSelectedPersonnel}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 text-xs"
+                  >
+                    Agregar {selectedQuickPersonnel.size} persona{selectedQuickPersonnel.size > 1 ? 's' : ''}
                   </Button>
-                  <Button onClick={handleAddMember} disabled={newMember.roleId === 0}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Agregar al Equipo
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setQuickPersonnelMode(false);
+                    setSelectedQuickPersonnel(new Set());
+                  }}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {availablePersonnel.map(person => {
+                const isSelected = selectedQuickPersonnel.has(person.id);
+                const isAlreadyInTeam = quotationData.teamMembers.some(member => member.personnelId === person.id);
+
+                return (
+                  <Button
+                    key={person.id}
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleQuickPersonnelToggle(person.id)}
+                    disabled={isAlreadyInTeam}
+                    className={`text-xs p-2 h-auto text-left justify-start transition-all ${
+                      isSelected 
+                        ? 'bg-green-600 text-white border-green-600' 
+                        : isAlreadyInTeam
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                        : 'bg-white hover:bg-green-100 border-green-200'
+                    }`}
+                  >
+                    <div className="flex items-center w-full">
+                      <div className="flex-grow">
+                        <div className="font-medium">{person.name}</div>
+                        <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
+                          ${person.hourlyRate || 50}/h
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div className="ml-2 text-white">✓</div>
+                      )}
+                      {isAlreadyInTeam && (
+                        <div className="ml-2 text-gray-400 text-xs">Ya agregado</div>
+                      )}
+                    </div>
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                );
+              })}
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+
+
 
       {/* Lista de miembros con drag & drop */}
       <div className="space-y-4">
