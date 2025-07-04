@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Calendar as CalendarIcon, Clock, Users, AlertCircle, CheckCircle2, Plus, Save, DollarSign, X } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, AlertCircle, CheckCircle2, Plus, Save, DollarSign, X, Send } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -231,7 +231,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <CalendarIcon className="h-5 w-5" />
               Definir Período de Registro
             </CardTitle>
           </CardHeader>
