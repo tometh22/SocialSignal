@@ -56,8 +56,10 @@ const EnhancedTeamConfig: React.FC = () => {
 
   // Estados para agregar miembros rápidamente
   const [quickAddMode, setQuickAddMode] = useState(false);
+  const [quickPersonnelMode, setQuickPersonnelMode] = useState(false);
   const [showRoleDetails, setShowRoleDetails] = useState(false);
   const [selectedQuickRoles, setSelectedQuickRoles] = useState<Set<number>>(new Set());
+  const [selectedQuickPersonnel, setSelectedQuickPersonnel] = useState<Set<number>>(new Set());
 
   // Estado para el formulario de nuevo miembro
   const [newMember, setNewMember] = useState({
@@ -165,6 +167,44 @@ const EnhancedTeamConfig: React.FC = () => {
     });
     setQuickAddMode(false);
     setSelectedQuickRoles(new Set());
+  };
+
+  // Función para manejar el toggle de selección rápida de personal
+  const handleQuickPersonnelToggle = (personnelId: number) => {
+    setSelectedQuickPersonnel(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(personnelId)) {
+        newSet.delete(personnelId);
+      } else {
+        newSet.add(personnelId);
+      }
+      return newSet;
+    });
+  };
+
+  // Función para agregar el personal seleccionado
+  const handleQuickAddSelectedPersonnel = () => {
+    selectedQuickPersonnel.forEach(personnelId => {
+      const person = getPersonnelInfo(personnelId);
+      if (person) {
+        // If personnel has specific roles, try to find an appropriate one
+        // For now, we'll use a default role or let user select
+        const defaultRole = availableRoles.find(role => role.id === 1) || availableRoles[0]; // Default to first role
+        if (defaultRole) {
+          const hours = 40;
+          const rate = person.hourlyRate || defaultRole.defaultRate || 50;
+          addTeamMember({
+            roleId: defaultRole.id,
+            personnelId: personnelId,
+            hours,
+            rate,
+            cost: 0 // Will be recalculated by the context
+          });
+        }
+      }
+    });
+    setQuickPersonnelMode(false);
+    setSelectedQuickPersonnel(new Set());
   };
 
 
@@ -277,6 +317,14 @@ const EnhancedTeamConfig: React.FC = () => {
         >
           <Plus className="h-4 w-4" />
           Agregar Rápido
+        </Button>
+        <Button 
+          onClick={() => setQuickPersonnelMode(!quickPersonnelMode)}
+          variant="outline" 
+          className="flex items-center gap-2"
+        >
+          <User className="h-4 w-4" />
+          Agregar Personas
         </Button>
         <Button 
           onClick={() => setShowAddForm(!showAddForm)}
