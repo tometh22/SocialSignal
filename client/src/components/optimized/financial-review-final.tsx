@@ -191,9 +191,11 @@ export default function FinancialReviewFinal() {
   
   if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
     // Manual pricing mode - work backwards from final price
+    // The manual price is the final price AFTER discount
     finalTotalUSD = quotationData.financials.manualPrice;
-    discountAmountUSD = finalTotalUSD * (discountPercentage / 100);
-    subtotalWithMarginUSD = finalTotalUSD + discountAmountUSD; // Before discount
+    // Calculate subtotal before discount: final / (1 - discount_rate)
+    subtotalWithMarginUSD = finalTotalUSD / (1 - (discountPercentage / 100));
+    discountAmountUSD = subtotalWithMarginUSD - finalTotalUSD;
     marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformAndToolsUSD;
   } else {
     // Automatic pricing mode - work forwards from costs
