@@ -7,10 +7,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Clock, Users, Save, Send, Calendar } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Users, AlertCircle, CheckCircle2, Plus, Save, DollarSign, X } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 const quickTimeEntrySchema = z.object({
   periodName: z.string().min(1, "El nombre del período es requerido"),
@@ -34,7 +39,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentQuickEntryId, setCurrentQuickEntryId] = useState<number | null>(null);
-  const [teamHours, setTeamHours] = useState<{ [key: number]: { hours: number; description: string } }>({});
+  const [teamHours, setTeamHours] = useState<Record<number, { hours: number; description: string; customRate?: number }>>({});
 
   const form = useForm<z.infer<typeof quickTimeEntrySchema>>({
     resolver: zodResolver(quickTimeEntrySchema),
@@ -99,10 +104,10 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
     createQuickEntry.mutate(data);
   };
 
-  const handleUpdateTeamHours = (personnelId: number, hours: number, description: string) => {
+  const handleUpdateTeamHours = (personnelId: number, hours: number, description: string, customRate?: number) => {
     setTeamHours(prev => ({
       ...prev,
-      [personnelId]: { hours, description }
+      [personnelId]: { hours, description, customRate }
     }));
   };
 
@@ -113,14 +118,15 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
       if (data.hours > 0) {
         const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
         if (teamMember) {
+          const effectiveRate = data.customRate !== undefined ? data.customRate : teamMember.hourlyRate;
           return addTimeDetail.mutateAsync({
             quickTimeEntryId: currentQuickEntryId,
             data: {
               personnelId: parseInt(personnelId),
               roleId: teamMember.roleId,
               hours: data.hours,
-              hourlyRate: teamMember.hourlyRate,
-              totalCost: data.hours * teamMember.hourlyRate,
+              hourlyRate: effectiveRate,
+              totalCost: data.hours * effectiveRate,
               description: data.description
             }
           });
@@ -155,10 +161,13 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
   };
 
   const getTotalCost = () => {
+    if (!Array.isArray(baseTeam)) return 0;
+
     return Object.entries(teamHours).reduce((sum, [personnelId, data]) => {
-      const teamMember = Array.isArray(baseTeam) ? baseTeam.find((member: any) => member.personnelId === parseInt(personnelId)) : null;
+      const teamMember = baseTeam.find((member: any) => member.personnelId === parseInt(personnelId));
       if (teamMember && data.hours > 0) {
-        return sum + (data.hours * teamMember.hourlyRate);
+        const effectiveRate = data.customRate || teamMember.hourlyRate;
+        return sum + (data.hours * effectiveRate);
       }
       return sum;
     }, 0);
@@ -315,72 +324,128 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
           <CardContent>
             <div className="space-y-4">
               {Array.isArray(baseTeam) && baseTeam.map((member: any) => (
-                <div key={member.personnelId} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h4 className="font-medium">{member.personnel?.name}</h4>
-                      <p className="text-sm text-muted-foreground">{member.role?.name} - ${member.hourlyRate}/hora</p>
-                    </div>
-                  </div>
+                <div key={member.personnelId} className="space-y-3 p-4 bg-slate-50 rounded-lg border">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-sm font-medium text-slate-700">{member.personnel?.name}</span>
+                            <p className="text-xs text-slate-500">{member.role?.name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-semibold text-emerald-600">
+                              ${((teamHours[member.personnelId]?.hours || 0) * (teamHours[member.personnelId]?.customRate || member.hourlyRate)).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-slate-500">costo total</p>
+                          </div>
+                        </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Horas</label>
-                      <Input
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        placeholder="0.0"
-                        value={teamHours[member.personnelId]?.hours || ""}
-                        onChange={(e) => {
-                          const hours = parseFloat(e.target.value) || 0;
-                          handleUpdateTeamHours(
-                            member.personnelId,
-                            hours,
-                            teamHours[member.personnelId]?.description || ""
-                          );
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-1 block">Costo</label>
-                      <Input
-                        type="text"
-                        value={`$${((teamHours[member.personnelId]?.hours || 0) * member.hourlyRate).toFixed(2)}`}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                  </div>
+                        <div className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-3">
+                            <Label className="text-xs text-slate-600">Horas</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              placeholder="0"
+                              value={teamHours[member.personnelId]?.hours || ''}
+                              onChange={(e) => handleUpdateTeamHours(
+                                member.personnelId, 
+                                parseFloat(e.target.value) || 0, 
+                                teamHours[member.personnelId]?.description || '',
+                                teamHours[member.personnelId]?.customRate
+                              )}
+                              className="h-9 text-sm font-mono text-right"
+                            />
+                          </div>
 
-                  <div className="mt-3">
-                    <label className="text-sm font-medium mb-1 block">Descripción (opcional)</label>
-                    <Input
-                      placeholder="Descripción de las actividades..."
-                      value={teamHours[member.personnelId]?.description || ""}
-                      onChange={(e) => {
-                        handleUpdateTeamHours(
-                          member.personnelId,
-                          teamHours[member.personnelId]?.hours || 0,
-                          e.target.value
-                        );
-                      }}
-                    />
-                  </div>
-                </div>
+                          <div className="col-span-3">
+                            <Label className="text-xs text-slate-600 flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              Tarifa/Hora
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder={member.hourlyRate.toString()}
+                                value={teamHours[member.personnelId]?.customRate || ''}
+                                onChange={(e) => handleUpdateTeamHours(
+                                  member.personnelId, 
+                                  teamHours[member.personnelId]?.hours || 0, 
+                                  teamHours[member.personnelId]?.description || '',
+                                  parseFloat(e.target.value) || undefined
+                                )}
+                                className={cn(
+                                  "h-9 text-sm font-mono text-right pr-8",
+                                  teamHours[member.personnelId]?.customRate ? "border-amber-300 bg-amber-50" : "border-slate-300"
+                                )}
+                              />
+                              {teamHours[member.personnelId]?.customRate && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateTeamHours(
+                                    member.personnelId, 
+                                    teamHours[member.personnelId]?.hours || 0, 
+                                    teamHours[member.personnelId]?.description || '',
+                                    undefined
+                                  )}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-600 hover:text-amber-800"
+                                  title="Restaurar tarifa actual"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 mt-1">
+                              {teamHours[member.personnelId]?.customRate ? (
+                                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
+                                  Tarifa histórica
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">
+                                  Tarifa actual: ${member.hourlyRate}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="col-span-6">
+                            <Label className="text-xs text-slate-600">Descripción del trabajo</Label>
+                            <Input
+                              placeholder="Describe las actividades realizadas..."
+                              value={teamHours[member.personnelId]?.description || ''}
+                              onChange={(e) => handleUpdateTeamHours(
+                                member.personnelId, 
+                                teamHours[member.personnelId]?.hours || 0, 
+                                e.target.value,
+                                teamHours[member.personnelId]?.customRate
+                              )}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
               ))}
 
               {/* Resumen */}
-              <div className="border-t pt-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Total Horas:</span> {getTotalHours().toFixed(1)}h
-                  </div>
-                  <div>
-                    <span className="font-medium">Costo Total:</span> ${getTotalCost().toFixed(2)}
-                  </div>
+              <div className="flex justify-between items-center pt-4 border-t border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Total Horas</p>
+                  <p className="text-2xl font-bold text-blue-600">{getTotalHours()}h</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide">Costo Total</p>
+                  <p className="text-2xl font-bold text-emerald-600">${getTotalCost().toLocaleString()}</p>
                 </div>
               </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-500">Tarifa promedio</p>
+                <p className="text-lg font-semibold text-slate-700">
+                  ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(2) : '0'}/h
+                </p>
+              </div>
+            </div>
 
               {/* Botones de acción */}
               <div className="flex gap-2 pt-4">
@@ -392,7 +457,7 @@ export default function QuickTimeEntryForm({ projectId, onSuccess, onCancel }: Q
                   <Save className="h-4 w-4" />
                   {addTimeDetail.isPending ? "Guardando..." : "Guardar Horas"}
                 </Button>
-                
+
                 <Button 
                   onClick={handleSubmitForApproval}
                   disabled={submitQuickEntry.isPending || getTotalHours() === 0}
