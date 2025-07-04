@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 4, 2025: **MAJOR FUNCTIONALITY OVERHAUL** - Replaced QuickTimeRegister with WeeklyTimeRegister component for simplified weekly time tracking
+- July 4, 2025: Removed unnecessary real-time tracking functionality and play/pause features per user request
+- July 4, 2025: Created streamlined two-step process: period configuration and team hour registration
+- July 4, 2025: Fixed team member data retrieval to show all 14 team members instead of hardcoded mock data
 - July 4, 2025: **MAJOR UX ENHANCEMENT** - Completely redesigned QuickTimeRegister component with modern, user-friendly interface
 - July 4, 2025: Implemented historical hourly rate functionality for accurate cost tracking of previous months
 - July 4, 2025: Added editable tariff fields with visual indicators for historical vs current rates

@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CostTimeEntryForm from "@/components/cost-time-entry-form";
-import QuickTimeRegister from "@/components/quick-time-register";
+import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { SubprojectAlerts } from "@/components/subproject-alerts";
 import { SubprojectNavigation } from "@/components/subproject-navigation";
 import { CompletionPredictor } from "@/components/completion-predictor";
@@ -903,14 +903,8 @@ export default function ProjectDetailsEnhanced() {
 
       {/* Dialog de Registro Rápido de Tiempo */}
       <Dialog open={showQuickTimeRegister} onOpenChange={setShowQuickTimeRegister}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Timer className="h-5 w-5" />
-              Registro Rápido por Período
-            </DialogTitle>
-          </DialogHeader>
-          <QuickTimeRegister
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+          <WeeklyTimeRegister
             projectId={parseInt(projectId!)}
             onSuccess={() => {
               setShowQuickTimeRegister(false);

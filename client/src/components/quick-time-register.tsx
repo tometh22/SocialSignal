@@ -11,9 +11,6 @@ import { Separator } from '@/components/ui/separator';
 import { 
   Calendar, 
   Clock, 
-  Play, 
-  Pause, 
-  Square, 
   Users, 
   DollarSign, 
   Timer,
@@ -26,30 +23,21 @@ import {
   Eye,
   EyeOff,
   Target,
-  Zap
+  Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface TeamMember {
   id: string;
+  personnelId: number;
+  roleId: number;
   name: string;
   role: string;
-  avatar?: string;
   hourlyRate: number;
-  hoursWorked: number;
   targetHours: number;
-  isTracking: boolean;
-  lastActivity?: string;
-  efficiency: number;
-}
-
-interface TimeEntry {
-  id: string;
-  date: string;
-  hours: number;
-  description: string;
-  memberId: string;
 }
 
 interface QuickTimeRegisterProps {
