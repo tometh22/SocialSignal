@@ -135,7 +135,7 @@ const formSchema = z.object({
 });
 
 // Componentes personalizados
-const PersonAvatar: React.FC<{ name: string }> = ({ name }) => {
+const PersonAvatar: React.FC<{ name: string; size?: "sm" | "md" }> = ({ name, size = "md" }) => {
   const initials = name
     .split(" ")
     .map((n) => n[0])
@@ -143,9 +143,12 @@ const PersonAvatar: React.FC<{ name: string }> = ({ name }) => {
     .toUpperCase()
     .substring(0, 2);
 
+  const sizeClasses = size === "sm" ? "h-6 w-6" : "h-8 w-8";
+  const textSize = size === "sm" ? "text-xs" : "text-xs";
+
   return (
-    <Avatar className="h-8 w-8">
-      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+    <Avatar className={sizeClasses}>
+      <AvatarFallback className={`bg-primary/10 text-primary ${textSize}`}>
         {initials}
       </AvatarFallback>
     </Avatar>
@@ -1007,117 +1010,124 @@ const TimeEntries: React.FC = () => {
                       maxHeight: "70vh",
                       position: "relative",
                       overflowY: "auto",
-                      marginBottom: "120px" // Espacio adicional después del contenedor
+                      marginBottom: "20px"
                     }}
                   >
-                    <div style={{ paddingBottom: "150px" }}> {/* Espacio adicional dentro del contenedor */}
-                      <Table className="w-full" style={{ tableLayout: "fixed" }}>
-                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                          <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Personal</TableHead>
-                            <TableHead>Horas</TableHead>
-                            <TableHead className="hidden md:table-cell">Descripción</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredEntries.map((entry) => {
-                            const person = personnel?.find(p => p.id === entry.personnelId);
-                            return (
-                              <TableRow key={entry.id}>
-                                <TableCell>
-                                  <div className="flex flex-col">
-                                    <span>{formatDate(entry.date)}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(new Date(entry.date), "EEEE", { locale: es })}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <PersonAvatar name={person?.name || "Usuario"} />
-                                    <div>
-                                      <div className="font-medium">{person?.name}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {getRoleNameById(person?.roleId || 0)}
-                                      </div>
+                    <Table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                        <TableRow className="h-8">
+                          <TableHead className="py-2 text-xs font-medium">Fecha</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">Personal</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">Horas</TableHead>
+                          <TableHead className="py-2 text-xs font-medium hidden md:table-cell">Descripción</TableHead>
+                          <TableHead className="py-2 text-xs font-medium">Tipo</TableHead>
+                          <TableHead className="py-2 text-xs font-medium text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredEntries.map((entry) => {
+                          const person = personnel?.find(p => p.id === entry.personnelId);
+                          return (
+                            <TableRow key={entry.id} className="h-12 hover:bg-muted/50">
+                              <TableCell className="py-1.5">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-medium">{formatDate(entry.date)}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(entry.date), "EEEE", { locale: es })}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                      {person?.name
+                                        ?.split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .toUpperCase()
+                                        .substring(0, 2) || "U"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-medium truncate">{person?.name}</div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {getRoleNameById(person?.roleId || 0)}
                                     </div>
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center">
-                                    <span className="font-medium">{entry.hours}</span>
-                                    {!entry.billable ? (
-                                      <Badge variant="outline" className="ml-2 text-xs">
-                                        No facturable
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="ml-2 text-xs bg-green-100 text-green-800 hover:bg-green-200">
-                                        Facturable
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="max-w-[200px] truncate hidden md:table-cell">
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger className="cursor-help">
-                                        <span className="truncate block max-w-[250px]">
-                                          {entry.description || "-"}
-                                        </span>
-                                      </TooltipTrigger>
-                                      {entry.description && (
-                                        <TooltipContent className="max-w-[300px] p-4">
-                                          <p>{entry.description}</p>
-                                        </TooltipContent>
-                                      )}
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </TableCell>
-                                <TableCell>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-medium">{entry.hours}h</span>
                                   {entry.billable ? (
-                                    <div className="flex items-center gap-2">
-                                      <DollarSign className="h-4 w-4 text-green-600" />
-                                      <span className="text-sm">Facturable</span>
-                                    </div>
+                                    <Badge className="h-4 text-xs px-1 bg-green-100 text-green-800 hover:bg-green-200">
+                                      Fact.
+                                    </Badge>
                                   ) : (
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-4 w-4 text-amber-600" />
-                                      <span className="text-sm">No facturable</span>
-                                    </div>
+                                    <Badge variant="outline" className="h-4 text-xs px-1">
+                                      No fact.
+                                    </Badge>
                                   )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                        <span className="sr-only">Opciones</span>
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                      <DropdownMenuItem 
-                                        onClick={() => {
-                                          setEntryToDelete(entry.id);
-                                          setDeleteDialogOpen(true);
-                                        }}
-                                        className="text-red-600"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Eliminar registro
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1.5 max-w-[150px] truncate hidden md:table-cell">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger className="cursor-help">
+                                      <span className="text-xs truncate block">
+                                        {entry.description || "-"}
+                                      </span>
+                                    </TooltipTrigger>
+                                    {entry.description && (
+                                      <TooltipContent className="max-w-[300px] p-4">
+                                        <p>{entry.description}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </TableCell>
+                              <TableCell className="py-1.5">
+                                {entry.billable ? (
+                                  <div className="flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3 text-green-600" />
+                                    <span className="text-xs">Fact.</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3 text-amber-600" />
+                                    <span className="text-xs">No fact.</span>
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      <MoreHorizontal className="h-3 w-3" />
+                                      <span className="sr-only">Opciones</span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel className="text-xs">Acciones</DropdownMenuLabel>
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setEntryToDelete(entry.id);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      className="text-red-600 text-xs"
+                                    >
+                                      <Trash2 className="mr-2 h-3 w-3" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : (
                   // Vista de calendario tipo grid
