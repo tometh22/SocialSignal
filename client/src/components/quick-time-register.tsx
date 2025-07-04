@@ -29,6 +29,7 @@ import {
   Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 
 interface TeamMember {
   id: string;
@@ -51,7 +52,13 @@ interface TimeEntry {
   memberId: string;
 }
 
-export default function QuickTimeRegister() {
+interface QuickTimeRegisterProps {
+  projectId: number;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: QuickTimeRegisterProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('2025, Primera quincena marzo');
   const [startDate, setStartDate] = useState('04/01/2025');
   const [endDate, setEndDate] = useState('04/01/2025');
@@ -59,69 +66,50 @@ export default function QuickTimeRegister() {
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [newHours, setNewHours] = useState<{ [key: string]: string }>({});
 
-  // Mock data mejorada
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-    {
-      id: 'vp',
-      name: 'Vicky Puricelli',
-      role: 'Operations Lead',
-      avatar: '/api/placeholder/32/32',
-      hourlyRate: 20.8,
-      hoursWorked: 0,
-      targetHours: 40,
-      isTracking: false,
-      lastActivity: '2 horas ago',
-      efficiency: 92
-    },
-    {
-      id: 'va',
-      name: 'Victoria Achabal',
-      role: 'Operations Lead',
-      avatar: '/api/placeholder/32/32',
-      hourlyRate: 20.8,
-      hoursWorked: 0,
-      targetHours: 40,
-      isTracking: false,
-      lastActivity: '1 hora ago',
-      efficiency: 88
-    }
-  ]);
+  // Fetch actual team members from the project
+  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery({
+    queryKey: [`/api/projects/${projectId}/base-team`],
+    enabled: !!projectId,
+  });
 
-  const totalHours = teamMembers.reduce((sum, member) => sum + member.hoursWorked, 0);
-  const totalCost = teamMembers.reduce((sum, member) => sum + (member.hoursWorked * member.hourlyRate), 0);
-  const averageEfficiency = teamMembers.reduce((sum, member) => sum + member.efficiency, 0) / teamMembers.length;
+  // Convert API data to TeamMember format
+  const teamMembers: TeamMember[] = Array.isArray(baseTeam) ? baseTeam.map((member: any) => ({
+    id: member.personnelId.toString(),
+    name: member.personnel ? `${member.personnel.firstName} ${member.personnel.lastName}` : 'Personal sin nombre',
+    role: member.role ? member.role.name : 'Rol no especificado',
+    avatar: member.personnel?.avatar || '/api/placeholder/32/32',
+    hourlyRate: member.hourlyRate || 0,
+    hoursWorked: 0, // This would come from time entries
+    targetHours: member.hours || 40,
+    isTracking: false,
+    lastActivity: 'Sin actividad reciente',
+    efficiency: 90 // This could be calculated from performance data
+  })) : [];
+
+  const [trackingStates, setTrackingStates] = useState<{ [key: string]: boolean }>({});
+  const [hoursWorked, setHoursWorked] = useState<{ [key: string]: number }>({});
+
+  const totalHours = teamMembers.reduce((sum, member) => sum + (hoursWorked[member.id] || 0), 0);
+  const totalCost = teamMembers.reduce((sum, member) => sum + ((hoursWorked[member.id] || 0) * member.hourlyRate), 0);
+  const averageEfficiency = teamMembers.reduce((sum, member) => sum + member.efficiency, 0) / (teamMembers.length || 1);
 
   const handleStartTracking = (memberId: string) => {
-    setTeamMembers(prev => prev.map(member => 
-      member.id === memberId 
-        ? { ...member, isTracking: true, lastActivity: 'Tracking now' }
-        : member
-    ));
+    setTrackingStates(prev => ({ ...prev, [memberId]: true }));
   };
 
   const handleStopTracking = (memberId: string) => {
-    setTeamMembers(prev => prev.map(member => 
-      member.id === memberId 
-        ? { ...member, isTracking: false, lastActivity: 'Just now' }
-        : member
-    ));
+    setTrackingStates(prev => ({ ...prev, [memberId]: false }));
   };
 
   const handleEditHours = (memberId: string) => {
     setEditingMember(memberId);
-    const member = teamMembers.find(m => m.id === memberId);
-    if (member) {
-      setNewHours(prev => ({ ...prev, [memberId]: member.hoursWorked.toString() }));
-    }
+    const currentHours = hoursWorked[memberId] || 0;
+    setNewHours(prev => ({ ...prev, [memberId]: currentHours.toString() }));
   };
 
   const handleSaveHours = (memberId: string) => {
     const hours = parseFloat(newHours[memberId] || '0');
-    setTeamMembers(prev => prev.map(member => 
-      member.id === memberId 
-        ? { ...member, hoursWorked: hours }
-        : member
-    ));
+    setHoursWorked(prev => ({ ...prev, [memberId]: hours }));
     setEditingMember(null);
   };
 
@@ -311,8 +299,34 @@ export default function QuickTimeRegister() {
               </CardHeader>
               
               <CardContent className="space-y-4">
-                {teamMembers.map((member, index) => {
-                  const progress = (member.hoursWorked / member.targetHours) * 100;
+                {loadingTeam ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl animate-pulse">
+                      <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl animate-pulse">
+                      <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                        <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : teamMembers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 mb-2">No hay miembros en este proyecto</p>
+                    <p className="text-sm text-gray-400">Añade miembros del equipo desde la pestaña de configuración del proyecto</p>
+                  </div>
+                ) : (
+                  teamMembers.map((member, index) => {
+                  const currentHours = hoursWorked[member.id] || 0;
+                  const isTracking = trackingStates[member.id] || false;
+                  const progress = (currentHours / member.targetHours) * 100;
                   const efficiencyBadge = getEfficiencyBadge(member.efficiency);
                   
                   return (
@@ -322,7 +336,7 @@ export default function QuickTimeRegister() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
                       className={`p-4 rounded-xl border transition-all duration-200 ${
-                        member.isTracking 
+                        isTracking 
                           ? 'bg-blue-50 border-blue-200 shadow-md' 
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                       }`}
@@ -343,7 +357,7 @@ export default function QuickTimeRegister() {
                                 {efficiencyBadge.icon}
                                 {member.efficiency}%
                               </Badge>
-                              {member.isTracking && (
+                              {isTracking && (
                                 <Badge className="bg-green-100 text-green-800 text-xs gap-1">
                                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                                   En vivo
@@ -383,7 +397,7 @@ export default function QuickTimeRegister() {
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold">
-                                    {member.hoursWorked.toFixed(1)}
+                                    {currentHours.toFixed(1)}
                                   </span>
                                   <span className="text-gray-500 text-sm">
                                     / {member.targetHours}h
@@ -407,7 +421,7 @@ export default function QuickTimeRegister() {
                               />
                               <div className="flex justify-between text-xs text-gray-500">
                                 <span>{progress.toFixed(0)}%</span>
-                                <span>${(member.hoursWorked * member.hourlyRate).toFixed(2)}</span>
+                                <span>${(currentHours * member.hourlyRate).toFixed(2)}</span>
                               </div>
                             </div>
                           </div>
@@ -423,7 +437,7 @@ export default function QuickTimeRegister() {
 
                           {/* Controles de tracking */}
                           <div className="flex gap-2">
-                            {member.isTracking ? (
+                            {isTracking ? (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -449,7 +463,8 @@ export default function QuickTimeRegister() {
                       </div>
                     </motion.div>
                   );
-                })}
+                  })
+                )}
               </CardContent>
             </Card>
           </motion.div>
