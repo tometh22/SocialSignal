@@ -75,16 +75,20 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
   // Convert API data to TeamMember format
   const teamMembers: TeamMember[] = Array.isArray(baseTeam) ? baseTeam.map((member: any) => ({
     id: member.personnelId.toString(),
-    name: member.personnel ? `${member.personnel.firstName} ${member.personnel.lastName}` : 'Personal sin nombre',
+    name: member.personnel ? member.personnel.name : 'Personal sin nombre',
     role: member.role ? member.role.name : 'Rol no especificado',
     avatar: member.personnel?.avatar || '/api/placeholder/32/32',
     hourlyRate: member.hourlyRate || 0,
     hoursWorked: 0, // This would come from time entries
-    targetHours: member.hours || 40,
+    targetHours: member.estimatedHours || 40,
     isTracking: false,
     lastActivity: 'Sin actividad reciente',
     efficiency: 90 // This could be calculated from performance data
   })) : [];
+
+  // Log para debugging
+  console.log('🔍 Base team data:', baseTeam);
+  console.log('🔍 Converted team members:', teamMembers);
 
   const [trackingStates, setTrackingStates] = useState<{ [key: string]: boolean }>({});
   const [hoursWorked, setHoursWorked] = useState<{ [key: string]: number }>({});
