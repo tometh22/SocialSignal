@@ -199,15 +199,15 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="startDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fecha Inicio</FormLabel>
+                      <FormLabel className="text-sm">Fecha Inicio</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -219,9 +219,9 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                   name="endDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Fecha Fin</FormLabel>
+                      <FormLabel className="text-sm">Fecha Fin</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" {...field} className="h-9 text-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -234,22 +234,22 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                   type="button"
                   onClick={() => setShowTeamForm(!showTeamForm)}
                   variant={showTeamForm ? "secondary" : "default"}
-                  size="lg"
+                  size="sm"
                   className={cn(
-                    "px-8 py-3 text-base font-medium transition-all duration-200 transform hover:scale-105",
+                    "px-4 py-2 text-sm font-medium transition-all duration-200",
                     showTeamForm 
-                      ? "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:from-gray-200 hover:to-gray-300" 
-                      : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg"
+                      ? "bg-gray-100 text-gray-700 hover:bg-gray-200" 
+                      : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
                   )}
                 >
                   {showTeamForm ? (
                     <>
-                      <Users className="h-5 w-5 mr-2" />
+                      <Users className="h-4 w-4 mr-2" />
                       Ocultar Equipo
                     </>
                   ) : (
                     <>
-                      <Users className="h-5 w-5 mr-2" />
+                      <Users className="h-4 w-4 mr-2" />
                       Configurar Horas del Equipo
                     </>
                   )}
@@ -257,46 +257,44 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
               </div>
 
               {showTeamForm && (
-                <div className="space-y-6 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-xl p-6 border border-blue-100 shadow-sm">
+                <div className="space-y-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-lg p-4 border border-blue-100 shadow-sm">
                   <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mb-3">
-                      <Clock className="h-6 w-6 text-white" />
+                    <div className="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full mb-2">
+                      <Clock className="h-4 w-4 text-white" />
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-800 mb-1">Registro de Horas del Equipo</h4>
-                    <p className="text-sm text-gray-600">Configura las horas y tarifas para cada miembro del equipo</p>
+                    <h4 className="text-base font-semibold text-gray-800 mb-1">Registro de Horas del Equipo</h4>
+                    <p className="text-xs text-gray-600">Configura las horas y tarifas para cada miembro del equipo</p>
                   </div>
                   
-                  <div className="grid gap-4">
+                  <div className="grid gap-3">
                     {Array.isArray(baseTeam) && baseTeam.map((member: any, index) => (
-                      <div key={member.personnelId} className="group relative bg-white rounded-xl p-5 border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200">
+                      <div key={member.personnelId} className="group relative bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
                         {/* Header con nombre y costo total */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-xs">
                               {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                             </div>
                             <div>
-                              <h5 className="font-semibold text-gray-800">{member.personnel?.name}</h5>
-                              <p className="text-sm text-gray-500">{member.role?.name}</p>
+                              <h5 className="font-medium text-gray-800 text-sm">{member.personnel?.name}</h5>
+                              <p className="text-xs text-gray-500">{member.role?.name}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-emerald-600">
+                            <div className="text-lg font-bold text-emerald-600">
                               ${((teamHours[member.personnelId]?.hours || 0) * (teamHours[member.personnelId]?.customRate || member.hourlyRate)).toFixed(2)}
                             </div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Costo Total</p>
+                            <p className="text-xs text-gray-500">Total</p>
                           </div>
                         </div>
 
                         {/* Grid de inputs */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {/* Campo de Horas */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                              <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
-                                <Clock className="h-3 w-3 text-blue-600" />
-                              </div>
-                              Horas Trabajadas
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-blue-600" />
+                              Horas
                             </Label>
                             <div className="relative">
                               <Input
@@ -312,26 +310,24 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                                     customRate: prev[member.personnelId]?.customRate
                                   }
                                 }))}
-                                className="text-right text-lg font-semibold pr-12 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                className="text-right text-sm font-semibold pr-8 h-8 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">hrs</span>
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">hrs</span>
                             </div>
                           </div>
 
                           {/* Campo de Tarifa */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                              <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                                <DollarSign className="h-3 w-3 text-green-600" />
-                              </div>
-                              Tarifa por Hora
+                          <div className="space-y-1">
+                            <Label className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-green-600" />
+                              Tarifa/Hora
                             </Label>
                             <div className="relative">
                               <Input
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                placeholder={`${member.hourlyRate} (actual)`}
+                                placeholder={`${member.hourlyRate}`}
                                 value={teamHours[member.personnelId]?.customRate ?? ''}
                                 onChange={(e) => setTeamHours(prev => ({
                                   ...prev,
@@ -341,13 +337,13 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                                   }
                                 }))}
                                 className={cn(
-                                  "text-right text-lg font-semibold pr-12 h-12 transition-colors",
+                                  "text-right text-sm font-semibold pr-8 h-8 transition-colors",
                                   teamHours[member.personnelId]?.customRate 
                                     ? "border-amber-400 bg-amber-50 focus:border-amber-500 focus:ring-amber-500" 
                                     : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                                 )}
                               />
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                               {teamHours[member.personnelId]?.customRate ? (
                                 <button
                                   type="button"
@@ -358,25 +354,25 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                                       customRate: undefined
                                     }
                                   }))}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-amber-200 hover:bg-amber-300 rounded-full flex items-center justify-center text-amber-700 hover:text-amber-800 transition-colors"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-200 hover:bg-amber-300 rounded-full flex items-center justify-center text-amber-700 hover:text-amber-800 transition-colors"
                                   title="Restaurar tarifa actual"
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-2 w-2" />
                                 </button>
                               ) : (
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">/h</span>
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">/h</span>
                               )}
                             </div>
                             
                             {/* Badge indicador */}
-                            <div className="flex justify-center mt-2">
+                            <div className="flex justify-center mt-1">
                               {teamHours[member.personnelId]?.customRate ? (
-                                <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">
-                                  📅 Tarifa histórica
+                                <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs px-2 py-0">
+                                  📅 Histórica
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-gray-600 border-gray-300">
-                                  💼 Tarifa actual: ${member.hourlyRate}
+                                <Badge variant="outline" className="text-gray-600 border-gray-300 text-xs px-2 py-0">
+                                  💼 Actual: ${member.hourlyRate}
                                 </Badge>
                               )}
                             </div>
@@ -386,55 +382,54 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                     ))}
                   </div>
 
-                  {/* Resumen Final Mejorado */}
-                  <div className="bg-white rounded-xl p-6 border-2 border-dashed border-blue-200 shadow-inner">
-                    <div className="text-center mb-4">
-                      <h5 className="text-lg font-semibold text-gray-800 mb-1">Resumen del Registro</h5>
-                      <p className="text-sm text-gray-600">Totales calculados para el período</p>
+                  {/* Resumen Final Compacto */}
+                  <div className="bg-white rounded-lg p-3 border border-blue-200 shadow-sm">
+                    <div className="text-center mb-2">
+                      <h5 className="text-sm font-semibold text-gray-800">Resumen del Registro</h5>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
-                        <div className="text-3xl font-bold text-blue-600 mb-1">{getTotalHours().toFixed(1)}</div>
-                        <p className="text-sm font-medium text-blue-700">Horas Totales</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-2 bg-gradient-to-br from-blue-50 to-blue-100 rounded">
+                        <div className="text-xl font-bold text-blue-600">{getTotalHours().toFixed(1)}</div>
+                        <p className="text-xs font-medium text-blue-700">Horas</p>
                       </div>
                       
-                      <div className="text-center p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg">
-                        <div className="text-3xl font-bold text-emerald-600 mb-1">${getTotalCost().toLocaleString()}</div>
-                        <p className="text-sm font-medium text-emerald-700">Costo Total</p>
+                      <div className="text-center p-2 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded">
+                        <div className="text-xl font-bold text-emerald-600">${getTotalCost().toLocaleString()}</div>
+                        <p className="text-xs font-medium text-emerald-700">Costo</p>
                       </div>
                       
-                      <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
-                        <div className="text-3xl font-bold text-purple-600 mb-1">
+                      <div className="text-center p-2 bg-gradient-to-br from-purple-50 to-purple-100 rounded">
+                        <div className="text-xl font-bold text-purple-600">
                           ${getTotalHours() > 0 ? (getTotalCost() / getTotalHours()).toFixed(0) : '0'}
                         </div>
-                        <p className="text-sm font-medium text-purple-700">Tarifa Promedio</p>
+                        <p className="text-xs font-medium text-purple-700">Promedio</p>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex gap-4 justify-center pt-4">
+              <div className="flex gap-3 justify-center pt-3">
                 <Button 
                   type="submit" 
                   disabled={createTimeEntries.isPending || getTotalHours() === 0}
-                  size="lg"
+                  size="sm"
                   className={cn(
-                    "px-8 py-3 text-base font-medium transition-all duration-200 transform hover:scale-105",
+                    "px-4 py-2 text-sm font-medium transition-all duration-200",
                     getTotalHours() > 0 
-                      ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg" 
+                      ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white" 
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   )}
                 >
                   {createTimeEntries.isPending ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
                       Registrando...
                     </>
                   ) : (
                     <>
-                      <Save className="h-5 w-5 mr-2" />
+                      <Save className="h-4 w-4 mr-2" />
                       Registrar {getTotalHours().toFixed(1)}h - ${getTotalCost().toLocaleString()}
                     </>
                   )}
@@ -445,10 +440,10 @@ export default function QuickTimeRegister({ projectId, onSuccess, onCancel }: Qu
                     type="button" 
                     variant="outline" 
                     onClick={onCancel}
-                    size="lg"
-                    className="px-6 py-3 text-base border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                    size="sm"
+                    className="px-4 py-2 text-sm border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors"
                   >
-                    <X className="h-5 w-5 mr-2" />
+                    <X className="h-4 w-4 mr-2" />
                     Cancelar
                   </Button>
                 )}

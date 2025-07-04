@@ -496,7 +496,13 @@ export default function ProjectDetailsRedesigned() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => setShowQuickRegister(!showQuickRegister)}
+                  onClick={() => {
+                    setShowQuickRegister(!showQuickRegister);
+                    // Cerrar tabs automáticamente cuando se abre el registro
+                    if (!showQuickRegister) {
+                      setActiveTab("overview");
+                    }
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 h-8"
                 >
                   <Timer className="h-3 w-3 mr-1" />
