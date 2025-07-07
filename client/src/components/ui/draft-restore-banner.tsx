@@ -17,17 +17,23 @@ export const DraftRestoreBanner: React.FC = () => {
   const { setQuotationData } = useOptimizedQuote();
 
   useEffect(() => {
-    // Check for pending draft restore
-    const pendingDraft = localStorage.getItem('pending-draft-restore');
-    if (pendingDraft) {
+    console.log('🔍 DRAFT RESTORE BANNER - Component mounted');
+    const draftInfo = localStorage.getItem('pending-draft-restore');
+    console.log('🔍 DRAFT RESTORE BANNER - Draft info:', draftInfo);
+
+    if (draftInfo) {
       try {
-        const parsed = JSON.parse(pendingDraft);
+        const parsed = JSON.parse(draftInfo);
+        console.log('🔍 DRAFT RESTORE BANNER - Parsed:', parsed);
         setDraftInfo(parsed);
         setIsVisible(true);
+        console.log('✅ DRAFT RESTORE BANNER - Banner should be visible');
       } catch (error) {
-        console.error('Error parsing pending draft:', error);
+        console.error('❌ DRAFT RESTORE BANNER - Error parsing:', error);
         localStorage.removeItem('pending-draft-restore');
       }
+    } else {
+      console.log('ℹ️ DRAFT RESTORE BANNER - No pending draft found');
     }
   }, []);
 

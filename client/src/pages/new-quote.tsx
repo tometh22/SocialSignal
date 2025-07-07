@@ -11,16 +11,34 @@ export default function NewQuote() {
 
   useEffect(() => {
     // Check for pending draft
+    console.log('🔍 NEW QUOTE - Checking for pending draft...');
     const draftInfo = localStorage.getItem('pending-draft-restore');
+    console.log('🔍 Draft info from localStorage:', draftInfo);
+    
     if (draftInfo) {
       try {
         const parsed = JSON.parse(draftInfo);
+        console.log('🔍 Parsed draft info:', parsed);
         setPendingDraft(parsed);
         setShowBanner(true);
+        console.log('✅ Banner should show now');
       } catch (error) {
-        console.error('Error parsing draft info:', error);
+        console.error('❌ Error parsing draft info:', error);
         localStorage.removeItem('pending-draft-restore');
       }
+    } else {
+      console.log('ℹ️ No pending draft found');
+      
+      // Also check for regular draft
+      const regularDraft = localStorage.getItem('draft-quotation');
+      console.log('🔍 Regular draft found:', !!regularDraft);
+      if (regularDraft) {
+        console.log('🔍 Regular draft content:', regularDraft.substring(0, 100) + '...');
+      }
+      
+      // Check all localStorage keys related to drafts
+      const allKeys = Object.keys(localStorage).filter(key => key.includes('draft'));
+      console.log('🔍 All draft-related localStorage keys:', allKeys);
     }
   }, []);
 
@@ -60,6 +78,7 @@ export default function NewQuote() {
       </div>
       
       {/* Pending Changes Banner */}
+      {console.log('🔍 Banner render check:', { showBanner, pendingDraft: !!pendingDraft })}
       {showBanner && pendingDraft && (
         <Alert className="mx-4 mt-4 border-amber-200 bg-amber-50">
           <Info className="h-4 w-4 text-amber-600" />

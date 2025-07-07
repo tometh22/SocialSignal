@@ -266,6 +266,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     >
 
       {/* Draft Restore Banner */}
+      {console.log('🔍 OPTIMIZED QUOTE - Draft banner check:', { isEditing })}
       {!isEditing && <DraftRestoreBanner />}
 
       {/* Progress indicator */}
