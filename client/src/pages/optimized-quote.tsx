@@ -8,7 +8,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X, Clock, RefreshCw, Plus } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
-import { DraftRestoreBanner } from '@/components/ui/draft-restore-banner';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 
 import OptimizedBasicInfo from '@/components/optimized/basic-info';
@@ -273,8 +272,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     >
 
       {/* Banner de restauración de borradores */}
-      <DraftRestoreBanner />
-
 
 
 
