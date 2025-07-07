@@ -61,7 +61,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       const lastSave = localStorage.getItem('last-autosave-time');
       const hasData = quotationData.project.name || quotationData.teamMembers.length > 0 || quotationData.client;
       const timeSinceLastSave = lastSave ? Date.now() - parseInt(lastSave) : Infinity;
-      
+
       if (hasData && timeSinceLastSave > 5000) { // If more than 5 seconds since last save
         e.preventDefault();
         e.returnValue = 'Tienes cambios sin guardar en tu cotización. ¿Estás seguro de que quieres salir?';
@@ -247,7 +247,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             Volver
           </Button>
 
-          
+
 
           <Button
             variant="ghost"
@@ -272,109 +272,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       }
     >
 
-      {/* Banner de restauración integrado directamente */}
-      {!isEditing && (() => {
-        const draft = localStorage.getItem('draft-quotation');
-        const dismissed = localStorage.getItem('draft-banner-dismissed');
-        
-        if (draft && !dismissed && bannerVisible) {
-          return (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg mx-4 mb-4 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">Borrador encontrado</p>
-                    <p className="text-xs text-blue-700">Continúa donde lo dejaste o empezar nuevo</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => {
-                      try {
-                        const draftData = JSON.parse(draft);
-                        console.log('🔄 Restaurando borrador completo:', draftData);
-                        
-                        // Validar que los datos tienen la estructura correcta
-                        let dataToRestore = null;
-                        if (draftData.quotationData) {
-                          dataToRestore = draftData.quotationData;
-                        } else {
-                          dataToRestore = draftData;
-                        }
-                        
-                        // Validar estructura mínima antes de restaurar
-                        if (dataToRestore && typeof dataToRestore === 'object') {
-                          // Asegurar que project tiene la estructura correcta
-                          if (!dataToRestore.project) {
-                            dataToRestore.project = { name: "", type: "", duration: "" };
-                          }
-                          
-                          // Asegurar campos obligatorios de project
-                          if (!dataToRestore.project.name) dataToRestore.project.name = "";
-                          if (!dataToRestore.project.type) dataToRestore.project.type = "";
-                          if (!dataToRestore.project.duration) dataToRestore.project.duration = "";
-                          
-                          // Asegurar otros campos obligatorios
-                          if (!dataToRestore.teamMembers) dataToRestore.teamMembers = [];
-                          if (!dataToRestore.deliverables) dataToRestore.deliverables = [];
-                          if (!dataToRestore.financials) dataToRestore.financials = {};
-                          if (!dataToRestore.inflation) dataToRestore.inflation = {};
-                          
-                          console.log('✅ Estructura validada, restaurando datos:', dataToRestore);
-                          setQuotationDataDirect(dataToRestore);
-                        } else {
-                          console.warn('⚠️ Estructura de datos inválida en borrador');
-                        }
-                        localStorage.removeItem('draft-banner-dismissed');
-                        setBannerVisible(false);
-                        console.log('✅ Borrador restaurado exitosamente');
-                      } catch (e) {
-                        console.error('Error al restaurar borrador:', e);
-                      }
-                    }}
-                    size="sm"
-                    className="bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-1" />
-                    Continuar
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      localStorage.removeItem('draft-quotation');
-                      localStorage.removeItem('draft-quotation-backup');
-                      localStorage.setItem('draft-banner-dismissed', 'true');
-                      // Limpiar todos los datos usando resetQuotation
-                      resetQuotation();
-                      setBannerVisible(false);
-                      console.log('🆕 Empezando nuevo - datos limpiados');
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Nuevo
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      localStorage.setItem('draft-banner-dismissed', 'true');
-                      setBannerVisible(false);
-                      console.log('❌ Banner descartado');
-                    }}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          );
-        }
-        return null;
-      })()}
+      {/* Banner de restauración de borradores */}
+      <DraftRestoreBanner />
 
 
 
@@ -412,7 +311,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               ))}
             </div>
           </div>
-          
+
           {/* Autosave indicator */}
           <div className="flex justify-center mt-4">
             <AutosaveIndicator 

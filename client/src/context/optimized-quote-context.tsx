@@ -338,69 +338,30 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     return () => clearInterval(saveInterval);
   }, [quotationData]);
 
-  // Simplified draft detection - only store draft info for banner display
+  // Detección simplificada de borradores
   useEffect(() => {
     const draft = localStorage.getItem('draft-quotation');
-    const backup = localStorage.getItem('draft-quotation-backup');
-    const emergency = sessionStorage.getItem('emergency-draft');
-    const lastQuotationStatus = localStorage.getItem('last-quotation-status');
-    
-    if (draft || backup || emergency) {
+
+    if (draft) {
       try {
-        let savedData = null;
-        let timestamp = 0;
-        let source = '';
+        const draftParsed = JSON.parse(draft);
+        const quotationData = draftParsed.quotationData || draftParsed;
+        const timestamp = draftParsed.timestamp || Date.now();
 
-        // Try to load from primary draft first
-        if (draft) {
-          const draftParsed = JSON.parse(draft);
-          savedData = draftParsed.quotationData;
-          timestamp = draftParsed.timestamp;
-          source = 'autoguardado';
-        }
-        // Fallback to backup if primary is corrupted
-        else if (backup) {
-          const backupParsed = JSON.parse(backup);
-          savedData = backupParsed.quotationData;
-          timestamp = backupParsed.timestamp;
-          source = 'respaldo';
-        }
-        // Last resort: emergency data - only log it
-        else if (emergency) {
-          const emergencyParsed = JSON.parse(emergency);
-          console.log('🆘 Datos de emergencia encontrados:', emergencyParsed);
-          sessionStorage.removeItem('emergency-draft');
-          return;
-        }
+        const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60));
+        const isRecent = timeAgo < 2880; // 48 horas
 
-        const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000; // Extended to 48 hours
-        const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60)); // minutes ago
-        
-        // Always show banner for recent drafts unless explicitly dismissed
-        const shouldShowBanner = isRecent && 
-                                 savedData && 
-                                 (!lastQuotationStatus || !['approved', 'pending', 'in-negotiation'].includes(lastQuotationStatus)) &&
-                                 !localStorage.getItem('draft-banner-dismissed');
-        
-        if (shouldShowBanner) {
-          // Store draft info for banner component to handle
-          localStorage.setItem('pending-draft-restore', JSON.stringify({
-            data: savedData,
-            timestamp: timestamp,
-            source: source,
-            timeAgo: timeAgo
-          }));
-          console.log(`📋 Borrador detectado, guardado para mostrar banner - ${source} hace ${timeAgo} minutos`);
-        } else if (!isRecent && savedData) {
-          console.log(`⏰ Borrador encontrado pero es muy antiguo (${timeAgo} minutos)`);
-          // Clean up old drafts
-          if (timeAgo > 2880) { // Older than 48 hours
-            localStorage.removeItem('draft-quotation');
-            localStorage.removeItem('draft-quotation-backup');
-          }
+        console.log(`📋 Borrador detectado - hace ${timeAgo} minutos, reciente: ${isRecent}`);
+
+        // Limpiar borradores antiguos
+        if (!isRecent) {
+          localStorage.removeItem('draft-quotation');
+          localStorage.removeItem('draft-quotation-backup');
+          console.log('🧹 Borrador antiguo eliminado');
         }
       } catch (error) {
-        console.error('❌ Error detectando borrador:', error);
+        console.error('❌ Error parsing draft data:', error);
+        localStorage.removeItem('draft-quotation');
       }
     }
   }, []);
@@ -506,27 +467,27 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Check if we're in manual pricing mode
     if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
       console.log(`✏️ Manual pricing mode: Target price $${quotationData.financials.manualPrice}`);
-      
+
       // Calculate what margin would be needed to reach the manual price
       const manualPrice = quotationData.financials.manualPrice;
       calculatedMarkup = manualPrice - subtotalWithTools;
       const marginFactor = subtotalWithTools > 0 ? (manualPrice / subtotalWithTools) : 1;
-      
+
       console.log(`✏️ Manual price markup: $${calculatedMarkup}, Effective margin: ${marginFactor}x`);
       setMarkupAmount(calculatedMarkup);
-      
+
       // Update margin factor in the context for display purposes
       const updatedFinancials = {
         ...quotationData.financials,
         marginFactor: marginFactor,
         marginPercentage: ((marginFactor - 1) * 100)
       };
-      
+
       setQuotationData(prev => ({ 
         ...prev, 
         financials: updatedFinancials 
       }));
-      
+
       subtotalWithMarkup = manualPrice;
       console.log(`📈 Manual subtotal with markup: $${subtotalWithMarkup}`);
     } else {
@@ -535,7 +496,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       calculatedMarkup = subtotalWithTools * (marginFactor - 1);
       console.log(`💰 Auto markup: $${subtotalWithTools} × ${marginFactor - 1} = $${calculatedMarkup}`);
       setMarkupAmount(calculatedMarkup);
-      
+
       subtotalWithMarkup = subtotalWithTools + calculatedMarkup;
       console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup}`);
     }
@@ -825,7 +786,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           type: quotation.projectType || "on-demand",
           duration: quotation.projectDuration || ""
         },
-        analysisType: quotation.analysisType || "standard",
+        analysisType: quotation.analysisType || "standard",```python
         mentionsVolume: quotation.mentionsVolume || "medium",
         countriesCovered: quotation.countriesCovered || "1",
         clientEngagement: quotation.clientEngagement || "medium",
