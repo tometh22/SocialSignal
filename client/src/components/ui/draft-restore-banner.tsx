@@ -18,22 +18,41 @@ export const DraftRestoreBanner: React.FC = () => {
 
   useEffect(() => {
     console.log('🔍 DRAFT RESTORE BANNER - Component mounted');
-    const draftInfo = localStorage.getItem('pending-draft-restore');
-    console.log('🔍 DRAFT RESTORE BANNER - Draft info:', draftInfo);
+    
+    // Check for pending draft restore
+    const pendingDraft = localStorage.getItem('pending-draft-restore');
+    console.log('🔍 DRAFT RESTORE BANNER - Pending draft:', pendingDraft);
+    
+    // Also check regular draft for debugging
+    const regularDraft = localStorage.getItem('draft-quotation');
+    console.log('🔍 DRAFT RESTORE BANNER - Regular draft:', regularDraft ? 'exists' : 'none');
+    
+    // List all localStorage keys
+    const allKeys = Object.keys(localStorage);
+    console.log('🔍 DRAFT RESTORE BANNER - All localStorage keys:', allKeys);
 
-    if (draftInfo) {
+    if (pendingDraft) {
       try {
-        const parsed = JSON.parse(draftInfo);
-        console.log('🔍 DRAFT RESTORE BANNER - Parsed:', parsed);
+        const parsed = JSON.parse(pendingDraft);
+        console.log('🔍 DRAFT RESTORE BANNER - Parsed pending draft:', parsed);
         setDraftInfo(parsed);
         setIsVisible(true);
-        console.log('✅ DRAFT RESTORE BANNER - Banner should be visible');
+        console.log('✅ DRAFT RESTORE BANNER - Banner should be visible now');
       } catch (error) {
-        console.error('❌ DRAFT RESTORE BANNER - Error parsing:', error);
+        console.error('❌ DRAFT RESTORE BANNER - Error parsing pending draft:', error);
         localStorage.removeItem('pending-draft-restore');
       }
     } else {
       console.log('ℹ️ DRAFT RESTORE BANNER - No pending draft found');
+      
+      // Clear any old draft data that might be causing issues
+      const keysToCheck = ['draft-quotation', 'draft-quotation-backup', 'emergency-draft'];
+      keysToCheck.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value) {
+          console.log(`🔍 DRAFT RESTORE BANNER - Found ${key}:`, value.substring(0, 100) + '...');
+        }
+      });
     }
   }, []);
 

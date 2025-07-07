@@ -242,6 +242,22 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             Volver
           </Button>
 
+          {/* Debug button to clear all drafts */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const keys = ['draft-quotation', 'draft-quotation-backup', 'pending-draft-restore', 'emergency-draft'];
+              keys.forEach(key => localStorage.removeItem(key));
+              console.log('🧹 All draft data cleared');
+              window.location.reload();
+            }}
+            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpiar Drafts
+          </Button>
+
           <Button
             variant="ghost"
             size="sm"
@@ -266,8 +282,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     >
 
       {/* Draft Restore Banner */}
-      {console.log('🔍 OPTIMIZED QUOTE - Draft banner check:', { isEditing })}
-      {!isEditing && <DraftRestoreBanner />}
+      {(() => {
+        console.log('🔍 OPTIMIZED QUOTE - Banner render check:', { 
+          isEditing, 
+          effectiveQuotationId,
+          pendingDraft: localStorage.getItem('pending-draft-restore'),
+          shouldShow: !isEditing
+        });
+        return !isEditing ? <DraftRestoreBanner /> : null;
+      })()}
 
       {/* Progress indicator */}
       <div className="standard-card mb-6">
