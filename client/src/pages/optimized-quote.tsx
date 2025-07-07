@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X, Clock, RefreshCw, Plus } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { DraftRestoreBanner } from '@/components/ui/draft-restore-banner';
@@ -336,29 +336,23 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         }
         return null;
       })()}
-      
-      {/* TEMPORAL: Botón para crear datos de prueba */}
+
+      {/* TEMPORAL: Botón de test para el banner */}
       <div className="mx-4 mb-4">
         <Button
           onClick={() => {
-            const testData = {
-              client: { name: 'Cliente Test', id: 1 },
-              project: { name: 'Proyecto Test' },
-              teamMembers: [{ name: 'Test User', role: 'Developer' }],
-              timestamp: Date.now()
-            };
-            localStorage.setItem('draft-quotation', JSON.stringify(testData));
+            localStorage.setItem('draft-quotation', JSON.stringify({ test: 'data' }));
             localStorage.removeItem('draft-banner-dismissed');
-            console.log('📝 Borrador de prueba creado');
             window.location.reload();
           }}
           variant="outline"
           size="sm"
-          className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-100"
+          className="bg-yellow-50 text-yellow-600 border-yellow-200"
         >
-          🧪 Crear Borrador Test
+          🧪 Test Banner
         </Button>
       </div>
+
 
       {/* Progress indicator */}
       <div className="standard-card mb-6">
