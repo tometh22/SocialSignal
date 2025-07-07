@@ -40,7 +40,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     updateAdditionalDeliverableCost,
     updateClient,
     updateProjectName,
-    resetQuotation
+    resetQuotation,
+    setQuotationData: setQuotationDataDirect
   } = useOptimizedQuote();
 
   // Get quotation ID from URL if not passed as prop
@@ -294,15 +295,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     onClick={() => {
                       try {
                         const draftData = JSON.parse(draft);
-                        // Usar función directa del contexto para restaurar datos
-                        Object.keys(draftData).forEach(key => {
-                          if (key === 'client' && draftData.client) {
-                            updateClient(draftData.client);
-                          }
-                          if (key === 'project' && draftData.project?.name) {
-                            updateProjectName(draftData.project.name);
-                          }
-                        });
+                        console.log('🔄 Restaurando borrador completo:', draftData);
+                        
+                        // Usar la función correcta del contexto para restaurar TODO el borrador
+                        if (draftData.quotationData) {
+                          // El formato guardado incluye quotationData como wrapper
+                          setQuotationDataDirect(draftData.quotationData);
+                        } else {
+                          // Formato directo
+                          setQuotationDataDirect(draftData);
+                        }
                         localStorage.removeItem('draft-banner-dismissed');
                         setBannerVisible(false);
                         console.log('✅ Borrador restaurado exitosamente');
@@ -351,21 +353,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         return null;
       })()}
 
-      {/* TEMPORAL: Botón de test para el banner */}
-      <div className="mx-4 mb-4">
-        <Button
-          onClick={() => {
-            localStorage.setItem('draft-quotation', JSON.stringify({ test: 'data' }));
-            localStorage.removeItem('draft-banner-dismissed');
-            window.location.reload();
-          }}
-          variant="outline"
-          size="sm"
-          className="bg-yellow-50 text-yellow-600 border-yellow-200"
-        >
-          🧪 Test Banner
-        </Button>
-      </div>
+
 
 
       {/* Progress indicator */}
