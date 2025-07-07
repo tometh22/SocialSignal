@@ -46,26 +46,25 @@ export const DraftRestoreBanner: React.FC = () => {
               source = 'respaldo';
             }
 
-            if (parsedData && (parsedData.project?.name || parsedData.client?.name || parsedData.teamMembers?.length > 0)) {
+            // Verificar si hay cualquier dato en el borrador
+            if (parsedData) {
               const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60));
               const isRecent = timeAgo < 2880; // 48 horas
               
               console.log('🔍 BANNER - Datos encontrados, timeAgo:', timeAgo, 'isRecent:', isRecent);
+              console.log('🔍 BANNER - parsedData:', parsedData);
               
-              if (isRecent) {
-                const info = {
-                  data: parsedData,
-                  timestamp: timestamp,
-                  source: source,
-                  timeAgo: timeAgo
-                };
-                
-                setDraftInfo(info);
-                setIsVisible(true);
-                console.log('✅ BANNER - Mostrando banner!');
-              } else {
-                console.log('⏰ BANNER - Borrador muy antiguo');
-              }
+              // Mostrar banner siempre que haya datos, sin importar si están completos
+              const info = {
+                data: parsedData,
+                timestamp: timestamp,
+                source: source,
+                timeAgo: timeAgo
+              };
+              
+              setDraftInfo(info);
+              setIsVisible(true);
+              console.log('✅ BANNER - Banner activado con datos:', info);
             } else {
               console.log('ℹ️ BANNER - Borrador sin datos válidos');
             }
@@ -122,12 +121,22 @@ export const DraftRestoreBanner: React.FC = () => {
   // Force show banner for testing
   console.log('🔍 BANNER - Render check - isVisible:', isVisible, 'draftInfo:', !!draftInfo);
 
-  // Solo mostrar si hay datos de borrador válidos o está marcado como visible
-  if (!isVisible && !draftInfo) {
+  // TEMPORAL: Forzar visible para debug hasta que funcione la detección
+  const hasActualDraft = localStorage.getItem('draft-quotation') || localStorage.getItem('draft-quotation-backup');
+  console.log('🔍 BANNER - hasActualDraft:', !!hasActualDraft, 'isVisible:', isVisible, 'draftInfo:', !!draftInfo);
+  
+  if (!isVisible && !draftInfo && !hasActualDraft) {
     return null;
   }
 
-  const data = draftInfo?.data || {};
+  // Si hay borrador actual pero no draftInfo, crear info temporal
+  if (hasActualDraft && !draftInfo) {
+    const tempData = { project: { name: 'Datos guardados' }, client: { name: 'Cliente pendiente' } };
+    const tempInfo = { data: tempData, timeAgo: 0, source: 'autoguardado' };
+    console.log('🔍 BANNER - Usando datos temporales para mostrar banner');
+  }
+  
+  const data = draftInfo?.data || { project: { name: 'Datos guardados' }, client: { name: 'Cliente pendiente' } };
   const timeAgo = draftInfo?.timeAgo || 0;
   const source = draftInfo?.source || 'autoguardado';
 
