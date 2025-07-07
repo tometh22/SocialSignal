@@ -19,32 +19,82 @@ export const DraftRestoreBanner: React.FC = () => {
   useEffect(() => {
     console.log('🔍 DRAFT RESTORE BANNER - Component mounted');
     
-    try {
-      // Check for pending draft restore
-      const pendingDraft = localStorage.getItem('pending-draft-restore');
-      console.log('🔍 DRAFT RESTORE BANNER - Pending draft:', pendingDraft);
+    // Force check for all possible draft sources
+    const checkForDrafts = () => {
+      try {
+        // Check for pending draft restore first
+        let pendingDraft = localStorage.getItem('pending-draft-restore');
+        console.log('🔍 DRAFT RESTORE BANNER - Pending draft:', pendingDraft);
 
-      if (pendingDraft) {
-        const parsed = JSON.parse(pendingDraft);
-        console.log('🔍 DRAFT RESTORE BANNER - Parsed pending draft:', parsed);
-        
-        // Validar que el draft tenga datos válidos
-        if (parsed.data && typeof parsed.timeAgo === 'number') {
-          setDraftInfo(parsed);
-          setIsVisible(true);
-          console.log('✅ DRAFT RESTORE BANNER - Banner should be visible now');
+        // If no pending draft, check for actual draft data
+        if (!pendingDraft) {
+          const draft = localStorage.getItem('draft-quotation');
+          const backup = localStorage.getItem('draft-quotation-backup');
+          
+          console.log('🔍 DRAFT RESTORE BANNER - Draft found:', !!draft);
+          console.log('🔍 DRAFT RESTORE BANNER - Backup found:', !!backup);
+          
+          if (draft || backup) {
+            try {
+              let savedData = null;
+              let timestamp = 0;
+              let source = '';
+
+              if (draft) {
+                const draftParsed = JSON.parse(draft);
+                savedData = draftParsed.quotationData;
+                timestamp = draftParsed.timestamp;
+                source = 'autoguardado';
+              } else if (backup) {
+                const backupParsed = JSON.parse(backup);
+                savedData = backupParsed.quotationData;
+                timestamp = backupParsed.timestamp;
+                source = 'respaldo';
+              }
+
+              const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60));
+              const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000;
+              
+              if (isRecent && savedData && !localStorage.getItem('draft-banner-dismissed')) {
+                // Create pending draft for banner
+                const draftInfo = {
+                  data: savedData,
+                  timestamp: timestamp,
+                  source: source,
+                  timeAgo: timeAgo
+                };
+                
+                localStorage.setItem('pending-draft-restore', JSON.stringify(draftInfo));
+                setDraftInfo(draftInfo);
+                setIsVisible(true);
+                console.log('✅ DRAFT RESTORE BANNER - Banner activated from direct draft check');
+                return;
+              }
+            } catch (parseError) {
+              console.error('❌ Error parsing draft data:', parseError);
+            }
+          }
         } else {
-          console.warn('⚠️ DRAFT RESTORE BANNER - Invalid draft data structure');
-          localStorage.removeItem('pending-draft-restore');
+          // Process existing pending draft
+          const parsed = JSON.parse(pendingDraft);
+          console.log('🔍 DRAFT RESTORE BANNER - Parsed pending draft:', parsed);
+          
+          if (parsed.data && typeof parsed.timeAgo === 'number') {
+            setDraftInfo(parsed);
+            setIsVisible(true);
+            console.log('✅ DRAFT RESTORE BANNER - Banner should be visible now');
+          } else {
+            console.warn('⚠️ DRAFT RESTORE BANNER - Invalid draft data structure');
+            localStorage.removeItem('pending-draft-restore');
+          }
         }
-      } else {
-        console.log('ℹ️ DRAFT RESTORE BANNER - No pending draft found');
+      } catch (error) {
+        console.error('❌ DRAFT RESTORE BANNER - Error in useEffect:', error);
+        localStorage.removeItem('pending-draft-restore');
       }
-    } catch (error) {
-      console.error('❌ DRAFT RESTORE BANNER - Error in useEffect:', error);
-      // Limpiar datos corruptos
-      localStorage.removeItem('pending-draft-restore');
-    }
+    };
+
+    checkForDrafts();
   }, []);
 
   const handleRestoreDraft = () => {
