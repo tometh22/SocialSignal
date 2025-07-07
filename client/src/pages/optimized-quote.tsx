@@ -48,6 +48,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const isEditing = Boolean(effectiveQuotationId);
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [bannerVisible, setBannerVisible] = useState(true);
   const isOnline = useOnlineStatus();
 
   // Prevent accidental page refresh/close when there's unsaved data
@@ -272,7 +273,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
         const draft = localStorage.getItem('draft-quotation');
         const dismissed = localStorage.getItem('draft-banner-dismissed');
         
-        if (draft && !dismissed) {
+        if (draft && !dismissed && bannerVisible) {
           return (
             <div className="bg-blue-50 border border-blue-200 rounded-lg mx-4 mb-4 p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -292,8 +293,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                         const draftData = JSON.parse(draft);
                         setQuotationData(draftData);
                         localStorage.removeItem('draft-banner-dismissed');
-                        console.log('Borrador restaurado');
-                        window.location.reload();
+                        setBannerVisible(false);
+                        console.log('✅ Borrador restaurado exitosamente');
                       } catch (e) {
                         console.error('Error al restaurar borrador:', e);
                       }
@@ -310,8 +311,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                       localStorage.removeItem('draft-quotation-backup');
                       localStorage.setItem('draft-banner-dismissed', 'true');
                       setQuotationData({});
-                      console.log('Empezar nuevo');
-                      window.location.reload();
+                      setBannerVisible(false);
+                      console.log('🆕 Empezando nuevo - datos limpiados');
                     }}
                     variant="outline"
                     size="sm"
@@ -322,7 +323,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                   <Button
                     onClick={() => {
                       localStorage.setItem('draft-banner-dismissed', 'true');
-                      window.location.reload();
+                      setBannerVisible(false);
+                      console.log('❌ Banner descartado');
                     }}
                     variant="ghost"
                     size="sm"
