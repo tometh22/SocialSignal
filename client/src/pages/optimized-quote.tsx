@@ -267,8 +267,98 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       }
     >
 
-      {/* Draft Restore Banner - Solo en cotizaciones nuevas */}
-      {!isEditing && <DraftRestoreBanner />}
+      {/* Banner de restauración integrado directamente */}
+      {!isEditing && (() => {
+        const draft = localStorage.getItem('draft-quotation');
+        const dismissed = localStorage.getItem('draft-banner-dismissed');
+        
+        if (draft && !dismissed) {
+          return (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg mx-4 mb-4 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Borrador encontrado</p>
+                    <p className="text-xs text-blue-700">Continúa donde lo dejaste o empezar nuevo</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      try {
+                        const draftData = JSON.parse(draft);
+                        setQuotationData(draftData);
+                        localStorage.removeItem('draft-banner-dismissed');
+                        console.log('Borrador restaurado');
+                        window.location.reload();
+                      } catch (e) {
+                        console.error('Error al restaurar borrador:', e);
+                      }
+                    }}
+                    size="sm"
+                    className="bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Continuar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      localStorage.removeItem('draft-quotation');
+                      localStorage.removeItem('draft-quotation-backup');
+                      localStorage.setItem('draft-banner-dismissed', 'true');
+                      setQuotationData({});
+                      console.log('Empezar nuevo');
+                      window.location.reload();
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Nuevo
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      localStorage.setItem('draft-banner-dismissed', 'true');
+                      window.location.reload();
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+      
+      {/* TEMPORAL: Botón para crear datos de prueba */}
+      <div className="mx-4 mb-4">
+        <Button
+          onClick={() => {
+            const testData = {
+              client: { name: 'Cliente Test', id: 1 },
+              project: { name: 'Proyecto Test' },
+              teamMembers: [{ name: 'Test User', role: 'Developer' }],
+              timestamp: Date.now()
+            };
+            localStorage.setItem('draft-quotation', JSON.stringify(testData));
+            localStorage.removeItem('draft-banner-dismissed');
+            console.log('📝 Borrador de prueba creado');
+            window.location.reload();
+          }}
+          variant="outline"
+          size="sm"
+          className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-100"
+        >
+          🧪 Crear Borrador Test
+        </Button>
+      </div>
 
       {/* Progress indicator */}
       <div className="standard-card mb-6">
