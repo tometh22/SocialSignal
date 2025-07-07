@@ -376,16 +376,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         const isRecent = Date.now() - timestamp < 48 * 60 * 60 * 1000; // Extended to 48 hours
         const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60)); // minutes ago
         
-        // Only auto-restore if: 
-        // 1. Draft is recent
-        // 2. Current form is empty
-        // 3. Last quotation wasn't successfully completed (not 'approved', 'pending', or 'in-negotiation')
-        const shouldAutoRestore = isRecent && 
-                                  savedData && 
-                                  (!quotationData.project.name && quotationData.teamMembers.length === 0) &&
-                                  (!lastQuotationStatus || !['approved', 'pending', 'in-negotiation'].includes(lastQuotationStatus));
+        // Always show banner for recent drafts unless explicitly dismissed
+        const shouldShowBanner = isRecent && 
+                                 savedData && 
+                                 (!lastQuotationStatus || !['approved', 'pending', 'in-negotiation'].includes(lastQuotationStatus)) &&
+                                 !localStorage.getItem('draft-banner-dismissed');
         
-        if (shouldAutoRestore) {
+        if (shouldShowBanner) {
           // Store draft info for banner component to handle
           localStorage.setItem('pending-draft-restore', JSON.stringify({
             data: savedData,
@@ -393,7 +390,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
             source: source,
             timeAgo: timeAgo
           }));
-          console.log(`📋 Borrador detectado, guardado para mostrar banner`);
+          console.log(`📋 Borrador detectado, guardado para mostrar banner - ${source} hace ${timeAgo} minutos`);
         } else if (!isRecent && savedData) {
           console.log(`⏰ Borrador encontrado pero es muy antiguo (${timeAgo} minutos)`);
           // Clean up old drafts

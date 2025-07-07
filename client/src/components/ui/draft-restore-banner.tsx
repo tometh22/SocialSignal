@@ -50,6 +50,7 @@ export const DraftRestoreBanner: React.FC = () => {
   const handleRestoreDraft = () => {
     if (draftInfo?.data) {
       setQuotationData(draftInfo.data);
+      localStorage.removeItem('draft-banner-dismissed'); // Allow future drafts to show banner
       console.log('📋 Borrador restaurado desde banner');
       handleDismiss();
     }
@@ -60,6 +61,7 @@ export const DraftRestoreBanner: React.FC = () => {
     localStorage.removeItem('draft-quotation');
     localStorage.removeItem('draft-quotation-backup');
     localStorage.removeItem('pending-draft-restore');
+    localStorage.setItem('draft-banner-dismissed', 'true');
     console.log('🆕 Usuario eligió empezar de nuevo');
     handleDismiss();
   };
@@ -67,6 +69,7 @@ export const DraftRestoreBanner: React.FC = () => {
   const handleDismiss = () => {
     setIsVisible(false);
     localStorage.removeItem('pending-draft-restore');
+    localStorage.setItem('draft-banner-dismissed', 'true');
   };
 
   const formatTimeAgo = (minutes: number): string => {
