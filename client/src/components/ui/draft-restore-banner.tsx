@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { X, Clock, User, FileText, Users, AlertCircle } from 'lucide-react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
@@ -84,10 +84,10 @@ export const DraftRestoreBanner: React.FC = () => {
   const { data, timeAgo } = draftInfo;
 
   return (
-    <Alert className="mb-6 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm">
-      <AlertCircle className="h-4 w-4 text-amber-600" />
-      <AlertDescription>
-        <div className="flex items-center justify-between">
+    <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <span className="text-sm font-semibold text-amber-900">📋 Borrador encontrado</span>
@@ -131,18 +131,18 @@ export const DraftRestoreBanner: React.FC = () => {
               </Button>
             </div>
           </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDismiss}
-            className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 p-1 h-6 w-6 ml-3 shrink-0"
-            title="Cerrar"
-          >
-            <X className="h-3 w-3" />
-          </Button>
         </div>
-      </AlertDescription>
-    </Alert>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDismiss}
+          className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 p-1 h-6 w-6 ml-3 flex-shrink-0"
+          title="Cerrar"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
   );
 };
