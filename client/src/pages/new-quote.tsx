@@ -77,17 +77,7 @@ export default function NewQuote() {
         <h2 className="text-lg font-semibold text-neutral-900">Nueva Cotización de Social Listening</h2>
       </div>
       
-      {/* Banner eliminado - ahora se maneja en optimized-quote.tsx */}nner}
-                size="sm"
-                variant="outline"
-                className="border-amber-300 text-amber-700 hover:bg-amber-100"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
+      
       
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto wizard-container">
