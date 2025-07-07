@@ -297,13 +297,36 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                         const draftData = JSON.parse(draft);
                         console.log('🔄 Restaurando borrador completo:', draftData);
                         
-                        // Usar la función correcta del contexto para restaurar TODO el borrador
+                        // Validar que los datos tienen la estructura correcta
+                        let dataToRestore = null;
                         if (draftData.quotationData) {
-                          // El formato guardado incluye quotationData como wrapper
-                          setQuotationDataDirect(draftData.quotationData);
+                          dataToRestore = draftData.quotationData;
                         } else {
-                          // Formato directo
-                          setQuotationDataDirect(draftData);
+                          dataToRestore = draftData;
+                        }
+                        
+                        // Validar estructura mínima antes de restaurar
+                        if (dataToRestore && typeof dataToRestore === 'object') {
+                          // Asegurar que project tiene la estructura correcta
+                          if (!dataToRestore.project) {
+                            dataToRestore.project = { name: "", type: "", duration: "" };
+                          }
+                          
+                          // Asegurar campos obligatorios de project
+                          if (!dataToRestore.project.name) dataToRestore.project.name = "";
+                          if (!dataToRestore.project.type) dataToRestore.project.type = "";
+                          if (!dataToRestore.project.duration) dataToRestore.project.duration = "";
+                          
+                          // Asegurar otros campos obligatorios
+                          if (!dataToRestore.teamMembers) dataToRestore.teamMembers = [];
+                          if (!dataToRestore.deliverables) dataToRestore.deliverables = [];
+                          if (!dataToRestore.financials) dataToRestore.financials = {};
+                          if (!dataToRestore.inflation) dataToRestore.inflation = {};
+                          
+                          console.log('✅ Estructura validada, restaurando datos:', dataToRestore);
+                          setQuotationDataDirect(dataToRestore);
+                        } else {
+                          console.warn('⚠️ Estructura de datos inválida en borrador');
                         }
                         localStorage.removeItem('draft-banner-dismissed');
                         setBannerVisible(false);
