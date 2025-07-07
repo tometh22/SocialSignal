@@ -37,7 +37,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     saveQuotation,
     loadQuotation,
     updateDeliverables,
-    updateAdditionalDeliverableCost
+    updateAdditionalDeliverableCost,
+    updateClient,
+    updateProjectName,
+    resetQuotation
   } = useOptimizedQuote();
 
   // Get quotation ID from URL if not passed as prop
@@ -291,7 +294,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                     onClick={() => {
                       try {
                         const draftData = JSON.parse(draft);
-                        setQuotationData(draftData);
+                        // Usar función directa del contexto para restaurar datos
+                        Object.keys(draftData).forEach(key => {
+                          if (key === 'client' && draftData.client) {
+                            updateClient(draftData.client);
+                          }
+                          if (key === 'project' && draftData.project?.name) {
+                            updateProjectName(draftData.project.name);
+                          }
+                        });
                         localStorage.removeItem('draft-banner-dismissed');
                         setBannerVisible(false);
                         console.log('✅ Borrador restaurado exitosamente');
@@ -310,7 +321,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                       localStorage.removeItem('draft-quotation');
                       localStorage.removeItem('draft-quotation-backup');
                       localStorage.setItem('draft-banner-dismissed', 'true');
-                      setQuotationData({});
+                      // Limpiar todos los datos usando resetQuotation
+                      resetQuotation();
                       setBannerVisible(false);
                       console.log('🆕 Empezando nuevo - datos limpiados');
                     }}
