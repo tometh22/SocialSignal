@@ -110,6 +110,20 @@ export const DraftRestoreBanner: React.FC = () => {
     setIsVisible(false);
   };
 
+  // TEMPORAL: Función para crear borrador de prueba
+  const createTestDraft = () => {
+    const testData = {
+      client: { name: 'Cliente Test', id: 1 },
+      project: { name: 'Proyecto Test' },
+      teamMembers: [{ name: 'Test User', role: 'Developer' }],
+      timestamp: Date.now()
+    };
+    localStorage.setItem('draft-quotation', JSON.stringify(testData));
+    localStorage.removeItem('draft-banner-dismissed');
+    console.log('📝 Borrador de prueba creado');
+    window.location.reload(); // Recargar para activar la detección
+  };
+
   const formatTimeAgo = (minutes: number): string => {
     if (minutes < 60) {
       return `${minutes} minuto${minutes !== 1 ? 's' : ''}`;
@@ -121,11 +135,28 @@ export const DraftRestoreBanner: React.FC = () => {
   // Force show banner for testing
   console.log('🔍 BANNER - Render check - isVisible:', isVisible, 'draftInfo:', !!draftInfo);
 
-  // TEMPORAL: Forzar visible para debug hasta que funcione la detección
-  const hasActualDraft = localStorage.getItem('draft-quotation') || localStorage.getItem('draft-quotation-backup');
-  console.log('🔍 BANNER - hasActualDraft:', !!hasActualDraft, 'isVisible:', isVisible, 'draftInfo:', !!draftInfo);
+  // Verificación directa y forzada de localStorage
+  const draftQuotation = localStorage.getItem('draft-quotation');
+  const draftBackup = localStorage.getItem('draft-quotation-backup');
+  const pendingRestore = localStorage.getItem('pending-draft-restore');
+  const dismissed = localStorage.getItem('draft-banner-dismissed');
   
-  if (!isVisible && !draftInfo && !hasActualDraft) {
+  console.log('🔍 BANNER DEBUG:');
+  console.log('  - draft-quotation:', !!draftQuotation);
+  console.log('  - draft-quotation-backup:', !!draftBackup);
+  console.log('  - pending-draft-restore:', !!pendingRestore);
+  console.log('  - banner-dismissed:', !!dismissed);
+  console.log('  - isVisible:', isVisible);
+  console.log('  - draftInfo:', !!draftInfo);
+  
+  // Mostrar banner si hay cualquier borrador Y no está descartado
+  const shouldShow = (draftQuotation || draftBackup || pendingRestore || isVisible || draftInfo) && !dismissed;
+  
+  // TEMPORAL: Forzar aparición del banner para testing
+  const forceShow = !dismissed;
+  console.log('  - shouldShow:', shouldShow, 'forceShow:', forceShow);
+  
+  if (!shouldShow && !forceShow) {
     return null;
   }
 
