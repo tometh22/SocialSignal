@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Clock, User, FileText, Users, AlertCircle } from 'lucide-react';
+import { X, Clock, User, FileText, Users, AlertCircle, RefreshCw, Plus } from 'lucide-react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 
 interface DraftInfo {
@@ -89,10 +89,11 @@ export const DraftRestoreBanner: React.FC = () => {
 
   const handleRestoreDraft = () => {
     if (draftInfo?.data) {
+      console.log('📋 Restaurando borrador:', draftInfo.data);
       setQuotationData(draftInfo.data);
-      localStorage.removeItem('draft-banner-dismissed'); // Allow future drafts to show banner
-      console.log('📋 Borrador restaurado desde banner');
-      handleDismiss();
+      localStorage.removeItem('draft-banner-dismissed');
+      setIsVisible(false);
+      console.log('✅ Borrador restaurado exitosamente');
     }
   };
 
@@ -121,11 +122,8 @@ export const DraftRestoreBanner: React.FC = () => {
   // Force show banner for testing
   console.log('🔍 BANNER - Render check - isVisible:', isVisible, 'draftInfo:', !!draftInfo);
 
-  // Simplificar - mostrar siempre si hay draft info O isVisible
-  // TEMPORAL: Mostrar banner siempre para testing
-  const shouldShow = isVisible || draftInfo || true; // El 'true' es temporal
-  
-  if (!shouldShow) {
+  // Solo mostrar si hay datos de borrador válidos o está marcado como visible
+  if (!isVisible && !draftInfo) {
     return null;
   }
 
