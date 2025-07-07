@@ -786,7 +786,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           type: quotation.projectType || "on-demand",
           duration: quotation.projectDuration || ""
         },
-        analysisType: quotation.analysisType || "standard",```python
+        analysisType: quotation.analysisType || "standard",
         mentionsVolume: quotation.mentionsVolume || "medium",
         countriesCovered: quotation.countriesCovered || "1",
         clientEngagement: quotation.clientEngagement || "medium",
