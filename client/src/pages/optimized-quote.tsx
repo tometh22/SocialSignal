@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { DraftRestoreBanner } from '@/components/ui/draft-restore-banner';
@@ -242,21 +242,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             Volver
           </Button>
 
-          {/* Debug button to clear all drafts */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const keys = ['draft-quotation', 'draft-quotation-backup', 'pending-draft-restore', 'emergency-draft'];
-              keys.forEach(key => localStorage.removeItem(key));
-              console.log('🧹 All draft data cleared');
-              window.location.reload();
-            }}
-            className="text-red-600 hover:text-red-800 hover:bg-red-50"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Limpiar Drafts
-          </Button>
+          
 
           <Button
             variant="ghost"
