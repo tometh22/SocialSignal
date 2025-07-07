@@ -91,8 +91,12 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
     }
   };
 
-  // Componente invisible pero funcional - mantiene la lógica pero no se muestra
-  return null;
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${getStatusColor()}`}>
+      {getStatusIcon()}
+      <span>{getStatusText()}</span>
+    </div>
+  );
 };
 
 export default AutosaveIndicator;
