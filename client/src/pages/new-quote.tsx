@@ -77,34 +77,7 @@ export default function NewQuote() {
         <h2 className="text-lg font-semibold text-neutral-900">Nueva Cotización de Social Listening</h2>
       </div>
       
-      {/* Pending Changes Banner */}
-      {console.log('🔍 Banner render check:', { showBanner, pendingDraft: !!pendingDraft })}
-      {showBanner && pendingDraft && (
-        <Alert className="mx-4 mt-4 border-amber-200 bg-amber-50">
-          <Info className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="font-medium text-amber-800">
-                  Cambios pendientes detectados
-                </p>
-                <p className="text-sm text-amber-700">
-                  Tienes un borrador guardado {formatTimeAgo(pendingDraft.timeAgo)} desde {pendingDraft.source}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex gap-2 ml-4">
-              <Button
-                onClick={handleRestoreDraft}
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                <RotateCcw className="w-4 h-4 mr-1" />
-                Restaurar
-              </Button>
-              <Button
-                onClick={handleDismissBanner}
+      {/* Banner eliminado - ahora se maneja en optimized-quote.tsx */}nner}
                 size="sm"
                 variant="outline"
                 className="border-amber-300 text-amber-700 hover:bg-amber-100"

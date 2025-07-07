@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Clock, User, FileText, Users } from 'lucide-react';
+import { X, Clock, User, FileText, Users, AlertCircle } from 'lucide-react';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 
 interface DraftInfo {
@@ -19,40 +19,31 @@ export const DraftRestoreBanner: React.FC = () => {
   useEffect(() => {
     console.log('🔍 DRAFT RESTORE BANNER - Component mounted');
     
-    // Check for pending draft restore
-    const pendingDraft = localStorage.getItem('pending-draft-restore');
-    console.log('🔍 DRAFT RESTORE BANNER - Pending draft:', pendingDraft);
-    
-    // Also check regular draft for debugging
-    const regularDraft = localStorage.getItem('draft-quotation');
-    console.log('🔍 DRAFT RESTORE BANNER - Regular draft:', regularDraft ? 'exists' : 'none');
-    
-    // List all localStorage keys
-    const allKeys = Object.keys(localStorage);
-    console.log('🔍 DRAFT RESTORE BANNER - All localStorage keys:', allKeys);
+    try {
+      // Check for pending draft restore
+      const pendingDraft = localStorage.getItem('pending-draft-restore');
+      console.log('🔍 DRAFT RESTORE BANNER - Pending draft:', pendingDraft);
 
-    if (pendingDraft) {
-      try {
+      if (pendingDraft) {
         const parsed = JSON.parse(pendingDraft);
         console.log('🔍 DRAFT RESTORE BANNER - Parsed pending draft:', parsed);
-        setDraftInfo(parsed);
-        setIsVisible(true);
-        console.log('✅ DRAFT RESTORE BANNER - Banner should be visible now');
-      } catch (error) {
-        console.error('❌ DRAFT RESTORE BANNER - Error parsing pending draft:', error);
-        localStorage.removeItem('pending-draft-restore');
-      }
-    } else {
-      console.log('ℹ️ DRAFT RESTORE BANNER - No pending draft found');
-      
-      // Clear any old draft data that might be causing issues
-      const keysToCheck = ['draft-quotation', 'draft-quotation-backup', 'emergency-draft'];
-      keysToCheck.forEach(key => {
-        const value = localStorage.getItem(key);
-        if (value) {
-          console.log(`🔍 DRAFT RESTORE BANNER - Found ${key}:`, value.substring(0, 100) + '...');
+        
+        // Validar que el draft tenga datos válidos
+        if (parsed.data && typeof parsed.timeAgo === 'number') {
+          setDraftInfo(parsed);
+          setIsVisible(true);
+          console.log('✅ DRAFT RESTORE BANNER - Banner should be visible now');
+        } else {
+          console.warn('⚠️ DRAFT RESTORE BANNER - Invalid draft data structure');
+          localStorage.removeItem('pending-draft-restore');
         }
-      });
+      } else {
+        console.log('ℹ️ DRAFT RESTORE BANNER - No pending draft found');
+      }
+    } catch (error) {
+      console.error('❌ DRAFT RESTORE BANNER - Error in useEffect:', error);
+      // Limpiar datos corruptos
+      localStorage.removeItem('pending-draft-restore');
     }
   }, []);
 
@@ -93,66 +84,70 @@ export const DraftRestoreBanner: React.FC = () => {
   const { data, timeAgo } = draftInfo;
 
   return (
-    <Card className="mb-6 border-blue-200 bg-blue-50/50">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 mt-1">
-              <Clock className="h-5 w-5 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">
-                Borrador encontrado
-              </h3>
-              <div className="text-sm text-blue-700 space-y-1">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-1">
-                    <User className="h-4 w-4" />
-                    <span>{data.client?.name || 'Sin cliente'}</span>
+    <div className="mb-6 animate-in slide-in-from-top-4 duration-300">
+      <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-md">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0 mt-1">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-amber-900 mb-2">
+                  📋 Borrador encontrado
+                </h3>
+                <div className="text-sm text-amber-800 space-y-2">
+                  <div className="flex items-center space-x-4 flex-wrap">
+                    <div className="flex items-center space-x-1">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">{data.client?.name || 'Sin cliente'}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <FileText className="h-4 w-4" />
+                      <span className="font-medium">{data.project?.name || 'Sin nombre'}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Users className="h-4 w-4" />
+                      <span className="font-medium">{data.teamMembers?.length || 0} miembros</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <FileText className="h-4 w-4" />
-                    <span>{data.project?.name || 'Sin nombre'}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Users className="h-4 w-4" />
-                    <span>{data.teamMembers?.length || 0} miembros</span>
-                  </div>
+                  <p className="text-xs text-amber-600 flex items-center space-x-1">
+                    <Clock className="h-3 w-3" />
+                    <span>Guardado hace {formatTimeAgo(timeAgo)}</span>
+                  </p>
                 </div>
-                <p className="text-xs text-blue-600">
-                  Guardado hace {formatTimeAgo(timeAgo)}
-                </p>
-              </div>
-              <div className="flex items-center space-x-3 mt-3">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleRestoreDraft}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Continuar con borrador
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleStartFresh}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                >
-                  Empezar nueva cotización
-                </Button>
+                <div className="flex items-center space-x-3 mt-3">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleRestoreDraft}
+                    className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                  >
+                    ✅ Continuar con borrador
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleStartFresh}
+                    className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                  >
+                    🆕 Empezar nueva cotización
+                  </Button>
+                </div>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDismiss}
+              className="text-amber-500 hover:text-amber-700 hover:bg-amber-100 p-1 ml-2"
+              title="Cerrar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDismiss}
-            className="text-blue-400 hover:text-blue-600 hover:bg-blue-100 p-1"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

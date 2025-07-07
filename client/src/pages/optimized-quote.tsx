@@ -267,16 +267,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       }
     >
 
-      {/* Draft Restore Banner */}
-      {(() => {
-        console.log('🔍 OPTIMIZED QUOTE - Banner render check:', { 
-          isEditing, 
-          effectiveQuotationId,
-          pendingDraft: localStorage.getItem('pending-draft-restore'),
-          shouldShow: !isEditing
-        });
-        return !isEditing ? <DraftRestoreBanner /> : null;
-      })()}
+      {/* Draft Restore Banner - Solo en cotizaciones nuevas */}
+      {!isEditing && <DraftRestoreBanner />}
 
       {/* Progress indicator */}
       <div className="standard-card mb-6">
