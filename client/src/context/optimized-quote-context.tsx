@@ -338,32 +338,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     return () => clearInterval(saveInterval);
   }, [quotationData]);
 
-  // Detección simplificada de borradores
+  // Draft detection disabled - clean up any existing drafts on load
   useEffect(() => {
-    const draft = localStorage.getItem('draft-quotation');
-
-    if (draft) {
-      try {
-        const draftParsed = JSON.parse(draft);
-        const quotationData = draftParsed.quotationData || draftParsed;
-        const timestamp = draftParsed.timestamp || Date.now();
-
-        const timeAgo = Math.round((Date.now() - timestamp) / (1000 * 60));
-        const isRecent = timeAgo < 2880; // 48 horas
-
-        console.log(`📋 Borrador detectado - hace ${timeAgo} minutos, reciente: ${isRecent}`);
-
-        // Limpiar borradores antiguos
-        if (!isRecent) {
-          localStorage.removeItem('draft-quotation');
-          localStorage.removeItem('draft-quotation-backup');
-          console.log('🧹 Borrador antiguo eliminado');
-        }
-      } catch (error) {
-        console.error('❌ Error parsing draft data:', error);
-        localStorage.removeItem('draft-quotation');
-      }
-    }
+    // Clear any existing draft data to prevent issues
+    localStorage.removeItem('draft-quotation');
+    localStorage.removeItem('draft-quotation-backup');
+    localStorage.removeItem('pending-draft-restore');
+    console.log('🧹 Draft data cleared on component mount');
   }, []);
 
   // Calculate recommended roles based on template

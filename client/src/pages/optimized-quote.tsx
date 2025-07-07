@@ -271,10 +271,6 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       }
     >
 
-      {/* Banner de restauración de borradores */}
-
-
-
       {/* Progress indicator */}
       <div className="standard-card mb-6">
         <div className="card-content py-4">
