@@ -119,7 +119,12 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     personnelName: member.personnel?.name || member.personnelName || 'Sin nombre',
     roleName: member.role?.name || member.roleName || 'Sin rol',
     hourlyRate: member.personnel?.hourlyRate || member.hourlyRate || 0,
-    rate: member.personnel?.hourlyRate || member.rate || 0
+    rate: member.personnel?.hourlyRate || member.rate || 0,
+    // Asegurar que role siempre tenga la estructura correcta
+    role: member.role ? {
+      ...member.role,
+      name: member.role.name || 'Sin rol'
+    } : { name: 'Sin rol' }
   })) : [];
 
   // Cargar datos guardados al montar el componente
@@ -565,7 +570,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                             </Avatar>
                             <div>
                               <div className="font-medium text-gray-900 text-sm">{member.name || member.personnelName || 'Sin nombre'}</div>
-                              <div className="text-xs text-gray-500">{member.role || member.roleName || 'Sin rol'}</div>
+                              <div className="text-xs text-gray-500">{member.role?.name || member.roleName || 'Sin rol'}</div>
                             </div>
                           </div>
                         </td>
