@@ -541,13 +541,28 @@ export default function ProjectDetailsRedesigned() {
       
       const filtered = entries.filter((entry: TimeEntry) => {
         const entryDate = new Date(entry.date);
-        const isInRange = entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
+        // Normalizar las fechas para comparación exacta (solo fecha, sin hora)
+        const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
+        const startDateOnly = new Date(dateFilter.startDate.getFullYear(), dateFilter.startDate.getMonth(), dateFilter.startDate.getDate());
+        const endDateOnly = new Date(dateFilter.endDate.getFullYear(), dateFilter.endDate.getMonth(), dateFilter.endDate.getDate());
+        
+        const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
+        
+        console.log('🔍 Comparando entrada:', {
+          entryDate: entry.date,
+          entryDateOnly: entryDateOnly.toISOString(),
+          startDateOnly: startDateOnly.toISOString(),
+          endDateOnly: endDateOnly.toISOString(),
+          isInRange
+        });
+        
         return isInRange;
       });
       
       console.log('🔍 Entradas filtradas:', {
         filteredCount: filtered.length,
-        originalCount: entries.length
+        originalCount: entries.length,
+        sampleFiltered: filtered.slice(0, 3).map(e => ({ date: e.date, hours: e.hours, name: e.personnelName }))
       });
       
       return filtered;
