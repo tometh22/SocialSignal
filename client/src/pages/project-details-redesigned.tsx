@@ -775,42 +775,32 @@ export default function ProjectDetailsRedesigned() {
   // Cálculo de resumen de costos usando filtro temporal
   const costSummary = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return null;
-
+    
     const projectData = project as any;
-    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
+    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
     
-    // Aplicar filtro temporal a todas las entradas
-    const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
-    let totalBudget = 0;
-    
-    if (isAlwaysOnContract) {
-      // Para contratos Always On, calcular presupuesto proporcionalmente
-      const monthlyBudget = projectData.quotation?.baseCost || projectData.quotation?.totalAmount || 0;
-      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const daysInMonth = 30;
-      totalBudget = (monthlyBudget * daysDiff) / daysInMonth;
-    } else {
-      // Para proyectos únicos, calcular presupuesto proporcionalmente
-      const totalProjectBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
-      const projectStart = new Date(projectData.startDate || new Date());
-      const projectEnd = new Date(projectData.expectedEndDate || new Date());
-      const totalProjectDays = Math.max(1, Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)));
-      const filterDays = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
-      totalBudget = (totalProjectBudget * filterDays) / totalProjectDays;
-    }
-    
-    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+    const totalCost = filteredEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRate || 100)), 0);
     
-    const budgetUtilization = totalBudget > 0 ? (totalCost / totalBudget) * 100 : 0;
-    const profitMargin = totalBudget > 0 ? ((totalBudget - totalCost) / totalBudget) * 100 : 0;
+    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
+    const baseBudget = projectData.quotation?.baseCost || projectData.quotation?.totalAmount || 0;
+    
+    let budget = baseBudget;
+    if (isAlwaysOnContract) {
+      // Para contratos Always On, calcular presupuesto proporcionalmente al período
+      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysInMonth = 30;
+      budget = (baseBudget * daysDiff) / daysInMonth;
+    }
+    
+    const budgetUtilization = budget > 0 ? (totalCost / budget) * 100 : 0;
     
     return {
-      totalBudget,
       totalCost,
+      budget,
       budgetUtilization,
-      profitMargin,
-      period: dateFilter.label
+      savings: budget - totalCost,
+      filteredHours: filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0)
     };
   }, [project, timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
