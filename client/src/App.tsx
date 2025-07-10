@@ -2,43 +2,37 @@ import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard-fixed-corrected";
+// Core Pages
 import ExecutiveDashboard from "@/pages/executive-dashboard";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
-import QuoteDetails from "@/pages/quote-details";
 import QuotationDetail from "@/pages/quotation-detail";
 import QuoteRedirect from "@/pages/quote-redirect";
-import HuggiesPage from "@/pages/huggies-page";
 import Clients from "@/pages/clients";
-import Statistics from "@/pages/statistics-fixed";
+import AnalyticsConsolidated from "@/pages/analytics-consolidated";
 import Admin from "@/pages/admin-fixed";
 import AdminInflation from "@/pages/admin-inflation";
-import ActiveProjects from "@/pages/active-projects-redesigned";
+
+// Project Management Pages
+import ActiveProjects from "@/pages/active-projects";
 import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
-// Dashboard moderno mantenido - todos los antiguos eliminados
+
+// Analytics & Specialized Pages
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
-import VersionSelector from "@/pages/selector-version";
-import ClientSummary from "@/pages/client-summary";
-import ClientSummaryEnhanced from "@/pages/client-summary-enhanced";
 import ClientSummaryCompact from "@/pages/client-summary-compact";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
+
+// Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
-import WarnerTeamTemplate from "@/pages/temp-helpers/apply-warner-team";
 import EditDeliverable from "@/pages/edit-deliverable";
 import EditRobustnessPage from "@/pages/edit-robustness";
-// Importamos directamente el componente de edición de proyectos Always On
-import EditAlwaysOnProject from "@/pages/edit-always-on-project";
-import AlwaysOnDeliverablesDemo from "@/pages/always-on-deliverables-demo";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import RecurringTemplatesPage from "@/pages/recurring-templates";
-import AlwaysOnLanding from "@/pages/always-on-landing";
-import TestAlwaysOn from "@/pages/test-always-on";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -47,13 +41,6 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useEffect } from "react";
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { PageLayout } from '@/components/ui/page-layout';
-import { Download, Eye, Plus, RefreshCw, TrendingUp } from "lucide-react";
-import { KpiRibbon } from "@/components/dashboard/kpi-ribbon";
-import { DeviationSection } from "@/components/dashboard/deviation-section";
-import { ChartsSection } from "@/components/dashboard/charts-section";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -117,50 +104,52 @@ function AppRoutes() {
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
-                  <ProtectedRoute path="/recurring-templates" component={AlwaysOnLanding} />
+                  {/* Core Application Routes */}
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
+                  
+                  {/* Quotation Management */}
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
                   <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
-                  <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
-                  <ProtectedRoute path="/huggies" component={HuggiesPage} />
                   <ProtectedRoute path="/new-quote" component={() => <Redirect to="/optimized-quote" />} />
                   <ProtectedRoute path="/quotations" component={ManageQuotes} />
-                  <ProtectedRoute path="/manage-quotes" component={ManageQuotes} />
-                  <ProtectedRoute path="/quote/:id" component={QuoteDetails} />
                   <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
-                  <ProtectedRoute path="/quotation/:id" component={QuotationDetail} />
-                  <ProtectedRoute path="/clients" component={Clients} />
-                  <ProtectedRoute path="/statistics" component={Statistics} />
-                  <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
-                  <ProtectedRoute path="/admin" component={Admin} />
-
-                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
-
-                  {/* Rutas para gestión de proyectos activos */}
+                  <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
+                  
+                  {/* Legacy Redirects for Quotations */}
+                  <ProtectedRoute path="/manage-quotes" component={() => <Redirect to="/quotations" />} />
+                  <ProtectedRoute path="/quotation/:id" component={() => <Redirect to="/quotations/:id" />} />
+                  
+                  {/* Project Management */}
+                  <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
-                  <ProtectedRoute path="/project-details/:id" component={ProjectDetailsRedesigned} />
+                  <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} />
-                  <ProtectedRoute path="/active-projects" component={ActiveProjects} />
-                  <ProtectedRoute path="/active-projects/:projectId/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
-                  {/* Ruta moderna para proyecto analytics */}
-                  <ProtectedRoute path="/project-summary/:projectId" component={ProjectAnalyticsView} />
+                  
+                  {/* Analytics & Reports */}
+                  <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} />
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
-                  <ProtectedRoute path="/project-summary-selector/:projectId" component={VersionSelector} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} />
-                  <ProtectedRoute path="/client-summary-compact/:clientId" component={ClientSummaryCompact} />
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} />
-                  <ProtectedRoute path="/temp-helpers/apply-warner-team" component={WarnerTeamTemplate} />
+                  
+                  {/* Client & Resource Management */}
+                  <ProtectedRoute path="/clients" component={Clients} />
+                  <ProtectedRoute path="/admin" component={Admin} />
+                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
+                  
+                  {/* Specialized Tools */}
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
-                  <ProtectedRoute path="/always-on-demo" component={AlwaysOnDeliverablesDemo} />
-                  <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
-                  <ProtectedRoute path="/edit-always-on/:projectId" component={EditRobustnessPage} />
-                  <ProtectedRoute path="/projects/:projectId/recurring-templates" component={RecurringTemplatesPage} />
-                  <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
+                  <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
+                  <ProtectedRoute path="/recurring-templates/:projectId" component={RecurringTemplatesPage} />
+                  
+                  {/* Legacy Redirects */}
+                  <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
+                  <ProtectedRoute path="/project-details/:id" component={() => <Redirect to="/active-projects/:id" />} />
+                  
                   <Route component={NotFound} />
                 </Switch>
               </div>

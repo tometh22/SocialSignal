@@ -72,15 +72,15 @@ export default function SidebarFixed() {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  // Navegación compacta sin secciones expandibles
+  // Navegación simplificada y organizada
   const navItems = [
-    { href: "/", title: "Dashboard", icon: LayoutDashboard },
-    { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const },
-    { href: "/manage-quotes", title: "Cotizaciones", icon: FileText },
-    { href: "/active-projects", title: "Proyectos", icon: Briefcase, badge: projectCount.toString() },
-    { href: "/clients", title: "Clientes", icon: Building2 },
-    { href: "/statistics", title: "Análisis", icon: BarChart3 },
-    { href: "/admin", title: "Configuración", icon: Settings },
+    { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" },
+    { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
+    { href: "/quotations", title: "Gestión de Cotizaciones", icon: FileText, description: "Ver y editar cotizaciones" },
+    { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Gestión de proyectos en curso" },
+    { href: "/clients", title: "Clientes", icon: Building2, description: "Información de clientes" },
+    { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
+    { href: "/admin", title: "Configuración", icon: Settings, description: "Admin del sistema" },
   ];
 
   // Renderizar enlace de navegación compacto
