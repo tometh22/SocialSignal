@@ -112,8 +112,15 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     queryKey: ['/api/personnel'],
   });
 
-  // Obtener miembros del equipo - asegurar que siempre sea un array
-  const teamMembers = Array.isArray(baseTeam) ? baseTeam : (baseTeam ? [baseTeam] : []);
+  // Obtener miembros del equipo - asegurar que siempre sea un array y mapear la estructura
+  const teamMembers = Array.isArray(baseTeam) ? baseTeam.map(member => ({
+    ...member,
+    name: member.personnel?.name || member.name || 'Sin nombre',
+    personnelName: member.personnel?.name || member.personnelName || 'Sin nombre',
+    roleName: member.role?.name || member.roleName || 'Sin rol',
+    hourlyRate: member.personnel?.hourlyRate || member.hourlyRate || 0,
+    rate: member.personnel?.hourlyRate || member.rate || 0
+  })) : [];
 
   // Cargar datos guardados al montar el componente
   useEffect(() => {
@@ -194,7 +201,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
   };
 
   const addTimeEntry = () => {
-    if (!baseTeam || baseTeam.length === 0) {
+    if (!teamMembers || teamMembers.length === 0) {
       toast({
         title: "No hay equipo base",
         description: "Configura primero el equipo base del proyecto",
@@ -203,7 +210,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       return;
     }
 
-    const firstMember = baseTeam[0];
+    const firstMember = teamMembers[0];
     const newEntry: TimeEntry = {
       personnelId: firstMember.personnelId,
       roleId: firstMember.roleId,
@@ -537,7 +544,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {(Array.isArray(teamMembers) ? teamMembers : []).filter(member => member && member.personnelId && typeof member === 'object').map((member, index) => {
+                  {teamMembers.filter(member => member && member.personnelId && typeof member === 'object').map((member, index) => {
                     const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
                     const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : (member.hourlyRate || member.rate || 0);
 
