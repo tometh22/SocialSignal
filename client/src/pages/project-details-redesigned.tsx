@@ -324,7 +324,7 @@ export default function ProjectDetailsRedesigned() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
@@ -836,223 +836,228 @@ export default function ProjectDetailsRedesigned() {
 
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-5 w-full max-w-2xl">
-            <TabsTrigger value="overview" className="flex items-center gap-2 text-sm">
-              <Eye className="h-3 w-3" />
-              Resumen
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid grid-cols-3 w-full max-w-xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+            <TabsTrigger 
+              value="dashboard" 
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
+            >
+              <Gauge className="h-4 w-4" />
+              Dashboard
             </TabsTrigger>
-            <TabsTrigger value="time" className="flex items-center gap-2 text-sm">
-              <Clock className="h-3 w-3" />
-              Tiempo
+            <TabsTrigger 
+              value="operations" 
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+            >
+              <Activity className="h-4 w-4" />
+              Operaciones
             </TabsTrigger>
-            <TabsTrigger value="team" className="flex items-center gap-2 text-sm">
-              <Users className="h-3 w-3" />
-              Equipo
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2 text-sm">
-              <BarChart3 className="h-3 w-3" />
-              Analíticas
-            </TabsTrigger>
-            <TabsTrigger value="details" className="flex items-center gap-2 text-sm">
-              <FileText className="h-3 w-3" />
-              Detalles
+            <TabsTrigger 
+              value="analytics" 
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Análisis
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
-            {/* Grid de 3 columnas para mejor uso del espacio */}
-            <div className="grid grid-cols-3 gap-4">
-              {/* Progreso del proyecto */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Gauge className="h-4 w-4 text-blue-600" />
-                    Progreso del Proyecto
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="font-medium">Avance General</span>
-                      <span className="font-bold">{metrics[2]?.value}</span>
-                    </div>
-                    <Progress value={parseFloat(metrics[2]?.value.replace('%', '') || '0')} className="h-3" />
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Horas trabajadas</span>
-                      <span className="font-semibold">{metrics[1]?.value}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Presupuesto usado</span>
-                      <span className="font-semibold">{metrics[0]?.subtitle}</span>
-                    </div>
-                  </div>
-
-                  {parseFloat(metrics[2]?.value.replace('%', '') || '0') > 100 && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
-                      <div className="flex items-center gap-2 text-red-700">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span className="font-medium text-xs">Proyecto excedido</span>
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* KPIs Ejecutivos */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {metrics.map((metric, index) => {
+                const IconComponent = metric.icon;
+                return (
+                  <Card key={index} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600 mb-1">{metric.label}</p>
+                          <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
+                          {metric.subtitle && (
+                            <p className="text-xs text-gray-500 mt-1">{metric.subtitle}</p>
+                          )}
+                        </div>
+                        <div className={`p-3 rounded-lg ${metric.bgColor}`}>
+                          <IconComponent className={`h-5 w-5 ${metric.color}`} />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
 
-              {/* Actividad reciente */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Activity className="h-4 w-4 text-green-600" />
-                    Actividad Reciente
+            {/* Grid principal del dashboard */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Progreso y Estado */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gauge className="h-5 w-5 text-blue-600" />
+                    Vista General del Proyecto
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {recentTimeEntries.length > 0 ? (
-                      recentTimeEntries.slice(0, 3).map((entry: TimeEntry, index) => (
-                        <div key={entry.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium text-xs">{entry.personnelName}</p>
-                              <p className="text-xs text-gray-500">
-                                {new Date(entry.date).toLocaleDateString('es-ES')}
-                              </p>
-                            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Progreso Visual */}
+                    <div>
+                      <h4 className="font-semibold text-sm mb-3">Progreso del Proyecto</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Avance General</span>
+                            <span className="font-bold">{metrics[2]?.value}</span>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-xs">{entry.hours}h</p>
-                          </div>
+                          <Progress 
+                            value={parseFloat(metrics[2]?.value.replace('%', '') || '0')} 
+                            className="h-2"
+                          />
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-gray-500">
-                        <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                        <p className="text-xs">No hay registros aún</p>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Utilización Presupuesto</span>
+                            <span className="font-bold">{metrics[0]?.value}</span>
+                          </div>
+                          <Progress 
+                            value={parseFloat(metrics[0]?.value.replace('%', '') || '0')} 
+                            className="h-2"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Información Clave */}
+                    <div>
+                      <h4 className="font-semibold text-sm mb-3">Información Clave</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Cliente</span>
+                          <span className="font-medium">{clientName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Estado</span>
+                          <Badge variant={projectData.status === 'active' ? 'default' : 'secondary'}>
+                            {metrics[3]?.value}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Tipo</span>
+                          <span className="font-medium">{projectData.deliverableType || "No especificado"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Fecha límite</span>
+                          <span className="font-medium">
+                            {projectData.expectedEndDate ? 
+                              new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : 
+                              "No definida"
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Alertas y Estado */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    Centro de Alertas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* Alertas dinámicas */}
+                    {costSummary?.budgetUtilization && costSummary.budgetUtilization > 100 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-red-700 mb-1">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span className="font-medium text-sm">Presupuesto Excedido</span>
+                        </div>
+                        <p className="text-xs text-red-600">
+                          El proyecto ha superado el presupuesto asignado en {(costSummary.budgetUtilization - 100).toFixed(1)}%
+                        </p>
+                      </div>
+                    )}
+
+                    {project?.expectedEndDate && new Date(project.expectedEndDate) < new Date() && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-red-700 mb-1">
+                          <CalendarClock className="h-4 w-4" />
+                          <span className="font-medium text-sm">Proyecto Retrasado</span>
+                        </div>
+                        <p className="text-xs text-red-600">
+                          El proyecto ha superado su fecha límite estimada
+                        </p>
+                      </div>
+                    )}
+
+                    {costSummary?.budgetUtilization && costSummary.budgetUtilization > 80 && costSummary.budgetUtilization <= 100 && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-yellow-700 mb-1">
+                          <DollarSign className="h-4 w-4" />
+                          <span className="font-medium text-sm">Presupuesto Crítico</span>
+                        </div>
+                        <p className="text-xs text-yellow-600">
+                          El presupuesto está al {costSummary.budgetUtilization.toFixed(1)}% de utilización
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Estado general */}
+                    {(!costSummary?.budgetUtilization || costSummary.budgetUtilization <= 80) && 
+                     (!project?.expectedEndDate || new Date(project.expectedEndDate) >= new Date()) && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-green-700 mb-1">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="font-medium text-sm">Proyecto Saludable</span>
+                        </div>
+                        <p className="text-xs text-green-600">
+                          El proyecto está dentro de los parámetros normales
+                        </p>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Información útil del proyecto */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <FileText className="h-4 w-4 text-purple-600" />
-                    Información del Proyecto
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Tipo de entregable</p>
-                    <p className="font-semibold text-sm">{projectData.deliverableType || "No especificado"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Fecha de inicio</p>
-                    <p className="font-semibold text-sm">
-                      {projectData.startDate ? new Date(projectData.startDate).toLocaleDateString('es-ES') : "No definida"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Fecha estimada de fin</p>
-                    <p className="font-semibold text-sm">
-                      {projectData.expectedEndDate ? new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : "No definida"}
-                    </p>
-                  </div>
-                  {projectData.notes && (
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">Notas</p>
-                      <p className="text-xs text-gray-800 line-clamp-2">{projectData.notes}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
-          </TabsContent>
 
-          <TabsContent value="time" className="space-y-6">
+            {/* Actividad Reciente */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CalendarClock className="h-5 w-5 text-blue-600" />
-                    Registros de Tiempo
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Ver Todos
-                  </Button>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-green-600" />
+                  Actividad Reciente del Equipo
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {Array.isArray(timeEntries) && timeEntries.length > 0 ? (
-                    timeEntries.slice(0, 10).map((entry: TimeEntry) => (
-                      <div key={entry.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 group">
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback>
-                              {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{entry.personnelName}</p>
-                            <p className="text-sm text-gray-500">{entry.roleName}</p>
-                            {entry.description && (
-                              <p className="text-xs text-gray-400 mt-1">{entry.description}</p>
-                            )}
-                          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {recentTimeEntries.length > 0 ? (
+                    recentTimeEntries.slice(0, 6).map((entry: TimeEntry) => (
+                      <div key={entry.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-blue-500 text-white text-sm">
+                            {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{entry.personnelName}</p>
+                          <p className="text-xs text-gray-500">{entry.roleName}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(entry.date).toLocaleDateString('es-ES')}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-semibold text-lg">{entry.hours}h</p>
-                            <p className="text-sm text-gray-500">
-                              {new Date(entry.date).toLocaleDateString('es-ES')}
-                            </p>
-                            {entry.hourlyRate && (
-                              <p className="text-xs text-gray-400">
-                                ${(entry.hours * entry.hourlyRate).toFixed(0)}
-                              </p>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTimeEntry(entry.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
-                            disabled={deleteTimeEntryMutation.isPending}
-                          >
-                            {deleteTimeEntryMutation.isPending && entryToDelete === entry.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-blue-600">{entry.hours}h</p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-12">
-                      <Timer className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay registros de tiempo</h3>
-                      <p className="text-gray-600 mb-4">Comienza registrando las primeras horas de trabajo.</p>
-                      <Button onClick={() => setShowQuickRegister(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Registrar Tiempo
-                      </Button>
+                    <div className="col-span-full text-center py-8 text-gray-500">
+                      <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No hay actividad registrada aún</p>
                     </div>
                   )}
                 </div>
@@ -1060,16 +1065,203 @@ export default function ProjectDetailsRedesigned() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="team" className="space-y-6">
+          <TabsContent value="operations" className="space-y-6">
+            {/* Vista operacional integrada */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Gestión de Tiempo */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      Gestión de Tiempo
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowQuickRegister(true)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Registrar
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Resumen rápido */}
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Horas este período</p>
+                        <p className="text-xl font-bold text-blue-600">{metrics[1]?.value}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Costo acumulado</p>
+                        <p className="text-xl font-bold text-green-600">
+                          ${costSummary?.totalCost?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Últimos registros */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3">Registros Recientes</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {recentTimeEntries.length > 0 ? (
+                          recentTimeEntries.slice(0, 5).map((entry: TimeEntry) => (
+                            <div key={entry.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs bg-blue-500 text-white">
+                                    {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium text-sm">{entry.personnelName}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(entry.date).toLocaleDateString('es-ES')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-sm">{entry.hours}h</p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteTimeEntry(entry.id)}
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            <Clock className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">No hay registros aún</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Gestión de Equipo */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-green-600" />
+                    Equipo y Asignaciones
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Estadísticas de equipo */}
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Miembros activos</p>
+                        <p className="text-xl font-bold text-green-600">
+                          {timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => entry.personnelName)).size : 0}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600">Promedio h/día</p>
+                        <p className="text-xl font-bold text-purple-600">
+                          {timeEntries && timeEntries.length > 0 ? (
+                            (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
+                             new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
+                            ).toFixed(1)
+                          ) : 0}h
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Lista de miembros del equipo */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-3">Rendimiento del Equipo</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {teamStats.length > 0 ? (
+                          teamStats.map((member: any) => (
+                            <div key={member.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs bg-green-500 text-white">
+                                    {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium text-sm">{member.name}</p>
+                                  <p className="text-xs text-gray-500">{member.entries} registros</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-sm">{member.hours.toFixed(1)}h</p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(member.lastActivity).toLocaleDateString('es-ES')}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            <Users className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">No hay actividad del equipo</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Panel de acciones operativas */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-green-600" />
-                  Equipo del Proyecto
+                  <Activity className="h-5 w-5 text-orange-600" />
+                  Panel de Control Operativo
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ProjectTeamSection projectId={projectId!} timeEntries={timeEntries} project={project} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Button
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center gap-2"
+                    onClick={() => setShowQuickRegister(true)}
+                  >
+                    <Timer className="h-6 w-6 text-blue-600" />
+                    <span className="text-sm">Registrar Tiempo</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center gap-2"
+                    onClick={() => setLocation(`/active-projects/${projectId}/time-entries`)}
+                  >
+                    <Eye className="h-6 w-6 text-green-600" />
+                    <span className="text-sm">Ver Historial</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center gap-2"
+                    onClick={() => setLocation(`/project-settings/${projectId}`)}
+                  >
+                    <Settings className="h-6 w-6 text-purple-600" />
+                    <span className="text-sm">Configurar</span>
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className="h-20 flex flex-col items-center justify-center gap-2"
+                    onClick={() => setLocation(`/project-analytics/${projectId}`)}
+                  >
+                    <BarChart3 className="h-6 w-6 text-orange-600" />
+                    <span className="text-sm">Reportes</span>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
