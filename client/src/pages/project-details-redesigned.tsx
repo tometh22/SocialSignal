@@ -431,11 +431,52 @@ export default function ProjectDetailsRedesigned() {
       },
       {
         label: "Progreso",
-        value: `${progressPercentage.toFixed(1)}%`,
-        subtitle: progressPercentage > 100 ? "Excedido" : "En progreso",
+        value: (() => {
+          // Calcular progreso real basado en fechas del proyecto
+          if (!projectData.startDate) return "0.0%";
+          
+          const startDate = new Date(projectData.startDate);
+          const endDate = projectData.expectedEndDate ? new Date(projectData.expectedEndDate) : null;
+          const today = new Date();
+          
+          if (!endDate) return `${progressPercentage.toFixed(1)}%`;
+          
+          const totalDuration = endDate.getTime() - startDate.getTime();
+          const elapsedDuration = today.getTime() - startDate.getTime();
+          
+          if (totalDuration <= 0) return "0.0%";
+          
+          const timeProgress = Math.max(0, Math.min(100, (elapsedDuration / totalDuration) * 100));
+          return `${timeProgress.toFixed(1)}%`;
+        })(),
+        subtitle: (() => {
+          if (!projectData.startDate || !projectData.expectedEndDate) return "Sin cronograma definido";
+          
+          const endDate = new Date(projectData.expectedEndDate);
+          const today = new Date();
+          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysLeft < 0) return `${Math.abs(daysLeft)} días de retraso`;
+          if (daysLeft === 0) return "Vence hoy";
+          return `${daysLeft} días restantes`;
+        })(),
         icon: Target,
-        color: progressPercentage > 100 ? "text-red-700" : "text-purple-700",
-        bgColor: progressPercentage > 100 ? "bg-gradient-to-br from-red-50 to-red-100" : "bg-gradient-to-br from-purple-50 to-purple-100",
+        color: (() => {
+          if (!projectData.expectedEndDate) return "text-gray-700";
+          const endDate = new Date(projectData.expectedEndDate);
+          const today = new Date();
+          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return daysLeft < 0 ? "text-red-700" : daysLeft <= 7 ? "text-yellow-700" : "text-purple-700";
+        })(),
+        bgColor: (() => {
+          if (!projectData.expectedEndDate) return "bg-gradient-to-br from-gray-50 to-gray-100";
+          const endDate = new Date(projectData.expectedEndDate);
+          const today = new Date();
+          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          return daysLeft < 0 ? "bg-gradient-to-br from-red-50 to-red-100" : 
+                 daysLeft <= 7 ? "bg-gradient-to-br from-yellow-50 to-yellow-100" : 
+                 "bg-gradient-to-br from-purple-50 to-purple-100";
+        })(),
         change: progressPercentage - 50
       },
       {
@@ -1142,21 +1183,81 @@ export default function ProjectDetailsRedesigned() {
                       <p className="text-sm text-gray-600 mb-2">Monitores de alertas y desviaciones</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="text-center">
-                          <p className="font-medium">0%</p>
+                          <p className="font-medium">
+                            {costSummary?.budgetUtilization && costSummary.budgetUtilization > 80 ? 
+                              `${Math.min(costSummary.budgetUtilization - 80, 100).toFixed(0)}%` : "0%"
+                            }
+                          </p>
                           <p className="text-gray-500">Riesgo de presupuesto</p>
                         </div>
                         <div className="text-center">
-                          <p className="font-medium">0%</p>
+                          <p className="font-medium">
+                            {(() => {
+                              if (!project?.expectedEndDate) return "0%";
+                              const endDate = new Date(project.expectedEndDate);
+                              const today = new Date();
+                              const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                              if (daysLeft < 0) return "100%";
+                              if (daysLeft <= 7) return "75%";
+                              if (daysLeft <= 30) return "25%";
+                              return "0%";
+                            })()}
+                          </p>
                           <p className="text-gray-500">Riesgo de cronograma</p>
                         </div>
                       </div>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-3">
-                        <div className="flex items-center gap-1 text-yellow-700">
+                      <div className={`border rounded p-2 mt-3 ${
+                        (costSummary?.budgetUtilization && costSummary.budgetUtilization > 100) ||
+                        (project?.expectedEndDate && new Date(project.expectedEndDate) < new Date()) ?
+                        "bg-red-50 border-red-200" :
+                        (costSummary?.budgetUtilization && costSummary.budgetUtilization > 80) ||
+                        (project?.expectedEndDate && Math.ceil((new Date(project.expectedEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7) ?
+                        "bg-yellow-50 border-yellow-200" :
+                        "bg-green-50 border-green-200"
+                      }`}>
+                        <div className={`flex items-center gap-1 ${
+                          (costSummary?.budgetUtilization && costSummary.budgetUtilization > 100) ||
+                          (project?.expectedEndDate && new Date(project.expectedEndDate) < new Date()) ?
+                          "text-red-700" :
+                          (costSummary?.budgetUtilization && costSummary.budgetUtilization > 80) ||
+                          (project?.expectedEndDate && Math.ceil((new Date(project.expectedEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7) ?
+                          "text-yellow-700" :
+                          "text-green-700"
+                        }`}>
                           <AlertTriangle className="h-3 w-3" />
-                          <span className="text-xs font-medium">0 alertas activas</span>
+                          <span className="text-xs font-medium">
+                            {(() => {
+                              let alerts = 0;
+                              if (costSummary?.budgetUtilization && costSummary.budgetUtilization > 100) alerts++;
+                              if (project?.expectedEndDate && new Date(project.expectedEndDate) < new Date()) alerts++;
+                              return `${alerts} alertas activas`;
+                            })()}
+                          </span>
                         </div>
-                        <p className="text-xs text-yellow-600 mt-1">
-                          No se detectan riesgos críticos en este momento
+                        <p className={`text-xs mt-1 ${
+                          (costSummary?.budgetUtilization && costSummary.budgetUtilization > 100) ||
+                          (project?.expectedEndDate && new Date(project.expectedEndDate) < new Date()) ?
+                          "text-red-600" :
+                          (costSummary?.budgetUtilization && costSummary.budgetUtilization > 80) ||
+                          (project?.expectedEndDate && Math.ceil((new Date(project.expectedEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7) ?
+                          "text-yellow-600" :
+                          "text-green-600"
+                        }`}>
+                          {(() => {
+                            if (costSummary?.budgetUtilization && costSummary.budgetUtilization > 100) {
+                              return "Presupuesto excedido - Requiere atención inmediata";
+                            }
+                            if (project?.expectedEndDate && new Date(project.expectedEndDate) < new Date()) {
+                              return "Proyecto con retraso - Revisar cronograma";
+                            }
+                            if (costSummary?.budgetUtilization && costSummary.budgetUtilization > 80) {
+                              return "Presupuesto cerca del límite - Monitorear gastos";
+                            }
+                            if (project?.expectedEndDate && Math.ceil((new Date(project.expectedEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 7) {
+                              return "Fecha límite próxima - Acelerar progreso";
+                            }
+                            return "No se detectan riesgos críticos en este momento";
+                          })()}
                         </p>
                       </div>
                     </div>
@@ -1481,58 +1582,52 @@ export default function ProjectDetailsRedesigned() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-blue-600" />
-                      Asignación de Equipo
+                      <BarChart3 className="h-5 w-5 text-green-600" />
+                      Capacidad vs Demanda
                     </CardTitle>
                     <CardDescription>
-                      Distribución de horas por rol y persona
+                      Análisis de capacidad del equipo y demanda del proyecto
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {timeEntries && timeEntries.length > 0 ? (
-                        (() => {
-                          const hoursPerPerson = timeEntries.reduce((acc: any, entry: TimeEntry) => {
-                            if (!acc[entry.personnelName]) {
-                              acc[entry.personnelName] = { hours: 0, cost: 0, role: entry.roleName || "No especificado" };
-                            }
-                            acc[entry.personnelName].hours += entry.hours;
-                            acc[entry.personnelName].cost += (entry.hours * (entry.hourlyRate || 0));
-                            return acc;
-                          }, {});
-
-                          return Object.entries(hoursPerPerson)
-                            .sort(([,a]: any, [,b]: any) => b.hours - a.hours)
-                            .map(([name, data]: any, index) => {
-                              const roles = ['Project Manager', 'Analista Semi Senior', 'Lead Project Manager', 'Analista Semi Senior'];
-                              const initials = ['RO', 'IN', 'DO', 'AY', 'SA'];
-                              return (
-                                <div key={name} className="flex items-center justify-between p-3 border rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                      {initials[index] || name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-                                    </div>
-                                    <div>
-                                      <p className="font-medium text-sm">{name}</p>
-                                      <p className="text-xs text-gray-500">{roles[index] || data.role}</p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-semibold">{data.hours.toFixed(1)}h</p>
-                                    <div className="w-20 bg-gray-200 rounded-full h-1 mt-1">
-                                      <div className="bg-blue-500 h-1 rounded-full" style={{ width: `${Math.min((data.hours / 500) * 100, 100)}%` }}></div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            });
-                        })()
-                      ) : (
-                        <div className="text-center py-6 text-gray-500">
-                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No hay asignaciones de equipo</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-semibold text-sm mb-3">Capacidad del Equipo</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Miembros asignados</span>
+                            <span className="font-medium">{timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => entry.personnelName)).size : 0}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Capacidad promedio/día</span>
+                            <span className="font-medium">
+                              {timeEntries && timeEntries.length > 0 ? (
+                                (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
+                                 new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
+                                ).toFixed(1)
+                              ) : 0}h
+                            </span>
+                          </div>
                         </div>
-                      )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm mb-3">Demanda del Proyecto</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Horas requeridas</span>
+                            <span className="font-medium">${(project?.macroMonthlyBudget || project?.quotation?.totalAmount || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Costo por hora promedio</span>
+                            <span className="font-medium">
+                              ${timeEntries && timeEntries.length > 0 ? 
+                                (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hourlyRate || 0), 0) / timeEntries.length).toFixed(0) : 
+                                0
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
