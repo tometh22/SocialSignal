@@ -31,7 +31,10 @@ import {
   CalendarClock,
   Gauge,
   Trash2,
-  Loader2
+  Loader2,
+  Filter,
+  CalendarDays,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,9 +44,16 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface ProjectMetric {
   label: string;
@@ -64,6 +74,148 @@ interface TimeEntry {
   description?: string;
   roleName?: string;
   hourlyRate?: number;
+}
+
+interface DateFilter {
+  type: 'week' | 'month' | 'quarter' | 'custom';
+  startDate: Date;
+  endDate: Date;
+  label: string;
+}
+
+// Componente de filtro temporal
+function TimeRangeFilter({ 
+  selectedFilter, 
+  onFilterChange, 
+  className 
+}: { 
+  selectedFilter: DateFilter; 
+  onFilterChange: (filter: DateFilter) => void;
+  className?: string;
+}) {
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
+  const [customStart, setCustomStart] = useState<Date | undefined>(selectedFilter.startDate);
+  const [customEnd, setCustomEnd] = useState<Date | undefined>(selectedFilter.endDate);
+
+  const currentDate = new Date();
+
+  const presets: { label: string; type: DateFilter['type']; value: () => DateFilter }[] = [
+    {
+      label: "Esta semana",
+      type: "week",
+      value: () => ({
+        type: 'week',
+        startDate: startOfWeek(currentDate, { weekStartsOn: 1 }),
+        endDate: endOfWeek(currentDate, { weekStartsOn: 1 }),
+        label: "Esta semana"
+      })
+    },
+    {
+      label: "Este mes",
+      type: "month", 
+      value: () => ({
+        type: 'month',
+        startDate: startOfMonth(currentDate),
+        endDate: endOfMonth(currentDate),
+        label: "Este mes"
+      })
+    },
+    {
+      label: "Este trimestre",
+      type: "quarter",
+      value: () => ({
+        type: 'quarter',
+        startDate: startOfQuarter(currentDate),
+        endDate: endOfQuarter(currentDate),
+        label: "Este trimestre"
+      })
+    }
+  ];
+
+  const handlePresetSelect = (preset: typeof presets[0]) => {
+    const filter = preset.value();
+    onFilterChange(filter);
+  };
+
+  const handleCustomApply = () => {
+    if (customStart && customEnd) {
+      onFilterChange({
+        type: 'custom',
+        startDate: customStart,
+        endDate: customEnd,
+        label: `${format(customStart, 'dd/MM/yyyy', { locale: es })} - ${format(customEnd, 'dd/MM/yyyy', { locale: es })}`
+      });
+      setIsCustomOpen(false);
+    }
+  };
+
+  return (
+    <div className={className}>
+      <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">Período:</Label>
+          <Select 
+            value={selectedFilter.type} 
+            onValueChange={(value) => {
+              if (value === 'custom') {
+                setIsCustomOpen(true);
+              } else {
+                const preset = presets.find(p => p.type === value);
+                if (preset) handlePresetSelect(preset);
+              }
+            }}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Seleccionar período">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  {selectedFilter.label}
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {presets.map((preset) => (
+                <SelectItem key={preset.type} value={preset.type}>
+                  {preset.label}
+                </SelectItem>
+              ))}
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="p-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Fecha de inicio</Label>
+              <CalendarComponent
+                mode="single"
+                selected={customStart}
+                onSelect={setCustomStart}
+                initialFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fecha de fin</Label>
+              <CalendarComponent
+                mode="single"
+                selected={customEnd}
+                onSelect={setCustomEnd}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCustomOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCustomApply} disabled={!customStart || !customEnd}>
+                Aplicar
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 // Component for ProjectTeamSection with enhanced functionality
@@ -328,6 +480,14 @@ export default function ProjectDetailsRedesigned() {
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+  
+  // Estado del filtro temporal - por defecto este mes
+  const [dateFilter, setDateFilter] = useState<DateFilter>(() => ({
+    type: 'month',
+    startDate: startOfMonth(new Date()),
+    endDate: endOfMonth(new Date()),
+    label: "Este mes"
+  }));
 
   // Datos del proyecto
   const { data: project, isLoading } = useQuery({
@@ -353,46 +513,59 @@ export default function ProjectDetailsRedesigned() {
     enabled: !!projectId,
   });
 
-  // Cálculos principales
+  // Función para filtrar entradas por rango de fechas
+  const filterTimeEntriesByDateRange = useMemo(() => {
+    return (entries: TimeEntry[]) => {
+      return entries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
+      });
+    };
+  }, [dateFilter]);
+
+  // Cálculos principales basados en datos reales
   const metrics = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return [];
 
     const projectData = project as any;
     const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
     
-    // Para contratos Always On, calcular solo el mes actual
-    let filteredTimeEntries = timeEntries;
-    let estimatedHours = 0;
+    // Aplicar filtro de fecha a todas las entradas
+    const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
+    
+    // Cálculo real del presupuesto según el período
     let budget = 0;
-    let periodLabel = "";
+    let estimatedHours = 0;
+    let periodLabel = dateFilter.label;
     
     if (isAlwaysOnContract) {
-      // Filtrar solo entradas del mes actual (julio 2025)
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
-      
-      filteredTimeEntries = timeEntries.filter((entry: TimeEntry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-      });
-      
-      // Para contratos Always On, usar el costo base mensual como referencia
-      budget = projectData.quotation?.baseCost || 0; // Costo estimado mensual
-      estimatedHours = budget / 12; // Aproximación de horas mensuales
-      periodLabel = `${currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
+      // Para contratos Always On, calcular presupuesto proporcionalmente
+      const monthlyBudget = projectData.quotation?.baseCost || projectData.quotation?.totalAmount || 0;
+      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysInMonth = 30;
+      budget = (monthlyBudget * daysDiff) / daysInMonth;
+      estimatedHours = budget / 100; // Estimación basada en costo promedio por hora
     } else {
-      // Para proyectos normales, usar toda la información
-      budget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
-      estimatedHours = budget / 100; // Aproximación
-      periodLabel = "total del proyecto";
+      // Para proyectos únicos, usar presupuesto total o calcular proporcionalmente
+      const totalBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
+      const projectStart = new Date(projectData.startDate || new Date());
+      const projectEnd = new Date(projectData.expectedEndDate || new Date());
+      const totalProjectDays = Math.max(1, Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)));
+      const filterDays = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      budget = (totalBudget * filterDays) / totalProjectDays;
+      estimatedHours = budget / 100;
     }
     
+    // Cálculos reales basados en entradas filtradas
     const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
     const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRate || 100)), 0);
     
     const progressPercentage = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
+    const costOverrun = budget > 0 ? ((totalCost - budget) / budget) * 100 : 0;
+    const uniquePersonnel = new Set(filteredTimeEntries.map((entry: TimeEntry) => entry.personnelId)).size;
+    const avgHoursPerDay = filteredTimeEntries.length > 0 ? 
+      totalHours / Math.max(1, Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
     const costEfficiency = budget > 0 ? ((budget - totalCost) / budget) * 100 : 0;
 
     const getStatusColor = (status: string) => {
@@ -495,47 +668,19 @@ export default function ProjectDetailsRedesigned() {
   const recentTimeEntries = useMemo(() => {
     if (!Array.isArray(timeEntries)) return [];
     
-    const projectData = project as any;
-    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
-    
-    let filteredEntries = timeEntries;
-    
-    // Para contratos Always On, mostrar solo entradas del mes actual
-    if (isAlwaysOnContract) {
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
-      
-      filteredEntries = timeEntries.filter((entry: TimeEntry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-      });
-    }
+    // Aplicar filtro temporal para mostrar solo entradas del período seleccionado
+    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
     
     return filteredEntries
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
-  }, [timeEntries, project]);
+  }, [timeEntries, filterTimeEntriesByDateRange]);
 
   const teamStats = useMemo(() => {
     if (!Array.isArray(timeEntries) || !Array.isArray(baseTeam)) return [];
     
-    const projectData = project as any;
-    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
-    
-    let filteredEntries = timeEntries;
-    
-    // Para contratos Always On, calcular estadísticas solo del mes actual
-    if (isAlwaysOnContract) {
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
-      
-      filteredEntries = timeEntries.filter((entry: TimeEntry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-      });
-    }
+    // Aplicar filtro temporal para calcular estadísticas del período seleccionado
+    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
     
     const memberStats = new Map();
     
@@ -562,35 +707,33 @@ export default function ProjectDetailsRedesigned() {
     return Array.from(memberStats.values())
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
-  }, [timeEntries, baseTeam, project]);
+  }, [timeEntries, baseTeam, filterTimeEntriesByDateRange]);
 
-  // Cálculo de resumen de costos para analíticas
+  // Cálculo de resumen de costos usando filtro temporal
   const costSummary = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return null;
 
     const projectData = project as any;
     const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
     
-    // Para contratos Always On, calcular solo el mes actual
-    let filteredTimeEntries = timeEntries;
+    // Aplicar filtro temporal a todas las entradas
+    const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
     let totalBudget = 0;
     
     if (isAlwaysOnContract) {
-      // Filtrar solo entradas del mes actual
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth();
-      
-      filteredTimeEntries = timeEntries.filter((entry: TimeEntry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-      });
-      
-      // Para contratos Always On, usar el costo base mensual como presupuesto
-      totalBudget = projectData.quotation?.baseCost || 0;
+      // Para contratos Always On, calcular presupuesto proporcionalmente
+      const monthlyBudget = projectData.quotation?.baseCost || projectData.quotation?.totalAmount || 0;
+      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysInMonth = 30;
+      totalBudget = (monthlyBudget * daysDiff) / daysInMonth;
     } else {
-      // Para proyectos normales, usar presupuesto total
-      totalBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
+      // Para proyectos únicos, calcular presupuesto proporcionalmente
+      const totalProjectBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
+      const projectStart = new Date(projectData.startDate || new Date());
+      const projectEnd = new Date(projectData.expectedEndDate || new Date());
+      const totalProjectDays = Math.max(1, Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)));
+      const filterDays = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      totalBudget = (totalProjectBudget * filterDays) / totalProjectDays;
     }
     
     const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
@@ -603,9 +746,10 @@ export default function ProjectDetailsRedesigned() {
       totalBudget,
       totalCost,
       budgetUtilization,
-      profitMargin
+      profitMargin,
+      period: dateFilter.label
     };
-  }, [project, timeEntries]);
+  }, [project, timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -680,9 +824,18 @@ export default function ProjectDetailsRedesigned() {
         <div className="px-6 py-4">
           {/* Título del proyecto */}
           <div className="mb-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              {projectName}
-            </h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {projectName}
+              </h1>
+              
+              {/* Filtro temporal */}
+              <TimeRangeFilter 
+                selectedFilter={dateFilter}
+                onFilterChange={setDateFilter}
+                className="flex-shrink-0"
+              />
+            </div>
           </div>
           
           <div className="flex items-center justify-between mb-4">
@@ -1162,17 +1315,23 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Miembros activos</p>
                         <p className="text-xl font-bold text-green-600">
-                          {timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => entry.personnelName)).size : 0}
+                          {(() => {
+                            const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                            return new Set(filteredEntries.map((entry: TimeEntry) => entry.personnelName)).size;
+                          })()}
                         </p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Promedio h/día</p>
                         <p className="text-xl font-bold text-purple-600">
-                          {timeEntries && timeEntries.length > 0 ? (
-                            (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
-                             new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
-                            ).toFixed(1)
-                          ) : 0}h
+                          {(() => {
+                            const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                            if (filteredEntries.length === 0) return "0";
+                            
+                            const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
+                            const uniqueDays = new Set(filteredEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size;
+                            return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
+                          })()}h
                         </p>
                       </div>
                     </div>
@@ -1460,6 +1619,39 @@ export default function ProjectDetailsRedesigned() {
 
             {/* Análisis Consolidado */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Información del período seleccionado */}
+              <Card className="col-span-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarDays className="h-5 w-5 text-blue-600" />
+                    Análisis del Período: {dateFilter.label}
+                  </CardTitle>
+                  <CardDescription>
+                    Datos calculados para el período seleccionado • {costSummary?.period && `Análisis: ${costSummary.period}`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-gray-600">Registros</p>
+                      <p className="text-xl font-bold text-blue-600">{recentTimeEntries.length}</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-gray-600">Total Horas</p>
+                      <p className="text-xl font-bold text-green-600">{metrics[1]?.value}</p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <p className="text-sm text-gray-600">Costo Real</p>
+                      <p className="text-xl font-bold text-purple-600">${costSummary?.totalCost?.toLocaleString() || '0'}</p>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 rounded-lg">
+                      <p className="text-sm text-gray-600">Presupuesto</p>
+                      <p className="text-xl font-bold text-orange-600">${costSummary?.totalBudget?.toLocaleString() || '0'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
