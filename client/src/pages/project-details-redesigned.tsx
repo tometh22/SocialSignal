@@ -67,7 +67,7 @@ interface TimeEntry {
 }
 
 // Component for ProjectTeamSection with enhanced functionality
-function ProjectTeamSection({ projectId, timeEntries }: { projectId: string; timeEntries: any[] }) {
+function ProjectTeamSection({ projectId, timeEntries, project }: { projectId: string; timeEntries: any[]; project: any }) {
   const { toast } = useToast();
   
   const { data: baseTeam = [], isLoading: teamLoading, refetch } = useQuery({
@@ -109,9 +109,26 @@ function ProjectTeamSection({ projectId, timeEntries }: { projectId: string; tim
     },
   });
 
+  // Para contratos Always On, filtrar solo horas del mes actual
+  const filteredTimeEntries = useMemo(() => {
+    const projectData = project as any;
+    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
+    
+    if (!isAlwaysOnContract) return timeEntries;
+    
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    return timeEntries.filter((entry: any) => {
+      const entryDate = new Date(entry.date);
+      return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+    });
+  }, [timeEntries, project]);
+
   // Calcular tiempo registrado por miembro
   const getTimeWorkedByMember = (personnelId: number) => {
-    return timeEntries
+    return filteredTimeEntries
       .filter((entry: any) => entry.personnelId === personnelId)
       .reduce((total: number, entry: any) => total + (entry.hours || 0), 0);
   };
@@ -341,11 +358,40 @@ export default function ProjectDetailsRedesigned() {
     if (!project || !Array.isArray(timeEntries)) return [];
 
     const projectData = project as any;
-    const totalHours = timeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-    const totalCost = timeEntries.reduce((sum: number, entry: TimeEntry) => 
+    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
+    
+    // Para contratos Always On, calcular solo el mes actual
+    let filteredTimeEntries = timeEntries;
+    let estimatedHours = 0;
+    let budget = 0;
+    let periodLabel = "";
+    
+    if (isAlwaysOnContract) {
+      // Filtrar solo entradas del mes actual (julio 2025)
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      filteredTimeEntries = timeEntries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+      });
+      
+      // Para contratos Always On, usar el costo base mensual como referencia
+      budget = projectData.quotation?.baseCost || 0; // Costo estimado mensual
+      estimatedHours = budget / 12; // Aproximación de horas mensuales
+      periodLabel = `${currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`;
+    } else {
+      // Para proyectos normales, usar toda la información
+      budget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
+      estimatedHours = budget / 100; // Aproximación
+      periodLabel = "total del proyecto";
+    }
+    
+    const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRate || 100)), 0);
-    const budget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
-    const estimatedHours = budget / 100; // Aproximación
+    
     const progressPercentage = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
     const costEfficiency = budget > 0 ? ((budget - totalCost) / budget) * 100 : 0;
 
@@ -362,18 +408,22 @@ export default function ProjectDetailsRedesigned() {
 
     return [
       {
-        label: "Presupuesto Total",
+        label: isAlwaysOnContract ? "Presupuesto Mensual" : "Presupuesto Total",
         value: `$${budget.toLocaleString()}`,
-        subtitle: `${costEfficiency > 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%`,
+        subtitle: isAlwaysOnContract ? 
+          `${periodLabel} - ${costEfficiency > 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%` :
+          `${costEfficiency > 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%`,
         icon: DollarSign,
         color: "text-green-700",
         bgColor: "bg-gradient-to-br from-green-50 to-green-100",
         change: costEfficiency
       },
       {
-        label: "Horas Registradas",
+        label: isAlwaysOnContract ? `Horas ${periodLabel}` : "Horas Registradas",
         value: `${totalHours.toFixed(1)}h`,
-        subtitle: `de ${estimatedHours.toFixed(0)}h estimadas`,
+        subtitle: totalHours === 0 && isAlwaysOnContract ? 
+          "Sin registros este mes" : 
+          `de ${estimatedHours.toFixed(0)}h estimadas`,
         icon: Clock,
         color: "text-blue-700",
         bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
@@ -403,17 +453,52 @@ export default function ProjectDetailsRedesigned() {
 
   const recentTimeEntries = useMemo(() => {
     if (!Array.isArray(timeEntries)) return [];
-    return timeEntries
+    
+    const projectData = project as any;
+    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
+    
+    let filteredEntries = timeEntries;
+    
+    // Para contratos Always On, mostrar solo entradas del mes actual
+    if (isAlwaysOnContract) {
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      filteredEntries = timeEntries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+      });
+    }
+    
+    return filteredEntries
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
-  }, [timeEntries]);
+  }, [timeEntries, project]);
 
   const teamStats = useMemo(() => {
     if (!Array.isArray(timeEntries) || !Array.isArray(baseTeam)) return [];
     
+    const projectData = project as any;
+    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
+    
+    let filteredEntries = timeEntries;
+    
+    // Para contratos Always On, calcular estadísticas solo del mes actual
+    if (isAlwaysOnContract) {
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      filteredEntries = timeEntries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+      });
+    }
+    
     const memberStats = new Map();
     
-    timeEntries.forEach((entry: TimeEntry) => {
+    filteredEntries.forEach((entry: TimeEntry) => {
       if (!memberStats.has(entry.personnelId)) {
         memberStats.set(entry.personnelId, {
           id: entry.personnelId,
@@ -436,7 +521,7 @@ export default function ProjectDetailsRedesigned() {
     return Array.from(memberStats.values())
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
-  }, [timeEntries, baseTeam]);
+  }, [timeEntries, baseTeam, project]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -896,7 +981,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ProjectTeamSection projectId={projectId!} timeEntries={timeEntries} />
+                <ProjectTeamSection projectId={projectId!} timeEntries={timeEntries} project={project} />
               </CardContent>
             </Card>
           </TabsContent>
