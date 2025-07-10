@@ -99,7 +99,7 @@ function TimeRangeFilter({
 
   const currentDate = new Date();
 
-  const presets: { label: string; type: DateFilter['type']; value: () => DateFilter }[] = [
+  const presets: { label: string; type: DateFilter['type'] | 'lastMonth'; value: () => DateFilter }[] = [
     {
       label: "Esta semana",
       type: "week",
@@ -119,6 +119,19 @@ function TimeRangeFilter({
         endDate: endOfMonth(currentDate),
         label: "Este mes"
       })
+    },
+    {
+      label: "Mes pasado",
+      type: "lastMonth",
+      value: () => {
+        const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        return {
+          type: 'month',
+          startDate: startOfMonth(lastMonth),
+          endDate: endOfMonth(lastMonth),
+          label: "Mes pasado"
+        };
+      }
     },
     {
       label: "Este trimestre",
@@ -151,39 +164,42 @@ function TimeRangeFilter({
 
   return (
     <div className={className}>
-      <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
-        <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium">Período:</Label>
-          <Select 
-            value={selectedFilter.type} 
-            onValueChange={(value) => {
-              if (value === 'custom') {
-                setIsCustomOpen(true);
-              } else {
-                const preset = presets.find(p => p.type === value);
-                if (preset) handlePresetSelect(preset);
-              }
-            }}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Seleccionar período">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4" />
-                  {selectedFilter.label}
-                </div>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {presets.map((preset) => (
-                <SelectItem key={preset.type} value={preset.type}>
-                  {preset.label}
-                </SelectItem>
-              ))}
-              <SelectItem value="custom">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium">Período:</Label>
+        <Select 
+          value={selectedFilter.type === 'custom' ? 'custom' : selectedFilter.type} 
+          onValueChange={(value) => {
+            if (value === 'custom') {
+              setIsCustomOpen(true);
+            } else {
+              const preset = presets.find(p => p.type === value || (value === 'lastMonth' && p.type === 'lastMonth'));
+              if (preset) handlePresetSelect(preset);
+            }
+          }}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Seleccionar período">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />
+                {selectedFilter.label}
+              </div>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {presets.map((preset, index) => (
+              <SelectItem key={`${preset.type}-${index}`} value={preset.type === 'lastMonth' ? 'lastMonth' : preset.type}>
+                {preset.label}
+              </SelectItem>
+            ))}
+            <SelectItem value="custom">Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
+      <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
+        <PopoverTrigger asChild>
+          <div style={{ display: 'none' }} />
+        </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="p-4 space-y-4">
             <div className="space-y-2">
@@ -516,10 +532,25 @@ export default function ProjectDetailsRedesigned() {
   // Función para filtrar entradas por rango de fechas
   const filterTimeEntriesByDateRange = useMemo(() => {
     return (entries: TimeEntry[]) => {
-      return entries.filter((entry: TimeEntry) => {
-        const entryDate = new Date(entry.date);
-        return entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
+      console.log('🔍 Filtro temporal activo:', {
+        label: dateFilter.label,
+        startDate: dateFilter.startDate.toISOString(),
+        endDate: dateFilter.endDate.toISOString(),
+        totalEntries: entries.length
       });
+      
+      const filtered = entries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        const isInRange = entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
+        return isInRange;
+      });
+      
+      console.log('🔍 Entradas filtradas:', {
+        filteredCount: filtered.length,
+        originalCount: entries.length
+      });
+      
+      return filtered;
     };
   }, [dateFilter]);
 
