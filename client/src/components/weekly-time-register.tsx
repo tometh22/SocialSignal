@@ -112,8 +112,8 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     queryKey: ['/api/personnel'],
   });
 
-  // Obtener miembros del equipo
-  const teamMembers = Array.isArray(baseTeam) ? baseTeam : [];
+  // Obtener miembros del equipo - asegurar que siempre sea un array
+  const teamMembers = Array.isArray(baseTeam) ? baseTeam : (baseTeam ? [baseTeam] : []);
 
   // Cargar datos guardados al montar el componente
   useEffect(() => {
@@ -537,9 +537,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {(teamMembers || []).filter(member => member && member.personnelId && typeof member === 'object').map((member, index) => {
+                  {(Array.isArray(teamMembers) ? teamMembers : []).filter(member => member && member.personnelId && typeof member === 'object').map((member, index) => {
                     const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
-                    const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : (member.hourlyRate || 0);
+                    const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : (member.hourlyRate || member.rate || 0);
 
                     return (
                       <motion.tr
@@ -557,8 +557,8 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium text-gray-900 text-sm">{member.name || 'Sin nombre'}</div>
-                              <div className="text-xs text-gray-500">{member.role || 'Sin rol'}</div>
+                              <div className="font-medium text-gray-900 text-sm">{member.name || member.personnelName || 'Sin nombre'}</div>
+                              <div className="text-xs text-gray-500">{member.role || member.roleName || 'Sin rol'}</div>
                             </div>
                           </div>
                         </td>
@@ -583,7 +583,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                             type="number"
                             step="0.1"
                             min="0"
-                            placeholder={`${member.hourlyRate}`}
+                            placeholder={`${member.hourlyRate || member.rate || 0}`}
                             value={memberHours.customRate || ''}
                             onChange={(e) => handleUpdateHours(
                               member.personnelId,
