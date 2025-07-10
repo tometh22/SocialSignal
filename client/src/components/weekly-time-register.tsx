@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Calendar, Clock, Save, X, Plus, Trash2, AlertCircle, CheckCircle2, Users, DollarSign, Send, Timer } from 'lucide-react';
+import { Calendar, Clock, Save, X, Plus, Trash2, AlertCircle, CheckCircle2, Users, DollarSign, Send, Timer, UserPlus } from 'lucide-react';
 import { queryClient } from '@/lib/queryClient';
 import { motion } from 'framer-motion';
 
@@ -46,6 +48,8 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
   const [teamHours, setTeamHours] = useState<Record<number, { hours: number; description: string; customRate?: number }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [additionalMembers, setAdditionalMembers] = useState<any[]>([]);
 
   // Clave para localStorage específica del proyecto
   const storageKey = `weekly-time-register-${projectId}`;
@@ -58,6 +62,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       notes,
       timeEntries,
       teamHours,
+      additionalMembers,
       startDate,
       endDate,
       timestamp: Date.now()
@@ -79,6 +84,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           setNotes(data.notes || '');
           setTimeEntries(data.timeEntries || []);
           setTeamHours(data.teamHours || {});
+          setAdditionalMembers(data.additionalMembers || []);
           setStartDate(data.startDate || format(selectedWeek, 'yyyy-MM-dd'));
           setEndDate(data.endDate || format(addDays(selectedWeek, 6), 'yyyy-MM-dd'));
           setHasUnsavedChanges(true);
@@ -112,20 +118,24 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     queryKey: ['/api/personnel'],
   });
 
-  // Obtener miembros del equipo - asegurar que siempre sea un array y mapear la estructura
-  const teamMembers = Array.isArray(baseTeam) ? baseTeam.map(member => ({
+  // Obtener miembros del equipo base - asegurar que siempre sea un array y mapear la estructura
+  const baseTeamMembers = Array.isArray(baseTeam) ? baseTeam.map(member => ({
     ...member,
     name: member.personnel?.name || member.name || 'Sin nombre',
     personnelName: member.personnel?.name || member.personnelName || 'Sin nombre',
     roleName: member.role?.name || member.roleName || 'Sin rol',
     hourlyRate: member.personnel?.hourlyRate || member.hourlyRate || 0,
     rate: member.personnel?.hourlyRate || member.rate || 0,
+    isAdditional: false,
     // Asegurar que role siempre tenga la estructura correcta
     role: member.role ? {
       ...member.role,
       name: member.role.name || 'Sin rol'
     } : { name: 'Sin rol' }
   })) : [];
+
+  // Combinar miembros del equipo base con miembros adicionales
+  const teamMembers = [...baseTeamMembers, ...additionalMembers];
 
   // Cargar datos guardados al montar el componente
   useEffect(() => {
@@ -134,7 +144,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
   // Autoguardado cuando cambian los datos
   useEffect(() => {
-    if (periodName || notes || timeEntries.length > 0 || Object.keys(teamHours).length > 0) {
+    if (periodName || notes || timeEntries.length > 0 || Object.keys(teamHours).length > 0 || additionalMembers.length > 0) {
       setHasUnsavedChanges(true);
       const timeoutId = setTimeout(() => {
         saveToStorage();
@@ -142,7 +152,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
       return () => clearTimeout(timeoutId);
     }
-  }, [periodName, notes, timeEntries, teamHours, selectedWeek, startDate, endDate]);
+  }, [periodName, notes, timeEntries, teamHours, additionalMembers, selectedWeek, startDate, endDate]);
 
   // Limpiar al desmontar si los datos fueron enviados exitosamente
   useEffect(() => {
@@ -248,6 +258,83 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     }
   });
 
+  // Función para agregar un nuevo miembro al equipo
+  const handleAddTeamMember = (personnelId: number) => {
+    const personDetails = Array.isArray(personnel) ? personnel.find((p: any) => p.id === personnelId) : null;
+    
+    if (!personDetails) {
+      toast({
+        title: "Error",
+        description: "No se encontró la información del personal seleccionado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verificar si ya está en el equipo
+    const alreadyExists = teamMembers.some(member => member.personnelId === personnelId);
+    if (alreadyExists) {
+      toast({
+        title: "Miembro ya existe",
+        description: "Esta persona ya está en el equipo del proyecto",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newMember = {
+      id: `additional-${personnelId}`,
+      projectId: projectId,
+      personnelId: personnelId,
+      roleId: personDetails.roleId || 1,
+      estimatedHours: 0,
+      hourlyRate: personDetails.hourlyRate || 0,
+      isActive: true,
+      isAdditional: true,
+      name: personDetails.name,
+      personnelName: personDetails.name,
+      roleName: 'Miembro Adicional',
+      rate: personDetails.hourlyRate || 0,
+      role: {
+        id: personDetails.roleId || 1,
+        name: 'Miembro Adicional'
+      },
+      personnel: {
+        id: personnelId,
+        name: personDetails.name,
+        hourlyRate: personDetails.hourlyRate || 0
+      }
+    };
+
+    setAdditionalMembers(prev => [...prev, newMember]);
+    setShowAddMemberModal(false);
+    setHasUnsavedChanges(true);
+    
+    toast({
+      title: "✅ Miembro agregado",
+      description: `${personDetails.name} ha sido agregado al equipo`,
+    });
+  };
+
+  // Función para remover un miembro adicional
+  const handleRemoveAdditionalMember = (personnelId: number) => {
+    setAdditionalMembers(prev => prev.filter(member => member.personnelId !== personnelId));
+    
+    // También remover sus horas registradas
+    setTeamHours(prev => {
+      const updated = { ...prev };
+      delete updated[personnelId];
+      return updated;
+    });
+    
+    setHasUnsavedChanges(true);
+    
+    toast({
+      title: "Miembro removido",
+      description: "El miembro ha sido removido del equipo temporal",
+    });
+  };
+
   const handleSaveAllHours = async () => {
     setIsSubmitting(true);
     
@@ -257,15 +344,23 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           const memberData = teamHours[member.personnelId];
           if (!memberData || !memberData.hours) return null;
           
+          const hourlyRate = memberData.customRate !== undefined ? memberData.customRate : (member.hourlyRate || 0);
+          const totalCost = memberData.hours * hourlyRate;
+          
           return {
             projectId,
             personnelId: member.personnelId,
             roleId: member.roleId,
             hours: memberData.hours,
+            totalCost,
+            hourlyRateAtTime: hourlyRate,
+            entryType: 'hours' as const,
             description: memberData.description || '',
             date: startDate,
-            periodName,
-            notes
+            periodDescription: periodName,
+            isDateRange: true,
+            startDate: startDate,
+            endDate: endDate || startDate
           };
         })
         .filter(Boolean);
@@ -511,10 +606,59 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       {/* Tabla compacta de miembros del equipo */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            Registro de Horas por Miembro
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-600" />
+              Registro de Horas por Miembro
+            </CardTitle>
+            <Dialog open={showAddMemberModal} onOpenChange={setShowAddMemberModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Agregar Miembro
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Agregar Miembro al Equipo</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Seleccionar Personal</Label>
+                    <Select onValueChange={(value) => handleAddTeamMember(parseInt(value))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una persona..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(personnel) && personnel
+                          .filter((person: any) => !teamMembers.some(member => member.personnelId === person.id))
+                          .map((person: any) => (
+                            <SelectItem key={person.id} value={person.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="w-6 h-6">
+                                  <AvatarFallback className="bg-blue-600 text-white text-xs">
+                                    {person.name ? person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '?'}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{person.name}</div>
+                                  <div className="text-xs text-gray-500">${person.hourlyRate || 0}/hora</div>
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {Array.isArray(personnel) && personnel.filter((person: any) => !teamMembers.some(member => member.personnelId === person.id)).length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      Todo el personal ya está agregado al equipo
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loadingTeam ? (
@@ -546,6 +690,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                     <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Tarifa</th>
                     <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Costo</th>
                     <th className="text-left px-4 py-3 text-sm font-medium text-gray-900">Descripción</th>
+                    <th className="text-center px-4 py-3 text-sm font-medium text-gray-900 w-12">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -626,6 +771,20 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                             )}
                             className="min-w-[200px] h-8 text-sm"
                           />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {member.isAdditional ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveAdditionalMember(member.personnelId)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-gray-400">Base</span>
+                          )}
                         </td>
                       </motion.tr>
                     );
