@@ -542,7 +542,13 @@ export default function ProjectDetailsRedesigned() {
         endDateFormatted: dateFilter.endDate.toLocaleDateString('es-ES'),
         totalEntries: entries.length,
         currentMonth: new Date().getMonth() + 1,
-        filterMonth: dateFilter.startDate.getMonth() + 1
+        filterMonth: dateFilter.startDate.getMonth() + 1,
+        muestraTodasLasEntradas: entries.map(e => ({
+          fecha: e.date,
+          mes: new Date(e.date).getMonth() + 1,
+          horas: e.hours,
+          persona: e.personnelName
+        })).slice(0, 10) // solo primeras 10 para no saturar logs
       });
       
       const filtered = entries.filter((entry: TimeEntry) => {
