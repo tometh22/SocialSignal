@@ -523,6 +523,49 @@ export default function ProjectDetailsRedesigned() {
       .slice(0, 5);
   }, [timeEntries, baseTeam, project]);
 
+  // Cálculo de resumen de costos para analíticas
+  const costSummary = useMemo(() => {
+    if (!project || !Array.isArray(timeEntries)) return null;
+
+    const projectData = project as any;
+    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
+    
+    // Para contratos Always On, calcular solo el mes actual
+    let filteredTimeEntries = timeEntries;
+    let totalBudget = 0;
+    
+    if (isAlwaysOnContract) {
+      // Filtrar solo entradas del mes actual
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      filteredTimeEntries = timeEntries.filter((entry: TimeEntry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+      });
+      
+      // Para contratos Always On, usar el costo base mensual como presupuesto
+      totalBudget = projectData.quotation?.baseCost || 0;
+    } else {
+      // Para proyectos normales, usar presupuesto total
+      totalBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 0;
+    }
+    
+    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+      sum + ((entry.hours || 0) * (entry.hourlyRate || 100)), 0);
+    
+    const budgetUtilization = totalBudget > 0 ? (totalCost / totalBudget) * 100 : 0;
+    const profitMargin = totalBudget > 0 ? ((totalBudget - totalCost) / totalBudget) * 100 : 0;
+    
+    return {
+      totalBudget,
+      totalCost,
+      budgetUtilization,
+      profitMargin
+    };
+  }, [project, timeEntries]);
+
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
     mutationFn: async (entryId: number) => {
