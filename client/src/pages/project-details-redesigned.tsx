@@ -753,7 +753,7 @@ export default function ProjectDetailsRedesigned() {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full max-w-xl">
+          <TabsList className="grid grid-cols-5 w-full max-w-2xl">
             <TabsTrigger value="overview" className="flex items-center gap-2 text-sm">
               <Eye className="h-3 w-3" />
               Resumen
@@ -765,6 +765,10 @@ export default function ProjectDetailsRedesigned() {
             <TabsTrigger value="team" className="flex items-center gap-2 text-sm">
               <Users className="h-3 w-3" />
               Equipo
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2 text-sm">
+              <BarChart3 className="h-3 w-3" />
+              Analíticas
             </TabsTrigger>
             <TabsTrigger value="details" className="flex items-center gap-2 text-sm">
               <FileText className="h-3 w-3" />
@@ -984,6 +988,257 @@ export default function ProjectDetailsRedesigned() {
                 <ProjectTeamSection projectId={projectId!} timeEntries={timeEntries} project={project} />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            {/* KPIs principales del proyecto */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Costo Real vs Presupuesto</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics[0]?.value}</div>
+                  <p className="text-xs text-muted-foreground">{metrics[0]?.subtitle}</p>
+                  <div className="mt-2">
+                    <Progress 
+                      value={costSummary?.budgetUtilization || 0} 
+                      className="h-2" 
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Horas Trabajadas</CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics[1]?.value}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {project?.isAlwaysOnMacro ? "Este mes" : "Total acumulado"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Progreso</CardTitle>
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{metrics[2]?.value}</div>
+                  <p className="text-xs text-muted-foreground">Completado</p>
+                  <div className="mt-2">
+                    <Progress 
+                      value={parseFloat(metrics[2]?.value.replace('%', '') || '0')} 
+                      className="h-2" 
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Rentabilidad</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {costSummary?.profitMargin ? `${costSummary.profitMargin.toFixed(1)}%` : "N/A"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Margen de ganancia</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Gráficos y análisis detallado */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    Distribución de Horas por Persona
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {timeEntries && timeEntries.length > 0 ? (
+                      (() => {
+                        // Agrupar horas por persona
+                        const hoursPerPerson = timeEntries.reduce((acc: any, entry: TimeEntry) => {
+                          if (!acc[entry.personnelName]) {
+                            acc[entry.personnelName] = { hours: 0, cost: 0 };
+                          }
+                          acc[entry.personnelName].hours += entry.hours;
+                          acc[entry.personnelName].cost += (entry.hours * (entry.hourlyRate || 0));
+                          return acc;
+                        }, {});
+
+                        return Object.entries(hoursPerPerson)
+                          .sort(([,a]: any, [,b]: any) => b.hours - a.hours)
+                          .slice(0, 5)
+                          .map(([name, data]: any) => (
+                            <div key={name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs">
+                                    {name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium text-sm">{name}</span>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold">{data.hours.toFixed(1)}h</p>
+                                <p className="text-xs text-gray-500">${data.cost.toFixed(0)}</p>
+                              </div>
+                            </div>
+                          ));
+                      })()
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No hay datos suficientes</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-purple-600" />
+                    Actividad del Proyecto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Días activos</span>
+                      <span className="font-semibold">
+                        {timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => 
+                          new Date(entry.date).toDateString()
+                        )).size : 0}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Promedio horas/día</span>
+                      <span className="font-semibold">
+                        {timeEntries && timeEntries.length > 0 ? (
+                          (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
+                           new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
+                          ).toFixed(1)
+                        ) : 0}h
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Último registro</span>
+                      <span className="font-semibold">
+                        {timeEntries && timeEntries.length > 0 ? 
+                          new Date(Math.max(...timeEntries.map((entry: TimeEntry) => 
+                            new Date(entry.date).getTime()
+                          ))).toLocaleDateString('es-ES') : 
+                          "Sin registros"
+                        }
+                      </span>
+                    </div>
+
+                    {project?.isAlwaysOnMacro && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                        <div className="flex items-center gap-2 text-blue-700">
+                          <Zap className="h-4 w-4" />
+                          <span className="font-medium text-sm">Contrato Always-On</span>
+                        </div>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Las métricas se calculan mensualmente para este tipo de contrato.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Análisis financiero detallado */}
+            {costSummary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gauge className="h-5 w-5 text-green-600" />
+                    Análisis Financiero Detallado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm text-gray-600">INGRESOS</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Presupuesto Total</span>
+                          <span className="font-semibold">${costSummary.totalBudget?.toLocaleString()}</span>
+                        </div>
+                        {project?.isAlwaysOnMacro && (
+                          <div className="flex justify-between">
+                            <span className="text-sm">Presupuesto Mensual</span>
+                            <span className="font-semibold">${project.macroMonthlyBudget?.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm text-gray-600">COSTOS</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Costo Real</span>
+                          <span className="font-semibold">${costSummary.totalCost?.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Utilización</span>
+                          <span className="font-semibold">{costSummary.budgetUtilization?.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm text-gray-600">RENTABILIDAD</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Ganancia</span>
+                          <span className={`font-semibold ${(costSummary.totalBudget - costSummary.totalCost) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${(costSummary.totalBudget - costSummary.totalCost).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Margen</span>
+                          <span className={`font-semibold ${costSummary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {costSummary.profitMargin?.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {costSummary.budgetUtilization > 100 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                      <div className="flex items-center gap-2 text-red-700">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="font-medium">Advertencia: Presupuesto Excedido</span>
+                      </div>
+                      <p className="text-sm text-red-600 mt-1">
+                        El proyecto ha superado el presupuesto asignado en {(costSummary.budgetUtilization - 100).toFixed(1)}%.
+                        Considera revisar el alcance o renegociar con el cliente.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
