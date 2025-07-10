@@ -989,6 +989,15 @@ export default function ProjectDetailsRedesigned() {
 
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
+        {/* Filtro temporal */}
+        <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+          <TimeRangeFilter
+            selectedFilter={dateFilter}
+            onFilterChange={setDateFilter}
+            className="flex items-center gap-4"
+          />
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid grid-cols-3 w-full max-w-xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
