@@ -1,198 +1,205 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  DollarSign, 
-  Save,
-  Send,
-  CheckCircle2,
-  X
-} from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { toast } from '@/hooks/use-toast';
+import { Calendar, Clock, Save, X, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { queryClient } from '@/lib/queryClient';
 
-interface TeamMember {
+interface TimeEntry {
+  id?: number;
   personnelId: number;
   roleId: number;
-  name: string;
-  role: string;
-  hourlyRate: number;
-  estimatedHours: number;
+  date: string;
+  hours: number;
+  description: string;
+  isNew?: boolean;
 }
 
 interface WeeklyTimeRegisterProps {
   projectId: number;
-  onSuccess?: () => void;
-  onCancel?: () => void;
+  onSuccess: () => void;
+  onCancel: () => void;
 }
 
 export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: WeeklyTimeRegisterProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  // Estados para el período
-  const [periodName, setPeriodName] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [notes, setNotes] = useState('');
-  
-  // Estados para las horas del equipo
-  const [teamHours, setTeamHours] = useState<Record<number, { hours: number; description: string; customRate?: number }>>({});
-  const [step, setStep] = useState<'period' | 'team'>('period');
+  const [selectedWeek, setSelectedWeek] = useState(() => {
+    const today = new Date();
+    return startOfWeek(today, { weekStartsOn: 1 }); // Lunes como primer día
+  });
 
-  // Fetch team members
-  const { data: baseTeam = [], isLoading: loadingTeam } = useQuery({
+  const [periodName, setPeriodName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Clave para localStorage específica del proyecto
+  const storageKey = `weekly-time-register-${projectId}`;
+
+  // Función para guardar en localStorage
+  const saveToStorage = () => {
+    const data = {
+      selectedWeek: selectedWeek.toISOString(),
+      periodName,
+      notes,
+      timeEntries,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(data));
+    console.log('📁 Datos guardados automáticamente');
+  };
+
+  // Función para cargar desde localStorage
+  const loadFromStorage = () => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const data = JSON.parse(stored);
+        // Solo cargar si es reciente (menos de 1 hora)
+        if (Date.now() - data.timestamp < 3600000) {
+          setSelectedWeek(new Date(data.selectedWeek));
+          setPeriodName(data.periodName || '');
+          setNotes(data.notes || '');
+          setTimeEntries(data.timeEntries || []);
+          setHasUnsavedChanges(true);
+          toast({
+            title: "📋 Datos recuperados",
+            description: "Se han restaurado los datos del registro anterior",
+          });
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando datos guardados:', error);
+    }
+    return false;
+  };
+
+  // Función para limpiar localStorage
+  const clearStorage = () => {
+    localStorage.removeItem(storageKey);
+    setHasUnsavedChanges(false);
+  };
+
+  // Cargar equipo base del proyecto
+  const { data: baseTeam } = useQuery({
     queryKey: [`/api/projects/${projectId}/base-team`],
     enabled: !!projectId,
   });
 
-  // Convert API data to TeamMember format
-  const teamMembers: TeamMember[] = Array.isArray(baseTeam) ? baseTeam.map((member: any) => ({
-    personnelId: member.personnelId,
-    roleId: member.roleId,
-    name: member.personnel ? member.personnel.name : 'Personal sin nombre',
-    role: member.role ? member.role.name : 'Rol no especificado',
-    hourlyRate: member.hourlyRate || 0,
-    estimatedHours: member.estimatedHours || 40,
-  })) : [];
-
-  // Auto-generate period name based on dates
-  React.useEffect(() => {
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const startMonth = format(start, "MMMM", { locale: es });
-      const endMonth = format(end, "MMMM", { locale: es });
-
-      let suggestedName = "";
-      if (startMonth === endMonth) {
-        suggestedName = `${startMonth} ${start.getFullYear()}`;
-        const weekOfMonth = Math.ceil(start.getDate() / 7);
-        if (weekOfMonth === 1) suggestedName += ', Primera semana';
-        else if (weekOfMonth === 2) suggestedName += ', Segunda semana';
-        else if (weekOfMonth === 3) suggestedName += ', Tercera semana';
-        else suggestedName += ', Cuarta semana';
-      } else {
-        suggestedName = `${startMonth} - ${endMonth} ${start.getFullYear()}`;
-      }
-      
-      setPeriodName(suggestedName);
-    }
-  }, [startDate, endDate]);
-
-  // Crear entradas de tiempo individuales
-  const createTimeEntry = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest(`/api/time-entries`, "POST", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-    },
-    onError: (error: any) => {
-      console.error('Error creating time entry:', error);
-    }
+  // Obtener personal disponible
+  const { data: personnel } = useQuery({
+    queryKey: ['/api/personnel'],
   });
 
-  const handleCreatePeriod = () => {
-    if (!periodName || !startDate || !endDate) {
-      toast({
-        title: "Datos incompletos",
-        description: "Por favor completa todos los campos del período",
-        variant: "destructive"
-      });
-      return;
+  // Cargar datos guardados al montar el componente
+  useEffect(() => {
+    loadFromStorage();
+  }, []);
+
+  // Autoguardado cuando cambian los datos
+  useEffect(() => {
+    if (periodName || notes || timeEntries.length > 0) {
+      setHasUnsavedChanges(true);
+      const timeoutId = setTimeout(() => {
+        saveToStorage();
+      }, 2000); // Guardar después de 2 segundos de inactividad
+
+      return () => clearTimeout(timeoutId);
     }
+  }, [periodName, notes, timeEntries, selectedWeek]);
 
-    setStep('team');
-    toast({
-      title: "Período configurado",
-      description: "Ahora puedes registrar las horas del equipo",
-    });
-  };
-
-  const handleUpdateHours = (personnelId: number, hours: number, description: string, customRate?: number) => {
-    setTeamHours(prev => ({
-      ...prev,
-      [personnelId]: { hours, description, customRate }
-    }));
-  };
-
-  const handleSaveAllHours = async () => {
-    const validEntries = Object.entries(teamHours).filter(([_, data]) => data.hours > 0);
-
-    if (validEntries.length === 0) {
-      toast({
-        title: "Sin registros",
-        description: "Agrega horas para al menos un miembro del equipo",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Crear las entradas de tiempo individuales
-    const promises = validEntries.map(([personnelId, data]) => {
-      const member = teamMembers.find(m => m.personnelId === parseInt(personnelId));
-      if (member) {
-        const effectiveRate = data.customRate !== undefined ? data.customRate : member.hourlyRate;
-        
-        return createTimeEntry.mutateAsync({
-          projectId: projectId,
-          personnelId: parseInt(personnelId),
-          date: startDate, // Usar la fecha de inicio del período
-          hours: data.hours,
-          description: `${periodName}: ${data.description || 'Trabajo realizado'}`,
-          entryType: "hours",
-          hourlyRate: effectiveRate,
-          totalCost: data.hours * effectiveRate
-        });
+  // Limpiar al desmontar si los datos fueron enviados exitosamente
+  useEffect(() => {
+    return () => {
+      // Solo limpiar si no hay cambios sin guardar o si se está cerrando después de enviar
+      if (!hasUnsavedChanges) {
+        clearStorage();
       }
-      return Promise.resolve();
-    });
+    };
+  }, [hasUnsavedChanges]);
 
-    try {
-      await Promise.all(promises);
+  const updateTimeEntry = (index: number, field: keyof TimeEntry, value: any) => {
+    const updated = [...timeEntries];
+    updated[index] = { ...updated[index], [field]: value };
+    setTimeEntries(updated);
+    setHasUnsavedChanges(true);
+  };
+
+  const removeTimeEntry = (index: number) => {
+    const updated = timeEntries.filter((_, i) => i !== index);
+    setTimeEntries(updated);
+    setHasUnsavedChanges(true);
+  };
+
+  const addTimeEntry = () => {
+    if (!baseTeam || baseTeam.length === 0) {
       toast({
-        title: "Horas guardadas exitosamente",
-        description: `Se registraron ${validEntries.length} entradas de tiempo`,
+        title: "No hay equipo base",
+        description: "Configura primero el equipo base del proyecto",
+        variant: "destructive"
       });
-      
+      return;
+    }
+
+    const firstMember = baseTeam[0];
+    const newEntry: TimeEntry = {
+      personnelId: firstMember.personnelId,
+      roleId: firstMember.roleId,
+      date: format(selectedWeek, 'yyyy-MM-dd'),
+      hours: 0,
+      description: '',
+      isNew: true
+    };
+
+    setTimeEntries([...timeEntries, newEntry]);
+    setHasUnsavedChanges(true);
+  };
+
+  const submitMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/projects/weekly-time-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al enviar el registro');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "✅ Registro enviado",
+        description: "Las horas se han registrado correctamente",
+      });
+
+      // Limpiar datos guardados después del envío exitoso
+      clearStorage();
+
+      // Invalidar consultas relacionadas
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      onSuccess?.();
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${projectId}`] });
+
+      onSuccess();
+    },
+    onError: (error: any) => {
       toast({
-        title: "Error al guardar",
-        description: "Algunos registros no pudieron guardarse",
-        variant: "destructive"
+        title: "❌ Error",
+        description: error.message || "No se pudo enviar el registro",
+        variant: "destructive",
       });
-    }
-  };
-
-  const getTotalHours = () => {
-    return Object.values(teamHours).reduce((sum, data) => sum + (data.hours || 0), 0);
-  };
-
-  const getTotalCost = () => {
-    return Object.entries(teamHours).reduce((sum, [personnelId, data]) => {
-      const member = teamMembers.find(m => m.personnelId === parseInt(personnelId));
-      if (member) {
-        const rate = data.customRate !== undefined ? data.customRate : member.hourlyRate;
-        return sum + (data.hours * rate);
-      }
-      return sum;
-    }, 0);
-  };
-
+    },
+  });
   if (step === 'period') {
     return (
       <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -206,7 +213,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
               <p className="text-gray-500">Configura el período de tiempo para el registro</p>
             </div>
           </div>
-          
+
           {onCancel && (
             <Button variant="outline" onClick={onCancel}>
               <X className="w-4 h-4 mr-2" />
@@ -216,12 +223,42 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         </div>
 
         <Card>
-          <CardHeader>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Configuración de Período
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Registro Semanal de Horas
+              {hasUnsavedChanges && (
+                <Badge variant="outline" className="ml-2 text-orange-600 border-orange-200">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Autoguardado
+                </Badge>
+              )}
             </CardTitle>
-          </CardHeader>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  if (window.confirm('Tienes cambios sin enviar. ¿Estás seguro de cerrar?')) {
+                    onCancel();
+                  }
+                } else {
+                  onCancel();
+                }
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Configura el período de tiempo para el registro
+            {hasUnsavedChanges && (
+              <span className="text-orange-600 ml-2">• Los datos se guardan automáticamente</span>
+            )}
+          </p>
+        </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -233,7 +270,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="endDate">Fecha de Fin</Label>
                 <Input
@@ -248,22 +285,29 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             <div className="space-y-2">
               <Label htmlFor="periodName">Nombre del Período</Label>
               <Input
-                id="periodName"
+                type="text"
                 value={periodName}
-                onChange={(e) => setPeriodName(e.target.value)}
-                placeholder="Ej: Enero 2025, Primera semana"
+                onChange={(e) => {
+                  setPeriodName(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                placeholder="Ej. Enero 2025, Primera semana"
+                className="flex-1"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notas (opcional)</Label>
               <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Añade cualquier nota relevante para este período..."
-                rows={3}
-              />
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setHasUnsavedChanges(true);
+              }}
+              placeholder="Añade cualquier nota relevante para este período..."
+              rows={3}
+              className="resize-none"
+            />
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
@@ -293,7 +337,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             <p className="text-gray-500">Período: {periodName}</p>
           </div>
         </div>
-        
+
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setStep('period')}>
             Cambiar Período
@@ -396,7 +440,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   {teamMembers.map((member, index) => {
                     const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
                     const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : member.hourlyRate;
-                    
+
                     return (
                       <motion.tr
                         key={member.personnelId}
