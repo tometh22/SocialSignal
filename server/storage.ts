@@ -280,22 +280,30 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Proyecto o personal no encontrado");
     }
 
-    // Calcular costo de esta entrada
-    const entryCost = entry.hours * personnel.hourlyRate;
+    // Solo validar presupuesto en proyectos que NO sean "always on" (fee-mensual)
+    // Los contratos "always on" pueden exceder el costo estimado mensual
+    const isAlwaysOnContract = project.quotation.projectType === 'fee-mensual';
+    
+    if (!isAlwaysOnContract) {
+      // Calcular costo de esta entrada
+      const entryCost = entry.hours * personnel.hourlyRate;
 
-    // Obtener total gastado hasta ahora
-    const existingEntries = await this.getTimeEntriesByProject(entry.projectId);
-    const currentCost = await this.calculateProjectTotalCost(entry.projectId);
+      // Obtener total gastado hasta ahora
+      const existingEntries = await this.getTimeEntriesByProject(entry.projectId);
+      const currentCost = await this.calculateProjectTotalCost(entry.projectId);
 
-    // Validar límite de presupuesto
-    const totalBudget = project.quotation.baseCost || 0;
-    if (currentCost + entryCost > totalBudget) {
-      throw new Error(`Esta entrada excedería el presupuesto del proyecto. Límite: $${totalBudget}, Actual: $${currentCost}, Nueva entrada: $${entryCost}`);
-    }
+      // Validar límite de presupuesto
+      const totalBudget = project.quotation.baseCost || 0;
+      if (currentCost + entryCost > totalBudget) {
+        throw new Error(`Esta entrada excedería el presupuesto del proyecto. Límite: $${totalBudget}, Actual: $${currentCost}, Nueva entrada: $${entryCost}`);
+      }
 
-    // Alerta cuando se acerca al límite (90%)
-    if (currentCost + entryCost > totalBudget * 0.9) {
-      console.warn(`ALERTA: El proyecto ${project.id} está cerca del límite de presupuesto (${((currentCost + entryCost) / totalBudget * 100).toFixed(1)}%)`);
+      // Alerta cuando se acerca al límite (90%)
+      if (currentCost + entryCost > totalBudget * 0.9) {
+        console.warn(`ALERTA: El proyecto ${project.id} está cerca del límite de presupuesto (${((currentCost + entryCost) / totalBudget * 100).toFixed(1)}%)`);
+      }
+    } else {
+      console.log(`📊 Registro de horas en contrato Always On: ${project.quotation.projectName} - Sin validación de presupuesto`);
     }
 
     const [newEntry] = await db.insert(timeEntries).values(entry).returning();
