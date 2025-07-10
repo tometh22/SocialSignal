@@ -78,6 +78,16 @@ export default function ActiveProjects() {
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ['/api/clients'] });
 
+  // Consulta para obtener todas las entradas de tiempo para calcular horas totales
+  const { data: allTimeEntries = [] } = useQuery({
+    queryKey: ['/api/time-entries'],
+    queryFn: async () => {
+      const response = await fetch('/api/time-entries');
+      if (!response.ok) throw new Error('Error al cargar entradas de tiempo');
+      return response.json();
+    },
+  });
+
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [deleteMacroProjectId, setDeleteMacroProjectId] = useState<number | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
@@ -236,10 +246,57 @@ export default function ActiveProjects() {
     }, [filteredActiveProjects]);
 
     const totalBudget = useMemo(() => {
-        return filteredActiveProjects.reduce((acc, p) => acc + (p.quotation?.totalAmount || 0), 0);
+        return filteredActiveProjects.reduce((acc, p) => {
+            // Para proyectos Always-On, usar el presupuesto mensual
+            const isAlwaysOnProject = p.isAlwaysOnMacro || 
+                p.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                p.quotation?.projectName?.toLowerCase().includes('modo') ||
+                p.macroMonthlyBudget ||
+                (p.quotation?.projectName?.toLowerCase().includes('presupuesto') && p.quotation?.projectName?.toLowerCase().includes('global'));
+            
+            if (isAlwaysOnProject && p.macroMonthlyBudget) {
+                return acc + p.macroMonthlyBudget;
+            }
+            
+            // Para proyectos únicos, usar el monto total
+            return acc + (p.quotation?.totalAmount || 0);
+        }, 0);
     }, [filteredActiveProjects]);
 
-    const totalHours = 1250;
+    // Calcular horas totales con filtro mensual para proyectos Always-On
+    const totalHours = useMemo(() => {
+        if (!allTimeEntries || !Array.isArray(allTimeEntries)) return 0;
+        
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+        
+        return allTimeEntries
+            .filter((entry: any) => {
+                // Filtrar por proyectos en la vista actual
+                const isProjectInCurrentView = filteredActiveProjects.some(p => p.id === entry.projectId);
+                if (!isProjectInCurrentView) return false;
+                
+                // Para proyectos Always-On, filtrar por mes actual
+                const project = filteredActiveProjects.find(p => p.id === entry.projectId);
+                const isAlwaysOnProject = project && (
+                    project.isAlwaysOnMacro || 
+                    project.quotation?.projectName?.toLowerCase().includes('always-on') ||
+                    project.quotation?.projectName?.toLowerCase().includes('modo') ||
+                    project.macroMonthlyBudget ||
+                    (project.quotation?.projectName?.toLowerCase().includes('presupuesto') && project.quotation?.projectName?.toLowerCase().includes('global'))
+                );
+                
+                if (isAlwaysOnProject) {
+                    const entryDate = new Date(entry.date);
+                    return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+                }
+                
+                // Para proyectos únicos, incluir todas las horas
+                return true;
+            })
+            .reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
+    }, [allTimeEntries, filteredActiveProjects]);
 
   // Estadísticas por tipo
   const stats = useMemo(() => {

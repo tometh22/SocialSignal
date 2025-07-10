@@ -103,6 +103,11 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 10, 2025: **MAJOR MONTHLY FILTERING IMPLEMENTATION** - Applied comprehensive monthly filtering for Always-On contracts across all project views
+- July 10, 2025: Updated active projects summary KPI cards to show monthly metrics for Always-On contracts instead of accumulated totals
+- July 10, 2025: Modified project details view to apply monthly filtering for team statistics and time entries
+- July 10, 2025: Enhanced budget calculations to show monthly budget for Always-On projects vs total budget for unique projects
+- July 10, 2025: Implemented intelligent time tracking filtering: monthly view for Always-On contracts, total view for unique projects
 - July 4, 2025: **MAJOR FUNCTIONALITY OVERHAUL** - Replaced QuickTimeRegister with WeeklyTimeRegister component for simplified weekly time tracking
 - July 4, 2025: Removed unnecessary real-time tracking functionality and play/pause features per user request
 - July 4, 2025: Created streamlined two-step process: period configuration and team hour registration
