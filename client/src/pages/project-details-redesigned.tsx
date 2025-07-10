@@ -124,12 +124,14 @@ function TimeRangeFilter({
       label: "Mes pasado",
       type: "lastMonth",
       value: () => {
+        // Obtener el mes anterior dinámicamente
         const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
         return {
           type: 'month',
           startDate: startOfMonth(lastMonth),
           endDate: endOfMonth(lastMonth),
-          label: "Mes pasado"
+          label: `Mes pasado (${monthName})`
         };
       }
     },
@@ -536,7 +538,11 @@ export default function ProjectDetailsRedesigned() {
         label: dateFilter.label,
         startDate: dateFilter.startDate.toISOString(),
         endDate: dateFilter.endDate.toISOString(),
-        totalEntries: entries.length
+        startDateFormatted: dateFilter.startDate.toLocaleDateString('es-ES'),
+        endDateFormatted: dateFilter.endDate.toLocaleDateString('es-ES'),
+        totalEntries: entries.length,
+        currentMonth: new Date().getMonth() + 1,
+        filterMonth: dateFilter.startDate.getMonth() + 1
       });
       
       const filtered = entries.filter((entry: TimeEntry) => {
@@ -548,13 +554,17 @@ export default function ProjectDetailsRedesigned() {
         
         const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
         
-        console.log('🔍 Comparando entrada:', {
-          entryDate: entry.date,
-          entryDateOnly: entryDateOnly.toISOString(),
-          startDateOnly: startDateOnly.toISOString(),
-          endDateOnly: endDateOnly.toISOString(),
-          isInRange
-        });
+        if (dateFilter.label.includes('pasado')) {
+          console.log('🔍 Comparando entrada para MES PASADO:', {
+            entryDate: entry.date,
+            entryDateOnly: entryDateOnly.toLocaleDateString('es-ES'),
+            startDateOnly: startDateOnly.toLocaleDateString('es-ES'),
+            endDateOnly: endDateOnly.toLocaleDateString('es-ES'),
+            entryMonth: entryDateOnly.getMonth() + 1,
+            filterMonth: startDateOnly.getMonth() + 1,
+            isInRange
+          });
+        }
         
         return isInRange;
       });
