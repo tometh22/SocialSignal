@@ -113,7 +113,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
   });
 
   // Obtener miembros del equipo
-  const teamMembers = baseTeam || [];
+  const teamMembers = Array.isArray(baseTeam) ? baseTeam : [];
 
   // Cargar datos guardados al montar el componente
   useEffect(() => {
@@ -167,11 +167,15 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
   };
 
   const getTotalCost = () => {
+    if (!Array.isArray(teamMembers)) return 0;
+    
     return teamMembers.reduce((sum, member) => {
+      if (!member || typeof member !== 'object' || !member.personnelId) return sum;
+      
       const memberData = teamHours[member.personnelId];
       if (!memberData || !memberData.hours) return sum;
       
-      const rate = memberData.customRate !== undefined ? memberData.customRate : member.hourlyRate;
+      const rate = memberData.customRate !== undefined ? memberData.customRate : (member.hourlyRate || 0);
       return sum + (memberData.hours * rate);
     }, 0);
   };
@@ -533,7 +537,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {teamMembers.filter(member => member && member.personnelId).map((member, index) => {
+                  {(teamMembers || []).filter(member => member && member.personnelId && typeof member === 'object').map((member, index) => {
                     const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
                     const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : (member.hourlyRate || 0);
 
