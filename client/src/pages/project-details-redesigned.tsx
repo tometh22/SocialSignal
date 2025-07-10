@@ -29,7 +29,9 @@ import {
   Building,
   Percent,
   CalendarClock,
-  Gauge
+  Gauge,
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +40,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
@@ -306,6 +309,8 @@ export default function ProjectDetailsRedesigned() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("overview");
   const [showQuickRegister, setShowQuickRegister] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
 
   // Datos del proyecto
   const { data: project, isLoading } = useQuery({
@@ -432,6 +437,40 @@ export default function ProjectDetailsRedesigned() {
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
   }, [timeEntries, baseTeam]);
+
+  // Mutación para eliminar entrada de tiempo
+  const deleteTimeEntryMutation = useMutation({
+    mutationFn: async (entryId: number) => {
+      return apiRequest(`/api/time-entries/${entryId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+      toast({
+        title: "✅ Registro eliminado",
+        description: "El registro se ha eliminado correctamente"
+      });
+      setDeleteDialogOpen(false);
+      setEntryToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Error",
+        description: error.message || "No se pudo eliminar el registro",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteTimeEntry = (entryId: number) => {
+    setEntryToDelete(entryId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (entryToDelete) {
+      deleteTimeEntryMutation.mutate(entryToDelete);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -789,7 +828,7 @@ export default function ProjectDetailsRedesigned() {
                 <div className="space-y-3">
                   {Array.isArray(timeEntries) && timeEntries.length > 0 ? (
                     timeEntries.slice(0, 10).map((entry: TimeEntry) => (
-                      <div key={entry.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div key={entry.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 group">
                         <div className="flex items-center gap-4">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback>
@@ -804,16 +843,31 @@ export default function ProjectDetailsRedesigned() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-lg">{entry.hours}h</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(entry.date).toLocaleDateString('es-ES')}
-                          </p>
-                          {entry.hourlyRate && (
-                            <p className="text-xs text-gray-400">
-                              ${(entry.hours * entry.hourlyRate).toFixed(0)}
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-semibold text-lg">{entry.hours}h</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(entry.date).toLocaleDateString('es-ES')}
                             </p>
-                          )}
+                            {entry.hourlyRate && (
+                              <p className="text-xs text-gray-400">
+                                ${(entry.hours * entry.hourlyRate).toFixed(0)}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTimeEntry(entry.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                            disabled={deleteTimeEntryMutation.isPending}
+                          >
+                            {deleteTimeEntryMutation.isPending && entryToDelete === entry.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </div>
                     ))
@@ -911,6 +965,50 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Diálogo de confirmación para eliminar registro */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Eliminar Registro de Tiempo
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar este registro de tiempo? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setEntryToDelete(null);
+              }}
+              disabled={deleteTimeEntryMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteTimeEntryMutation.isPending}
+            >
+              {deleteTimeEntryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
