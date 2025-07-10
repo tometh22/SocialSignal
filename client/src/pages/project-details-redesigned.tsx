@@ -1458,76 +1458,79 @@ export default function ProjectDetailsRedesigned() {
               </Card>
             </div>
 
-            {/* Tabs de análisis específico del proyecto */}
-            <Tabs defaultValue="vista-general" className="space-y-4">
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="vista-general">Vista General</TabsTrigger>
-                <TabsTrigger value="indicadores-robustez">Indicadores de Robustez</TabsTrigger>
-                <TabsTrigger value="analisis-detallado">Análisis Detallado</TabsTrigger>
-                <TabsTrigger value="equipo-recursos">Equipo y Recursos</TabsTrigger>
-                <TabsTrigger value="entregables">Entregables</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="vista-general" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-blue-600" />
-                        Distribución de Horas por Persona
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {timeEntries && timeEntries.length > 0 ? (
-                          (() => {
-                            // Agrupar horas por persona
-                            const hoursPerPerson = timeEntries.reduce((acc: any, entry: TimeEntry) => {
-                              if (!acc[entry.personnelName]) {
-                                acc[entry.personnelName] = { hours: 0, cost: 0 };
-                              }
-                              acc[entry.personnelName].hours += entry.hours;
-                              acc[entry.personnelName].cost += (entry.hours * (entry.hourlyRate || 0));
-                              return acc;
-                            }, {});
-
-                            return Object.entries(hoursPerPerson)
-                              .sort(([,a]: any, [,b]: any) => b.hours - a.hours)
-                              .slice(0, 5)
-                              .map(([name, data]: any) => (
-                                <div key={name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="text-xs bg-blue-500 text-white">
-                                        {name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-medium text-sm">{name}</p>
-                                      <p className="text-xs text-gray-500">Project Manager</p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-semibold">{data.hours.toFixed(1)}h</p>
-                                    <div className="w-20 bg-gray-200 rounded-full h-1 mt-1">
-                                      <div className="bg-blue-500 h-1 rounded-full" style={{ width: '85%' }}></div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ));
-                          })()
-                        ) : (
-                          <div className="text-center py-6 text-gray-500">
-                            <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No hay datos suficientes</p>
-                          </div>
-                        )}
-                        {timeEntries && timeEntries.length > 5 && (
-                          <Button variant="outline" size="sm" className="w-full mt-2">
-                            Ver 12 más
-                          </Button>
-                        )}
+            {/* Análisis Consolidado */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    Capacidad vs Demanda
+                  </CardTitle>
+                  <CardDescription>
+                    Análisis de capacidad del equipo y demanda del proyecto
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-gray-600">Capacidad del Equipo</p>
+                        <p className="text-lg font-semibold">Miembros asignados: {baseTeam?.length || 0}</p>
+                        <p className="text-sm text-gray-500">Capacidad promedio/día: {(baseTeam?.length * 8) || 0}h</p>
                       </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-gray-600">Demanda del Proyecto</p>
+                        <p className="text-lg font-semibold">Horas requeridas: $29,230</p>
+                        <p className="text-sm text-gray-500">Costo por hora promedio: $12</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-green-600" />
+                    Distribución de Horas por Persona
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {teamStats && teamStats.length > 0 ? (
+                      teamStats.map((member: any) => (
+                        <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs bg-blue-500 text-white">
+                                {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">{member.name}</p>
+                              <p className="text-xs text-gray-500">{member.entries} registros</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{member.hours.toFixed(1)}h</p>
+                            <div className="w-20 bg-gray-200 rounded-full h-1 mt-1">
+                              <div className="bg-blue-500 h-1 rounded-full" style={{ width: '85%' }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No hay datos de equipo disponibles</p>
+                      </div>
+                    )}
+                  </div>
                     </CardContent>
                   </Card>
 
@@ -1588,284 +1591,6 @@ export default function ProjectDetailsRedesigned() {
                   </Card>
                 </div>
               </TabsContent>
-
-              <TabsContent value="indicadores-robustez" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-orange-600" />
-                      Puntuación Global de Robustez
-                    </CardTitle>
-                    <CardDescription>
-                      Evaluación compuesta basada en múltiples parámetros del proyecto
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="text-4xl font-bold">6.01<span className="text-lg text-gray-500">/10</span></div>
-                      <div className="text-yellow-500">⭐</div>
-                    </div>
-                    <div className="relative mb-4">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Bajo</span>
-                        <span>Moderado</span>
-                        <span>Alto</span>
-                        <span>Excelente</span>
-                      </div>
-                      <div className="w-full bg-gradient-to-r from-red-200 via-yellow-200 via-green-200 to-blue-200 rounded-full h-2">
-                        <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '60.1%' }}></div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-sm font-semibold text-green-600 mb-2">✓ Puntos fuertes</h4>
-                        <ul className="text-xs space-y-1 text-gray-600">
-                          <li>• Calidad de documentación: 8.2/10</li>
-                          <li>• Precisión de estimaciones: 7.5/10</li>
-                          <li>• Satisfacción del cliente: 8.0/10</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-red-600 mb-2">⚠ Áreas de mejora</h4>
-                        <ul className="text-xs space-y-1 text-gray-600">
-                          <li>• Control de costos: 4.2/10</li>
-                          <li>• Adherencia al cronograma: 5.1/10</li>
-                          <li>• Distribución de cargas de trabajo: 4.8/10</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-blue-600" />
-                        Robustez en Gestión de Horas
-                      </CardTitle>
-                      <CardDescription>
-                        Análisis de la distribución y eficiencia de horas
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="text-2xl font-bold">5.3</div>
-                          <div className="text-sm text-gray-500">Puntuación</div>
-                          <div className="text-xs text-orange-600">Moderado</div>
-                        </div>
-                        <div className="text-right text-xs">
-                          <div className="text-red-600 font-medium">Distribución por rol: 4.8/10</div>
-                          <div className="text-orange-600 font-medium">Eficiencia de horas facturables: 6.2/10</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-green-600" />
-                        Robustez Financiera
-                      </CardTitle>
-                      <CardDescription>
-                        Análisis de la gestión financiera del proyecto
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <div className="text-2xl font-bold">4.2</div>
-                          <div className="text-sm text-gray-500">Puntuación</div>
-                          <div className="text-xs text-orange-600">Bajo</div>
-                        </div>
-                        <div className="text-right text-xs">
-                          <div className="text-red-600 font-medium">Control de costos: 3.5/10</div>
-                          <div className="text-red-600 font-medium">Previsibilidad financiera: 4/10</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="analisis-detallado" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-blue-600" />
-                        Costos vs. Presupuesto
-                      </CardTitle>
-                      <CardDescription>
-                        Evolución de costos a lo largo del tiempo
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 mb-2">Visualización del gráfico costTimeline</p>
-                        <p className="text-xs text-gray-400">(Esta visualización se implementa con Recharts)</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-purple-600" />
-                        Tendencia de Horas
-                      </CardTitle>
-                      <CardDescription>
-                        Horas registradas por semana
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 mb-2">Visualización del gráfico timeTrend</p>
-                        <p className="text-xs text-gray-400">(Esta visualización se implementa con Recharts)</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                      Análisis de Desviaciones
-                    </CardTitle>
-                    <CardDescription>
-                      Variaciones respecto a lo planificado
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <DollarSign className="h-4 w-4 text-red-600" />
-                          <span className="font-semibold">Desviación de Costos</span>
-                        </div>
-                        <div className="text-2xl font-bold text-red-600">-209668.0%</div>
-                        <p className="text-xs text-gray-600">Desviación dentro de márgenes aceptables</p>
-                        <div className="text-right text-xs text-green-600 mt-1">∼$ 0</div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="h-4 w-4 text-green-600" />
-                          <span className="font-semibold">Desviación de Cronograma</span>
-                        </div>
-                        <div className="text-2xl font-bold text-green-600">0.0%</div>
-                        <p className="text-xs text-gray-600">Progreso acorde a lo planificado</p>
-                        <div className="text-right text-xs text-green-600 mt-1">∼ No definido días</div>
-                      </div>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                      <h4 className="font-semibold text-sm text-blue-700 mb-2">Acciones Recomendadas</h4>
-                      <ul className="text-xs text-blue-600 space-y-1">
-                        <li>• Mantener el plan actual y continuar con los reportes periódicos</li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="equipo-recursos" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-green-600" />
-                      Capacidad vs Demanda
-                    </CardTitle>
-                    <CardDescription>
-                      Análisis de capacidad del equipo y demanda del proyecto
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-semibold text-sm mb-3">Capacidad del Equipo</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Miembros asignados</span>
-                            <span className="font-medium">{timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => entry.personnelName)).size : 0}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Capacidad promedio/día</span>
-                            <span className="font-medium">
-                              {timeEntries && timeEntries.length > 0 ? (
-                                (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
-                                 new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
-                                ).toFixed(1)
-                              ) : 0}h
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-sm mb-3">Demanda del Proyecto</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Horas requeridas</span>
-                            <span className="font-medium">${(project?.macroMonthlyBudget || project?.quotation?.totalAmount || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Costo por hora promedio</span>
-                            <span className="font-medium">
-                              ${timeEntries && timeEntries.length > 0 ? 
-                                (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hourlyRate || 0), 0) / timeEntries.length).toFixed(0) : 
-                                0
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="entregables" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-purple-600" />
-                      Distribución de Horas
-                    </CardTitle>
-                    <CardDescription>
-                      Facturables vs. No Facturables
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center">
-                      <div className="text-center py-8">
-                        <p className="text-gray-500 mb-2">Gráfico circular de distribución</p>
-                        <p className="text-xs text-gray-400">(Recharts PieChart)</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-2 mb-1">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                            <span className="text-sm font-medium">Facturable</span>
-                          </div>
-                          <p className="text-lg font-bold">0.0h</p>
-                          <p className="text-xs text-gray-500">0.0%</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-2 mb-1">
-                            <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                            <span className="text-sm font-medium">No Facturable</span>
-                          </div>
-                          <p className="text-lg font-bold">{metrics[1]?.value}</p>
-                          <p className="text-xs text-gray-500">100.0%</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
