@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
@@ -8,9 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
-import { Calendar, Clock, Save, X, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Save, X, Plus, Trash2, AlertCircle, CheckCircle2, Users, DollarSign, Send, Timer } from 'lucide-react';
 import { queryClient } from '@/lib/queryClient';
+import { motion } from 'framer-motion';
 
 interface TimeEntry {
   id?: number;
@@ -29,14 +32,18 @@ interface WeeklyTimeRegisterProps {
 }
 
 export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: WeeklyTimeRegisterProps) {
+  const [step, setStep] = useState<'period' | 'register'>('period');
   const [selectedWeek, setSelectedWeek] = useState(() => {
     const today = new Date();
     return startOfWeek(today, { weekStartsOn: 1 }); // Lunes como primer día
   });
 
+  const [startDate, setStartDate] = useState(() => format(selectedWeek, 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(() => format(addDays(selectedWeek, 6), 'yyyy-MM-dd'));
   const [periodName, setPeriodName] = useState('');
   const [notes, setNotes] = useState('');
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [teamHours, setTeamHours] = useState<Record<number, { hours: number; description: string; customRate?: number }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -50,6 +57,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       periodName,
       notes,
       timeEntries,
+      teamHours,
+      startDate,
+      endDate,
       timestamp: Date.now()
     };
     localStorage.setItem(storageKey, JSON.stringify(data));
@@ -68,6 +78,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           setPeriodName(data.periodName || '');
           setNotes(data.notes || '');
           setTimeEntries(data.timeEntries || []);
+          setTeamHours(data.teamHours || {});
+          setStartDate(data.startDate || format(selectedWeek, 'yyyy-MM-dd'));
+          setEndDate(data.endDate || format(addDays(selectedWeek, 6), 'yyyy-MM-dd'));
           setHasUnsavedChanges(true);
           toast({
             title: "📋 Datos recuperados",
@@ -89,7 +102,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
   };
 
   // Cargar equipo base del proyecto
-  const { data: baseTeam } = useQuery({
+  const { data: baseTeam, isLoading: loadingTeam } = useQuery({
     queryKey: [`/api/projects/${projectId}/base-team`],
     enabled: !!projectId,
   });
@@ -99,6 +112,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     queryKey: ['/api/personnel'],
   });
 
+  // Obtener miembros del equipo
+  const teamMembers = baseTeam || [];
+
   // Cargar datos guardados al montar el componente
   useEffect(() => {
     loadFromStorage();
@@ -106,7 +122,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
   // Autoguardado cuando cambian los datos
   useEffect(() => {
-    if (periodName || notes || timeEntries.length > 0) {
+    if (periodName || notes || timeEntries.length > 0 || Object.keys(teamHours).length > 0) {
       setHasUnsavedChanges(true);
       const timeoutId = setTimeout(() => {
         saveToStorage();
@@ -114,7 +130,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
 
       return () => clearTimeout(timeoutId);
     }
-  }, [periodName, notes, timeEntries, selectedWeek]);
+  }, [periodName, notes, timeEntries, teamHours, selectedWeek, startDate, endDate]);
 
   // Limpiar al desmontar si los datos fueron enviados exitosamente
   useEffect(() => {
@@ -125,6 +141,40 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       }
     };
   }, [hasUnsavedChanges]);
+
+  const handleCreatePeriod = () => {
+    if (!periodName.trim()) {
+      toast({
+        title: "Campo requerido",
+        description: "Por favor ingresa un nombre para el período",
+        variant: "destructive"
+      });
+      return;
+    }
+    setStep('register');
+  };
+
+  const handleUpdateHours = (personnelId: number, hours: number, description: string, customRate?: number) => {
+    setTeamHours(prev => ({
+      ...prev,
+      [personnelId]: { hours, description, customRate }
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const getTotalHours = () => {
+    return Object.values(teamHours).reduce((sum, member) => sum + (member.hours || 0), 0);
+  };
+
+  const getTotalCost = () => {
+    return teamMembers.reduce((sum, member) => {
+      const memberData = teamHours[member.personnelId];
+      if (!memberData || !memberData.hours) return sum;
+      
+      const rate = memberData.customRate !== undefined ? memberData.customRate : member.hourlyRate;
+      return sum + (memberData.hours * rate);
+    }, 0);
+  };
 
   const updateTimeEntry = (index: number, field: keyof TimeEntry, value: any) => {
     const updated = [...timeEntries];
@@ -153,7 +203,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     const newEntry: TimeEntry = {
       personnelId: firstMember.personnelId,
       roleId: firstMember.roleId,
-      date: format(selectedWeek, 'yyyy-MM-dd'),
+      date: startDate,
       hours: 0,
       description: '',
       isNew: true
@@ -163,24 +213,62 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
     setHasUnsavedChanges(true);
   };
 
-  const submitMutation = useMutation({
+  const createTimeEntry = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/projects/weekly-time-register', {
+      const response = await fetch('/api/time-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
       if (!response.ok) {
-        throw new Error('Error al enviar el registro');
+        throw new Error('Error al crear el registro de tiempo');
       }
 
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+    }
+  });
+
+  const handleSaveAllHours = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      const entries = teamMembers
+        .map(member => {
+          const memberData = teamHours[member.personnelId];
+          if (!memberData || !memberData.hours) return null;
+          
+          return {
+            projectId,
+            personnelId: member.personnelId,
+            roleId: member.roleId,
+            hours: memberData.hours,
+            description: memberData.description || '',
+            date: startDate,
+            periodName,
+            notes
+          };
+        })
+        .filter(Boolean);
+
+      if (entries.length === 0) {
+        toast({
+          title: "No hay horas para registrar",
+          description: "Ingresa las horas trabajadas para al menos un miembro del equipo",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Crear todas las entradas
+      await Promise.all(entries.map(entry => createTimeEntry.mutateAsync(entry)));
+
       toast({
-        title: "✅ Registro enviado",
-        description: "Las horas se han registrado correctamente",
+        title: "✅ Registro completado",
+        description: `Se registraron ${entries.length} entradas de tiempo`,
       });
 
       // Limpiar datos guardados después del envío exitoso
@@ -191,15 +279,17 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${projectId}`] });
 
       onSuccess();
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "❌ Error",
-        description: error.message || "No se pudo enviar el registro",
+        description: error.message || "No se pudo completar el registro",
         variant: "destructive",
       });
-    },
-  });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (step === 'period') {
     return (
       <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -223,42 +313,42 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         </div>
 
         <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-blue-600" />
-              Registro Semanal de Horas
-              {hasUnsavedChanges && (
-                <Badge variant="outline" className="ml-2 text-orange-600 border-orange-200">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  Autoguardado
-                </Badge>
-              )}
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (hasUnsavedChanges) {
-                  if (window.confirm('Tienes cambios sin enviar. ¿Estás seguro de cerrar?')) {
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Configuración de Período
+                {hasUnsavedChanges && (
+                  <Badge variant="outline" className="ml-2 text-orange-600 border-orange-200">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Autoguardado
+                  </Badge>
+                )}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (hasUnsavedChanges) {
+                    if (window.confirm('Tienes cambios sin enviar. ¿Estás seguro de cerrar?')) {
+                      onCancel();
+                    }
+                  } else {
                     onCancel();
                   }
-                } else {
-                  onCancel();
-                }
-              }}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Configura el período de tiempo para el registro
-            {hasUnsavedChanges && (
-              <span className="text-orange-600 ml-2">• Los datos se guardan automáticamente</span>
-            )}
-          </p>
-        </CardHeader>
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Configura el período de tiempo para el registro
+              {hasUnsavedChanges && (
+                <span className="text-orange-600 ml-2">• Los datos se guardan automáticamente</span>
+              )}
+            </p>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -267,7 +357,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   id="startDate"
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </div>
 
@@ -277,7 +370,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   id="endDate"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
                 />
               </div>
             </div>
@@ -299,15 +395,15 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             <div className="space-y-2">
               <Label htmlFor="notes">Notas (opcional)</Label>
               <Textarea
-              value={notes}
-              onChange={(e) => {
-                setNotes(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              placeholder="Añade cualquier nota relevante para este período..."
-              rows={3}
-              className="resize-none"
-            />
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                placeholder="Añade cualquier nota relevante para este período..."
+                rows={3}
+                className="resize-none"
+              />
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
@@ -532,11 +628,11 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         </Button>
         <Button 
           onClick={handleSaveAllHours} 
-          disabled={createTimeEntry.isPending}
+          disabled={isSubmitting}
           className="gap-2"
         >
           <Send className="w-4 h-4" />
-          {createTimeEntry.isPending ? 'Guardando...' : 'Guardar Registro Semanal'}
+          {isSubmitting ? 'Guardando...' : 'Guardar Registro Semanal'}
         </Button>
       </div>
     </div>
