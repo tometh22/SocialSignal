@@ -533,9 +533,9 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {teamMembers.map((member, index) => {
+                  {teamMembers.filter(member => member && member.personnelId).map((member, index) => {
                     const memberHours = teamHours[member.personnelId] || { hours: 0, description: '', customRate: undefined };
-                    const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : member.hourlyRate;
+                    const effectiveRate = memberHours.customRate !== undefined ? memberHours.customRate : (member.hourlyRate || 0);
 
                     return (
                       <motion.tr
@@ -549,12 +549,12 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
                           <div className="flex items-center gap-3">
                             <Avatar className="w-8 h-8">
                               <AvatarFallback className="bg-blue-600 text-white text-xs font-semibold">
-                                {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium text-gray-900 text-sm">{member.name}</div>
-                              <div className="text-xs text-gray-500">{member.role}</div>
+                              <div className="font-medium text-gray-900 text-sm">{member.name || 'Sin nombre'}</div>
+                              <div className="text-xs text-gray-500">{member.role || 'Sin rol'}</div>
                             </div>
                           </div>
                         </td>
