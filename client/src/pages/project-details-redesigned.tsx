@@ -1986,4 +1986,3 @@ export default function ProjectDetailsRedesigned() {
     </div>
   );
 }
-
