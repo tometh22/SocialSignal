@@ -100,7 +100,7 @@ function TimeRangeFilter({
 
   const currentDate = new Date();
 
-  const presets: { label: string; type: DateFilter['type'] | 'lastMonth'; value: () => DateFilter }[] = [
+  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter'; value: () => DateFilter }[] = [
     {
       label: "Esta semana",
       type: "week",
@@ -145,6 +145,23 @@ function TimeRangeFilter({
         endDate: endOfQuarter(currentDate),
         label: "Este trimestre"
       })
+    },
+    {
+      label: "Trimestre pasado",
+      type: "lastQuarter",
+      value: () => {
+        // Obtener el trimestre anterior dinámicamente
+        const lastQuarter = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
+        const quarterStart = startOfQuarter(lastQuarter);
+        const quarterEnd = endOfQuarter(lastQuarter);
+        const quarterName = `Q${Math.floor(quarterStart.getMonth() / 3) + 1} ${quarterStart.getFullYear()}`;
+        return {
+          type: 'quarter',
+          startDate: quarterStart,
+          endDate: quarterEnd,
+          label: `Trimestre pasado (${quarterName})`
+        };
+      }
     }
   ];
 
@@ -170,12 +187,19 @@ function TimeRangeFilter({
       <div className="flex items-center gap-2">
         <Label className="text-sm font-medium">Período:</Label>
         <Select 
-          value={selectedFilter.type === 'custom' ? 'custom' : selectedFilter.type} 
+          value={selectedFilter.type === 'custom' ? 'custom' : 
+                selectedFilter.label.includes('Trimestre pasado') ? 'lastQuarter' :
+                selectedFilter.label.includes('Mes pasado') ? 'lastMonth' : 
+                selectedFilter.type} 
           onValueChange={(value) => {
             if (value === 'custom') {
               setIsCustomOpen(true);
             } else {
-              const preset = presets.find(p => p.type === value || (value === 'lastMonth' && p.type === 'lastMonth'));
+              const preset = presets.find(p => 
+                p.type === value || 
+                (value === 'lastMonth' && p.type === 'lastMonth') || 
+                (value === 'lastQuarter' && p.type === 'lastQuarter')
+              );
               if (preset) handlePresetSelect(preset);
             }
           }}
@@ -190,7 +214,10 @@ function TimeRangeFilter({
           </SelectTrigger>
           <SelectContent>
             {presets.map((preset, index) => (
-              <SelectItem key={`${preset.type}-${index}`} value={preset.type === 'lastMonth' ? 'lastMonth' : preset.type}>
+              <SelectItem 
+                key={`${preset.type}-${index}`} 
+                value={preset.type === 'lastMonth' ? 'lastMonth' : preset.type === 'lastQuarter' ? 'lastQuarter' : preset.type}
+              >
                 {preset.label}
               </SelectItem>
             ))}
@@ -199,40 +226,46 @@ function TimeRangeFilter({
         </Select>
       </div>
 
-      <Popover open={isCustomOpen} onOpenChange={setIsCustomOpen}>
-        <PopoverTrigger asChild>
-          <div style={{ display: 'none' }} />
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="p-4 space-y-4">
-            <div className="space-y-2">
-              <Label>Fecha de inicio</Label>
-              <CalendarComponent
-                mode="single"
-                selected={customStart}
-                onSelect={setCustomStart}
-                initialFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Fecha de fin</Label>
-              <CalendarComponent
-                mode="single"
-                selected={customEnd}
-                onSelect={setCustomEnd}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsCustomOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCustomApply} disabled={!customStart || !customEnd}>
-                Aplicar
-              </Button>
+      {isCustomOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96 max-w-[90vw]">
+            <h3 className="text-lg font-semibold mb-4">Seleccionar período personalizado</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Fecha de inicio</Label>
+                <CalendarComponent
+                  mode="single"
+                  selected={customStart}
+                  onSelect={setCustomStart}
+                  initialFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de fin</Label>
+                <CalendarComponent
+                  mode="single"
+                  selected={customEnd}
+                  onSelect={setCustomEnd}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCustomOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleCustomApply}
+                  disabled={!customStart || !customEnd}
+                >
+                  Aplicar
+                </Button>
+              </div>
             </div>
           </div>
-        </PopoverContent>
-      </Popover>
+        </div>
+      )}
     </div>
   );
 }
