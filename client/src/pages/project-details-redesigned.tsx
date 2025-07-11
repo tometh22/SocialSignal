@@ -623,69 +623,61 @@ export default function ProjectDetailsRedesigned() {
         
         const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
         
-        if (dateFilter.label.includes('pasado')) {
-          console.log('🔍 COMPARACION DETALLADA:', {
-            entryDateOnly: entryDateOnly.toLocaleDateString('es-ES'),
-            startDateOnly: startDateOnly.toLocaleDateString('es-ES'),
-            endDateOnly: endDateOnly.toLocaleDateString('es-ES'),
-            isInRange,
-            entryTimestamp: entryDateOnly.getTime(),
-            startTimestamp: startDateOnly.getTime(),
-            endTimestamp: endDateOnly.getTime()
-          });
-        }
-        
         return isInRange;
-      });
-      
-      console.log('🔍 RESULTADO DEL FILTRO:', {
-        filteredCount: filtered.length,
-        originalCount: entries.length,
-        filtroActivo: dateFilter.label,
-        periodoCompleto: `${dateFilter.startDate.toLocaleDateString('es-ES')} - ${dateFilter.endDate.toLocaleDateString('es-ES')}`,
-        primerResultado: filtered.length > 0 ? {
-          fecha: filtered[0].date,
-          horas: filtered[0].hours,
-          persona: filtered[0].personnelName
-        } : 'No hay resultados',
-        esJunio: dateFilter.startDate.getMonth() === 5 // junio es mes 5 (0-indexado)
       });
       
       return filtered;
     };
   }, [dateFilter]);
 
-  // Cálculos principales basados en datos reales - SIMPLIFICADO
+  // Cálculos principales basados en objetivos de cotización aprobada
   const metrics = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return [];
 
     const projectData = project as any;
-    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
+    const quotationData = projectData.quotation;
     
-    // APLICAR EL FILTRO TEMPORAL - ESTO ES LO MÁS IMPORTANTE
+    // APLICAR EL FILTRO TEMPORAL
     const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
     
-    console.log('🎯 RECALCULANDO METRICAS CON FILTRO:', {
-      filtroActual: dateFilter.label,
-      filtroRango: `${dateFilter.startDate.toLocaleDateString('es-ES')} - ${dateFilter.endDate.toLocaleDateString('es-ES')}`,
-      entradaOriginal: timeEntries.length,
-      entradaFiltrada: filteredTimeEntries.length,
-      horasTotales: filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0),
-      fechasEncontradas: timeEntries.map(e => e.date).slice(0, 3)
-    });
+    // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA
+    const monthlyClientPrice = quotationData?.totalAmount || 29230; // Precio mensual al cliente
+    const monthlyBaseCost = quotationData?.baseCost || 10113.4; // Costo base mensual estimado
+    const monthlyEstimatedHours = quotationData?.estimatedHours || 969; // Horas estimadas mensuales
+    const monthlyMarkup = quotationData?.markup || 2.8; // Markup mensual
     
-    // Presupuesto básico
-    const totalBudget = projectData.quotation?.totalAmount || projectData.deliverableBudget || 10450;
+    // CALCULAR OBJETIVOS SEGÚN EL PERÍODO SELECCIONADO
+    const getTargetMultiplier = () => {
+      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysInMonth = 30;
+      
+      if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
+        return 3; // Trimestre = 3 meses
+      } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
+        return 6; // Semestre = 6 meses
+      } else if (dateFilter.label.includes('año') || dateFilter.label.includes('12 meses')) {
+        return 12; // Año = 12 meses
+      } else if (dateFilter.label.includes('mes') || daysDiff >= 25) {
+        return 1; // Mes completo
+      } else {
+        return daysDiff / daysInMonth; // Proporción de mes
+      }
+    };
     
-    // CALCULOS SIMPLES BASADOS EN DATOS FILTRADOS
-    const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+    const targetMultiplier = getTargetMultiplier();
+    const targetClientPrice = monthlyClientPrice * targetMultiplier;
+    const targetBaseCost = monthlyBaseCost * targetMultiplier;
+    const targetHours = monthlyEstimatedHours * targetMultiplier;
+    
+    // CALCULAR DATOS REALES DEL PERÍODO FILTRADO
+    const actualHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+    const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
     
-    const uniquePersonnel = new Set(filteredTimeEntries.map((entry: TimeEntry) => entry.personnelId)).size;
-    
-    // Calcular eficiencia de costos
-    const costEfficiency = totalBudget > 0 ? ((totalBudget - totalCost) / totalBudget) * 100 : 0;
+    // CALCULAR EFICIENCIAS Y DESVIACIONES
+    const costEfficiency = targetBaseCost > 0 ? ((targetBaseCost - actualCost) / targetBaseCost) * 100 : 0;
+    const hourEfficiency = targetHours > 0 ? ((targetHours - actualHours) / targetHours) * 100 : 0;
+    const budgetUtilization = targetBaseCost > 0 ? (actualCost / targetBaseCost) * 100 : 0;
 
     const getStatusColor = (status: string) => {
       switch (status) {
@@ -700,74 +692,57 @@ export default function ProjectDetailsRedesigned() {
 
     return [
       {
-        label: "Presupuesto Mensual",
-        value: `$${totalBudget.toLocaleString()}`,
-        subtitle: `${costEfficiency >= 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%`,
+        label: "Presupuesto vs Objetivo",
+        value: `$${actualCost.toLocaleString()}`,
+        subtitle: `Objetivo: $${targetBaseCost.toLocaleString()} | ${costEfficiency >= 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%`,
         icon: DollarSign,
-        color: "text-green-700",
-        bgColor: "bg-gradient-to-br from-green-50 to-green-100",
+        color: costEfficiency >= 0 ? "text-green-700" : "text-red-700",
+        bgColor: costEfficiency >= 0 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100",
         change: costEfficiency
       },
       {
-        label: `Horas ${dateFilter.label}`,
-        value: `${totalHours.toFixed(1)}h`,
-        subtitle: totalHours === 0 ? 
-          "Sin registros en este período" : 
-          `de ${Math.ceil(totalHours * 1.2)}h estimadas`,
+        label: `Horas vs Objetivo`,
+        value: `${actualHours.toFixed(1)}h`,
+        subtitle: `Objetivo: ${targetHours.toFixed(1)}h | ${hourEfficiency >= 0 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(hourEfficiency).toFixed(1)}%`,
         icon: Clock,
-        color: "text-blue-700",
-        bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
-        change: totalHours > 0 ? 10 : -100
+        color: hourEfficiency >= 0 ? "text-green-700" : "text-orange-700",
+        bgColor: hourEfficiency >= 0 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-orange-50 to-orange-100",
+        change: hourEfficiency
       },
       {
-        label: "Progreso",
+        label: "Progreso del Período",
         value: (() => {
-          // Calcular progreso real basado en fechas del proyecto
-          if (!projectData.startDate) return "0.0%";
-          
-          const startDate = new Date(projectData.startDate);
-          const endDate = projectData.expectedEndDate ? new Date(projectData.expectedEndDate) : null;
-          const today = new Date();
-          
-          if (!endDate) return "0.0%";
-          
-          const totalDuration = endDate.getTime() - startDate.getTime();
-          const elapsedDuration = today.getTime() - startDate.getTime();
-          
-          if (totalDuration <= 0) return "0.0%";
-          
-          const timeProgress = Math.max(0, Math.min(100, (elapsedDuration / totalDuration) * 100));
-          return `${timeProgress.toFixed(1)}%`;
+          // Calcular progreso basado en horas completadas vs objetivo del período
+          if (targetHours === 0) return "0.0%";
+          const progressPercentage = Math.min(100, (actualHours / targetHours) * 100);
+          return `${progressPercentage.toFixed(1)}%`;
         })(),
         subtitle: (() => {
-          if (!projectData.startDate || !projectData.expectedEndDate) return "Sin cronograma definido";
-          
-          const endDate = new Date(projectData.expectedEndDate);
-          const today = new Date();
-          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (daysLeft < 0) return `${Math.abs(daysLeft)} días de retraso`;
-          if (daysLeft === 0) return "Vence hoy";
-          return `${daysLeft} días restantes`;
+          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
+          if (progressPercentage >= 100) return "Objetivo completado";
+          if (progressPercentage >= 80) return "Cerca del objetivo";
+          if (progressPercentage >= 50) return "Progreso moderado";
+          if (progressPercentage > 0) return "Progreso inicial";
+          return "Sin progreso registrado";
         })(),
         icon: Target,
         color: (() => {
-          if (!projectData.expectedEndDate) return "text-gray-700";
-          const endDate = new Date(projectData.expectedEndDate);
-          const today = new Date();
-          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          return daysLeft < 0 ? "text-red-700" : daysLeft <= 7 ? "text-yellow-700" : "text-purple-700";
+          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
+          if (progressPercentage >= 100) return "text-green-700";
+          if (progressPercentage >= 80) return "text-blue-700";
+          if (progressPercentage >= 50) return "text-yellow-700";
+          if (progressPercentage > 0) return "text-orange-700";
+          return "text-gray-700";
         })(),
         bgColor: (() => {
-          if (!projectData.expectedEndDate) return "bg-gradient-to-br from-gray-50 to-gray-100";
-          const endDate = new Date(projectData.expectedEndDate);
-          const today = new Date();
-          const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          return daysLeft < 0 ? "bg-gradient-to-br from-red-50 to-red-100" : 
-                 daysLeft <= 7 ? "bg-gradient-to-br from-yellow-50 to-yellow-100" : 
-                 "bg-gradient-to-br from-purple-50 to-purple-100";
+          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
+          if (progressPercentage >= 100) return "bg-gradient-to-br from-green-50 to-green-100";
+          if (progressPercentage >= 80) return "bg-gradient-to-br from-blue-50 to-blue-100";
+          if (progressPercentage >= 50) return "bg-gradient-to-br from-yellow-50 to-yellow-100";
+          if (progressPercentage > 0) return "bg-gradient-to-br from-orange-50 to-orange-100";
+          return "bg-gradient-to-br from-gray-50 to-gray-100";
         })(),
-        change: 0
+        change: targetHours > 0 ? ((actualHours / targetHours) * 100) - 100 : 0
       },
       {
         label: "Estado",
@@ -826,35 +801,51 @@ export default function ProjectDetailsRedesigned() {
       .slice(0, 5);
   }, [timeEntries, baseTeam, filterTimeEntriesByDateRange]);
 
-  // Cálculo de resumen de costos usando filtro temporal
+  // Cálculo de resumen de costos usando objetivos de cotización
   const costSummary = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return null;
     
     const projectData = project as any;
+    const quotationData = projectData.quotation;
     const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
     
-    const totalCost = filteredEntries.reduce((sum: number, entry: TimeEntry) => 
-      sum + ((entry.hours || 0) * (entry.hourlyRate || 100)), 0);
+    // Obtener objetivos mensuales de la cotización
+    const monthlyBaseCost = quotationData?.baseCost || 10113.4;
+    const monthlyEstimatedHours = quotationData?.estimatedHours || 969;
     
-    const isAlwaysOnContract = projectData.quotation?.projectType === 'fee-mensual';
-    const baseBudget = projectData.quotation?.baseCost || projectData.quotation?.totalAmount || 0;
+    // Calcular multiplicador según el período
+    const getTargetMultiplier = () => {
+      if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
+        return 3;
+      } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
+        return 6;
+      } else if (dateFilter.label.includes('año') || dateFilter.label.includes('12 meses')) {
+        return 12;
+      } else {
+        return 1; // Por defecto, un mes
+      }
+    };
     
-    let budget = baseBudget;
-    if (isAlwaysOnContract) {
-      // Para contratos Always On, calcular presupuesto proporcionalmente al período
-      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const daysInMonth = 30;
-      budget = (baseBudget * daysDiff) / daysInMonth;
-    }
+    const targetMultiplier = getTargetMultiplier();
+    const targetBudget = monthlyBaseCost * targetMultiplier;
+    const targetHours = monthlyEstimatedHours * targetMultiplier;
     
-    const budgetUtilization = budget > 0 ? (totalCost / budget) * 100 : 0;
+    // Calcular datos reales
+    const actualCost = filteredEntries.reduce((sum: number, entry: TimeEntry) => 
+      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
+    
+    const actualHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+    
+    const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
     
     return {
-      totalCost,
-      budget,
+      totalCost: actualCost,
+      budget: targetBudget,
       budgetUtilization,
-      savings: budget - totalCost,
-      filteredHours: filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0)
+      savings: targetBudget - actualCost,
+      filteredHours: actualHours,
+      targetHours,
+      targetMultiplier
     };
   }, [project, timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
@@ -1150,27 +1141,16 @@ export default function ProjectDetailsRedesigned() {
                             <span>Avance General</span>
                             <span className="font-bold">
                               {(() => {
-                                // Calcular progreso basado en horas trabajadas en el período filtrado
-                                const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                                const filteredHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-                                
-                                if (filteredHours === 0) return "0.0%";
-                                
-                                // Estimar horas totales necesarias basándose en el presupuesto
-                                const estimatedTotalHours = (projectData.quotation?.totalAmount || 10000) / 100; // Asumiendo $100/hora promedio
-                                const progressPercentage = Math.min(100, (filteredHours / estimatedTotalHours) * 100);
-                                
+                                if (!costSummary || !costSummary.targetHours) return "0.0%";
+                                const progressPercentage = Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
                                 return `${progressPercentage.toFixed(1)}%`;
                               })()}
                             </span>
                           </div>
                           <Progress 
                             value={(() => {
-                              const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                              const filteredHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-                              if (filteredHours === 0) return 0;
-                              const estimatedTotalHours = (projectData.quotation?.totalAmount || 10000) / 100;
-                              return Math.min(100, (filteredHours / estimatedTotalHours) * 100);
+                              if (!costSummary || !costSummary.targetHours) return 0;
+                              return Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
                             })()} 
                             className="h-2"
                           />
