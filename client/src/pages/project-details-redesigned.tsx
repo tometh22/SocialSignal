@@ -534,22 +534,26 @@ export default function ProjectDetailsRedesigned() {
   // Función para filtrar entradas por rango de fechas
   const filterTimeEntriesByDateRange = useMemo(() => {
     return (entries: TimeEntry[]) => {
-      console.log('🔍 Filtro temporal activo:', {
+      console.log('🔍 CONFIGURACION FILTRO TEMPORAL:', {
         label: dateFilter.label,
-        startDate: dateFilter.startDate.toISOString(),
-        endDate: dateFilter.endDate.toISOString(),
-        startDateFormatted: dateFilter.startDate.toLocaleDateString('es-ES'),
-        endDateFormatted: dateFilter.endDate.toLocaleDateString('es-ES'),
-        totalEntries: entries.length,
-        currentMonth: new Date().getMonth() + 1,
-        filterMonth: dateFilter.startDate.getMonth() + 1,
-        muestraTodasLasEntradas: entries.map(e => ({
-          fecha: e.date,
-          mes: new Date(e.date).getMonth() + 1,
-          horas: e.hours,
-          persona: e.personnelName
-        })).slice(0, 10) // solo primeras 10 para no saturar logs
+        filtroInicio: dateFilter.startDate.toLocaleDateString('es-ES'),
+        filtroFin: dateFilter.endDate.toLocaleDateString('es-ES'),
+        filtroMes: dateFilter.startDate.getMonth() + 1,
+        filtroAño: dateFilter.startDate.getFullYear(),
+        totalEntradas: entries.length,
+        fechaActual: new Date().toLocaleDateString('es-ES'),
+        mesActual: new Date().getMonth() + 1
       });
+      
+      // Mostrar todas las entradas disponibles para debug
+      console.log('🔍 TODAS LAS ENTRADAS EN BD:', entries.map(e => ({
+        fecha: e.date,
+        fechaFormato: new Date(e.date).toLocaleDateString('es-ES'),
+        mes: new Date(e.date).getMonth() + 1,
+        año: new Date(e.date).getFullYear(),
+        horas: e.hours,
+        persona: e.personnelName
+      })));
       
       const filtered = entries.filter((entry: TimeEntry) => {
         const entryDate = new Date(entry.date);
@@ -1014,7 +1018,44 @@ export default function ProjectDetailsRedesigned() {
             </div>
           </div>
 
-
+          {/* Métricas principales con colores atractivos */}
+          <div className="grid grid-cols-4 gap-3 mt-4">
+            {metrics.map((metric, index) => {
+              const IconComponent = metric.icon;
+              return (
+                <Card key={index} className={`${metric.bgColor} border-0 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1`}>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium text-gray-600">{metric.label}</p>
+                        <p className={`text-lg font-bold ${metric.color}`}>{metric.value}</p>
+                        {metric.subtitle && (
+                          <p className="text-xs text-gray-500 mt-0.5">{metric.subtitle}</p>
+                        )}
+                      </div>
+                      <div className={`p-2 rounded-full shadow-lg ${metric.color.replace('text-', 'bg-').replace('-700', '-500')}`}>
+                        <IconComponent className="h-4 w-4 text-white" />
+                      </div>
+                    </div>
+                    {metric.change !== undefined && (
+                      <div className="mt-2 pt-2 border-t border-white/30">
+                        <div className={`flex items-center text-xs ${metric.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {metric.change >= 0 ? (
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3 mr-1" />
+                          )}
+                          <span className="font-medium">
+                            {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       </div>
 
