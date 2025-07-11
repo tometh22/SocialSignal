@@ -36,12 +36,35 @@ interface WeeklyTimeRegisterProps {
 export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: WeeklyTimeRegisterProps) {
   const [step, setStep] = useState<'period' | 'register'>('period');
   const [selectedWeek, setSelectedWeek] = useState(() => {
-    const today = new Date();
-    return startOfWeek(today, { weekStartsOn: 1 }); // Lunes como primer día
+    try {
+      const today = new Date();
+      if (isNaN(today.getTime())) {
+        console.error('Invalid date in selectedWeek initialization');
+        return new Date();
+      }
+      return startOfWeek(today, { weekStartsOn: 1 }); // Lunes como primer día
+    } catch (error) {
+      console.error('Error initializing selectedWeek:', error);
+      return new Date();
+    }
   });
 
-  const [startDate, setStartDate] = useState(() => format(selectedWeek, 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState(() => format(addDays(selectedWeek, 6), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(() => {
+    try {
+      return format(selectedWeek, 'yyyy-MM-dd');
+    } catch (error) {
+      console.error('Error formatting start date:', error);
+      return format(new Date(), 'yyyy-MM-dd');
+    }
+  });
+  const [endDate, setEndDate] = useState(() => {
+    try {
+      return format(addDays(selectedWeek, 6), 'yyyy-MM-dd');
+    } catch (error) {
+      console.error('Error formatting end date:', error);
+      return format(addDays(new Date(), 6), 'yyyy-MM-dd');
+    }
+  });
   const [periodName, setPeriodName] = useState('');
   const [notes, setNotes] = useState('');
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
@@ -79,7 +102,16 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
         const data = JSON.parse(stored);
         // Solo cargar si es reciente (menos de 1 hora)
         if (Date.now() - data.timestamp < 3600000) {
-          setSelectedWeek(new Date(data.selectedWeek));
+          try {
+            const parsedWeek = new Date(data.selectedWeek);
+            if (isNaN(parsedWeek.getTime())) {
+              throw new Error('Invalid date in storage');
+            }
+            setSelectedWeek(parsedWeek);
+          } catch (error) {
+            console.error('Error parsing stored week date:', error);
+            setSelectedWeek(new Date());
+          }
           setPeriodName(data.periodName || '');
           setNotes(data.notes || '');
           setTimeEntries(data.timeEntries || []);
