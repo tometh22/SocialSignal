@@ -1415,12 +1415,12 @@ export default function ProjectDetailsRedesigned() {
                       {(() => {
                         const realCost = costSummary?.totalCost || 0;
                         const budget = costSummary?.budget || 0;
-                        if (realCost === 0 || budget === 0) return "0%";
-                        const markup = ((budget - realCost) / realCost) * 100;
-                        return `${markup.toFixed(1)}%`;
+                        if (realCost === 0 || budget === 0) return "0x";
+                        const markup = budget / realCost;
+                        return `${markup.toFixed(1)}x`;
                       })()}
                     </div>
-                    <div className="text-sm text-gray-600">Markup Real</div>
+                    <div className="text-sm text-gray-600">Markup</div>
                   </div>
                 </div>
               </CardContent>
@@ -1463,19 +1463,19 @@ export default function ProjectDetailsRedesigned() {
                           const realCost = costSummary?.totalCost || 0;
                           const budget = costSummary?.budget || 0;
                           if (realCost === 0 || budget === 0) return 'secondary';
-                          const markup = ((budget - realCost) / realCost) * 100;
-                          if (markup >= 30) return 'default';
-                          if (markup >= 15) return 'secondary';
+                          const markup = budget / realCost;
+                          if (markup >= 2.5) return 'default';
+                          if (markup >= 1.8) return 'secondary';
                           return 'destructive';
                         })()}>
                           {(() => {
                             const realCost = costSummary?.totalCost || 0;
                             const budget = costSummary?.budget || 0;
                             if (realCost === 0 || budget === 0) return 'Sin datos';
-                            const markup = ((budget - realCost) / realCost) * 100;
-                            if (markup >= 30) return 'Excelente';
-                            if (markup >= 15) return 'Bueno';
-                            if (markup >= 5) return 'Aceptable';
+                            const markup = budget / realCost;
+                            if (markup >= 2.5) return 'Excelente';
+                            if (markup >= 1.8) return 'Bueno';
+                            if (markup >= 1.2) return 'Aceptable';
                             return 'Crítico';
                           })()}
                         </Badge>
@@ -1484,9 +1484,9 @@ export default function ProjectDetailsRedesigned() {
                         {(() => {
                           const realCost = costSummary?.totalCost || 0;
                           const budget = costSummary?.budget || 0;
-                          if (realCost === 0 || budget === 0) return "0%";
-                          const markup = ((budget - realCost) / realCost) * 100;
-                          return `${markup.toFixed(1)}%`;
+                          if (realCost === 0 || budget === 0) return "0x";
+                          const markup = budget / realCost;
+                          return `${markup.toFixed(1)}x`;
                         })()}
                       </p>
                       <p className="text-sm text-amber-700 mt-1">
@@ -1542,10 +1542,10 @@ export default function ProjectDetailsRedesigned() {
                               const currentHours = costSummary?.filteredHours || 0;
                               const targetHours = costSummary?.targetHours || 0;
                               const budget = costSummary?.budget || 0;
-                              if (currentHours === 0 || targetHours === 0 || budget === 0) return '0%';
+                              if (currentHours === 0 || targetHours === 0 || budget === 0) return '0x';
                               const projectedCost = (currentCost / currentHours) * targetHours;
-                              const projectedMarkup = ((budget - projectedCost) / projectedCost) * 100;
-                              return `${projectedMarkup.toFixed(1)}%`;
+                              const projectedMarkup = budget / projectedCost;
+                              return `${projectedMarkup.toFixed(1)}x`;
                             })()}
                           </span>
                         </div>
