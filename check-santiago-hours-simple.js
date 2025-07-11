@@ -1,25 +1,30 @@
 
-import { pool } from './server/db.ts';
+const { Pool } = require('pg');
+
+// Configuración de la base de datos
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 async function checkSantiagoHours() {
   try {
     console.log('🔍 Consultando horas de Santiago Berisso en proyecto Warner...\n');
     
     // Primero encontramos el ID de Santiago Berisso
-    const { rows: personnel } = await pool.query(`
+    const personnelResult = await pool.query(`
       SELECT id, name FROM personnel WHERE name ILIKE '%santiago%berisso%'
     `);
     
-    if (personnel.length === 0) {
+    if (personnelResult.rows.length === 0) {
       console.log('❌ No se encontró Santiago Berisso en la base de datos');
       return;
     }
     
-    const santiagoId = personnel[0].id;
+    const santiagoId = personnelResult.rows[0].id;
     console.log(`✅ Santiago Berisso encontrado - ID: ${santiagoId}`);
     
     // Encontrar el proyecto Warner (ID 26 según los logs)
-    const { rows: projects } = await pool.query(`
+    const projectsResult = await pool.query(`
       SELECT ap.id, q.project_name, q.client_id, c.name as client_name
       FROM active_projects ap
       JOIN quotations q ON ap.quotation_id = q.id
@@ -28,11 +33,11 @@ async function checkSantiagoHours() {
     `);
     
     console.log('📋 Proyectos Warner encontrados:');
-    projects.forEach(p => {
+    projectsResult.rows.forEach(p => {
       console.log(`  - ID: ${p.id}, Proyecto: ${p.project_name}, Cliente: ${p.client_name}`);
     });
     
-    if (projects.length === 0) {
+    if (projectsResult.rows.length === 0) {
       console.log('❌ No se encontraron proyectos de Warner');
       return;
     }
@@ -41,7 +46,7 @@ async function checkSantiagoHours() {
     const warnerProjectId = 26;
     
     // Consultar horas por mes
-    const { rows: mayHours } = await pool.query(`
+    const mayHoursResult = await pool.query(`
       SELECT 
         DATE_TRUNC('month', date) as month,
         SUM(hours) as total_hours,
@@ -54,7 +59,7 @@ async function checkSantiagoHours() {
       GROUP BY DATE_TRUNC('month', date)
     `, [warnerProjectId, santiagoId]);
     
-    const { rows: juneHours } = await pool.query(`
+    const juneHoursResult = await pool.query(`
       SELECT 
         DATE_TRUNC('month', date) as month,
         SUM(hours) as total_hours,
@@ -68,7 +73,7 @@ async function checkSantiagoHours() {
     `, [warnerProjectId, santiagoId]);
     
     // Mostrar todas las entradas de Santiago en el proyecto Warner
-    const { rows: allEntries } = await pool.query(`
+    const allEntriesResult = await pool.query(`
       SELECT 
         date,
         hours,
@@ -80,36 +85,37 @@ async function checkSantiagoHours() {
     `, [warnerProjectId, santiagoId]);
     
     console.log('\n📊 RESUMEN DE HORAS - SANTIAGO BERISSO EN PROYECTO WARNER:');
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
     
     console.log('\n🗓️ MAYO 2025:');
-    if (mayHours.length > 0) {
-      console.log(`   Total de horas: ${mayHours[0].total_hours}h`);
-      console.log(`   Número de registros: ${mayHours[0].entries_count}`);
+    if (mayHoursResult.rows.length > 0) {
+      console.log(`   Total de horas: ${mayHoursResult.rows[0].total_hours}h`);
+      console.log(`   Número de registros: ${mayHoursResult.rows[0].entries_count}`);
     } else {
       console.log('   No hay registros de horas en mayo 2025');
     }
     
     console.log('\n🗓️ JUNIO 2025:');
-    if (juneHours.length > 0) {
-      console.log(`   Total de horas: ${juneHours[0].total_hours}h`);
-      console.log(`   Número de registros: ${juneHours[0].entries_count}`);
+    if (juneHoursResult.rows.length > 0) {
+      console.log(`   Total de horas: ${juneHoursResult.rows[0].total_hours}h`);
+      console.log(`   Número de registros: ${juneHoursResult.rows[0].entries_count}`);
     } else {
       console.log('   No hay registros de horas en junio 2025');
     }
     
     console.log('\n📋 DETALLE DE TODAS LAS ENTRADAS:');
-    if (allEntries.length > 0) {
-      allEntries.forEach(entry => {
+    if (allEntriesResult.rows.length > 0) {
+      allEntriesResult.rows.forEach(entry => {
         const monthName = new Date(entry.month).toLocaleDateString('es-ES', { 
           month: 'long', 
           year: 'numeric' 
         });
-        console.log(`   ${entry.date.toISOString().split('T')[0]} | ${entry.hours}h | ${monthName} | ${entry.description || 'Sin descripción'}`);
+        const dateStr = entry.date.toISOString().split('T')[0];
+        console.log(`   ${dateStr} | ${entry.hours}h | ${monthName} | ${entry.description || 'Sin descripción'}`);
       });
       
-      const totalHours = allEntries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
-      console.log(`\n💯 TOTAL GENERAL: ${totalHours}h en ${allEntries.length} registros`);
+      const totalHours = allEntriesResult.rows.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+      console.log(`\n💯 TOTAL GENERAL: ${totalHours}h en ${allEntriesResult.rows.length} registros`);
     } else {
       console.log('   No se encontraron registros de tiempo para Santiago Berisso en el proyecto Warner');
     }
