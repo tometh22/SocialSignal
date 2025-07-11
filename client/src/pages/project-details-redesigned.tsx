@@ -1574,9 +1574,21 @@ export default function ProjectDetailsRedesigned() {
                     <p className="text-2xl font-bold text-blue-600">
                       {(() => {
                         const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        return filteredEntries ? new Set(filteredEntries.map((entry: TimeEntry) => 
-                          new Date(entry.date).toDateString()
-                        )).size : 0;
+                        if (!filteredEntries) return 0;
+                        
+                        try {
+                          const validDates = filteredEntries
+                            .map((entry: TimeEntry) => {
+                              const date = new Date(entry.date);
+                              return !isNaN(date.getTime()) ? date.toDateString() : null;
+                            })
+                            .filter((dateString): dateString is string => dateString !== null);
+                          
+                          return new Set(validDates).size;
+                        } catch (error) {
+                          console.error('Error calculating active days:', error);
+                          return 0;
+                        }
                       })()}
                     </p>
                     <p className="text-sm text-blue-600">días con registro</p>
@@ -1590,7 +1602,13 @@ export default function ProjectDetailsRedesigned() {
                         if (!filteredEntries || filteredEntries.length === 0) return "0";
                         
                         const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
-                        const uniqueDays = new Set(filteredEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size;
+                        const validDates = filteredEntries
+                          .map((entry: TimeEntry) => {
+                            const date = new Date(entry.date);
+                            return !isNaN(date.getTime()) ? date.toDateString() : null;
+                          })
+                          .filter((dateString): dateString is string => dateString !== null);
+                        const uniqueDays = new Set(validDates).size;
                         return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
                       })()}h
                     </p>
@@ -1604,9 +1622,19 @@ export default function ProjectDetailsRedesigned() {
                         const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
                         if (!filteredEntries || filteredEntries.length === 0) return "Sin registros";
                         
-                        return new Date(Math.max(...filteredEntries.map((entry: TimeEntry) => 
-                          new Date(entry.date).getTime()
-                        ))).toLocaleDateString('es-ES');
+                        try {
+                          const dates = filteredEntries
+                            .map((entry: TimeEntry) => new Date(entry.date))
+                            .filter(date => !isNaN(date.getTime()));
+                          
+                          if (dates.length === 0) return "Sin registros";
+                          
+                          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                          return maxDate.toLocaleDateString('es-ES');
+                        } catch (error) {
+                          console.error('Error calculating max date:', error);
+                          return "Error en fecha";
+                        }
                       })()}
                     </p>
                     <p className="text-sm text-purple-600">fecha más reciente</p>
