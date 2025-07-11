@@ -637,14 +637,25 @@ export default function ProjectDetailsRedesigned() {
     const projectData = project as any;
     const quotationData = projectData.quotation;
     
+
+    
     // APLICAR EL FILTRO TEMPORAL
     const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
     
-    // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA
-    const monthlyClientPrice = quotationData?.totalAmount || 29230; // Precio mensual al cliente
-    const monthlyBaseCost = quotationData?.baseCost || 10113.4; // Costo base mensual estimado
-    const monthlyEstimatedHours = quotationData?.estimatedHours || 969; // Horas estimadas mensuales
-    const monthlyMarkup = quotationData?.markup || 2.8; // Markup mensual
+    // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA ASOCIADA AL PROYECTO
+    if (!quotationData) {
+      console.warn('⚠️ No hay cotización asociada al proyecto:', projectData.id);
+      return [];
+    }
+    
+    const monthlyClientPrice = quotationData.totalAmount; // Precio mensual al cliente
+    const monthlyBaseCost = quotationData.baseCost; // Costo base mensual estimado
+    const monthlyMarkup = quotationData.markupAmount || 0; // Markup mensual
+    
+    // Obtener horas estimadas desde la cotización (calculadas desde los miembros del equipo)
+    const monthlyEstimatedHours = quotationData.estimatedHours || 0;
+    
+
     
     // CALCULAR OBJETIVOS SEGÚN EL PERÍODO SELECCIONADO
     const getTargetMultiplier = () => {
@@ -809,9 +820,14 @@ export default function ProjectDetailsRedesigned() {
     const quotationData = projectData.quotation;
     const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
     
-    // Obtener objetivos mensuales de la cotización
-    const monthlyBaseCost = quotationData?.baseCost || 10113.4;
-    const monthlyEstimatedHours = quotationData?.estimatedHours || 969;
+    // Obtener objetivos mensuales de la cotización asociada al proyecto
+    if (!quotationData) {
+      console.warn('⚠️ No hay cotización asociada al proyecto para costSummary:', projectData.id);
+      return null;
+    }
+    
+    const monthlyBaseCost = quotationData.baseCost;
+    const monthlyEstimatedHours = quotationData.estimatedHours || 0;
     
     // Calcular multiplicador según el período
     const getTargetMultiplier = () => {

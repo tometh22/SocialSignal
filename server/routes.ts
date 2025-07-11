@@ -1276,6 +1276,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(id);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
+      // Calcular horas estimadas desde los miembros del equipo de la cotización
+      let estimatedHours = 0;
+      if (project.quotation) {
+        try {
+          const teamMembers = await storage.getQuotationTeamMembers(project.quotation.id);
+          estimatedHours = teamMembers.reduce((total, member) => total + (member.hours || 0), 0);
+
+        } catch (error) {
+          console.error("Error calculando horas estimadas:", error);
+        }
+      }
+
       // Si es un proyecto macro, obtener sus subproyectos
       if (project.isAlwaysOnMacro) {
         try {
@@ -1283,6 +1295,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Agregamos los subproyectos a un nuevo objeto para evitar problemas de tipado
           return res.json({
             ...project,
+            quotation: {
+              ...project.quotation,
+              estimatedHours
+            },
             subProjects: subprojects
           });
         } catch (error) {
@@ -1291,7 +1307,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      res.json(project);
+      res.json({
+        ...project,
+        quotation: {
+          ...project.quotation,
+          estimatedHours
+        }
+      });
     } catch (error) {
       console.error("Error fetching active project:", error);
       res.status(500).json({ message: "Failed to fetch active project" });
