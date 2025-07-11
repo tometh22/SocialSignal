@@ -1414,9 +1414,9 @@ export default function ProjectDetailsRedesigned() {
                     <div className="text-2xl font-bold text-amber-600">
                       {(() => {
                         const realCost = costSummary?.totalCost || 0;
-                        const budget = costSummary?.budget || 0;
-                        if (realCost === 0 || budget === 0) return "0x";
-                        const markup = budget / realCost;
+                        const quotationPrice = quotationData?.totalAmount || 0; // Precio de la cotización
+                        if (realCost === 0 || quotationPrice === 0) return "0x";
+                        const markup = quotationPrice / realCost;
                         return `${markup.toFixed(1)}x`;
                       })()}
                     </div>
@@ -1443,9 +1443,9 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Presupuesto</p>
+                        <p className="text-sm text-gray-600 mb-1">Precio Cotización</p>
                         <p className="text-xl font-bold text-gray-800">
-                          ${costSummary?.budget?.toLocaleString() || '0'}
+                          ${quotationData?.totalAmount?.toLocaleString() || '0'}
                         </p>
                       </div>
                       <div className="p-4 bg-red-50 rounded-lg">
@@ -1461,18 +1461,18 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-sm font-medium text-amber-800">Markup Calculado</p>
                         <Badge variant={(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const budget = costSummary?.budget || 0;
-                          if (realCost === 0 || budget === 0) return 'secondary';
-                          const markup = budget / realCost;
+                          const quotationPrice = quotationData?.totalAmount || 0;
+                          if (realCost === 0 || quotationPrice === 0) return 'secondary';
+                          const markup = quotationPrice / realCost;
                           if (markup >= 2.5) return 'default';
                           if (markup >= 1.8) return 'secondary';
                           return 'destructive';
                         })()}>
                           {(() => {
                             const realCost = costSummary?.totalCost || 0;
-                            const budget = costSummary?.budget || 0;
-                            if (realCost === 0 || budget === 0) return 'Sin datos';
-                            const markup = budget / realCost;
+                            const quotationPrice = quotationData?.totalAmount || 0;
+                            if (realCost === 0 || quotationPrice === 0) return 'Sin datos';
+                            const markup = quotationPrice / realCost;
                             if (markup >= 2.5) return 'Excelente';
                             if (markup >= 1.8) return 'Bueno';
                             if (markup >= 1.2) return 'Aceptable';
@@ -1483,36 +1483,93 @@ export default function ProjectDetailsRedesigned() {
                       <p className="text-3xl font-bold text-amber-600">
                         {(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const budget = costSummary?.budget || 0;
-                          if (realCost === 0 || budget === 0) return "0x";
-                          const markup = budget / realCost;
+                          const quotationPrice = quotationData?.totalAmount || 0;
+                          if (realCost === 0 || quotationPrice === 0) return "0x";
+                          const markup = quotationPrice / realCost;
                           return `${markup.toFixed(1)}x`;
                         })()}
                       </p>
                       <p className="text-sm text-amber-700 mt-1">
                         Ganancia neta: ${(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const budget = costSummary?.budget || 0;
-                          const profit = budget - realCost;
+                          const quotationPrice = quotationData?.totalAmount || 0;
+                          const profit = quotationPrice - realCost;
                           return profit.toLocaleString();
                         })()}
                       </p>
                     </div>
                   </div>
 
-                  {/* Indicadores visuales */}
+                  {/* Comparación vs Cotización Aprobada */}
                   <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span>Progreso vs Presupuesto</span>
-                        <span className="font-medium">
-                          {costSummary?.budgetUtilization?.toFixed(1) || 0}%
-                        </span>
+                    <h4 className="font-semibold text-sm text-gray-800">Comparación vs Cotización Aprobada</h4>
+                    
+                    {/* Precios y markup */}
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Precio cotización:</span>
+                          <p className="font-bold text-gray-800">${quotationData?.totalAmount?.toLocaleString() || 0}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Costo real actual:</span>
+                          <p className="font-bold text-red-600">${costSummary?.totalCost?.toLocaleString() || 0}</p>
+                        </div>
                       </div>
-                      <Progress 
-                        value={costSummary?.budgetUtilization || 0} 
-                        className="h-3"
-                      />
+                    </div>
+
+                    {/* Costos estimados vs reales */}
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Costo estimado:</span>
+                          <p className="font-bold text-blue-600">${quotationData?.baseCost?.toLocaleString() || 0}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Desviación costo:</span>
+                          <p className={`font-bold ${(() => {
+                            const realCost = costSummary?.totalCost || 0;
+                            const estimatedCost = quotationData?.baseCost || 0;
+                            const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
+                            return deviation > 0 ? 'text-red-600' : 'text-green-600';
+                          })()}`}>
+                            {(() => {
+                              const realCost = costSummary?.totalCost || 0;
+                              const estimatedCost = quotationData?.baseCost || 0;
+                              if (estimatedCost === 0) return '0%';
+                              const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
+                              return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Horas estimadas vs reales */}
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Horas estimadas:</span>
+                          <p className="font-bold text-green-600">{costSummary?.targetHours || 0}h</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Desviación horas:</span>
+                          <p className={`font-bold ${(() => {
+                            const realHours = costSummary?.filteredHours || 0;
+                            const estimatedHours = costSummary?.targetHours || 0;
+                            const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
+                            return deviation > 0 ? 'text-red-600' : 'text-green-600';
+                          })()}`}>
+                            {(() => {
+                              const realHours = costSummary?.filteredHours || 0;
+                              const estimatedHours = costSummary?.targetHours || 0;
+                              if (estimatedHours === 0) return '0%';
+                              const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
+                              return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                            })()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="p-4 bg-blue-50 rounded-lg">
@@ -1541,10 +1598,10 @@ export default function ProjectDetailsRedesigned() {
                               const currentCost = costSummary?.totalCost || 0;
                               const currentHours = costSummary?.filteredHours || 0;
                               const targetHours = costSummary?.targetHours || 0;
-                              const budget = costSummary?.budget || 0;
-                              if (currentHours === 0 || targetHours === 0 || budget === 0) return '0x';
+                              const quotationPrice = quotationData?.totalAmount || 0;
+                              if (currentHours === 0 || targetHours === 0 || quotationPrice === 0) return '0x';
                               const projectedCost = (currentCost / currentHours) * targetHours;
-                              const projectedMarkup = budget / projectedCost;
+                              const projectedMarkup = quotationPrice / projectedCost;
                               return `${projectedMarkup.toFixed(1)}x`;
                             })()}
                           </span>

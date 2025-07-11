@@ -106,7 +106,9 @@ This is a comprehensive internal project management platform built for Epical Di
 - July 11, 2025: **MAJOR UX REDESIGN - ELIMINATED REDUNDANT COMPONENTS** - Completely restructured project details view with professional 3-tab interface
 - July 11, 2025: Created consolidated analytics system: "Resumen Ejecutivo", "Gestión del Equipo", and "Análisis Mensual" eliminating all redundancies
 - July 11, 2025: Implemented comprehensive markup calculation card with dynamic filtering that respects selected date ranges  
-- July 11, 2025: Fixed markup calculation to use proper multiplier formula (Budget/Cost) instead of percentage, displaying as "2.5x" format
+- July 11, 2025: **CRITICAL MARKUP LOGIC CORRECTION** - Fixed markup calculation to use quotation price instead of budget (Price/Cost) as source of truth
+- July 11, 2025: Added comprehensive comparison section showing real vs estimated costs, hours, and price from approved quotation
+- July 11, 2025: Implemented deviation percentages with color coding (red for over, green for under estimates)
 - July 11, 2025: Added detailed markup analysis with profit calculations, budget utilization progress, and projected final markup
 - July 11, 2025: Enhanced markup quality thresholds: Excelente (2.5x+), Bueno (1.8x+), Aceptable (1.2x+), Crítico (<1.2x)
 - July 11, 2025: Enhanced executive summary with 4-metric KPI cards including real-time markup percentage
