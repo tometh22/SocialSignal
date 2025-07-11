@@ -541,7 +541,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
         {/* Contenido: Vista General */}
         <TabsContent value="overview" className="mt-0 space-y-6">
           {/* KPIs principales */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {/* Presupuesto */}
             <Card className="shadow-sm">
               <CardContent className="p-4">
@@ -615,18 +615,18 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardContent>
             </Card>
 
-            {/* Tiempo */}
+            {/* Ingresos */}
             <Card className="shadow-sm">
               <CardContent className="p-4">
                 <div className="flex flex-col h-full">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Timer className="h-4 w-4 text-primary" />
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-medium">Cronograma</h3>
-                        <p className="text-xs text-muted-foreground">Progreso del proyecto</p>
+                        <h3 className="text-sm font-medium">Ingresos</h3>
+                        <p className="text-xs text-muted-foreground">Objetivo vs actual</p>
                       </div>
                     </div>
                     <TooltipProvider>
@@ -635,15 +635,15 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-6 w-6" 
-                            onClick={() => onHelpRequest('timeHelp')}
+                            className="h-6 w-6"
+                            onClick={() => onHelpRequest('revenueHelp')}
                           >
                             <HelpCircle className="h-3.5 w-3.5" />
                             <span className="sr-only">Ayuda</span>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="text-xs">Avance del cronograma</p>
+                          <p className="text-xs">Ingresos del período</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -652,28 +652,98 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   <div className="flex-1 flex flex-col justify-between mt-2">
                     <div className="space-y-2">
                       <div className="flex justify-between items-baseline">
-                        <span className="text-2xl font-bold">
-                          {projectMetrics?.progressPercentage?.toFixed(1) || 0}%
+                        <span className="text-2xl font-bold text-green-600">
+                          {formatCurrency(costSummary?.periodPrice || 0)}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {calculateRemainingDays()} días restantes
+                          {costSummary?.quotationMultiplier > 1 ? `×${costSummary?.quotationMultiplier}` : ''}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                        <div>
+                          <p className="text-muted-foreground">Mensual</p>
+                          <p className="font-medium">{formatCurrency(costSummary?.monthlyPrice || 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Período</p>
+                          <p className="font-medium">{formatCurrency(costSummary?.periodPrice || 0)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Markup */}
+            <Card className="shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Star className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium">Markup</h3>
+                        <p className="text-xs text-muted-foreground">Margen del período</p>
+                      </div>
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => onHelpRequest('markupHelp')}
+                          >
+                            <HelpCircle className="h-3.5 w-3.5" />
+                            <span className="sr-only">Ayuda</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Margen de ganancia del período</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+
+                  <div className="flex-1 flex flex-col justify-between mt-2">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(costSummary?.actualMarkup || 0)}
+                        </span>
+                        <span className={`text-sm ${
+                          costSummary?.markupEfficiency >= 100 ? 'text-green-600' : 
+                          costSummary?.markupEfficiency >= 80 ? 'text-yellow-600' : 
+                          'text-red-600'
+                        }`}>
+                          {costSummary?.markupEfficiency?.toFixed(1) || 0}%
                         </span>
                       </div>
 
                       <Progress 
-                        value={projectMetrics?.progressPercentage || 0} 
+                        value={costSummary?.markupEfficiency || 0} 
                         max={100} 
                         className="h-2"
+                        indicatorClassName={
+                          costSummary?.markupEfficiency >= 100 ? "bg-green-500" : 
+                          costSummary?.markupEfficiency >= 80 ? "bg-yellow-500" : 
+                          "bg-red-500"
+                        }
                       />
 
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                         <div>
-                          <p className="text-muted-foreground">Inicio</p>
-                          <p className="font-medium">{formatDate(project?.startDate)}</p>
+                          <p className="text-muted-foreground">Esperado</p>
+                          <p className="font-medium">{formatCurrency(costSummary?.expectedMarkup || 0)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Fin estimado</p>
-                          <p className="font-medium">{formatDate(project?.expectedEndDate)}</p>
+                          <p className="text-muted-foreground">Actual</p>
+                          <p className="font-medium">{formatCurrency(costSummary?.actualMarkup || 0)}</p>
                         </div>
                       </div>
                     </div>
@@ -1568,4 +1638,4 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       const percentOfTotal = ((person.hours / (projectMetrics?.actualHours || 1)) * 100).toFixed(1);
 
                       return (
-                        <div key={index} className
+                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0"

@@ -315,11 +315,26 @@ const ProjectAnalyticsView: React.FC = () => {
     if (!project?.quotation) return null;
 
     const quotationData = project.quotation;
+    
+    // Obtener precio mensual de la cotización (precio al cliente)
+    const monthlyPrice = quotationData.totalAmount || 0;
     const monthlyEstimatedCost = quotationData.baseCost || 0;
+    
+    // Calcular objetivos del período multiplicados
+    const periodPrice = monthlyPrice * quotationMultiplier;
     const periodEstimatedCost = monthlyEstimatedCost * quotationMultiplier;
-
+    
+    // Calcular markup del período
+    const periodMarkup = periodPrice - periodEstimatedCost;
+    
+    // Calcular porcentaje de uso basado en el costo real vs presupuesto estimado
     const percentageUsed = periodEstimatedCost > 0 ? (actualCost / periodEstimatedCost) * 100 : 0;
     const variance = percentageUsed - 100;
+    
+    // Calcular eficiencia del markup (markup real vs esperado)
+    const expectedMarkup = periodMarkup;
+    const actualMarkup = periodPrice - actualCost;
+    const markupEfficiency = expectedMarkup > 0 ? (actualMarkup / expectedMarkup) * 100 : 0;
 
     return {
       estimatedCost: periodEstimatedCost,
@@ -327,7 +342,14 @@ const ProjectAnalyticsView: React.FC = () => {
       percentageUsed,
       variance,
       monthlyEstimatedCost,
-      quotationMultiplier
+      quotationMultiplier,
+      // Nuevos campos para markup
+      periodPrice,
+      periodMarkup,
+      expectedMarkup,
+      actualMarkup,
+      markupEfficiency,
+      monthlyPrice
     };
   }, [project, actualCost, quotationMultiplier]);
 
