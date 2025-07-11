@@ -1638,4 +1638,27 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       const percentOfTotal = ((person.hours / (projectMetrics?.actualHours || 1)) * 100).toFixed(1);
 
                       return (
-                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0"></old_str>
+                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0">
+                          <div className="col-span-3 flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                              {person.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className="font-medium truncate">{person.name}</span>
+                          </div>
+                          <div className="col-span-2 flex items-center">
+                            <span className="text-muted-foreground">{roleDetails?.name || 'Sin rol'}</span>
+                          </div>
+                          <div className="col-span-2 flex items-center">
+                            <span className="font-medium">{formatNumber(person.hours, 1)}h</span>
+                          </div>
+                          <div className="col-span-2 flex items-center">
+                            <span className="text-muted-foreground">{percentOfTotal}%</span>
+                          </div>
+                          <div className="col-span-3 flex items-center">
+                            <Progress 
+                              value={person.hours} 
+                              max={Math.max(...timeByPersonnelData.map(p => p.hours))} 
+                              className="h-2 flex-1" 
+                            />
+                          </div>
+                        </div></old_str></old_str>
