@@ -228,40 +228,44 @@ function TimeRangeFilter({
 
       {isCustomOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96 max-w-[90vw]">
-            <h3 className="text-lg font-semibold mb-4">Seleccionar período personalizado</h3>
-            <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-auto max-w-[90vw] max-h-[90vh] overflow-auto">
+            <h3 className="text-lg font-semibold mb-4 text-center">Seleccionar período personalizado</h3>
+            <div className="flex gap-6">
               <div className="space-y-2">
-                <Label>Fecha de inicio</Label>
+                <Label className="text-sm font-medium">Fecha de inicio</Label>
                 <CalendarComponent
                   mode="single"
                   selected={customStart}
                   onSelect={setCustomStart}
                   initialFocus
+                  className="border rounded-lg p-2"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Fecha de fin</Label>
+                <Label className="text-sm font-medium">Fecha de fin</Label>
                 <CalendarComponent
                   mode="single"
                   selected={customEnd}
                   onSelect={setCustomEnd}
+                  className="border rounded-lg p-2"
                 />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsCustomOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleCustomApply}
-                  disabled={!customStart || !customEnd}
-                >
-                  Aplicar
-                </Button>
-              </div>
+            </div>
+            <div className="flex justify-center gap-3 mt-6 pt-4 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCustomOpen(false)}
+                className="px-6"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleCustomApply}
+                disabled={!customStart || !customEnd}
+                className="px-6"
+              >
+                Aplicar
+              </Button>
             </div>
           </div>
         </div>
