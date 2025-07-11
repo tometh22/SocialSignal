@@ -100,47 +100,7 @@ function TimeRangeFilter({
 
   const currentDate = new Date();
 
-  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter' | 'may2025' | 'june2025' | 'mayJune2025'; value: () => DateFilter }[] = [
-    {
-      label: "Mayo 2025",
-      type: "may2025",
-      value: () => ({
-        type: 'month',
-        startDate: new Date(2025, 4, 1), // Mayo 2025
-        endDate: new Date(2025, 4, 31), // Último día de mayo 2025
-        label: "Mayo 2025"
-      })
-    },
-    {
-      label: "Junio 2025",
-      type: "june2025",
-      value: () => ({
-        type: 'month',
-        startDate: new Date(2025, 5, 1), // Junio 2025
-        endDate: new Date(2025, 5, 30), // Último día de junio 2025
-        label: "Junio 2025"
-      })
-    },
-    {
-      label: "Mayo - Junio 2025",
-      type: "mayJune2025",
-      value: () => ({
-        type: 'custom',
-        startDate: new Date(2025, 4, 1), // Mayo 2025
-        endDate: new Date(2025, 5, 30), // Junio 2025
-        label: "Mayo - Junio 2025"
-      })
-    },
-    {
-      label: "Esta semana",
-      type: "week",
-      value: () => ({
-        type: 'week',
-        startDate: startOfWeek(currentDate, { weekStartsOn: 1 }),
-        endDate: endOfWeek(currentDate, { weekStartsOn: 1 }),
-        label: "Esta semana"
-      })
-    },
+  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter' | 'lastSemester' | 'semester' | 'year'; value: () => DateFilter }[] = [
     {
       label: "Este mes",
       type: "month", 
@@ -155,7 +115,6 @@ function TimeRangeFilter({
       label: "Mes pasado",
       type: "lastMonth",
       value: () => {
-        // Obtener el mes anterior dinámicamente
         const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
         const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
         return {
@@ -180,7 +139,6 @@ function TimeRangeFilter({
       label: "Trimestre pasado",
       type: "lastQuarter",
       value: () => {
-        // Obtener el trimestre anterior dinámicamente
         const lastQuarter = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
         const quarterStart = startOfQuarter(lastQuarter);
         const quarterEnd = endOfQuarter(lastQuarter);
@@ -192,6 +150,48 @@ function TimeRangeFilter({
           label: `Trimestre pasado (${quarterName})`
         };
       }
+    },
+    {
+      label: "Este semestre",
+      type: "semester",
+      value: () => {
+        const currentSemester = Math.floor(currentDate.getMonth() / 6);
+        const semesterStart = new Date(currentDate.getFullYear(), currentSemester * 6, 1);
+        const semesterEnd = new Date(currentDate.getFullYear(), (currentSemester + 1) * 6 - 1, 0);
+        return {
+          type: 'custom',
+          startDate: semesterStart,
+          endDate: semesterEnd,
+          label: `Este semestre (${currentSemester === 0 ? 'Enero-Junio' : 'Julio-Diciembre'})`
+        };
+      }
+    },
+    {
+      label: "Semestre pasado",
+      type: "lastSemester",
+      value: () => {
+        const currentSemester = Math.floor(currentDate.getMonth() / 6);
+        const lastSemester = currentSemester === 0 ? 1 : 0;
+        const year = currentSemester === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
+        const semesterStart = new Date(year, lastSemester * 6, 1);
+        const semesterEnd = new Date(year, (lastSemester + 1) * 6 - 1, 0);
+        return {
+          type: 'custom',
+          startDate: semesterStart,
+          endDate: semesterEnd,
+          label: `Semestre pasado (${lastSemester === 0 ? 'Enero-Junio' : 'Julio-Diciembre'} ${year})`
+        };
+      }
+    },
+    {
+      label: "Total año",
+      type: "year",
+      value: () => ({
+        type: 'custom',
+        startDate: new Date(currentDate.getFullYear(), 0, 1),
+        endDate: new Date(currentDate.getFullYear(), 11, 31),
+        label: `Año ${currentDate.getFullYear()}`
+      })
     }
   ];
 
@@ -218,11 +218,11 @@ function TimeRangeFilter({
         <Label className="text-sm font-medium">Período:</Label>
         <Select 
           value={selectedFilter.type === 'custom' ? 'custom' : 
-                selectedFilter.label.includes('Mayo 2025') ? 'may2025' :
-                selectedFilter.label.includes('Junio 2025') ? 'june2025' :
-                selectedFilter.label.includes('Mayo - Junio 2025') ? 'mayJune2025' :
                 selectedFilter.label.includes('Trimestre pasado') ? 'lastQuarter' :
-                selectedFilter.label.includes('Mes pasado') ? 'lastMonth' : 
+                selectedFilter.label.includes('Mes pasado') ? 'lastMonth' :
+                selectedFilter.label.includes('Semestre pasado') ? 'lastSemester' :
+                selectedFilter.label.includes('Este semestre') ? 'semester' :
+                selectedFilter.label.includes('Año') ? 'year' :
                 selectedFilter.type} 
           onValueChange={(value) => {
             if (value === 'custom') {
@@ -232,9 +232,9 @@ function TimeRangeFilter({
                 p.type === value || 
                 (value === 'lastMonth' && p.type === 'lastMonth') || 
                 (value === 'lastQuarter' && p.type === 'lastQuarter') ||
-                (value === 'may2025' && p.type === 'may2025') ||
-                (value === 'june2025' && p.type === 'june2025') ||
-                (value === 'mayJune2025' && p.type === 'mayJune2025')
+                (value === 'lastSemester' && p.type === 'lastSemester') ||
+                (value === 'semester' && p.type === 'semester') ||
+                (value === 'year' && p.type === 'year')
               );
               if (preset) handlePresetSelect(preset);
             }
@@ -567,14 +567,14 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   
-  // Estado del filtro temporal - configurado por defecto para mostrar todos los datos
+  // Estado del filtro temporal - configurado por defecto para mostrar el mes actual
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
-    // Configurar para mostrar todos los datos disponibles (mayo y junio 2025)
+    const now = new Date();
     return {
-      type: 'custom',
-      startDate: new Date(2025, 4, 1), // Mayo 2025
-      endDate: new Date(2025, 5, 30), // Junio 2025
-      label: "Mayo - Junio 2025"
+      type: 'month',
+      startDate: startOfMonth(now),
+      endDate: endOfMonth(now),
+      label: "Este mes"
     };
   });
 
@@ -692,8 +692,24 @@ export default function ProjectDetailsRedesigned() {
     
 
     
-    // CALCULAR OBJETIVOS SEGÚN EL PERÍODO SELECCIONADO
+    // IMPLEMENTAR LÓGICA DIFERENCIADA SEGÚN TIPO DE PROYECTO
+    // Fuente de verdad: quotationData.projectType determina si es 'always-on' o 'one-shot'
+    const isAlwaysOnProject = quotationData.projectType === 'always-on';
+    
+    console.log('🎯 TIPO DE PROYECTO DETECTADO:', {
+      projectType: quotationData.projectType,
+      isAlwaysOn: isAlwaysOnProject,
+      filtroActual: dateFilter.label,
+      factorMultiplicador: isAlwaysOnProject ? 'Variable según período' : 'Siempre 1 (valor total)'
+    });
+    
     const getTargetMultiplier = () => {
+      // Para proyectos One-Shot, siempre usar el valor total (multiplicador = 1)
+      if (!isAlwaysOnProject) {
+        return 1;
+      }
+      
+      // Para proyectos Always-On, calcular multiplicador según período seleccionado
       const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
       const daysInMonth = 30;
       
@@ -711,6 +727,8 @@ export default function ProjectDetailsRedesigned() {
     };
     
     const targetMultiplier = getTargetMultiplier();
+    
+    // Aplicar multiplicador solo para proyectos Always-On
     const targetClientPrice = monthlyClientPrice * targetMultiplier;
     const targetBaseCost = monthlyBaseCost * targetMultiplier;
     const targetHours = monthlyEstimatedHours * targetMultiplier;

@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 11, 2025: **UNIVERSAL TEMPORAL FILTERING SYSTEM** - Implemented generic date filter options for ANY project using system sources of truth
+- July 11, 2025: Created universal filter options: "Este mes", "Mes pasado", "Este trimestre", "Trimestre pasado", "Este semestre", "Semestre pasado", "Total año", "Fecha personalizada"
+- July 11, 2025: **CRITICAL BUSINESS LOGIC IMPLEMENTATION** - Added differentiated calculation logic for Always-On vs One-Shot projects using quotationData.projectType as source of truth
+- July 11, 2025: Always-On projects (projectType='always-on') multiply objectives by selected time period, One-Shot projects always use total quotation values regardless of filter
 - July 11, 2025: **MAJOR UX REDESIGN - ELIMINATED REDUNDANT COMPONENTS** - Completely restructured project details view with professional 3-tab interface
 - July 11, 2025: Created consolidated analytics system: "Resumen Ejecutivo", "Gestión del Equipo", and "Análisis Mensual" eliminating all redundancies
 - July 11, 2025: Implemented monthly detailed breakdown view with dynamic team distribution and activity metrics as requested by user
