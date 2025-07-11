@@ -1148,20 +1148,46 @@ export default function ProjectDetailsRedesigned() {
                         <div>
                           <div className="flex justify-between text-sm mb-1">
                             <span>Avance General</span>
-                            <span className="font-bold">{metrics[2]?.value}</span>
+                            <span className="font-bold">
+                              {(() => {
+                                // Calcular progreso basado en horas trabajadas en el período filtrado
+                                const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                                const filteredHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                                
+                                if (filteredHours === 0) return "0.0%";
+                                
+                                // Estimar horas totales necesarias basándose en el presupuesto
+                                const estimatedTotalHours = (projectData.quotation?.totalAmount || 10000) / 100; // Asumiendo $100/hora promedio
+                                const progressPercentage = Math.min(100, (filteredHours / estimatedTotalHours) * 100);
+                                
+                                return `${progressPercentage.toFixed(1)}%`;
+                              })()}
+                            </span>
                           </div>
                           <Progress 
-                            value={parseFloat(metrics[2]?.value.replace('%', '') || '0')} 
+                            value={(() => {
+                              const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                              const filteredHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                              if (filteredHours === 0) return 0;
+                              const estimatedTotalHours = (projectData.quotation?.totalAmount || 10000) / 100;
+                              return Math.min(100, (filteredHours / estimatedTotalHours) * 100);
+                            })()} 
                             className="h-2"
                           />
                         </div>
                         <div>
                           <div className="flex justify-between text-sm mb-1">
                             <span>Utilización Presupuesto</span>
-                            <span className="font-bold">{metrics[0]?.value}</span>
+                            <span className="font-bold">
+                              {(() => {
+                                if (!costSummary) return "$0";
+                                const utilization = costSummary.budgetUtilization;
+                                return `${utilization.toFixed(1)}%`;
+                              })()}
+                            </span>
                           </div>
                           <Progress 
-                            value={parseFloat(metrics[0]?.value.replace('%', '') || '0')} 
+                            value={costSummary?.budgetUtilization || 0} 
                             className="h-2"
                           />
                         </div>
@@ -1439,18 +1465,7 @@ export default function ProjectDetailsRedesigned() {
                             const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
                             const uniqueDays = new Set(filteredEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size;
                             
-                            // Debug logging
-                            console.log('🔍 PROMEDIO H/DÍA CÁLCULO:', {
-                              totalHours,
-                              uniqueDays,
-                              entriesCount: filteredEntries.length,
-                              promedio: uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0",
-                              primerEntrada: filteredEntries[0] ? {
-                                fecha: filteredEntries[0].date,
-                                horas: filteredEntries[0].hours,
-                                persona: filteredEntries[0].personnelName
-                              } : null
-                            });
+
                             
                             return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
                           })()}h
