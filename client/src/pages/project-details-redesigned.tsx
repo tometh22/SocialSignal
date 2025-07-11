@@ -553,22 +553,26 @@ export default function ProjectDetailsRedesigned() {
       
       const filtered = entries.filter((entry: TimeEntry) => {
         const entryDate = new Date(entry.date);
-        // Normalizar las fechas para comparación exacta (solo fecha, sin hora)
-        const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
-        const startDateOnly = new Date(dateFilter.startDate.getFullYear(), dateFilter.startDate.getMonth(), dateFilter.startDate.getDate());
-        const endDateOnly = new Date(dateFilter.endDate.getFullYear(), dateFilter.endDate.getMonth(), dateFilter.endDate.getDate());
         
-        const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
+        // Comparar solo año y mes para filtrado temporal
+        const entryYear = entryDate.getFullYear();
+        const entryMonth = entryDate.getMonth(); // 0-indexado
+        const filterYear = dateFilter.startDate.getFullYear();
+        const filterMonth = dateFilter.startDate.getMonth(); // 0-indexado
+        
+        // Para filtros mensuales, comparar solo año y mes
+        const isInRange = entryYear === filterYear && entryMonth === filterMonth;
         
         if (dateFilter.label.includes('pasado')) {
           console.log('🔍 Comparando entrada para MES PASADO:', {
             entryDate: entry.date,
-            entryDateOnly: entryDateOnly.toLocaleDateString('es-ES'),
-            startDateOnly: startDateOnly.toLocaleDateString('es-ES'),
-            endDateOnly: endDateOnly.toLocaleDateString('es-ES'),
-            entryMonth: entryDateOnly.getMonth() + 1,
-            filterMonth: startDateOnly.getMonth() + 1,
-            isInRange
+            entryYear,
+            entryMonth: entryMonth + 1, // mostrar 1-indexado
+            filterYear,
+            filterMonth: filterMonth + 1, // mostrar 1-indexado
+            isInRange,
+            horas: entry.hours,
+            persona: entry.personnelName
           });
         }
         
