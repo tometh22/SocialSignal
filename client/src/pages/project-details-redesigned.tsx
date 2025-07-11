@@ -571,7 +571,7 @@ export default function ProjectDetailsRedesigned() {
         }
         
         // Para filtros mensuales (mes pasado, mes actual), usar solo año/mes
-        if (dateFilter.label.includes('pasado') || dateFilter.label.includes('actual')) {
+        if (dateFilter.label.includes('pasado') || dateFilter.label.includes('Este mes')) {
           const entryYear = entryDate.getFullYear();
           const entryMonth = entryDate.getMonth();
           const filterYear = dateFilter.startDate.getFullYear();
@@ -586,7 +586,9 @@ export default function ProjectDetailsRedesigned() {
               filterYear,
               filterMonth: filterMonth + 1,
               matches,
-              filtroFecha: `${filterYear}-${String(filterMonth + 1).padStart(2, '0')}`
+              filtroFecha: `${filterYear}-${String(filterMonth + 1).padStart(2, '0')}`,
+              entryDateString: entryDate.toLocaleDateString('es-ES'),
+              filterDateString: dateFilter.startDate.toLocaleDateString('es-ES')
             });
           }
           
@@ -687,10 +689,10 @@ export default function ProjectDetailsRedesigned() {
         change: costEfficiency
       },
       {
-        label: isAlwaysOnContract ? `Horas ${periodLabel}` : "Horas Registradas",
+        label: isAlwaysOnContract ? `Horas ${periodLabel}` : `Horas ${periodLabel}`,
         value: `${totalHours.toFixed(1)}h`,
-        subtitle: totalHours === 0 && isAlwaysOnContract ? 
-          "Sin registros este mes" : 
+        subtitle: totalHours === 0 ? 
+          (dateFilter.label.includes('pasado') ? "Sin registros en este período" : "Sin registros este mes") : 
           `de ${estimatedHours.toFixed(0)}h estimadas`,
         icon: Clock,
         color: "text-blue-700",
