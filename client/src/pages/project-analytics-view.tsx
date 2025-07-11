@@ -181,6 +181,8 @@ const ProjectAnalyticsView: React.FC = () => {
     isLoadingPersonnel || 
     isLoadingDeliverable;
 
+    const quotationData = project?.quotation;
+
   // Función para calcular el multiplicador de objetivos según el período seleccionado
   const getQuotationMultiplier = useCallback(() => {
     if (!project?.quotation) return 1;
@@ -228,217 +230,316 @@ const ProjectAnalyticsView: React.FC = () => {
     }
   }, [timeFilter, customDateRange, project]);
 
-  // Función para filtrar datos por tiempo con opciones completas
-  const filterTimeEntriesByDateRange = useCallback((data: TimeEntry[]) => {
-    if (!data || timeFilter === "all") return data;
+  // Función para filtrar registros de tiempo según el filtro seleccionado
+  const getFilteredTimeEntries = useCallback((entries: TimeEntry[], filter: string) => {
+    if (!entries || entries.length === 0) return [];
 
     const now = new Date();
-    let startDate: Date;
-    let endDate: Date = now;
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
 
-    switch (timeFilter) {
+    console.log('🔍 Filtering entries:', {
+      totalEntries: entries.length,
+      filter,
+      currentYear,
+      currentMonth,
+      sampleEntry: entries[0] ? {
+        id: entries[0].id,
+        date: entries[0].date,
+        createdAt: entries[0].createdAt,
+        hours: entries[0].hours
+      } : null
+    });
+
+    switch (filter) {
       case "current_month":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
+        const currentMonthFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const matches = entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
+          return matches;
+        });
+        console.log('📅 Current month filtered:', currentMonthFiltered.length);
+        return currentMonthFiltered;
+
       case "last_month":
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
+        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const lastMonthFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const matches = entryDate.getFullYear() === lastMonthYear && entryDate.getMonth() === lastMonth;
+          return matches;
+        });
+        console.log('📅 Last month filtered:', lastMonthFiltered.length, { lastMonth, lastMonthYear });
+        return lastMonthFiltered;
+
       case "current_quarter":
-        const currentQuarter = Math.floor(now.getMonth() / 3);
-        startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
-        endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
-        break;
+        const currentQuarter = Math.floor(currentMonth / 3);
+        const quarterStartMonth = currentQuarter * 3;
+        const quarterEndMonth = quarterStartMonth + 2;
+        const currentQuarterFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryMonth = entryDate.getMonth();
+          const matches = entryDate.getFullYear() === currentYear && 
+                 entryMonth >= quarterStartMonth && 
+                 entryMonth <= quarterEndMonth;
+          return matches;
+        });
+        console.log('📅 Current quarter filtered:', currentQuarterFiltered.length);
+        return currentQuarterFiltered;
+
       case "last_quarter":
-        const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
-        const lastQuarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
-        const adjustedLastQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        startDate = new Date(lastQuarterYear, adjustedLastQuarter * 3, 1);
-        endDate = new Date(lastQuarterYear, (adjustedLastQuarter + 1) * 3, 0);
-        break;
+        const lastQuarter = currentMonth < 3 ? 3 : Math.floor(currentMonth / 3) - 1;
+        const lastQuarterYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+        const lastQuarterStartMonth = lastQuarter * 3;
+        const lastQuarterEndMonth = lastQuarterStartMonth + 2;
+        const lastQuarterFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryMonth = entryDate.getMonth();
+          const matches = entryDate.getFullYear() === lastQuarterYear && 
+                 entryMonth >= lastQuarterStartMonth && 
+                 entryMonth <= lastQuarterEndMonth;
+          return matches;
+        });
+        console.log('📅 Last quarter filtered:', lastQuarterFiltered.length, { lastQuarter, lastQuarterYear });
+        return lastQuarterFiltered;
+
       case "current_semester":
-        const currentSemester = Math.floor(now.getMonth() / 6);
-        startDate = new Date(now.getFullYear(), currentSemester * 6, 1);
-        endDate = new Date(now.getFullYear(), (currentSemester + 1) * 6, 0);
-        break;
+        const currentSemester = Math.floor(currentMonth / 6);
+        const semesterStartMonth = currentSemester * 6;
+        const semesterEndMonth = semesterStartMonth + 5;
+        const currentSemesterFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryMonth = entryDate.getMonth();
+          const matches = entryDate.getFullYear() === currentYear && 
+                 entryMonth >= semesterStartMonth && 
+                 entryMonth <= semesterEndMonth;
+          return matches;
+        });
+        console.log('📅 Current semester filtered:', currentSemesterFiltered.length);
+        return currentSemesterFiltered;
+
       case "last_semester":
-        const lastSemester = Math.floor(now.getMonth() / 6) - 1;
-        const lastSemesterYear = lastSemester < 0 ? now.getFullYear() - 1 : now.getFullYear();
-        const adjustedLastSemester = lastSemester < 0 ? 1 : lastSemester;
-        startDate = new Date(lastSemesterYear, adjustedLastSemester * 6, 1);
-        endDate = new Date(lastSemesterYear, (adjustedLastSemester + 1) * 6, 0);
-        break;
+        const lastSemester = currentMonth < 6 ? 1 : 0;
+        const lastSemesterYear = currentMonth < 6 ? currentYear - 1 : currentYear;
+        const lastSemesterStartMonth = lastSemester * 6;
+        const lastSemesterEndMonth = lastSemesterStartMonth + 5;
+        const lastSemesterFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const entryMonth = entryDate.getMonth();
+          const matches = entryDate.getFullYear() === lastSemesterYear && 
+                 entryMonth >= lastSemesterStartMonth && 
+                 entryMonth <= lastSemesterEndMonth;
+          return matches;
+        });
+        console.log('📅 Last semester filtered:', lastSemesterFiltered.length);
+        return lastSemesterFiltered;
+
       case "current_year":
-        startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31);
-        break;
-      case "custom":
-        if (!customDateRange.start || !customDateRange.end) return data;
-        startDate = customDateRange.start;
-        endDate = customDateRange.end;
-        break;
+        const currentYearFiltered = entries.filter(entry => {
+          const entryDate = new Date(entry.date || entry.createdAt);
+          const matches = entryDate.getFullYear() === currentYear;
+          return matches;
+        });
+        console.log('📅 Current year filtered:', currentYearFiltered.length);
+        return currentYearFiltered;
+
+      case "all":
       default:
-        return data;
+        console.log('📅 All entries (no filter):', entries.length);
+        return entries;
+    }
+  }, []);
+
+  // Aplicar filtros a los datos
+  const filteredTimeEntries = useMemo(() => {
+    const filtered = getFilteredTimeEntries(timeEntries, timeFilter);
+    console.log('📊 Final filtered entries:', {
+      filter: timeFilter,
+      originalCount: timeEntries.length,
+      filteredCount: filtered.length,
+      totalHours: filtered.reduce((sum, entry) => sum + (entry.hours || 0), 0)
+    });
+    return filtered;
+  }, [timeEntries, timeFilter, getFilteredTimeEntries]);
+
+  // Calcular resumen de costos usando datos filtrados
+  const costSummary = useMemo(() => {
+    if (!quotationData || !personnel || !roles) return null;
+
+    const dataToUse = timeFilter === "all" ? timeEntries : filteredTimeEntries;
+
+    let actualCost = 0;
+    dataToUse.forEach(entry => {
+      const person = personnel.find(p => p.id === entry.personnelId);
+      if (person && entry.hours) {
+        actualCost += entry.hours * person.hourlyRate;
+      }
+    });
+
+    // Para proyectos Always-On, ajustar el costo planificado según el período
+    let plannedCost = quotationData.finalPrice || 0;
+    if (quotationData.projectType === 'always-on' && timeFilter !== "all") {
+      const quotationMultiplier = getQuotationMultiplier(timeFilter);
+      plannedCost = (quotationData.finalPrice || 0) * quotationMultiplier;
     }
 
-    return data.filter(entry => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= startDate && entryDate <= endDate;
+    const percentageUsed = plannedCost > 0 ? (actualCost / plannedCost) * 100 : 0;
+
+    console.log('💰 Cost summary calculated:', {
+      filter: timeFilter,
+      actualCost,
+      plannedCost,
+      percentageUsed,
+      entriesUsed: dataToUse.length,
+      projectType: quotationData.projectType
     });
-  }, [timeFilter, customDateRange]);
-
-  // Aplicar filtro temporal
-  const filteredTimeEntries = useMemo(() => {
-    return filterTimeEntriesByDateRange(timeEntries);
-  }, [timeEntries, filterTimeEntriesByDateRange]);
-
-  // Obtener multiplicador de objetivos
-  const quotationMultiplier = useMemo(() => {
-    return getQuotationMultiplier();
-  }, [getQuotationMultiplier]);
-
-  // Calcular horas totales filtradas
-  const totalHours = useMemo(() => {
-    return filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
-  }, [filteredTimeEntries]);
-
-  // Calcular costo real filtrado
-  const actualCost = useMemo(() => {
-    return filteredTimeEntries.reduce((sum, entry) => {
-      return sum + (entry.hours * (entry.hourlyRateAtTime || entry.hourlyRate || 0));
-    }, 0);
-  }, [filteredTimeEntries]);
-
-  // Calcular resumen de costos con multiplicador
-  const costSummary = useMemo(() => {
-    if (!project?.quotation) return null;
-
-    const quotationData = project.quotation;
-    
-    // Obtener precio mensual de la cotización (precio al cliente)
-    const monthlyPrice = quotationData.totalAmount || 0;
-    const monthlyEstimatedCost = quotationData.baseCost || 0;
-    
-    // Calcular objetivos del período multiplicados
-    const periodPrice = monthlyPrice * quotationMultiplier;
-    const periodEstimatedCost = monthlyEstimatedCost * quotationMultiplier;
-    
-    // Calcular markup del período
-    const periodMarkup = periodPrice - periodEstimatedCost;
-    
-    // Calcular porcentaje de uso basado en el costo real vs presupuesto estimado
-    const percentageUsed = periodEstimatedCost > 0 ? (actualCost / periodEstimatedCost) * 100 : 0;
-    const variance = percentageUsed - 100;
-    
-    // Calcular eficiencia del markup (markup real vs esperado)
-    const expectedMarkup = periodMarkup;
-    const actualMarkup = periodPrice - actualCost;
-    const markupEfficiency = expectedMarkup > 0 ? (actualMarkup / expectedMarkup) * 100 : 0;
 
     return {
-      estimatedCost: periodEstimatedCost,
-      actualCost: actualCost,
-      percentageUsed,
-      variance,
-      monthlyEstimatedCost,
-      quotationMultiplier,
-      // Nuevos campos para markup
-      periodPrice,
-      periodMarkup,
-      expectedMarkup,
-      actualMarkup,
-      markupEfficiency,
-      monthlyPrice
+      actualCost,
+      plannedCost,
+      percentageUsed: Math.min(percentageUsed, 100)
     };
-  }, [project, actualCost, quotationMultiplier]);
+  }, [quotationData, personnel, roles, timeEntries, filteredTimeEntries, timeFilter]);
 
-  // Métricas del proyecto con objetivos multiplicados
-  const projectMetrics: ProjectMetrics = useMemo(() => {
-    if (!project || !timeEntries) {
-      return {
-        hoursPerDay: 0,
-        progressPercentage: 0,
-        plannedHours: 0,
-        actualHours: totalHours,
-        daysElapsed: 0,
-        daysTotal: 0,
-      };
+  // Calcular métricas del proyecto usando datos filtrados
+  const projectMetrics = useMemo(() => {
+    if (!project) return null;
+
+    // Usar datos filtrados o todos los datos según el filtro
+    const dataToUse = timeFilter === "all" ? timeEntries : filteredTimeEntries;
+    const actualHours = dataToUse.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+
+    // Para proyectos Always-On, ajustar las horas planificadas según el período
+    let plannedHours = project.quotation?.totalHours || 0;
+
+    if (quotationData?.projectType === 'always-on' && timeFilter !== "all") {
+      const quotationMultiplier = getQuotationMultiplier();
+      plannedHours = (project.quotation?.totalHours || 0) * quotationMultiplier;
     }
 
-    try {
-      // Calcular días según el período seleccionado
-      let daysTotal = 0;
-      let daysElapsed = 0;
+    const startDate = project.startDate ? new Date(project.startDate) : new Date();
+    const endDate = project.expectedEndDate ? new Date(project.expectedEndDate) : new Date();
+    const currentDate = new Date();
 
-      if (timeFilter === "all") {
-        // Para "all", usar fechas del proyecto
-        const startDate = new Date(project.startDate);
-        const endDate = project.expectedEndDate 
-          ? new Date(project.expectedEndDate) 
-          : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
-        const today = new Date();
+    const totalTime = endDate.getTime() - startDate.getTime();
+    const elapsedTime = currentDate.getTime() - startDate.getTime();
 
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          daysTotal = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-          daysElapsed = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-        }
-      } else {
-        // Para períodos específicos, calcular días del período
-        const now = new Date();
-        switch (timeFilter) {
-          case "current_month":
-          case "last_month":
-            daysTotal = 30;
-            daysElapsed = now.getDate();
-            break;
-          case "current_quarter":
-          case "last_quarter":
-            daysTotal = 90;
-            daysElapsed = Math.floor((now.getMonth() % 3) * 30 + now.getDate());
-            break;
-          case "current_semester":
-          case "last_semester":
-            daysTotal = 180;
-            daysElapsed = Math.floor((now.getMonth() % 6) * 30 + now.getDate());
-            break;
-          case "current_year":
-            daysTotal = 365;
-            daysElapsed = Math.floor((now.getMonth() * 30) + now.getDate());
-            break;
-          default:
-            daysTotal = 30;
-            daysElapsed = now.getDate();
-        }
+    const daysTotal = Math.ceil(totalTime / (1000 * 60 * 60 * 24));
+    const daysElapsed = Math.max(0, Math.ceil(elapsedTime / (1000 * 60 * 60 * 24)));
+
+    const progressPercentage = plannedHours > 0 ? (actualHours / plannedHours) * 100 : 0;
+    const hoursPerDay = daysElapsed > 0 ? actualHours / daysElapsed : 0;
+
+    console.log('📊 Project metrics calculated:', {
+      filter: timeFilter,
+      actualHours,
+      plannedHours,
+      progressPercentage,
+      entriesUsed: dataToUse.length,
+      projectType: quotationData?.projectType
+    });
+
+    return {
+      hoursPerDay,
+      progressPercentage,
+      plannedHours,
+      actualHours,
+      daysElapsed,
+      daysTotal,
+    };
+  }, [project, timeEntries, filteredTimeEntries, timeFilter, quotationData]);
+
+  // Calcular datos de tiempo por personal usando datos filtrados
+  const timeByPersonnelData = useMemo(() => {
+    if (!personnel) return [];
+
+    const dataToUse = timeFilter === "all" ? timeEntries : filteredTimeEntries;
+
+    const personnelHours = dataToUse.reduce((acc, entry) => {
+      if (entry.personnelId && entry.hours) {
+        acc[entry.personnelId] = (acc[entry.personnelId] || 0) + entry.hours;
       }
+      return acc;
+    }, {} as Record<number, number>);
 
-      // Obtener horas planificadas desde la cotización y multiplicar
-      const monthlyPlannedHours = project.quotation?.estimatedHours || 0;
-      const plannedHours = monthlyPlannedHours * quotationMultiplier;
+    const result = Object.entries(personnelHours)
+      .map(([personnelId, hours]) => {
+        const person = personnel.find(p => p.id === parseInt(personnelId));
+        return {
+          id: parseInt(personnelId),
+          name: person ? `${person.name}` : 'Desconocido',
+          hours
+        };
+      })
+      .filter(item => item.hours > 0)
+      .sort((a, b) => b.hours - a.hours);
 
-      const progressPercentage = plannedHours > 0 ? (totalHours / plannedHours) * 100 : 0;
-      const hoursPerDay = daysElapsed > 0 ? totalHours / daysElapsed : 0;
+    console.log('👥 Personnel data calculated:', {
+      filter: timeFilter,
+      totalPersonnel: result.length,
+      totalHours: result.reduce((sum, p) => sum + p.hours, 0),
+      entriesUsed: dataToUse.length
+    });
 
+    return result;
+  }, [personnel, timeEntries, filteredTimeEntries, timeFilter]);
+
+  const billableDistributionData = useMemo(() => {
+    const dataToUse = timeFilter === "all" ? timeEntries : filteredTimeEntries;
+
+    const billableHours = dataToUse.reduce((acc, entry) => {
+      if (entry.billable) {
+        return acc + entry.hours;
+      }
+      return acc;
+    }, 0);
+
+    const nonBillableHours = dataToUse.reduce((acc, entry) => {
+      if (!entry.billable) {
+        return acc + entry.hours;
+      }
+      return acc;
+    }, 0);
+
+    const totalHours = billableHours + nonBillableHours;
+
+    const billablePercentage = totalHours > 0 ? (billableHours / totalHours) * 100 : 0;
+    const nonBillablePercentage = totalHours > 0 ? (nonBillableHours / totalHours) * 100 : 0;
+
+    return [
+      { label: "Facturable", value: billablePercentage },
+      { label: "No Facturable", value: nonBillablePercentage }
+    ];
+  }, [timeEntries, filteredTimeEntries, timeFilter]);
+
+  const riskIndicators = useMemo(() => {
+    const costSummaryData = costSummary;
+    const projectMetricsData = projectMetrics;
+
+    if (!costSummaryData || !projectMetricsData) {
       return {
-        hoursPerDay,
-        progressPercentage,
-        plannedHours,
-        actualHours: totalHours,
-        daysElapsed,
-        daysTotal,
-      };
-    } catch (error) {
-      console.error("Error calculando métricas del proyecto:", error);
-      return {
-        hoursPerDay: 0,
-        progressPercentage: 0,
-        plannedHours: 0,
-        actualHours: totalHours,
-        daysElapsed: 0,
-        daysTotal: 0,
+        budgetRisk: 0,
+        scheduleRisk: 0,
       };
     }
-  }, [project, timeEntries, totalHours, quotationMultiplier, timeFilter]);
+
+    const { percentageUsed } = costSummaryData;
+    const { progressPercentage, daysElapsed, daysTotal } = projectMetricsData;
+
+    const budgetRisk = percentageUsed > 0 && progressPercentage > 0
+      ? Math.max(0, Math.min(100, (percentageUsed * 0.6) + (100 - progressPercentage) * 0.4))
+      : 0;
+
+    const expectedProgress = (daysElapsed / daysTotal) * 100;
+    const scheduleRisk = expectedProgress > 0
+      ? Math.max(0, Math.min(100, (1 - (progressPercentage / expectedProgress)) * 100))
+      : 0;
+
+    return {
+      budgetRisk,
+      scheduleRisk,
+    };
+  }, [costSummary, projectMetrics]);
 
   // Handlers
   const handleTimeFilterChange = (newFilter: string) => {
@@ -742,7 +843,7 @@ const ProjectAnalyticsView: React.FC = () => {
               </div>
             )}
 
-			
+
 </div>
             <ProjectAnalytics
               project={project}
