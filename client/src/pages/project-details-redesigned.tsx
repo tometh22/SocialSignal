@@ -1438,6 +1438,20 @@ export default function ProjectDetailsRedesigned() {
                             
                             const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
                             const uniqueDays = new Set(filteredEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size;
+                            
+                            // Debug logging
+                            console.log('🔍 PROMEDIO H/DÍA CÁLCULO:', {
+                              totalHours,
+                              uniqueDays,
+                              entriesCount: filteredEntries.length,
+                              promedio: uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0",
+                              primerEntrada: filteredEntries[0] ? {
+                                fecha: filteredEntries[0].date,
+                                horas: filteredEntries[0].hours,
+                                persona: filteredEntries[0].personnelName
+                              } : null
+                            });
+                            
                             return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
                           })()}h
                         </p>
