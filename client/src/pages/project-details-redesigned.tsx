@@ -1574,7 +1574,7 @@ export default function ProjectDetailsRedesigned() {
                     <span>Consumido</span>
                   </div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span>${costSummary?.totalBudget?.toLocaleString() || 0}</span>
+                    <span>${costSummary?.budget?.toLocaleString() || 0}</span>
                     <span>${costSummary?.totalCost?.toLocaleString() || 0}</span>
                   </div>
                   <div className="mt-2">
@@ -1779,7 +1779,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-center p-3 bg-orange-50 rounded-lg">
                       <p className="text-sm text-gray-600">Presupuesto</p>
-                      <p className="text-xl font-bold text-orange-600">${costSummary?.totalBudget?.toLocaleString() || '0'}</p>
+                      <p className="text-xl font-bold text-orange-600">${costSummary?.budget?.toLocaleString() || '0'}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1810,8 +1810,8 @@ export default function ProjectDetailsRedesigned() {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm text-gray-600">Demanda del Proyecto</p>
-                        <p className="text-lg font-semibold">Horas requeridas: $29,230</p>
-                        <p className="text-sm text-gray-500">Costo por hora promedio: $12</p>
+                        <p className="text-lg font-semibold">Horas requeridas: {costSummary?.targetHours?.toFixed(0) || 0}h</p>
+                        <p className="text-sm text-gray-500">Presupuesto: ${costSummary?.budget?.toLocaleString() || '0'}</p>
                       </div>
                     </div>
                   </div>
