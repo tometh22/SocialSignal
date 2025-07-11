@@ -275,7 +275,13 @@ function TimeRangeFilter({
 }
 
 // Component for ProjectTeamSection with enhanced functionality
-function ProjectTeamSection({ projectId, timeEntries, project }: { projectId: string; timeEntries: any[]; project: any }) {
+function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filterTimeEntriesByDateRange }: { 
+  projectId: string; 
+  timeEntries: any[]; 
+  project: any;
+  dateFilter: DateFilter;
+  filterTimeEntriesByDateRange: (entries: any[]) => any[];
+}) {
   const { toast } = useToast();
   
   const { data: baseTeam = [], isLoading: teamLoading, refetch } = useQuery({
@@ -317,22 +323,10 @@ function ProjectTeamSection({ projectId, timeEntries, project }: { projectId: st
     },
   });
 
-  // Para contratos Always On, filtrar solo horas del mes actual
+  // USAR EL FILTRO DE FECHA GLOBAL EN LUGAR DEL FILTRO LOCAL
   const filteredTimeEntries = useMemo(() => {
-    const projectData = project as any;
-    const isAlwaysOnContract = projectData?.quotation?.projectType === 'fee-mensual';
-    
-    if (!isAlwaysOnContract) return timeEntries;
-    
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-    
-    return timeEntries.filter((entry: any) => {
-      const entryDate = new Date(entry.date);
-      return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-    });
-  }, [timeEntries, project]);
+    return filterTimeEntriesByDateRange(timeEntries);
+  }, [timeEntries, filterTimeEntriesByDateRange]);
 
   // Calcular tiempo registrado por miembro
   const getTimeWorkedByMember = (personnelId: number) => {
@@ -1311,6 +1305,25 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Equipo del Proyecto */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-purple-600" />
+                  Equipo del Proyecto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ProjectTeamSection 
+                  projectId={projectId!} 
+                  timeEntries={timeEntries} 
+                  project={project}
+                  dateFilter={dateFilter}
+                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="operations" className="space-y-6">
@@ -1833,32 +1846,40 @@ export default function ProjectDetailsRedesigned() {
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">Días activos</span>
                           <span className="font-semibold">
-                            {timeEntries ? new Set(timeEntries.map((entry: TimeEntry) => 
-                              new Date(entry.date).toDateString()
-                            )).size : 0}
+                            {(() => {
+                              const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                              return filteredEntries ? new Set(filteredEntries.map((entry: TimeEntry) => 
+                                new Date(entry.date).toDateString()
+                              )).size : 0;
+                            })()}
                           </span>
                         </div>
                         
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">Promedio horas/día</span>
                           <span className="font-semibold">
-                            {timeEntries && timeEntries.length > 0 ? (
-                              (timeEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0) / 
-                               new Set(timeEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size
-                              ).toFixed(1)
-                            ) : 0}h
+                            {(() => {
+                              const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                              if (!filteredEntries || filteredEntries.length === 0) return "0";
+                              
+                              const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
+                              const uniqueDays = new Set(filteredEntries.map((entry: TimeEntry) => new Date(entry.date).toDateString())).size;
+                              return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
+                            })()}h
                           </span>
                         </div>
 
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">Último registro</span>
                           <span className="font-semibold">
-                            {timeEntries && timeEntries.length > 0 ? 
-                              new Date(Math.max(...timeEntries.map((entry: TimeEntry) => 
+                            {(() => {
+                              const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                              if (!filteredEntries || filteredEntries.length === 0) return "Sin registros";
+                              
+                              return new Date(Math.max(...filteredEntries.map((entry: TimeEntry) => 
                                 new Date(entry.date).getTime()
-                              ))).toLocaleDateString('es-ES') : 
-                              "Sin registros"
-                            }
+                              ))).toLocaleDateString('es-ES');
+                            })()}
                           </span>
                         </div>
 
