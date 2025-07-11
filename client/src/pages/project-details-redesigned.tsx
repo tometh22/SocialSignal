@@ -1382,22 +1382,35 @@ export default function ProjectDetailsRedesigned() {
               </CardContent>
             </Card>
 
-            {/* Equipo del Proyecto */}
+            {/* Resumen Ejecutivo - Solo métricas clave */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-purple-600" />
-                  Equipo del Proyecto
+                  <Target className="h-5 w-5 text-blue-600" />
+                  Resumen de Resultados
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ProjectTeamSection 
-                  projectId={projectId!} 
-                  timeEntries={timeEntries} 
-                  project={project}
-                  dateFilter={dateFilter}
-                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {costSummary?.filteredHours || 0}h
+                    </div>
+                    <div className="text-sm text-gray-600">Horas Trabajadas</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      ${costSummary?.totalCost?.toLocaleString() || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Costo Real</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {baseTeam?.length || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Miembros Activos</div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
