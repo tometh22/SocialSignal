@@ -554,29 +554,46 @@ export default function ProjectDetailsRedesigned() {
       const filtered = entries.filter((entry: TimeEntry) => {
         const entryDate = new Date(entry.date);
         
-        // Comparar solo año y mes para filtrado temporal
-        const entryYear = entryDate.getFullYear();
-        const entryMonth = entryDate.getMonth(); // 0-indexado
-        const filterYear = dateFilter.startDate.getFullYear();
-        const filterMonth = dateFilter.startDate.getMonth(); // 0-indexado
-        
-        // Para filtros mensuales, comparar solo año y mes
-        const isInRange = entryYear === filterYear && entryMonth === filterMonth;
-        
+        // Debug: log every entry for last month filter
         if (dateFilter.label.includes('pasado')) {
-          console.log('🔍 Comparando entrada para MES PASADO:', {
-            entryDate: entry.date,
-            entryYear,
-            entryMonth: entryMonth + 1, // mostrar 1-indexado
-            filterYear,
-            filterMonth: filterMonth + 1, // mostrar 1-indexado
-            isInRange,
+          console.log('🔍 ENTRADA ANALIZADA:', {
+            fecha: entry.date,
+            año: entryDate.getFullYear(),
+            mes: entryDate.getMonth() + 1,
             horas: entry.hours,
             persona: entry.personnelName
           });
         }
         
-        return isInRange;
+        // Para filtros mensuales (mes pasado, mes actual), usar solo año/mes
+        if (dateFilter.label.includes('pasado') || dateFilter.label.includes('actual')) {
+          const entryYear = entryDate.getFullYear();
+          const entryMonth = entryDate.getMonth();
+          const filterYear = dateFilter.startDate.getFullYear();
+          const filterMonth = dateFilter.startDate.getMonth();
+          
+          const matches = entryYear === filterYear && entryMonth === filterMonth;
+          
+          if (dateFilter.label.includes('pasado')) {
+            console.log('🔍 COMPARACION MES PASADO:', {
+              entryYear,
+              entryMonth: entryMonth + 1,
+              filterYear,
+              filterMonth: filterMonth + 1,
+              matches,
+              filtroFecha: `${filterYear}-${String(filterMonth + 1).padStart(2, '0')}`
+            });
+          }
+          
+          return matches;
+        }
+        
+        // Para otros filtros, usar rango de fechas completo
+        const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
+        const startDateOnly = new Date(dateFilter.startDate.getFullYear(), dateFilter.startDate.getMonth(), dateFilter.startDate.getDate());
+        const endDateOnly = new Date(dateFilter.endDate.getFullYear(), dateFilter.endDate.getMonth(), dateFilter.endDate.getDate());
+        
+        return entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
       });
       
       console.log('🔍 RESULTADO DEL FILTRO:', {
@@ -997,38 +1014,7 @@ export default function ProjectDetailsRedesigned() {
             </div>
           </div>
 
-          {/* Métricas principales compactas */}
-          <div className="grid grid-cols-4 gap-3">
-            {metrics.map((metric, index) => {
-              const IconComponent = metric.icon;
-              return (
-                <Card key={index} className={`${metric.bgColor} border-0 hover:shadow-md transition-all duration-200`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-medium text-gray-600">{metric.label}</p>
-                        <p className={`text-lg font-bold ${metric.color}`}>{metric.value}</p>
-                        {metric.subtitle && (
-                          <p className="text-xs text-gray-500 mt-0.5">{metric.subtitle}</p>
-                        )}
-                      </div>
-                      <div className={`p-2 rounded-full shadow-md ${metric.color.replace('text-', 'bg-').replace('-700', '-500')}`}>
-                        <IconComponent className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                    {metric.change !== undefined && (
-                      <div className="mt-1">
-                        <div className={`flex items-center text-xs ${metric.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          <TrendingUp className="h-2 w-2 mr-1" />
-                          {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(1)}%
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+
         </div>
       </div>
 
