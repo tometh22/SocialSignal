@@ -100,7 +100,37 @@ function TimeRangeFilter({
 
   const currentDate = new Date();
 
-  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter'; value: () => DateFilter }[] = [
+  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter' | 'may2025' | 'june2025' | 'mayJune2025'; value: () => DateFilter }[] = [
+    {
+      label: "Mayo 2025",
+      type: "may2025",
+      value: () => ({
+        type: 'month',
+        startDate: new Date(2025, 4, 1), // Mayo 2025
+        endDate: new Date(2025, 4, 31), // Último día de mayo 2025
+        label: "Mayo 2025"
+      })
+    },
+    {
+      label: "Junio 2025",
+      type: "june2025",
+      value: () => ({
+        type: 'month',
+        startDate: new Date(2025, 5, 1), // Junio 2025
+        endDate: new Date(2025, 5, 30), // Último día de junio 2025
+        label: "Junio 2025"
+      })
+    },
+    {
+      label: "Mayo - Junio 2025",
+      type: "mayJune2025",
+      value: () => ({
+        type: 'custom',
+        startDate: new Date(2025, 4, 1), // Mayo 2025
+        endDate: new Date(2025, 5, 30), // Junio 2025
+        label: "Mayo - Junio 2025"
+      })
+    },
     {
       label: "Esta semana",
       type: "week",
@@ -188,6 +218,9 @@ function TimeRangeFilter({
         <Label className="text-sm font-medium">Período:</Label>
         <Select 
           value={selectedFilter.type === 'custom' ? 'custom' : 
+                selectedFilter.label.includes('Mayo 2025') ? 'may2025' :
+                selectedFilter.label.includes('Junio 2025') ? 'june2025' :
+                selectedFilter.label.includes('Mayo - Junio 2025') ? 'mayJune2025' :
                 selectedFilter.label.includes('Trimestre pasado') ? 'lastQuarter' :
                 selectedFilter.label.includes('Mes pasado') ? 'lastMonth' : 
                 selectedFilter.type} 
@@ -198,7 +231,10 @@ function TimeRangeFilter({
               const preset = presets.find(p => 
                 p.type === value || 
                 (value === 'lastMonth' && p.type === 'lastMonth') || 
-                (value === 'lastQuarter' && p.type === 'lastQuarter')
+                (value === 'lastQuarter' && p.type === 'lastQuarter') ||
+                (value === 'may2025' && p.type === 'may2025') ||
+                (value === 'june2025' && p.type === 'june2025') ||
+                (value === 'mayJune2025' && p.type === 'mayJune2025')
               );
               if (preset) handlePresetSelect(preset);
             }
@@ -531,15 +567,14 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   
-  // Estado del filtro temporal - configurado para mostrar datos existentes (junio 2025)
+  // Estado del filtro temporal - configurado por defecto para mostrar todos los datos
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
-    // Los datos están en junio 2025, configurar para mostrar ese período
-    const juneDate = new Date(2025, 5, 15); // Junio 2025 (mes 5 porque es 0-indexado)
+    // Configurar para mostrar todos los datos disponibles (mayo y junio 2025)
     return {
-      type: 'month',
-      startDate: startOfMonth(juneDate),
-      endDate: endOfMonth(juneDate),
-      label: "Mes pasado (junio 2025)"
+      type: 'custom',
+      startDate: new Date(2025, 4, 1), // Mayo 2025
+      endDate: new Date(2025, 5, 30), // Junio 2025
+      label: "Mayo - Junio 2025"
     };
   });
 
