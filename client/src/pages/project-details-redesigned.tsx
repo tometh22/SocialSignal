@@ -1106,30 +1106,6 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            {/* KPIs Ejecutivos */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {metrics.map((metric, index) => {
-                const IconComponent = metric.icon;
-                return (
-                  <Card key={index} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 mb-1">{metric.label}</p>
-                          <p className="text-2xl font-bold text-gray-900">{metric.value}</p>
-                          {metric.subtitle && (
-                            <p className="text-xs text-gray-500 mt-1">{metric.subtitle}</p>
-                          )}
-                        </div>
-                        <div className={`p-3 rounded-lg ${metric.bgColor}`}>
-                          <IconComponent className={`h-5 w-5 ${metric.color}`} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
 
             {/* Grid principal del dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
