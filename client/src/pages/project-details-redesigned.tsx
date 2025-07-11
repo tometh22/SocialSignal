@@ -50,9 +50,14 @@ interface ProjectData {
 }
 
 export default function ProjectDetailsRedesigned() {
-  const [, params] = useRoute('/project-details-redesigned/:id');
+  // Try multiple route patterns to match different URL structures
+  const [matchActiveProjects, paramsActiveProjects] = useRoute('/active-projects/:id');
+  const [matchProjects, paramsProjects] = useRoute('/projects/:id');
   const [, setLocation] = useLocation();
-  const projectId = params?.id ? parseInt(params.id) : null;
+  
+  // Extract project ID from any matching route
+  const projectId = paramsActiveProjects?.id || paramsProjects?.id;
+  const projectIdNum = projectId ? parseInt(projectId) : null;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -67,8 +72,8 @@ export default function ProjectDetailsRedesigned() {
     isLoading, 
     error 
   } = useQuery<ProjectData>({
-    queryKey: [`/api/projects/${projectId}/details`],
-    enabled: !!projectId,
+    queryKey: [`/api/projects/${projectIdNum}/details`],
+    enabled: !!projectIdNum,
   });
 
   // Filtrado de entradas de tiempo por fecha
