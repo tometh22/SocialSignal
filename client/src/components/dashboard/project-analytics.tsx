@@ -1638,4 +1638,4 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       const percentOfTotal = ((person.hours / (projectMetrics?.actualHours || 1)) * 100).toFixed(1);
 
                       return (
-                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0"
+                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0"></old_str>
