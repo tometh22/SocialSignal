@@ -99,7 +99,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 }) => {
   // Estado para el modo de visualización
   const [activeTab, setActiveTab] = useState("overview");
-  
+
   // Helpers para formatear datos
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { 
@@ -108,12 +108,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
       maximumFractionDigits: 0 
     }).format(amount);
   };
-  
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'No definida';
     return format(new Date(dateString), 'dd MMM yyyy', { locale: es });
   };
-  
+
   const formatNumber = (num: number, digits = 1) => {
     return num.toLocaleString('es-AR', { 
       minimumFractionDigits: digits,
@@ -124,30 +124,30 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
   // Calcular días restantes
   const calculateRemainingDays = () => {
     if (!project?.expectedEndDate) return 'No definido';
-    
+
     const today = new Date();
     const endDate = new Date(project.expectedEndDate);
     const diffTime = endDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return diffDays > 0 ? diffDays : 0;
   };
 
   // Determinar color según valor
   const getValueColor = (value: number, thresholds: [number, number, number]) => {
     const [warning, danger, critical] = thresholds;
-    
+
     if (value >= critical) return "text-red-600 font-bold";
     if (value >= danger) return "text-amber-600 font-semibold";
     if (value >= warning) return "text-yellow-600";
     return "text-green-600";
   };
-  
+
   const getBudgetClass = () => {
     const percentUsed = costSummary?.percentageUsed || 0;
     return getValueColor(percentUsed, [75, 90, 100]);
   };
-  
+
   const getRiskClass = (risk: number) => {
     return getValueColor(risk, [30, 60, 75]);
   };
@@ -157,11 +157,11 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
     if (actual >= expected * 0.8) return "bg-yellow-500";
     return "bg-red-500";
   };
-  
+
   // Renderizar indicadores de riesgo con visualización clara
   const renderRiskIndicator = (risk: number, label: string, helpTopic: string) => {
     const riskClass = getRiskClass(risk);
-    
+
     return (
       <div className="flex flex-col items-center gap-2 p-2 rounded-lg">
         <div className="relative w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -442,13 +442,77 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
     </Card>
   );
 
+  // Function to determine the display name for the time filter
+  const getFilterDisplayName = (filter: string) => {
+    switch (filter) {
+      case "week":
+        return "Semana";
+      case "month":
+        return "Mes";
+      case "quarter":
+        return "Trimestre";
+      case "all":
+        return "Todo";
+      default:
+        return "Desconocido";
+    }
+  };
+
+  // Function to calculate the quotation multiplier based on the time filter
+  const calculateQuotationMultiplier = (timeFilter: string) => {
+    switch (timeFilter) {
+      case "quarter":
+        return 3; // For a quarter, multiply by 3
+      default:
+        return 1; // Default is 1 for month and week
+    }
+  };
+
+   // Calculate quotation multiplier
+  const quotationMultiplier = calculateQuotationMultiplier(timeFilter);
+
+  // Filter time entries based on the selected time filter
+  const filteredTimeEntries = timeEntries.filter((entry) => {
+    if (timeFilter === "all") {
+      return true; // Show all entries
+    }
+
+    const entryDate = new Date(entry.date);
+    const today = new Date();
+
+    if (timeFilter === "week") {
+      // Logic to filter entries for the current week
+      const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+      return entryDate >= startOfWeek && entryDate <= today;
+    } else if (timeFilter === "month") {
+      // Logic to filter entries for the current month
+      return (
+        entryDate.getMonth() === today.getMonth() &&
+        entryDate.getFullYear() === today.getFullYear()
+      );
+    } else if (timeFilter === "quarter") {
+      // Logic to filter entries for the current quarter
+      const currentQuarter = Math.floor(today.getMonth() / 3);
+      const entryQuarter = Math.floor(entryDate.getMonth() / 3);
+      return (
+        entryQuarter === currentQuarter &&
+        entryDate.getFullYear() === today.getFullYear()
+      );
+    }
+
+    return false;
+  });
+
+  // Calculate total hours from filtered time entries
+  const totalHours = filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+
   return (
     <div className="w-full max-w-full overflow-x-hidden space-y-6">
       {/* Filtro de tiempo global */}
       <div className="flex justify-end">
         <TimeFilter />
       </div>
-      
+
       {/* Navegación por pestañas */}
       <Tabs 
         defaultValue="overview" 
@@ -473,7 +537,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             Entregables
           </TabsTrigger>
         </TabsList>
-        
+
         {/* Contenido: Vista General */}
         <TabsContent value="overview" className="mt-0 space-y-6">
           {/* KPIs principales */}
@@ -511,7 +575,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col justify-between mt-2">
                     <div className="space-y-2">
                       <div className="flex justify-between items-baseline">
@@ -523,7 +587,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           {costSummary?.variance?.toFixed(1) || 0}%
                         </span>
                       </div>
-                      
+
                       <Progress 
                         value={costSummary?.percentageUsed || 0} 
                         max={100} 
@@ -534,7 +598,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           "bg-green-500"
                         }
                       />
-                      
+
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                         <div>
                           <p className="text-muted-foreground">Presupuesto</p>
@@ -550,7 +614,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Tiempo */}
             <Card className="shadow-sm">
               <CardContent className="p-4">
@@ -584,7 +648,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col justify-between mt-2">
                     <div className="space-y-2">
                       <div className="flex justify-between items-baseline">
@@ -595,13 +659,13 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           {calculateRemainingDays()} días restantes
                         </span>
                       </div>
-                      
+
                       <Progress 
                         value={projectMetrics?.progressPercentage || 0} 
                         max={100} 
                         className="h-2"
                       />
-                      
+
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                         <div>
                           <p className="text-muted-foreground">Inicio</p>
@@ -617,7 +681,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Horas */}
             <Card className="shadow-sm">
               <CardContent className="p-4">
@@ -651,7 +715,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col justify-between mt-2">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="col-span-2">
@@ -663,14 +727,14 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                             {formatNumber(projectMetrics?.hoursPerDay || 0, 1)}h/día
                           </span>
                         </div>
-                        
+
                         <Progress 
                           value={projectMetrics?.actualHours || 0} 
                           max={Math.max(projectMetrics?.plannedHours || 0, projectMetrics?.actualHours || 0)} 
                           className="h-2"
                         />
                       </div>
-                      
+
                       <div className="mt-3">
                         <div className="flex items-center gap-1.5 mb-1">
                           <div className="w-3 h-3 rounded-full bg-primary"></div>
@@ -680,7 +744,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           {formatNumber(billableDistributionData.find(d => d.name === "Facturable")?.value || 0, 1)}h
                         </p>
                       </div>
-                      
+
                       <div className="mt-3">
                         <div className="flex items-center gap-1.5 mb-1">
                           <div className="w-3 h-3 rounded-full bg-gray-300"></div>
@@ -696,7 +760,27 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardContent>
             </Card>
           </div>
-          
+            {/* Información del período seleccionado */}
+            {timeFilter !== "all" && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Período: {getFilterDisplayName(timeFilter)}</span>
+                {quotationMultiplier > 1 && (
+                  <span className="text-blue-600">
+                    (Objetivo × {quotationMultiplier})
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Resumen de registros filtrados */}
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+              <span className="font-medium">Registros en el período:</span>
+              <span className="ml-2">{filteredTimeEntries.length} entradas</span>
+              <span className="ml-4 text-muted-foreground">
+                ({totalHours.toFixed(1)} horas totales)
+              </span>
+            </div>
+
           {/* Indicadores de riesgo y equipo asignado */}
           <div className="grid grid-cols-2 gap-4">
             {/* Indicadores de riesgo */}
@@ -735,7 +819,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   {renderRiskIndicator(riskIndicators.budgetRisk, "Riesgo de presupuesto", "budgetRiskHelp")}
                   {renderRiskIndicator(riskIndicators.scheduleRisk, "Riesgo de cronograma", "scheduleRiskHelp")}
                 </div>
-                
+
                 <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
                     <AlertCircle className="h-4 w-4" />
@@ -753,12 +837,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             {/* Equipo asignado (versión condensada) */}
             {renderTeamCard()}
           </div>
         </TabsContent>
-        
+
         {/* Contenido: Análisis Detallado */}
         {/* Contenido: Indicadores de Robustez */}
         <TabsContent value="robustness" className="mt-0 space-y-6">
@@ -768,7 +852,8 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 <Gauge className="h-5 w-5 text-primary" />
                 Indicadores de Robustez
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted```typescript
+-foreground">
                 Métricas detalladas sobre la fortaleza del proyecto y áreas de mejora
               </p>
             </div>
@@ -793,7 +878,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </TooltipProvider>
             </div>
           </div>
-          
+
           {/* Puntuación de Robustez Global */}
           <Card className="shadow-sm border-2 border-primary/10">
             <CardContent className="p-6">
@@ -815,7 +900,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   <Star className="h-8 w-8 text-amber-400 fill-amber-400" />
                 </div>
               </div>
-              
+
               <div className="mb-4">
                 <div className="flex justify-between text-sm mb-1">
                   <span>Bajo</span>
@@ -830,7 +915,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   ></div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                 <div className="p-4 rounded-lg bg-green-50 border border-green-100">
                   <h4 className="text-sm font-medium text-green-800 flex items-center gap-1.5 mb-1">
@@ -852,7 +937,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </li>
                   </ul>
                 </div>
-                
+
                 <div className="p-4 rounded-lg bg-red-50 border border-red-100">
                   <h4 className="text-sm font-medium text-red-800 flex items-center gap-1.5 mb-1">
                     <TrendingDown className="h-4 w-4 text-red-600" />
@@ -876,7 +961,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </div>
             </CardContent>
           </Card>
-          
+
           {/* Categorías de Robustez */}
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="shadow-sm">
@@ -903,7 +988,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </div>
                     <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
-                  
+
                   <div className="space-y-3 pt-2">
                     {[
                       { name: "Distribución por rol", score: 4.8, percentage: 48 },
@@ -938,7 +1023,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -963,7 +1048,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </div>
                     <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
-                  
+
                   <div className="space-y-3 pt-2">
                     {[
                       { name: "Control de costos", score: 3.5, percentage: 35 },
@@ -999,7 +1084,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardContent>
             </Card>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
@@ -1025,7 +1110,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </div>
                     <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
-                  
+
                   <div className="space-y-3 pt-2">
                     {[
                       { name: "Adherencia a fechas", score: 4.7, percentage: 47 },
@@ -1060,7 +1145,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1085,7 +1170,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </div>
                     <Settings className="h-5 w-5 text-muted-foreground opacity-70" />
                   </div>
-                  
+
                   <div className="space-y-3 pt-2">
                     {[
                       { name: "Calidad de documentación", score: 8.2, percentage: 82 },
@@ -1121,7 +1206,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Recomendaciones automáticas */}
           <Card className="shadow-sm border-amber-100">
             <CardHeader className="p-4 pb-2 bg-amber-50 border-b border-amber-100">
@@ -1151,7 +1236,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </li>
                   </ul>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
                   <h4 className="text-sm font-medium text-amber-800 flex items-center gap-1.5 mb-1">
                     <Clock className="h-4 w-4 text-amber-600" />
@@ -1168,7 +1253,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     </li>
                   </ul>
                 </div>
-                
+
                 <div className="p-3 rounded-lg bg-green-50 border border-green-100">
                   <h4 className="text-sm font-medium text-green-800 flex items-center gap-1.5 mb-1">
                     <FileText className="h-4 w-4 text-green-600" />
@@ -1189,7 +1274,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         {/* Contenido: Análisis Detallado */}
         <TabsContent value="analytics" className="mt-0 space-y-6">
           <div className="grid grid-cols-2 gap-4">
@@ -1206,7 +1291,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               "timeTrend"
             )}
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4">
             <Card className="shadow-sm col-span-2">
               <CardHeader className="p-4 pb-2">
@@ -1250,7 +1335,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                             : 'Desviación dentro de márgenes aceptables'}
                       </p>
                     </div>
-                    
+
                     <div className="space-y-2 p-3 rounded-lg bg-muted/30">
                       <h4 className="text-sm font-medium flex items-center gap-2">
                         <Timer className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1285,7 +1370,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="p-3 rounded-lg bg-muted/10 border">
                     <h4 className="text-sm font-medium mb-2">Acciones Recomendadas</h4>
                     <ul className="text-xs space-y-1.5 text-muted-foreground">
@@ -1324,7 +1409,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1343,7 +1428,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       <p className="text-[10px] mt-1">(Recharts PieChart)</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <div className="p-2 rounded-md bg-primary/10">
                       <div className="flex items-center gap-2 mb-1">
@@ -1358,7 +1443,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           (projectMetrics?.actualHours || 1)) * 100).toFixed(1)}%
                       </p>
                     </div>
-                    
+
                     <div className="p-2 rounded-md bg-muted/20">
                       <div className="flex items-center gap-2 mb-1">
                         <div className="w-3 h-3 rounded-full bg-gray-400"></div>
@@ -1378,7 +1463,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             </Card>
           </div>
         </TabsContent>
-        
+
         {/* Contenido: Equipo y Recursos */}
         <TabsContent value="team" className="mt-0 space-y-6">
           <div className="grid grid-cols-3 gap-4">
@@ -1391,7 +1476,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 "h-72"
               )}
             </div>
-            
+
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1410,9 +1495,9 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         p => personnel.find(per => per.id === p.id)?.roleId === role.id
                       );
                       const totalHoursInRole = personelInRole.reduce((sum, p) => sum + p.hours, 0);
-                      
+
                       if (totalHoursInRole <= 0) return null;
-                      
+
                       return (
                         <div key={role.id} className="p-2 rounded-md bg-muted/10">
                           <div className="flex justify-between items-baseline mb-1">
@@ -1444,7 +1529,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardContent>
             </Card>
           </div>
-          
+
           <Card className="shadow-sm">
             <CardHeader className="p-4 pb-2">
               <div className="flex justify-between">
@@ -1475,184 +1560,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     <div className="col-span-2">% del Total</div>
                     <div className="col-span-3">Distribución</div>
                   </div>
-                  
+
                   <div className="divide-y">
                     {timeByPersonnelData.map((person, index) => {
                       const personDetails = personnel.find(p => p.id === person.id);
                       const roleDetails = roles.find(r => r.id === personDetails?.roleId);
                       const percentOfTotal = ((person.hours / (projectMetrics?.actualHours || 1)) * 100).toFixed(1);
-                      
-                      return (
-                        <div key={index} className="grid grid-cols-12 gap-2 p-3 text-xs items-center hover:bg-muted/10">
-                          <div className="col-span-3 font-medium flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px]">
-                              {person.name.substring(0, 2).toUpperCase()}
-                            </div>
-                            <span>{person.name}</span>
-                          </div>
-                          <div className="col-span-2 text-muted-foreground">
-                            {roleDetails?.name || "No asignado"}
-                          </div>
-                          <div className="col-span-2 font-medium">
-                            {formatNumber(person.hours, 1)}h
-                          </div>
-                          <div className="col-span-2 text-muted-foreground">
-                            {percentOfTotal}%
-                          </div>
-                          <div className="col-span-3">
-                            <Progress 
-                              value={person.hours} 
-                              max={Math.max(...timeByPersonnelData.map(p => p.hours))} 
-                              className="h-1.5" 
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                  No hay datos de asignación de equipo
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="p-4 pt-2 flex justify-between">
-              <p className="text-xs text-muted-foreground">
-                Total: {timeByPersonnelData.length} persona{timeByPersonnelData.length !== 1 ? 's' : ''} • {formatNumber(projectMetrics?.actualHours || 0, 1)} horas
-              </p>
-              <Button variant="outline" size="sm" className="h-8 text-xs">
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Exportar
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        {/* Contenido: Entregables */}
-        <TabsContent value="deliverables" className="mt-0 space-y-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              {renderDeliverablesCard()}
-            </div>
-            
-            <Card className="shadow-sm">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
-                  Resumen de Entregables
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Estado general del proyecto
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 pt-2">
-                {deliverableData ? (
-                  <div className="space-y-4">
-                    <div className="flex flex-col items-center p-4 text-center">
-                      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                        <FileText className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold">{deliverableData.progress || 0}%</h3>
-                      <p className="text-sm text-muted-foreground">Progreso general</p>
-                    </div>
-                    
-                    <div className="space-y-2 pt-2">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">Última actualización:</span>
-                        <span className="font-medium">
-                          {deliverableData.last_updated ? formatDate(deliverableData.last_updated) : "No disponible"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">Responsable:</span>
-                        <span className="font-medium">{deliverableData.responsible || "No asignado"}</span>
-                      </div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">Prioridad:</span>
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {deliverableData.priority || "Normal"}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-48 p-4 text-center">
-                    <AlertCircle className="h-10 w-10 text-muted-foreground opacity-40 mb-2" />
-                    <p className="text-sm text-muted-foreground">No hay entregables definidos</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Agrega entregables para realizar un seguimiento detallado del proyecto
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-4 h-8 text-xs">
-                      Definir entregable
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          {deliverableData && (
-            <Card className="shadow-sm">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  Cronograma de Entregables
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Línea de tiempo y fechas críticas
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 pt-2">
-                <div className="h-40 flex items-center justify-center bg-muted/20 rounded-lg mb-4">
-                  <div className="text-center text-muted-foreground text-xs">
-                    <p>Línea de tiempo de entregables</p>
-                    <p className="text-[10px] mt-1">(Visualización en Timeline)</p>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-12 gap-2 p-3 bg-muted/20 text-xs font-medium">
-                    <div className="col-span-4">Entregable</div>
-                    <div className="col-span-2">Fecha Límite</div>
-                    <div className="col-span-2">Responsable</div>
-                    <div className="col-span-2">Estado</div>
-                    <div className="col-span-2">Progreso</div>
-                  </div>
-                  
-                  <div className="divide-y">
-                    <div className="grid grid-cols-12 gap-2 p-3 text-xs items-center hover:bg-muted/10">
-                      <div className="col-span-4 font-medium">{deliverableData.name}</div>
-                      <div className="col-span-2 text-muted-foreground">{formatDate(deliverableData.due_date)}</div>
-                      <div className="col-span-2">{deliverableData.responsible || "No asignado"}</div>
-                      <div className="col-span-2">
-                        <Badge 
-                          variant={deliverableData.status === 'completed' ? 'success' : 'default'} 
-                          className="text-[10px] h-5"
-                        >
-                          {deliverableData.status === 'completed' ? 'Completado' : 'En progreso'}
-                        </Badge>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={deliverableData.progress || 0} 
-                            max={100} 
-                            className="h-1.5 flex-1" 
-                          />
-                          <span className="font-medium">{deliverableData.progress || 0}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
 
-export default ProjectAnalytics;
+                      return (
+                        <div key={index} className

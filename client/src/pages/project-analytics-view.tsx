@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import ProjectAnalytics from "@/components/dashboard/project-analytics";
@@ -28,13 +28,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EditMacroProjectButton from "@/components/always-on/edit-macro-project-button";
-
+import { format, subDays } from 'date-fns';
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 // Interfaces para el tipado
 interface CostSummary {
   estimatedCost: number;
   actualCost: number;
   variance: number;
   percentageUsed: number;
+  monthlyEstimatedCost?: number;
+  quotationMultiplier?: number;
 }
 
 interface ProjectMetrics {
@@ -63,6 +66,10 @@ interface ActiveProject {
     projectName: string;
     clientId: number;
     totalAmount: number;
+	baseCost?: number;
+    estimatedHours?: number;
+    projectType?: string;
+    billingFrequency?: string;
     client?: {
       id: number;
       name: string;
@@ -80,6 +87,8 @@ interface TimeEntry {
   description: string | null;
   approved: boolean;
   billable: boolean;
+  hourlyRate?: number;
+  hourlyRateAtTime?: number;
 }
 
 interface Personnel {
@@ -130,6 +139,10 @@ const ProjectAnalyticsView: React.FC = () => {
     title: "",
     content: ""
   });
+    const [customDateRange, setCustomDateRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null,
+  });
 
   // Toast para notificaciones y estado del dialog
   const { toast } = useToast();
@@ -154,11 +167,6 @@ const ProjectAnalyticsView: React.FC = () => {
     queryKey: ['/api/personnel'],
   });
 
-  const { data: costSummary, isLoading: isLoadingCostSummary } = useQuery<CostSummary>({
-    queryKey: [`/api/projects/${parsedProjectId}/cost-summary`],
-    enabled: !!parsedProjectId,
-  });
-
   // Obtener datos MODO para el proyecto
   const { data: deliverableData, isLoading: isLoadingDeliverable } = useQuery<any>({
     queryKey: [`/api/modo/deliverables/project/${parsedProjectId}`],
@@ -171,12 +179,279 @@ const ProjectAnalyticsView: React.FC = () => {
     isLoadingTimeEntries || 
     isLoadingRoles || 
     isLoadingPersonnel || 
-    isLoadingCostSummary ||
     isLoadingDeliverable;
 
-  // Manejadores de acciones
-  const handleTimeFilterChange = (filter: string) => {
-    setTimeFilter(filter);
+  // Función para calcular el multiplicador de objetivos según el período seleccionado
+  const getQuotationMultiplier = useCallback(() => {
+    if (!project?.quotation) return 1;
+
+    // Si es un proyecto one-shot, siempre usar multiplicador 1
+    const isOneShot = project.quotation.projectType === 'one_shot' || 
+                     project.quotation.billingFrequency === 'one_time' ||
+                     !project.quotation.billingFrequency;
+
+    if (isOneShot) return 1;
+
+    // Para proyectos con fee mensual, calcular multiplicador según período
+    switch (timeFilter) {
+      case "current_month":
+      case "last_month":
+        return 1; // 1 mes
+      case "current_quarter":
+      case "last_quarter":
+        return 3; // 3 meses
+      case "current_semester":
+      case "last_semester":
+        return 6; // 6 meses
+      case "current_year":
+        return 12; // 12 meses
+      case "custom":
+        if (!customDateRange.start || !customDateRange.end) return 1;
+        // Calcular número de meses entre fechas
+        const monthDiff = Math.ceil(
+          (customDateRange.end.getTime() - customDateRange.start.getTime()) / 
+          (1000 * 60 * 60 * 24 * 30)
+        );
+        return Math.max(1, monthDiff);
+      case "all":
+        // Para "all", calcular meses desde inicio del proyecto
+        if (!project.startDate) return 1;
+        const projectStart = new Date(project.startDate);
+        const now = new Date();
+        const totalMonths = Math.ceil(
+          (now.getTime() - projectStart.getTime()) / 
+          (1000 * 60 * 60 * 24 * 30)
+        );
+        return Math.max(1, totalMonths);
+      default:
+        return 1;
+    }
+  }, [timeFilter, customDateRange, project]);
+
+  // Función para filtrar datos por tiempo con opciones completas
+  const filterTimeEntriesByDateRange = useCallback((data: TimeEntry[]) => {
+    if (!data || timeFilter === "all") return data;
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    switch (timeFilter) {
+      case "current_month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        break;
+      case "last_month":
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case "current_quarter":
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+        endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+        break;
+      case "last_quarter":
+        const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+        const lastQuarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+        const adjustedLastQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+        startDate = new Date(lastQuarterYear, adjustedLastQuarter * 3, 1);
+        endDate = new Date(lastQuarterYear, (adjustedLastQuarter + 1) * 3, 0);
+        break;
+      case "current_semester":
+        const currentSemester = Math.floor(now.getMonth() / 6);
+        startDate = new Date(now.getFullYear(), currentSemester * 6, 1);
+        endDate = new Date(now.getFullYear(), (currentSemester + 1) * 6, 0);
+        break;
+      case "last_semester":
+        const lastSemester = Math.floor(now.getMonth() / 6) - 1;
+        const lastSemesterYear = lastSemester < 0 ? now.getFullYear() - 1 : now.getFullYear();
+        const adjustedLastSemester = lastSemester < 0 ? 1 : lastSemester;
+        startDate = new Date(lastSemesterYear, adjustedLastSemester * 6, 1);
+        endDate = new Date(lastSemesterYear, (adjustedLastSemester + 1) * 6, 0);
+        break;
+      case "current_year":
+        startDate = new Date(now.getFullYear(), 0, 1);
+        endDate = new Date(now.getFullYear(), 11, 31);
+        break;
+      case "custom":
+        if (!customDateRange.start || !customDateRange.end) return data;
+        startDate = customDateRange.start;
+        endDate = customDateRange.end;
+        break;
+      default:
+        return data;
+    }
+
+    return data.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+  }, [timeFilter, customDateRange]);
+
+  // Aplicar filtro temporal
+  const filteredTimeEntries = useMemo(() => {
+    return filterTimeEntriesByDateRange(timeEntries);
+  }, [timeEntries, filterTimeEntriesByDateRange]);
+
+  // Obtener multiplicador de objetivos
+  const quotationMultiplier = useMemo(() => {
+    return getQuotationMultiplier();
+  }, [getQuotationMultiplier]);
+
+  // Calcular horas totales filtradas
+  const totalHours = useMemo(() => {
+    return filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+  }, [filteredTimeEntries]);
+
+  // Calcular costo real filtrado
+  const actualCost = useMemo(() => {
+    return filteredTimeEntries.reduce((sum, entry) => {
+      return sum + (entry.hours * (entry.hourlyRateAtTime || entry.hourlyRate || 0));
+    }, 0);
+  }, [filteredTimeEntries]);
+
+  // Calcular resumen de costos con multiplicador
+  const costSummary = useMemo(() => {
+    if (!project?.quotation) return null;
+
+    const quotationData = project.quotation;
+    const monthlyEstimatedCost = quotationData.baseCost || 0;
+    const periodEstimatedCost = monthlyEstimatedCost * quotationMultiplier;
+
+    const percentageUsed = periodEstimatedCost > 0 ? (actualCost / periodEstimatedCost) * 100 : 0;
+    const variance = percentageUsed - 100;
+
+    return {
+      estimatedCost: periodEstimatedCost,
+      actualCost: actualCost,
+      percentageUsed,
+      variance,
+      monthlyEstimatedCost,
+      quotationMultiplier
+    };
+  }, [project, actualCost, quotationMultiplier]);
+
+  // Métricas del proyecto con objetivos multiplicados
+  const projectMetrics: ProjectMetrics = useMemo(() => {
+    if (!project || !timeEntries) {
+      return {
+        hoursPerDay: 0,
+        progressPercentage: 0,
+        plannedHours: 0,
+        actualHours: totalHours,
+        daysElapsed: 0,
+        daysTotal: 0,
+      };
+    }
+
+    try {
+      // Calcular días según el período seleccionado
+      let daysTotal = 0;
+      let daysElapsed = 0;
+
+      if (timeFilter === "all") {
+        // Para "all", usar fechas del proyecto
+        const startDate = new Date(project.startDate);
+        const endDate = project.expectedEndDate 
+          ? new Date(project.expectedEndDate) 
+          : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+        const today = new Date();
+
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          daysTotal = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          daysElapsed = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+      } else {
+        // Para períodos específicos, calcular días del período
+        const now = new Date();
+        switch (timeFilter) {
+          case "current_month":
+          case "last_month":
+            daysTotal = 30;
+            daysElapsed = now.getDate();
+            break;
+          case "current_quarter":
+          case "last_quarter":
+            daysTotal = 90;
+            daysElapsed = Math.floor((now.getMonth() % 3) * 30 + now.getDate());
+            break;
+          case "current_semester":
+          case "last_semester":
+            daysTotal = 180;
+            daysElapsed = Math.floor((now.getMonth() % 6) * 30 + now.getDate());
+            break;
+          case "current_year":
+            daysTotal = 365;
+            daysElapsed = Math.floor((now.getMonth() * 30) + now.getDate());
+            break;
+          default:
+            daysTotal = 30;
+            daysElapsed = now.getDate();
+        }
+      }
+
+      // Obtener horas planificadas desde la cotización y multiplicar
+      const monthlyPlannedHours = project.quotation?.estimatedHours || 0;
+      const plannedHours = monthlyPlannedHours * quotationMultiplier;
+
+      const progressPercentage = plannedHours > 0 ? (totalHours / plannedHours) * 100 : 0;
+      const hoursPerDay = daysElapsed > 0 ? totalHours / daysElapsed : 0;
+
+      return {
+        hoursPerDay,
+        progressPercentage,
+        plannedHours,
+        actualHours: totalHours,
+        daysElapsed,
+        daysTotal,
+      };
+    } catch (error) {
+      console.error("Error calculando métricas del proyecto:", error);
+      return {
+        hoursPerDay: 0,
+        progressPercentage: 0,
+        plannedHours: 0,
+        actualHours: totalHours,
+        daysElapsed: 0,
+        daysTotal: 0,
+      };
+    }
+  }, [project, timeEntries, totalHours, quotationMultiplier, timeFilter]);
+
+  // Handlers
+  const handleTimeFilterChange = (newFilter: string) => {
+    setTimeFilter(newFilter);
+    // Si se selecciona custom, resetear el rango personalizado
+    if (newFilter !== "custom") {
+      setCustomDateRange({ start: null, end: null });
+    }
+  };
+
+  // Handler para cambio de rango personalizado
+  const handleCustomDateRangeChange = (start: Date | null, end: Date | null) => {
+    setCustomDateRange({ start, end });
+    if (start && end) {
+      setTimeFilter("custom");
+    }
+  };
+
+  // Función para mostrar nombres de filtros
+  const getFilterDisplayName = (filter: string): string => {
+    switch (filter) {
+      case "current_month": return "Este mes";
+      case "last_month": return "Mes pasado";
+      case "current_quarter": return "Este trimestre";
+      case "last_quarter": return "Trimestre pasado";
+      case "current_semester": return "Este semestre";
+      case "last_semester": return "Semestre pasado";
+      case "current_year": return "Este año";
+      case "custom": return "Personalizado";
+      default: return "Todo el proyecto";
+    }
+  };
+
+  const handleGoBack = () => {
+    setLocation("/active-projects");
   };
 
   const handleExpandChart = (type: string, title: string) => {
@@ -235,204 +510,6 @@ const ProjectAnalyticsView: React.FC = () => {
       content
     });
   };
-
-  const handleGoBack = () => {
-    setLocation("/active-projects");
-  };
-
-  // Filtrar entradas de tiempo según el filtro seleccionado
-  const filteredTimeEntries = useMemo(() => {
-    if (!timeEntries.length) return [];
-
-    const now = new Date();
-    let filterDate = new Date();
-
-    switch (timeFilter) {
-      case "week":
-        filterDate.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        filterDate.setMonth(now.getMonth() - 1);
-        break;
-      case "quarter":
-        filterDate.setMonth(now.getMonth() - 3);
-        break;
-      default:
-        return timeEntries;
-    }
-
-    return timeEntries.filter(entry => new Date(entry.date) >= filterDate);
-  }, [timeEntries, timeFilter]);
-
-  // Cálculos derivados
-  const totalHours = useMemo(() => {
-    return filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
-  }, [filteredTimeEntries]);
-
-  const billableHours = useMemo(() => {
-    return filteredTimeEntries.filter(entry => entry.billable).reduce((sum, entry) => sum + entry.hours, 0);
-  }, [filteredTimeEntries]);
-
-  const nonBillableHours = useMemo(() => {
-    return filteredTimeEntries.filter(entry => !entry.billable).reduce((sum, entry) => sum + entry.hours, 0);
-  }, [filteredTimeEntries]);
-
-  // Métricas del proyecto
-  const projectMetrics: ProjectMetrics = useMemo(() => {
-    if (!project || !timeEntries) {
-      return {
-        hoursPerDay: 0,
-        progressPercentage: 0,
-        plannedHours: 0,
-        actualHours: totalHours,
-        daysElapsed: 0,
-        daysTotal: 0,
-      };
-    }
-
-    try {
-      // Asegurarse de que las fechas son objetos Date válidos
-      const startDate = new Date(project.startDate);
-
-      // Si no hay fecha de fin establecida, usar 30 días desde hoy
-      const endDate = project.expectedEndDate 
-        ? new Date(project.expectedEndDate) 
-        : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
-
-      const today = new Date();
-
-      // Validamos que las fechas sean válidas
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        console.error("Fechas inválidas en el proyecto", { 
-          startDate: project.startDate, 
-          expectedEndDate: project.expectedEndDate
-        });
-
-        return {
-          hoursPerDay: 0,
-          progressPercentage: 0,
-          plannedHours: 0,
-          actualHours: totalHours,
-          daysElapsed: 0,
-          daysTotal: 30,  // Valor por defecto si hay fechas inválidas
-        };
-      }
-
-      // Cálculo de días totales y transcurridos
-      const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const elapsedDays = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const validElapsedDays = Math.max(0, elapsedDays);
-
-      // Asegurarse de que el porcentaje no exceda el 100%
-      let progressPercentage = (validElapsedDays / totalDays) * 100;
-      progressPercentage = Math.min(progressPercentage, 100);
-
-      const plannedHours = totalDays * 8;
-      const hoursPerDay = validElapsedDays > 0 ? totalHours / validElapsedDays : 0;
-
-      return {
-        hoursPerDay,
-        progressPercentage,
-        plannedHours,
-        actualHours: totalHours,
-        daysElapsed: validElapsedDays,
-        daysTotal: totalDays,
-      };
-    } catch (error) {
-      console.error("Error calculando métricas del proyecto:", error);
-      return {
-        hoursPerDay: 0,
-        progressPercentage: 0,
-        plannedHours: 0,
-        actualHours: totalHours,
-        daysElapsed: 0,
-        daysTotal: 30,  // Valor por defecto si hay error
-      };
-    }
-  }, [project, timeEntries, totalHours]);
-
-  // Datos para indicadores de riesgo
-  const riskIndicators = useMemo(() => {
-    if (!costSummary || !projectMetrics) {
-      return {
-        budgetRisk: 0,
-        scheduleRisk: 0,
-        activeAlerts: 0
-      };
-    }
-
-    // Riesgo de presupuesto (basado en la tendencia actual y la varianza)
-    let budgetRisk = costSummary.percentageUsed > projectMetrics.progressPercentage 
-      ? Math.min(100, (costSummary.percentageUsed / projectMetrics.progressPercentage) * 70)
-      : Math.min(70, (costSummary.percentageUsed / 100) * 70);
-
-    if (costSummary.variance > 10) budgetRisk += 15;
-    else if (costSummary.variance > 5) budgetRisk += 10;
-
-    // Riesgo de cronograma (basado en el progreso vs tiempo transcurrido)
-    let scheduleRisk = 0;
-    if (projectMetrics.daysElapsed > 0 && projectMetrics.daysTotal > 0) {
-      const idealProgress = (projectMetrics.daysElapsed / projectMetrics.daysTotal) * 100;
-      const progressDifference = idealProgress - projectMetrics.progressPercentage;
-
-      scheduleRisk = progressDifference > 0 
-        ? Math.min(100, (progressDifference / 20) * 100)
-        : 0;
-    }
-
-    // Alertas activas
-    let activeAlerts = 0;
-    if (budgetRisk >= 75) activeAlerts++;
-    if (scheduleRisk >= 75) activeAlerts++;
-    if (costSummary.variance > 10) activeAlerts++;
-
-    return {
-      budgetRisk: Math.round(budgetRisk),
-      scheduleRisk: Math.round(scheduleRisk),
-      activeAlerts
-    };
-  }, [costSummary, projectMetrics]);
-
-  // Datos para gráficos
-  const timeByPersonnelData = useMemo(() => {
-    if (!filteredTimeEntries.length || !personnel.length) return [];
-
-    const timeByPerson: Record<number, number> = {};
-    filteredTimeEntries.forEach(entry => {
-      if (!timeByPerson[entry.personnelId]) {
-        timeByPerson[entry.personnelId] = 0;
-      }
-      timeByPerson[entry.personnelId] += entry.hours;
-    });
-
-    return Object.keys(timeByPerson).map(personId => {
-      const personInfo = personnel.find(p => p.id === parseInt(personId));
-      let role = "No asignado";
-
-      if (personInfo && personInfo.roleId) {
-        const roleInfo = roles.find(r => r.id === personInfo.roleId);
-        if (roleInfo) {
-          role = roleInfo.name;
-        }
-      }
-
-      return {
-        id: parseInt(personId),
-        name: personInfo ? personInfo.name : `Persona ${personId}`,
-        hours: timeByPerson[parseInt(personId)],
-        role
-      };
-    }).sort((a, b) => b.hours - a.hours);
-  }, [filteredTimeEntries, personnel, roles]);
-
-  const billableDistributionData = useMemo(() => {
-    if (!filteredTimeEntries.length) return [];
-
-    return [
-      { name: "Facturable", value: billableHours },
-      { name: "No Facturable", value: nonBillableHours }
-    ].filter(item => item.value > 0);
-  }, [billableHours, nonBillableHours]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -586,6 +663,65 @@ const ProjectAnalyticsView: React.FC = () => {
             <div className="border-b pb-2 mb-4">
               <h3 className="text-base font-medium text-gray-700">Métricas Detalladas</h3>
             </div>
+
+			{/* Filtros y botones de acción */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filtrar por tiempo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todo el proyecto</SelectItem>
+                <SelectItem value="current_month">Este mes</SelectItem>
+                <SelectItem value="last_month">Mes pasado</SelectItem>
+                <SelectItem value="current_quarter">Este trimestre</SelectItem>
+                <SelectItem value="last_quarter">Trimestre pasado</SelectItem>
+                <SelectItem value="current_semester">Este semestre</SelectItem>
+                <SelectItem value="last_semester">Semestre pasado</SelectItem>
+                <SelectItem value="current_year">Este año</SelectItem>
+                <SelectItem value="custom">Fecha personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+
+			{/* Selector de rango personalizado */}
+            {timeFilter === "custom" && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={customDateRange.start ? customDateRange.start.toISOString().split('T')[0] : ''}
+                  onChange={(e) => handleCustomDateRangeChange(
+                    e.target.value ? new Date(e.target.value) : null,
+                    customDateRange.end
+                  )}
+                  className="px-3 py-2 border rounded-md text-sm"
+                />
+                <span className="text-sm text-muted-foreground">a</span>
+                <Input
+                  type="date"
+                  value={customDateRange.end ? customDateRange.end.toISOString().split('T')[0] : ''}
+                  onChange={(e) => handleCustomDateRangeChange(
+                    customDateRange.start,
+                    e.target.value ? new Date(e.target.value) : null
+                  )}
+                  className="px-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+            )}
+
+            {/* Información del período seleccionado */}
+            {timeFilter !== "all" && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Período: {getFilterDisplayName(timeFilter)}</span>
+                {quotationMultiplier > 1 && (
+                  <span className="text-blue-600">
+                    (Objetivo × {quotationMultiplier})
+                  </span>
+                )}
+              </div>
+            )}
+
+			
+</div>
             <ProjectAnalytics
               project={project}
               costSummary={costSummary}
@@ -697,9 +833,7 @@ const ProjectAnalyticsView: React.FC = () => {
                   <p className="text-xs text-muted-foreground">
                     Presupuesto mensual que se compartirá entre todos los subproyectos
                   </p>
-                </div>
-
-                <div className="grid gap-2">
+                </div><div className="grid gap-2">
                   <Label htmlFor="status">Estado</Label>
                   <Select name="status" defaultValue={project?.status || "active"}>
                     <SelectTrigger>
