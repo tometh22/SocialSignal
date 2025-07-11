@@ -34,6 +34,7 @@ interface TimeEntry {
   approved: boolean;
   personnelName: string;
   roleName: string;
+  totalCost: number;
 }
 
 interface ProjectData {
@@ -45,8 +46,10 @@ interface ProjectData {
   startDate: string;
   endDate: string;
   totalBudget: number;
+  budget: number;
   spentBudget: number;
   timeEntries: TimeEntry[];
+  estimatedHours: number;
 }
 
 export default function ProjectDetailsRedesigned() {
@@ -149,7 +152,7 @@ export default function ProjectDetailsRedesigned() {
     }
 
     const totalHours = filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
-    const totalCost = filteredTimeEntries.reduce((sum, entry) => sum + (entry.hours * 50), 0); // Asumiendo $50/hora
+    const totalCost = filteredTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
     const uniqueDays = new Set(filteredTimeEntries.map(entry => entry.date)).size;
     const avgHoursPerDay = uniqueDays > 0 ? totalHours / uniqueDays : 0;
     const teamMembers = new Set(filteredTimeEntries.map(entry => entry.personnelName)).size;
@@ -344,7 +347,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Fecha de Fin</p>
-                    <p className="font-medium">{format(new Date(projectData.endDate), 'dd/MM/yyyy', { locale: es })}</p>
+                    <p className="font-medium">{projectData.endDate ? format(new Date(projectData.endDate), 'dd/MM/yyyy', { locale: es }) : '31/12/1969'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -358,20 +361,20 @@ export default function ProjectDetailsRedesigned() {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Presupuesto Total</span>
-                    <span className="font-bold">${projectData.totalBudget.toLocaleString()}</span>
+                    <span className="font-bold">${(projectData.budget || projectData.totalBudget).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Gastado</span>
-                    <span className="font-bold text-red-600">${projectData.spentBudget.toLocaleString()}</span>
+                    <span className="font-bold text-red-600">${analytics.totalCost.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Restante</span>
-                    <span className="font-bold text-green-600">${(projectData.totalBudget - projectData.spentBudget).toLocaleString()}</span>
+                    <span className="font-bold text-green-600">${((projectData.budget || projectData.totalBudget) - analytics.totalCost).toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${(projectData.spentBudget / projectData.totalBudget) * 100}%` }}
+                      style={{ width: `${Math.min((analytics.totalCost / (projectData.budget || projectData.totalBudget)) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -402,8 +405,8 @@ export default function ProjectDetailsRedesigned() {
                     <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-4">
                         <div>
-                          <p className="font-medium">{entry.personnelName}</p>
-                          <p className="text-sm text-gray-600">{entry.roleName}</p>
+                          <p className="font-medium">{entry.personnelName || 'Sin nombre'}</p>
+                          <p className="text-sm text-gray-600">{entry.roleName || 'Sin rol'}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">
