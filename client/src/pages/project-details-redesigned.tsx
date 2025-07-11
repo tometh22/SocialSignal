@@ -1391,7 +1391,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-blue-50 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
                       {costSummary?.filteredHours || 0}h
@@ -1409,6 +1409,160 @@ export default function ProjectDetailsRedesigned() {
                       {baseTeam?.length || 0}
                     </div>
                     <div className="text-sm text-gray-600">Miembros Activos</div>
+                  </div>
+                  <div className="text-center p-4 bg-amber-50 rounded-lg">
+                    <div className="text-2xl font-bold text-amber-600">
+                      {(() => {
+                        const realCost = costSummary?.totalCost || 0;
+                        const budget = costSummary?.budget || 0;
+                        if (realCost === 0 || budget === 0) return "0%";
+                        const markup = ((budget - realCost) / realCost) * 100;
+                        return `${markup.toFixed(1)}%`;
+                      })()}
+                    </div>
+                    <div className="text-sm text-gray-600">Markup Real</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card detallada de análisis de Markup */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-amber-600" />
+                  Análisis de Markup - {dateFilter.label}
+                </CardTitle>
+                <CardDescription>
+                  Rentabilidad del proyecto basada en el período seleccionado
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Métricas de markup */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-1">Presupuesto</p>
+                        <p className="text-xl font-bold text-gray-800">
+                          ${costSummary?.budget?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-red-50 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-1">Costo Real</p>
+                        <p className="text-xl font-bold text-red-600">
+                          ${costSummary?.totalCost?.toLocaleString() || '0'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-amber-800">Markup Calculado</p>
+                        <Badge variant={(() => {
+                          const realCost = costSummary?.totalCost || 0;
+                          const budget = costSummary?.budget || 0;
+                          if (realCost === 0 || budget === 0) return 'secondary';
+                          const markup = ((budget - realCost) / realCost) * 100;
+                          if (markup >= 30) return 'default';
+                          if (markup >= 15) return 'secondary';
+                          return 'destructive';
+                        })()}>
+                          {(() => {
+                            const realCost = costSummary?.totalCost || 0;
+                            const budget = costSummary?.budget || 0;
+                            if (realCost === 0 || budget === 0) return 'Sin datos';
+                            const markup = ((budget - realCost) / realCost) * 100;
+                            if (markup >= 30) return 'Excelente';
+                            if (markup >= 15) return 'Bueno';
+                            if (markup >= 5) return 'Aceptable';
+                            return 'Crítico';
+                          })()}
+                        </Badge>
+                      </div>
+                      <p className="text-3xl font-bold text-amber-600">
+                        {(() => {
+                          const realCost = costSummary?.totalCost || 0;
+                          const budget = costSummary?.budget || 0;
+                          if (realCost === 0 || budget === 0) return "0%";
+                          const markup = ((budget - realCost) / realCost) * 100;
+                          return `${markup.toFixed(1)}%`;
+                        })()}
+                      </p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Ganancia neta: ${(() => {
+                          const realCost = costSummary?.totalCost || 0;
+                          const budget = costSummary?.budget || 0;
+                          const profit = budget - realCost;
+                          return profit.toLocaleString();
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Indicadores visuales */}
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Progreso vs Presupuesto</span>
+                        <span className="font-medium">
+                          {costSummary?.budgetUtilization?.toFixed(1) || 0}%
+                        </span>
+                      </div>
+                      <Progress 
+                        value={costSummary?.budgetUtilization || 0} 
+                        className="h-3"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-semibold text-blue-800 mb-2">Proyección Final</h4>
+                      <p className="text-sm text-blue-700 mb-2">
+                        Basado en ritmo actual de trabajo
+                      </p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span>Costo proyectado:</span>
+                          <span className="font-medium">
+                            ${(() => {
+                              const currentCost = costSummary?.totalCost || 0;
+                              const currentHours = costSummary?.filteredHours || 0;
+                              const targetHours = costSummary?.targetHours || 0;
+                              if (currentHours === 0 || targetHours === 0) return '0';
+                              const projectedCost = (currentCost / currentHours) * targetHours;
+                              return projectedCost.toLocaleString();
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Markup proyectado:</span>
+                          <span className="font-medium">
+                            {(() => {
+                              const currentCost = costSummary?.totalCost || 0;
+                              const currentHours = costSummary?.filteredHours || 0;
+                              const targetHours = costSummary?.targetHours || 0;
+                              const budget = costSummary?.budget || 0;
+                              if (currentHours === 0 || targetHours === 0 || budget === 0) return '0%';
+                              const projectedCost = (currentCost / currentHours) * targetHours;
+                              const projectedMarkup = ((budget - projectedCost) / projectedCost) * 100;
+                              return `${projectedMarkup.toFixed(1)}%`;
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {project?.isAlwaysOnMacro && (
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-indigo-700 mb-1">
+                          <Zap className="h-4 w-4" />
+                          <span className="font-medium text-sm">Contrato Always-On</span>
+                        </div>
+                        <p className="text-xs text-indigo-600">
+                          Los cálculos de markup se ajustan mensualmente para este tipo de contrato
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
