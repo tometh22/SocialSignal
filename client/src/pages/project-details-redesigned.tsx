@@ -543,7 +543,10 @@ export default function ProjectDetailsRedesigned() {
         filtroAño: dateFilter.startDate.getFullYear(),
         totalEntradas: entries.length,
         fechaActual: new Date().toLocaleDateString('es-ES'),
-        mesActual: new Date().getMonth() + 1
+        mesActual: new Date().getMonth() + 1,
+        esFiltroMesPasado: dateFilter.label.includes('pasado'),
+        startDateRaw: dateFilter.startDate,
+        endDateRaw: dateFilter.endDate
       });
       
       // Mostrar todas las entradas disponibles para debug
