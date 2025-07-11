@@ -500,16 +500,15 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   
-  // Estado del filtro temporal - por defecto mes pasado para mostrar datos existentes
+  // Estado del filtro temporal - configurado para mostrar datos existentes (junio 2025)
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
-    const currentDate = new Date();
-    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    // Los datos están en junio 2025, configurar para mostrar ese período
+    const juneDate = new Date(2025, 5, 15); // Junio 2025 (mes 5 porque es 0-indexado)
     return {
       type: 'month',
-      startDate: startOfMonth(lastMonth),
-      endDate: endOfMonth(lastMonth),
-      label: `Mes pasado (${monthName})`
+      startDate: startOfMonth(juneDate),
+      endDate: endOfMonth(juneDate),
+      label: "Mes pasado (junio 2025)"
     };
   });
 
@@ -637,9 +636,11 @@ export default function ProjectDetailsRedesigned() {
     
     console.log('🎯 RECALCULANDO METRICAS CON FILTRO:', {
       filtroActual: dateFilter.label,
+      filtroRango: `${dateFilter.startDate.toLocaleDateString('es-ES')} - ${dateFilter.endDate.toLocaleDateString('es-ES')}`,
       entradaOriginal: timeEntries.length,
       entradaFiltrada: filteredTimeEntries.length,
-      horasTotales: filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0)
+      horasTotales: filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0),
+      fechasEncontradas: timeEntries.map(e => e.date).slice(0, 3)
     });
     
     // Presupuesto básico
