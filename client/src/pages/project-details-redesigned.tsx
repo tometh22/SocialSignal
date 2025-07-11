@@ -697,7 +697,7 @@ export default function ProjectDetailsRedesigned() {
           const endDate = projectData.expectedEndDate ? new Date(projectData.expectedEndDate) : null;
           const today = new Date();
           
-          if (!endDate) return `${progressPercentage.toFixed(1)}%`;
+          if (!endDate) return "0.0%";
           
           const totalDuration = endDate.getTime() - startDate.getTime();
           const elapsedDuration = today.getTime() - startDate.getTime();
@@ -735,7 +735,7 @@ export default function ProjectDetailsRedesigned() {
                  daysLeft <= 7 ? "bg-gradient-to-br from-yellow-50 to-yellow-100" : 
                  "bg-gradient-to-br from-purple-50 to-purple-100";
         })(),
-        change: progressPercentage - 50
+        change: 0
       },
       {
         label: "Estado",
