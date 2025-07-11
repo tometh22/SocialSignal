@@ -500,13 +500,18 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   
-  // Estado del filtro temporal - por defecto este mes
-  const [dateFilter, setDateFilter] = useState<DateFilter>(() => ({
-    type: 'month',
-    startDate: startOfMonth(new Date()),
-    endDate: endOfMonth(new Date()),
-    label: "Este mes"
-  }));
+  // Estado del filtro temporal - por defecto mes pasado para mostrar datos existentes
+  const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
+    const currentDate = new Date();
+    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    return {
+      type: 'month',
+      startDate: startOfMonth(lastMonth),
+      endDate: endOfMonth(lastMonth),
+      label: `Mes pasado (${monthName})`
+    };
+  });
 
   // Datos del proyecto
   const { data: project, isLoading } = useQuery({
@@ -560,50 +565,47 @@ export default function ProjectDetailsRedesigned() {
       })));
       
       const filtered = entries.filter((entry: TimeEntry) => {
+        // Asegurar que la fecha se parsee correctamente
         const entryDate = new Date(entry.date);
         
-        // Debug: log every entry for last month filter
+        // Verificar que la fecha es válida
+        if (isNaN(entryDate.getTime())) {
+          console.warn('Fecha inválida encontrada:', entry.date);
+          return false;
+        }
+        
+        // Debug mejorado
         if (dateFilter.label.includes('pasado')) {
           console.log('🔍 ENTRADA ANALIZADA:', {
-            fecha: entry.date,
+            fechaOriginal: entry.date,
+            fechaParsed: entryDate.toISOString(),
             año: entryDate.getFullYear(),
             mes: entryDate.getMonth() + 1,
             horas: entry.hours,
-            persona: entry.personnelName
+            persona: entry.personnelName || 'Sin nombre'
           });
         }
         
-        // Para filtros mensuales (mes pasado, mes actual), usar solo año/mes
-        if (dateFilter.label.includes('pasado') || dateFilter.label.includes('Este mes')) {
-          const entryYear = entryDate.getFullYear();
-          const entryMonth = entryDate.getMonth();
-          const filterYear = dateFilter.startDate.getFullYear();
-          const filterMonth = dateFilter.startDate.getMonth();
-          
-          const matches = entryYear === filterYear && entryMonth === filterMonth;
-          
-          if (dateFilter.label.includes('pasado')) {
-            console.log('🔍 COMPARACION MES PASADO:', {
-              entryYear,
-              entryMonth: entryMonth + 1,
-              filterYear,
-              filterMonth: filterMonth + 1,
-              matches,
-              filtroFecha: `${filterYear}-${String(filterMonth + 1).padStart(2, '0')}`,
-              entryDateString: entryDate.toLocaleDateString('es-ES'),
-              filterDateString: dateFilter.startDate.toLocaleDateString('es-ES')
-            });
-          }
-          
-          return matches;
-        }
-        
-        // Para otros filtros, usar rango de fechas completo
+        // Usar comparación por rango de fechas para todos los casos
         const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
         const startDateOnly = new Date(dateFilter.startDate.getFullYear(), dateFilter.startDate.getMonth(), dateFilter.startDate.getDate());
         const endDateOnly = new Date(dateFilter.endDate.getFullYear(), dateFilter.endDate.getMonth(), dateFilter.endDate.getDate());
         
-        return entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
+        const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
+        
+        if (dateFilter.label.includes('pasado')) {
+          console.log('🔍 COMPARACION DETALLADA:', {
+            entryDateOnly: entryDateOnly.toLocaleDateString('es-ES'),
+            startDateOnly: startDateOnly.toLocaleDateString('es-ES'),
+            endDateOnly: endDateOnly.toLocaleDateString('es-ES'),
+            isInRange,
+            entryTimestamp: entryDateOnly.getTime(),
+            startTimestamp: startDateOnly.getTime(),
+            endTimestamp: endDateOnly.getTime()
+          });
+        }
+        
+        return isInRange;
       });
       
       console.log('🔍 RESULTADO DEL FILTRO:', {
