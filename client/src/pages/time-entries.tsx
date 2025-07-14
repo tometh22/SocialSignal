@@ -453,14 +453,26 @@ const TimeEntries: React.FC = () => {
     mutationFn: async (entryId: number) => {
       return apiRequest(`/api/time-entries/${entryId}`, "DELETE");
     },
+    onMutate: async (entryId: number) => {
+      // Actualización optimista: remover inmediatamente de la lista local
+      setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
+      
+      // También actualizar el cache de React Query
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        return oldData.filter(entry => entry.id !== entryId);
+      });
+    },
     onSuccess: () => {
+      // Invalidar cache para asegurar sincronización
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       toast({
         title: "✅ Registro eliminado",
         description: "El registro se ha eliminado correctamente"
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, entryId: number) => {
+      // En caso de error, restaurar el elemento (rollback)
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
       toast({
         title: "❌ Error",
         description: error.message || "No se pudo eliminar el registro",
