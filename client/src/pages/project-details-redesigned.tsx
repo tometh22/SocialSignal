@@ -1639,7 +1639,7 @@ export default function ProjectDetailsRedesigned() {
                     <Button
                       variant="outline"
                       className="h-16 flex items-center justify-center gap-3 hover:bg-green-50 hover:border-green-300"
-                      onClick={() => setLocation(`/time-tracking?project=${projectId}`)}
+                      onClick={() => setLocation(`/time-entries?project=${projectId}`)}
                     >
                       <History className="h-5 w-5 text-green-600" />
                       <div className="text-left">
@@ -1651,7 +1651,14 @@ export default function ProjectDetailsRedesigned() {
                     <Button
                       variant="outline"
                       className="h-16 flex items-center justify-center gap-3 hover:bg-purple-50 hover:border-purple-300"
-                      onClick={() => console.log('Configure team')}
+                      onClick={() => {
+                        // Abrir modal de configuración de equipo
+                        setShowQuickRegister(true);
+                        toast({
+                          title: "Configurar Equipo",
+                          description: "Usa 'Registrar Tiempo' para asignar horas a miembros del equipo",
+                        });
+                      }}
                     >
                       <Settings className="h-5 w-5 text-purple-600" />
                       <div className="text-left">
@@ -1663,7 +1670,32 @@ export default function ProjectDetailsRedesigned() {
                     <Button
                       variant="outline"
                       className="h-16 flex items-center justify-center gap-3 hover:bg-orange-50 hover:border-orange-300"
-                      onClick={() => console.log('Generate reports')}
+                      onClick={() => {
+                        // Generar y exportar reporte del equipo
+                        const csvData = teamStats.map(member => ({
+                          nombre: member.name,
+                          horas: member.hours,
+                          registros: member.entries,
+                          ultima_actividad: member.lastActivity
+                        }));
+                        
+                        const csvContent = "data:text/csv;charset=utf-8," + 
+                          "Nombre,Horas,Registros,Última Actividad\n" +
+                          csvData.map(row => `"${row.nombre}",${row.horas},${row.registros},"${row.ultima_actividad}"`).join("\n");
+                        
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `reporte_equipo_${projectId}_${new Date().toISOString().split('T')[0]}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        toast({
+                          title: "Reporte Generado",
+                          description: "Se ha descargado el reporte del equipo en formato CSV",
+                        });
+                      }}
                     >
                       <FileText className="h-5 w-5 text-orange-600" />
                       <div className="text-left">

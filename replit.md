@@ -103,6 +103,7 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 14, 2025: **TEAM ACTIONS FUNCTIONALITY** - Implemented full functionality for team management buttons: Historial Completo (navigates to time-entries), Configurar Equipo (opens time registration), and Generar Reportes (exports team data as CSV)
 - July 14, 2025: **FINANCIAL ANALYSIS ENHANCEMENT** - Added dedicated "Análisis de Rentabilidad" section with markup calculation, price vs cost breakdown, and budget efficiency metrics providing key financial insights not available in header cards
 - July 14, 2025: **UX CONSOLIDATION - ELIMINATED REDUNDANT INDICATORS SECTION** - Removed duplicate "Indicadores Clave" section within dashboard tab as it showed identical information to header cards, improving UI clarity and reducing cognitive load
 - July 14, 2025: **CRITICAL TEMPORAL FILTERING SYSTEM FIXES** - Fixed missing dateFilter dependencies in recentTimeEntries, teamStats, and ProjectTeamSection components ensuring all 3 tabs update correctly when date filter changes
