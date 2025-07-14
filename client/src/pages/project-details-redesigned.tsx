@@ -1653,229 +1653,297 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
-            {/* Métricas del Período - Optimizado */}
-            <Card className="border-l-4 border-l-indigo-500">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+            {/* Análisis Mensual Avanzado */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Métricas Principales */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-indigo-600" />
-                    Análisis Detallado - {dateFilter.label}
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Vista Consolidada
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  Métricas completas de tiempo, costos y rendimiento del equipo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-medium text-blue-800">Registros</p>
-                    </div>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {(() => {
-                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        return filteredEntries ? filteredEntries.length : 0;
-                      })()}
-                    </p>
-                    <p className="text-xs text-blue-500">entradas de tiempo</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-green-600" />
-                      <p className="text-sm font-medium text-green-800">Total Horas</p>
-                    </div>
-                    <p className="text-2xl font-bold text-green-600">{costSummary?.filteredHours || 0}h</p>
-                    <p className="text-xs text-green-500">tiempo trabajado</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-4 w-4 text-purple-600" />
-                      <p className="text-sm font-medium text-purple-800">Costo Real</p>
-                    </div>
-                    <p className="text-2xl font-bold text-purple-600">${costSummary?.totalCost?.toLocaleString() || '0'}</p>
-                    <p className="text-xs text-purple-500">gasto efectivo</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4 text-orange-600" />
-                      <p className="text-sm font-medium text-orange-800">Presupuesto</p>
-                    </div>
-                    <p className="text-2xl font-bold text-orange-600">${costSummary?.budget?.toLocaleString() || '0'}</p>
-                    <p className="text-xs text-orange-500">asignado</p>
-                  </div>
-                </div>
-
-                {/* Distribución Optimizada por Persona */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <Users className="h-5 w-5 text-green-600" />
-                      Distribución por Miembro del Equipo
-                    </h3>
-                    <Badge variant="secondary" className="text-xs">
-                      {teamStats ? teamStats.length : 0} miembros activos
-                    </Badge>
-                  </div>
-                  
-                  {teamStats && teamStats.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {teamStats.map((member: any) => (
-                        <div key={member.id} className="p-4 border border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 hover:shadow-sm transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                                  {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-semibold text-gray-900">{member.name}</p>
-                                <p className="text-sm text-gray-500 flex items-center gap-1">
-                                  <FileText className="h-3 w-3" />
-                                  {member.entries} registros
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-blue-600">{member.hours.toFixed(1)}h</p>
-                              <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(member.lastActivity).toLocaleDateString('es-ES')}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300" 
-                                style={{ width: `${Math.min((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100, 100)}%` }}
-                              ></div>
-                            </div>
-                            <div className="flex justify-between text-xs text-gray-500">
-                              <span>Progreso relativo</span>
-                              <span>{Math.round((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100)}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                      <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="font-medium">No hay datos de equipo para el período seleccionado</p>
-                      <p className="text-sm">Selecciona un período diferente o verifica los registros de tiempo</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Métricas de Actividad Optimizadas */}
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                    <Activity className="h-5 w-5 text-purple-600" />
-                    Métricas de Actividad
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    Análisis Mensual Avanzado - {dateFilter.label}
+                  </CardTitle>
+                  <CardDescription>
+                    Tendencias y patrones de desempeño del proyecto
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CalendarDays className="h-4 w-4 text-blue-600" />
-                        <h4 className="font-semibold text-blue-800">Días Activos</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-blue-600" />
+                          <p className="text-sm font-medium text-blue-800">Horas Totales</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(0)}%
+                        </Badge>
                       </div>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {(() => {
-                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                          if (!filteredEntries) return 0;
-                          
-                          try {
-                            const validDates = filteredEntries
-                              .map((entry: TimeEntry) => {
-                                const date = new Date(entry.date);
-                                return !isNaN(date.getTime()) ? date.toDateString() : null;
-                              })
-                              .filter((dateString): dateString is string => dateString !== null);
-                            
-                            return new Set(validDates).size;
-                          } catch (error) {
-                            console.error('Error calculating active days:', error);
-                            return 0;
-                          }
-                        })()}
+                      <p className="text-2xl font-bold text-blue-600 mb-1">
+                        {costSummary?.filteredHours || 0}h
                       </p>
-                      <p className="text-sm text-blue-600">días con registro</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-500">de {costSummary?.targetHours || 0}h estimadas</span>
+                        <span className={`font-medium ${(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                          {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? '+' : ''}
+                          {((costSummary?.filteredHours || 0) - (costSummary?.targetHours || 0)).toFixed(1)}h
+                        </span>
+                      </div>
                     </div>
                     
                     <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Gauge className="h-4 w-4 text-green-600" />
-                        <h4 className="font-semibold text-green-800">Promedio Diario</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-green-600" />
+                          <p className="text-sm font-medium text-green-800">Costo vs Presupuesto</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(0)}%
+                        </Badge>
                       </div>
-                      <p className="text-2xl font-bold text-green-600">
-                        {(() => {
-                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                          if (!filteredEntries || filteredEntries.length === 0) return "0";
-                          
-                          const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
-                          const validDates = filteredEntries
-                            .map((entry: TimeEntry) => {
-                              const date = new Date(entry.date);
-                              return !isNaN(date.getTime()) ? date.toDateString() : null;
-                            })
-                            .filter((dateString): dateString is string => dateString !== null);
-                          const uniqueDays = new Set(validDates).size;
-                          return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
-                        })()}h
+                      <p className="text-2xl font-bold text-green-600 mb-1">
+                        ${costSummary?.totalCost?.toLocaleString() || '0'}
                       </p>
-                      <p className="text-sm text-green-600">horas por día</p>
-                    </div>
-                    
-                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CalendarClock className="h-4 w-4 text-purple-600" />
-                        <h4 className="font-semibold text-purple-800">Último Registro</h4>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-500">de ${costSummary?.budget?.toLocaleString() || '0'}</span>
+                        <span className={`font-medium ${(costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                          {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? '+' : ''}
+                          ${((costSummary?.totalCost || 0) - (costSummary?.budget || 0)).toLocaleString()}
+                        </span>
                       </div>
-                      <p className="text-lg font-bold text-purple-600">
-                        {(() => {
-                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                          if (!filteredEntries || filteredEntries.length === 0) return "Sin registros";
-                          
-                          try {
-                            const dates = filteredEntries
-                              .map((entry: TimeEntry) => new Date(entry.date))
-                              .filter(date => !isNaN(date.getTime()));
-                            
-                            if (dates.length === 0) return "Sin registros";
-                            
-                            const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-                            return maxDate.toLocaleDateString('es-ES');
-                          } catch (error) {
-                            console.error('Error calculating max date:', error);
-                            return "Error en fecha";
-                          }
-                        })()}
-                      </p>
-                      <p className="text-sm text-purple-600">fecha más reciente</p>
                     </div>
                   </div>
-                </div>
 
-                {project?.isAlwaysOnMacro && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                    <div className="flex items-center gap-2 text-blue-700 mb-2">
-                      <Zap className="h-5 w-5" />
-                      <span className="font-semibold">Contrato Always-On</span>
+                  {/* Gráfico de Tendencias Simulado */}
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-purple-600" />
+                      Tendencia de Horas por Semana
+                    </h4>
+                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                      <div className="flex items-end justify-between h-32 gap-2">
+                        {(() => {
+                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                          if (!filteredEntries || filteredEntries.length === 0) {
+                            return Array(7).fill(0).map((_, i) => (
+                              <div key={i} className="bg-gray-200 rounded-t w-full h-4"></div>
+                            ));
+                          }
+                          
+                          // Agrupar por semana
+                          const weeklyData = filteredEntries.reduce((acc: any, entry: TimeEntry) => {
+                            const date = new Date(entry.date);
+                            const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
+                            const weekKey = weekStart.toISOString().split('T')[0];
+                            
+                            if (!acc[weekKey]) acc[weekKey] = 0;
+                            acc[weekKey] += entry.hours;
+                            return acc;
+                          }, {});
+                          
+                          const weeks = Object.entries(weeklyData).slice(-7);
+                          const maxHours = Math.max(...weeks.map(([, hours]) => hours as number));
+                          
+                          return weeks.map(([week, hours], i) => (
+                            <div key={week} className="flex flex-col items-center gap-1 w-full">
+                              <div 
+                                className="bg-gradient-to-t from-purple-500 to-purple-400 rounded-t w-full transition-all duration-300"
+                                style={{ height: `${(hours as number / maxHours) * 100}%` }}
+                              ></div>
+                              <span className="text-xs text-gray-500 transform rotate-45">
+                                {new Date(week).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
                     </div>
-                    <p className="text-sm text-blue-600">
-                      Las métricas se calculan mensualmente para este tipo de contrato. Los datos mostrados corresponden al filtro temporal seleccionado.
-                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Panel de Análisis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-orange-600" />
+                    Análisis de Rendimiento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Eficiencia del Equipo */}
+                  <div className="p-3 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-yellow-600" />
+                      <h5 className="font-semibold text-yellow-800">Eficiencia del Equipo</h5>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Promedio por persona</span>
+                        <span className="font-medium">
+                          {teamStats && teamStats.length > 0 
+                            ? (teamStats.reduce((sum: number, member: any) => sum + member.hours, 0) / teamStats.length).toFixed(1)
+                            : 0}h
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Miembros activos</span>
+                        <span className="font-medium">{teamStats?.length || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Días productivos</span>
+                        <span className="font-medium">
+                          {(() => {
+                            const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                            if (!filteredEntries) return 0;
+                            const validDates = filteredEntries
+                              .map((entry: TimeEntry) => new Date(entry.date).toDateString())
+                              .filter((dateString, index, array) => array.indexOf(dateString) === index);
+                            return validDates.length;
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Alertas y Recomendaciones */}
+                  <div className="space-y-2">
+                    <h5 className="font-semibold flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      Alertas
+                    </h5>
+                    
+                    {/* Alerta de presupuesto */}
+                    {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.8 && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                          <span className="text-sm font-medium text-red-800">Presupuesto Crítico</span>
+                        </div>
+                        <p className="text-xs text-red-600">
+                          Utilizado el {((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(1)}% del presupuesto
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Alerta de horas */}
+                    {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.9 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="h-4 w-4 text-yellow-600" />
+                          <span className="text-sm font-medium text-yellow-800">Horas Elevadas</span>
+                        </div>
+                        <p className="text-xs text-yellow-600">
+                          Cerca del límite de horas estimadas
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Estado saludable */}
+                    {(costSummary?.totalCost || 0) <= (costSummary?.budget || 0) * 0.8 && 
+                     (costSummary?.filteredHours || 0) <= (costSummary?.targetHours || 0) * 0.9 && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-800">Proyecto Saludable</span>
+                        </div>
+                        <p className="text-xs text-green-600">
+                          Dentro de los parámetros normales
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Análisis Detallado por Equipo */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  Análisis Detallado por Miembro del Equipo
+                </CardTitle>
+                <CardDescription>
+                  Rendimiento individual y contribución al proyecto
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {teamStats && teamStats.length > 0 ? (
+                  <div className="space-y-4">
+                    {teamStats.map((member: any, index: number) => (
+                      <div key={member.id} className="p-4 border border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-white">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <Avatar className="h-12 w-12">
+                                <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                                  {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-white">#{index + 1}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">{member.name}</p>
+                              <p className="text-sm text-gray-500">{member.entries} registros de tiempo</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-blue-600">{member.hours.toFixed(1)}h</p>
+                            <p className="text-sm text-gray-500">
+                              ${(member.hours * 15).toLocaleString()} estimado
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Productividad</span>
+                              <span className="font-medium">
+                                {teamStats.length > 0 
+                                  ? Math.round((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100)
+                                  : 0}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ 
+                                  width: `${teamStats.length > 0 
+                                    ? Math.round((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100)
+                                    : 0}%` 
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Última actividad</p>
+                            <p className="font-medium text-gray-900">
+                              {new Date(member.lastActivity).toLocaleDateString('es-ES', { 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}
+                            </p>
+                          </div>
+                          
+                          <div className="text-center">
+                            <p className="text-sm text-gray-500">Promedio diario</p>
+                            <p className="font-medium text-gray-900">
+                              {(member.hours / Math.max(member.entries, 1)).toFixed(1)}h
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium">No hay datos del equipo</p>
+                    <p className="text-sm">Selecciona un período diferente o verifica los registros</p>
                   </div>
                 )}
               </CardContent>
