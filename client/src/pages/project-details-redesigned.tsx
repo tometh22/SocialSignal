@@ -1414,7 +1414,7 @@ export default function ProjectDetailsRedesigned() {
                     <div className="text-2xl font-bold text-amber-600">
                       {(() => {
                         const realCost = costSummary?.totalCost || 0;
-                        const quotationPrice = quotationData?.totalAmount || 0; // Precio de la cotización
+                        const quotationPrice = projectData.quotation?.totalAmount || 0; // Precio de la cotización
                         if (realCost === 0 || quotationPrice === 0) return "0x";
                         const markup = quotationPrice / realCost;
                         return `${markup.toFixed(1)}x`;
@@ -1445,7 +1445,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-sm text-gray-600 mb-1">Precio Cotización</p>
                         <p className="text-xl font-bold text-gray-800">
-                          ${quotationData?.totalAmount?.toLocaleString() || '0'}
+                          ${projectData.quotation?.totalAmount?.toLocaleString() || '0'}
                         </p>
                       </div>
                       <div className="p-4 bg-red-50 rounded-lg">
@@ -1461,7 +1461,7 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-sm font-medium text-amber-800">Markup Calculado</p>
                         <Badge variant={(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = quotationData?.totalAmount || 0;
+                          const quotationPrice = projectData.quotation?.totalAmount || 0;
                           if (realCost === 0 || quotationPrice === 0) return 'secondary';
                           const markup = quotationPrice / realCost;
                           if (markup >= 2.5) return 'default';
@@ -1470,7 +1470,7 @@ export default function ProjectDetailsRedesigned() {
                         })()}>
                           {(() => {
                             const realCost = costSummary?.totalCost || 0;
-                            const quotationPrice = quotationData?.totalAmount || 0;
+                            const quotationPrice = projectData.quotation?.totalAmount || 0;
                             if (realCost === 0 || quotationPrice === 0) return 'Sin datos';
                             const markup = quotationPrice / realCost;
                             if (markup >= 2.5) return 'Excelente';
@@ -1483,7 +1483,7 @@ export default function ProjectDetailsRedesigned() {
                       <p className="text-3xl font-bold text-amber-600">
                         {(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = quotationData?.totalAmount || 0;
+                          const quotationPrice = projectData.quotation?.totalAmount || 0;
                           if (realCost === 0 || quotationPrice === 0) return "0x";
                           const markup = quotationPrice / realCost;
                           return `${markup.toFixed(1)}x`;
@@ -1492,7 +1492,7 @@ export default function ProjectDetailsRedesigned() {
                       <p className="text-sm text-amber-700 mt-1">
                         Ganancia neta: ${(() => {
                           const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = quotationData?.totalAmount || 0;
+                          const quotationPrice = projectData.quotation?.totalAmount || 0;
                           const profit = quotationPrice - realCost;
                           return profit.toLocaleString();
                         })()}
@@ -1509,7 +1509,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">Precio cotización:</span>
-                          <p className="font-bold text-gray-800">${quotationData?.totalAmount?.toLocaleString() || 0}</p>
+                          <p className="font-bold text-gray-800">${projectData.quotation?.totalAmount?.toLocaleString() || 0}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Costo real actual:</span>
@@ -1523,19 +1523,19 @@ export default function ProjectDetailsRedesigned() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-600">Costo estimado:</span>
-                          <p className="font-bold text-blue-600">${quotationData?.baseCost?.toLocaleString() || 0}</p>
+                          <p className="font-bold text-blue-600">${projectData.quotation?.baseCost?.toLocaleString() || 0}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Desviación costo:</span>
                           <p className={`font-bold ${(() => {
                             const realCost = costSummary?.totalCost || 0;
-                            const estimatedCost = quotationData?.baseCost || 0;
+                            const estimatedCost = projectData.quotation?.baseCost || 0;
                             const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
                             return deviation > 0 ? 'text-red-600' : 'text-green-600';
                           })()}`}>
                             {(() => {
                               const realCost = costSummary?.totalCost || 0;
-                              const estimatedCost = quotationData?.baseCost || 0;
+                              const estimatedCost = projectData.quotation?.baseCost || 0;
                               if (estimatedCost === 0) return '0%';
                               const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
                               return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
@@ -1598,7 +1598,7 @@ export default function ProjectDetailsRedesigned() {
                               const currentCost = costSummary?.totalCost || 0;
                               const currentHours = costSummary?.filteredHours || 0;
                               const targetHours = costSummary?.targetHours || 0;
-                              const quotationPrice = quotationData?.totalAmount || 0;
+                              const quotationPrice = projectData.quotation?.totalAmount || 0;
                               if (currentHours === 0 || targetHours === 0 || quotationPrice === 0) return '0x';
                               const projectedCost = (currentCost / currentHours) * targetHours;
                               const projectedMarkup = quotationPrice / projectedCost;
