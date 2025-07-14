@@ -429,7 +429,19 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       }
 
       // Crear todas las entradas
-      await Promise.all(entries.map(entry => createTimeEntry.mutateAsync(entry)));
+      console.log('📤 Enviando entradas:', entries);
+      
+      for (const entry of entries) {
+        try {
+          console.log('🔄 Procesando entrada individual:', entry);
+          await createTimeEntry.mutateAsync(entry);
+          console.log('✅ Entrada procesada correctamente');
+        } catch (error) {
+          console.error('❌ Error en entrada específica:', error);
+          console.error('📄 Datos de la entrada fallida:', entry);
+          throw error;
+        }
+      }
 
       toast({
         title: "✅ Registro completado",
