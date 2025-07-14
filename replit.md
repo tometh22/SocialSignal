@@ -103,6 +103,8 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 14, 2025: **CRITICAL TEMPORAL FILTERING SYSTEM FIXES** - Fixed missing dateFilter dependencies in recentTimeEntries, teamStats, and ProjectTeamSection components ensuring all 3 tabs update correctly when date filter changes
+- July 14, 2025: **MARKUP CALCULATION CONSOLIDATION** - Unified markup calculation logic across executive summary and monthly analysis using consistent targetClientPrice/actualCost formula
 - July 14, 2025: **COMPREHENSIVE UX/UI AUDIT AND REDESIGN** - Conducted complete user experience audit and eliminated all redundant components
 - July 14, 2025: **PROFESSIONAL INTERFACE CONSOLIDATION** - Restructured project details with clean 3-section KPI layout eliminating visual overload
 - July 14, 2025: **MARKUP DISPLAY OPTIMIZATION** - Consolidated markup calculations into single source of truth with prominent visual hierarchy

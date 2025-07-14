@@ -363,7 +363,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
   // USAR EL FILTRO DE FECHA GLOBAL EN LUGAR DEL FILTRO LOCAL
   const filteredTimeEntries = useMemo(() => {
     return filterTimeEntriesByDateRange(timeEntries);
-  }, [timeEntries, filterTimeEntriesByDateRange]);
+  }, [timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
   // Calcular tiempo registrado por miembro
   const getTimeWorkedByMember = (personnelId: number) => {
@@ -831,7 +831,7 @@ export default function ProjectDetailsRedesigned() {
     return filteredEntries
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
-  }, [timeEntries, filterTimeEntriesByDateRange]);
+  }, [timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
   const teamStats = useMemo(() => {
     if (!Array.isArray(timeEntries) || !Array.isArray(baseTeam)) return [];
@@ -864,7 +864,7 @@ export default function ProjectDetailsRedesigned() {
     return Array.from(memberStats.values())
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
-  }, [timeEntries, baseTeam, filterTimeEntriesByDateRange]);
+  }, [timeEntries, baseTeam, filterTimeEntriesByDateRange, dateFilter]);
 
   // Cálculo de resumen de costos usando objetivos de cotización
   const costSummary = useMemo(() => {
