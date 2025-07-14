@@ -1713,159 +1713,217 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
-            {/* Vista mensual detallada y análisis completo */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  Análisis Detallado por Período: {dateFilter.label}
+            {/* Métricas del Período - Optimizado */}
+            <Card className="border-l-4 border-l-indigo-500">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-indigo-600" />
+                    Análisis Detallado - {dateFilter.label}
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Vista Consolidada
+                  </Badge>
                 </CardTitle>
                 <CardDescription>
-                  Vista consolidada de tiempo, costos y rendimiento del equipo
+                  Métricas completas de tiempo, costos y rendimiento del equipo
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Registros</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <p className="text-sm font-medium text-blue-800">Registros</p>
+                    </div>
                     <p className="text-2xl font-bold text-blue-600">
                       {(() => {
                         const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
                         return filteredEntries ? filteredEntries.length : 0;
                       })()}
                     </p>
+                    <p className="text-xs text-blue-500">entradas de tiempo</p>
                   </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Total Horas</p>
-                    <p className="text-2xl font-bold text-green-600">{metrics[1]?.value}</p>
+                  
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-800">Total Horas</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">{costSummary?.filteredHours || 0}h</p>
+                    <p className="text-xs text-green-500">tiempo trabajado</p>
                   </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Costo Real</p>
+                  
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-4 w-4 text-purple-600" />
+                      <p className="text-sm font-medium text-purple-800">Costo Real</p>
+                    </div>
                     <p className="text-2xl font-bold text-purple-600">${costSummary?.totalCost?.toLocaleString() || '0'}</p>
+                    <p className="text-xs text-purple-500">gasto efectivo</p>
                   </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Presupuesto</p>
+                  
+                  <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-orange-600" />
+                      <p className="text-sm font-medium text-orange-800">Presupuesto</p>
+                    </div>
                     <p className="text-2xl font-bold text-orange-600">${costSummary?.budget?.toLocaleString() || '0'}</p>
+                    <p className="text-xs text-orange-500">asignado</p>
                   </div>
                 </div>
 
-                {/* Distribución detallada por persona */}
+                {/* Distribución Optimizada por Persona */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Users className="h-5 w-5 text-green-600" />
-                    Distribución por Miembro del Equipo
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Users className="h-5 w-5 text-green-600" />
+                      Distribución por Miembro del Equipo
+                    </h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {teamStats ? teamStats.length : 0} miembros activos
+                    </Badge>
+                  </div>
+                  
                   {teamStats && teamStats.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {teamStats.map((member: any) => (
-                        <div key={member.id} className="p-4 border border-gray-200 rounded-lg bg-white">
+                        <div key={member.id} className="p-4 border border-gray-200 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 hover:shadow-sm transition-shadow">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-10 w-10">
-                                <AvatarFallback className="text-sm bg-blue-500 text-white">
+                                <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-blue-600 text-white">
                                   {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-semibold">{member.name}</p>
-                                <p className="text-sm text-gray-500">{member.entries} registros</p>
+                                <p className="font-semibold text-gray-900">{member.name}</p>
+                                <p className="text-sm text-gray-500 flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  {member.entries} registros
+                                </p>
                               </div>
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-bold text-blue-600">{member.hours.toFixed(1)}h</p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
                                 {new Date(member.lastActivity).toLocaleDateString('es-ES')}
                               </p>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${Math.min((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100, 100)}%` }}
-                            ></div>
+                          
+                          <div className="space-y-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${Math.min((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100, 100)}%` }}
+                              ></div>
+                            </div>
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Progreso relativo</span>
+                              <span>{Math.round((member.hours / Math.max(...teamStats.map((t: any) => t.hours))) * 100)}%</span>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
                       <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p>No hay datos de equipo para el período seleccionado</p>
+                      <p className="font-medium">No hay datos de equipo para el período seleccionado</p>
+                      <p className="text-sm">Selecciona un período diferente o verifica los registros de tiempo</p>
                     </div>
                   )}
                 </div>
 
-                {/* Métricas de actividad */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-2">Días Activos</h4>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {(() => {
-                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        if (!filteredEntries) return 0;
-                        
-                        try {
+                {/* Métricas de Actividad Optimizadas */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                    <Activity className="h-5 w-5 text-purple-600" />
+                    Métricas de Actividad
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CalendarDays className="h-4 w-4 text-blue-600" />
+                        <h4 className="font-semibold text-blue-800">Días Activos</h4>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {(() => {
+                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                          if (!filteredEntries) return 0;
+                          
+                          try {
+                            const validDates = filteredEntries
+                              .map((entry: TimeEntry) => {
+                                const date = new Date(entry.date);
+                                return !isNaN(date.getTime()) ? date.toDateString() : null;
+                              })
+                              .filter((dateString): dateString is string => dateString !== null);
+                            
+                            return new Set(validDates).size;
+                          } catch (error) {
+                            console.error('Error calculating active days:', error);
+                            return 0;
+                          }
+                        })()}
+                      </p>
+                      <p className="text-sm text-blue-600">días con registro</p>
+                    </div>
+                    
+                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gauge className="h-4 w-4 text-green-600" />
+                        <h4 className="font-semibold text-green-800">Promedio Diario</h4>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {(() => {
+                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                          if (!filteredEntries || filteredEntries.length === 0) return "0";
+                          
+                          const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
                           const validDates = filteredEntries
                             .map((entry: TimeEntry) => {
                               const date = new Date(entry.date);
                               return !isNaN(date.getTime()) ? date.toDateString() : null;
                             })
                             .filter((dateString): dateString is string => dateString !== null);
+                          const uniqueDays = new Set(validDates).size;
+                          return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
+                        })()}h
+                      </p>
+                      <p className="text-sm text-green-600">horas por día</p>
+                    </div>
+                    
+                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CalendarClock className="h-4 w-4 text-purple-600" />
+                        <h4 className="font-semibold text-purple-800">Último Registro</h4>
+                      </div>
+                      <p className="text-lg font-bold text-purple-600">
+                        {(() => {
+                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                          if (!filteredEntries || filteredEntries.length === 0) return "Sin registros";
                           
-                          return new Set(validDates).size;
-                        } catch (error) {
-                          console.error('Error calculating active days:', error);
-                          return 0;
-                        }
-                      })()}
-                    </p>
-                    <p className="text-sm text-blue-600">días con registro</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
-                    <h4 className="font-semibold text-green-800 mb-2">Promedio Diario</h4>
-                    <p className="text-2xl font-bold text-green-600">
-                      {(() => {
-                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        if (!filteredEntries || filteredEntries.length === 0) return "0";
-                        
-                        const totalHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + entry.hours, 0);
-                        const validDates = filteredEntries
-                          .map((entry: TimeEntry) => {
-                            const date = new Date(entry.date);
-                            return !isNaN(date.getTime()) ? date.toDateString() : null;
-                          })
-                          .filter((dateString): dateString is string => dateString !== null);
-                        const uniqueDays = new Set(validDates).size;
-                        return uniqueDays > 0 ? (totalHours / uniqueDays).toFixed(1) : "0";
-                      })()}h
-                    </p>
-                    <p className="text-sm text-green-600">horas por día</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg">
-                    <h4 className="font-semibold text-purple-800 mb-2">Último Registro</h4>
-                    <p className="text-lg font-bold text-purple-600">
-                      {(() => {
-                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        if (!filteredEntries || filteredEntries.length === 0) return "Sin registros";
-                        
-                        try {
-                          const dates = filteredEntries
-                            .map((entry: TimeEntry) => new Date(entry.date))
-                            .filter(date => !isNaN(date.getTime()));
-                          
-                          if (dates.length === 0) return "Sin registros";
-                          
-                          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-                          return maxDate.toLocaleDateString('es-ES');
-                        } catch (error) {
-                          console.error('Error calculating max date:', error);
-                          return "Error en fecha";
-                        }
-                      })()}
-                    </p>
-                    <p className="text-sm text-purple-600">fecha más reciente</p>
+                          try {
+                            const dates = filteredEntries
+                              .map((entry: TimeEntry) => new Date(entry.date))
+                              .filter(date => !isNaN(date.getTime()));
+                            
+                            if (dates.length === 0) return "Sin registros";
+                            
+                            const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                            return maxDate.toLocaleDateString('es-ES');
+                          } catch (error) {
+                            console.error('Error calculating max date:', error);
+                            return "Error en fecha";
+                          }
+                        })()}
+                      </p>
+                      <p className="text-sm text-purple-600">fecha más reciente</p>
+                    </div>
                   </div>
                 </div>
 
