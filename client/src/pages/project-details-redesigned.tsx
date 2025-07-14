@@ -1382,105 +1382,25 @@ export default function ProjectDetailsRedesigned() {
               </CardContent>
             </Card>
 
-            {/* Resumen Ejecutivo - Solo métricas clave */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-600" />
-                  Resumen de Resultados
+            {/* KPIs Ejecutivos - Métricas críticas únicamente */}
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-blue-600" />
+                    Indicadores Clave - {dateFilter.label}
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {dateFilter.type === 'month' ? 'Mensual' : 'Período'}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {costSummary?.filteredHours || 0}h
-                    </div>
-                    <div className="text-sm text-gray-600">Horas Trabajadas</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      ${costSummary?.totalCost?.toLocaleString() || 0}
-                    </div>
-                    <div className="text-sm text-gray-600">Costo Real</div>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {baseTeam?.length || 0}
-                    </div>
-                    <div className="text-sm text-gray-600">Miembros Activos</div>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <div className="text-2xl font-bold text-amber-600">
-                      {(() => {
-                        const realCost = costSummary?.totalCost || 0;
-                        const quotationPrice = projectData.quotation?.totalAmount || 0; // Precio de la cotización
-                        if (realCost === 0 || quotationPrice === 0) return "0x";
-                        const markup = quotationPrice / realCost;
-                        return `${markup.toFixed(1)}x`;
-                      })()}
-                    </div>
-                    <div className="text-sm text-gray-600">Markup</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Card detallada de análisis de Markup */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-amber-600" />
-                  Análisis de Markup - {dateFilter.label}
-                </CardTitle>
-                <CardDescription>
-                  Rentabilidad del proyecto basada en el período seleccionado
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Métricas de markup */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Precio Cotización</p>
-                        <p className="text-xl font-bold text-gray-800">
-                          ${projectData.quotation?.totalAmount?.toLocaleString() || '0'}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-red-50 rounded-lg">
-                        <p className="text-sm text-gray-600 mb-1">Costo Real</p>
-                        <p className="text-xl font-bold text-red-600">
-                          ${costSummary?.totalCost?.toLocaleString() || '0'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-amber-800">Markup Calculado</p>
-                        <Badge variant={(() => {
-                          const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = projectData.quotation?.totalAmount || 0;
-                          if (realCost === 0 || quotationPrice === 0) return 'secondary';
-                          const markup = quotationPrice / realCost;
-                          if (markup >= 2.5) return 'default';
-                          if (markup >= 1.8) return 'secondary';
-                          return 'destructive';
-                        })()}>
-                          {(() => {
-                            const realCost = costSummary?.totalCost || 0;
-                            const quotationPrice = projectData.quotation?.totalAmount || 0;
-                            if (realCost === 0 || quotationPrice === 0) return 'Sin datos';
-                            const markup = quotationPrice / realCost;
-                            if (markup >= 2.5) return 'Excelente';
-                            if (markup >= 1.8) return 'Bueno';
-                            if (markup >= 1.2) return 'Aceptable';
-                            return 'Crítico';
-                          })()}
-                        </Badge>
-                      </div>
-                      <p className="text-3xl font-bold text-amber-600">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Markup - Métrica principal */}
+                  <div className="relative">
+                    <div className="text-center p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                      <div className="text-3xl font-bold text-amber-600 mb-2">
                         {(() => {
                           const realCost = costSummary?.totalCost || 0;
                           const quotationPrice = projectData.quotation?.totalAmount || 0;
@@ -1488,138 +1408,216 @@ export default function ProjectDetailsRedesigned() {
                           const markup = quotationPrice / realCost;
                           return `${markup.toFixed(1)}x`;
                         })()}
-                      </p>
-                      <p className="text-sm text-amber-700 mt-1">
-                        Ganancia neta: ${(() => {
+                      </div>
+                      <div className="text-sm font-medium text-amber-800 mb-1">Markup Actual</div>
+                      <Badge variant={(() => {
+                        const realCost = costSummary?.totalCost || 0;
+                        const quotationPrice = projectData.quotation?.totalAmount || 0;
+                        if (realCost === 0 || quotationPrice === 0) return 'secondary';
+                        const markup = quotationPrice / realCost;
+                        if (markup >= 2.5) return 'default';
+                        if (markup >= 1.8) return 'secondary';
+                        return 'destructive';
+                      })()} className="text-xs">
+                        {(() => {
                           const realCost = costSummary?.totalCost || 0;
                           const quotationPrice = projectData.quotation?.totalAmount || 0;
-                          const profit = quotationPrice - realCost;
-                          return profit.toLocaleString();
+                          if (realCost === 0 || quotationPrice === 0) return 'Sin datos';
+                          const markup = quotationPrice / realCost;
+                          if (markup >= 2.5) return 'Excelente';
+                          if (markup >= 1.8) return 'Bueno';
+                          if (markup >= 1.2) return 'Aceptable';
+                          return 'Crítico';
                         })()}
-                      </p>
+                      </Badge>
                     </div>
                   </div>
 
-                  {/* Comparación vs Cotización Aprobada */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-sm text-gray-800">Comparación vs Cotización Aprobada</h4>
-                    
-                    {/* Precios y markup */}
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                  {/* Financiero */}
+                  <div className="space-y-3">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-gray-600">Precio cotización:</span>
-                          <p className="font-bold text-gray-800">${projectData.quotation?.totalAmount?.toLocaleString() || 0}</p>
+                          <div className="text-sm text-gray-600">Costo Real</div>
+                          <div className="text-xl font-bold text-green-600">
+                            ${costSummary?.totalCost?.toLocaleString() || 0}
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-gray-600">Costo real actual:</span>
-                          <p className="font-bold text-red-600">${costSummary?.totalCost?.toLocaleString() || 0}</p>
-                        </div>
+                        <DollarSign className="h-5 w-5 text-green-500" />
                       </div>
                     </div>
-
-                    {/* Costos estimados vs reales */}
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-gray-600">Costo estimado:</span>
-                          <p className="font-bold text-blue-600">${projectData.quotation?.baseCost?.toLocaleString() || 0}</p>
+                          <div className="text-sm text-gray-600">Ingreso Cotizado</div>
+                          <div className="text-xl font-bold text-blue-600">
+                            ${projectData.quotation?.totalAmount?.toLocaleString() || 0}
+                          </div>
                         </div>
+                        <TrendingUp className="h-5 w-5 text-blue-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Operacional */}
+                  <div className="space-y-3">
+                    <div className="p-4 bg-purple-50 rounded-lg">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <span className="text-gray-600">Desviación costo:</span>
-                          <p className={`font-bold ${(() => {
+                          <div className="text-sm text-gray-600">Horas Trabajadas</div>
+                          <div className="text-xl font-bold text-purple-600">
+                            {costSummary?.filteredHours || 0}h
+                          </div>
+                        </div>
+                        <Clock className="h-5 w-5 text-purple-500" />
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-sm text-gray-600">Equipo Activo</div>
+                          <div className="text-xl font-bold text-gray-600">
+                            {baseTeam?.length || 0}
+                          </div>
+                        </div>
+                        <Users className="h-5 w-5 text-gray-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Análisis de Desviaciones - Comparación vs Cotización */}
+            <Card className="border-l-4 border-l-orange-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-orange-600" />
+                  Análisis de Desviaciones vs Cotización
+                </CardTitle>
+                <CardDescription>
+                  Comparación detallada del rendimiento real contra objetivos aprobados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Desviación Financiera */}
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Desviación Financiera
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Presupuesto base:</span>
+                        <span className="font-medium">${projectData.quotation?.baseCost?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Costo real:</span>
+                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t">
+                        <span>Desviación:</span>
+                        <span className={`font-bold ${(() => {
+                          const realCost = costSummary?.totalCost || 0;
+                          const estimatedCost = projectData.quotation?.baseCost || 0;
+                          const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
+                          return deviation > 0 ? 'text-red-600' : 'text-green-600';
+                        })()}`}>
+                          {(() => {
                             const realCost = costSummary?.totalCost || 0;
                             const estimatedCost = projectData.quotation?.baseCost || 0;
+                            if (estimatedCost === 0) return '0%';
                             const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
-                            return deviation > 0 ? 'text-red-600' : 'text-green-600';
-                          })()}`}>
-                            {(() => {
-                              const realCost = costSummary?.totalCost || 0;
-                              const estimatedCost = projectData.quotation?.baseCost || 0;
-                              if (estimatedCost === 0) return '0%';
-                              const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
-                              return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
-                            })()}
-                          </p>
-                        </div>
+                            return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                          })()}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Horas estimadas vs reales */}
-                    <div className="p-3 bg-green-50 rounded-lg">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Horas estimadas:</span>
-                          <p className="font-bold text-green-600">{costSummary?.targetHours || 0}h</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Desviación horas:</span>
-                          <p className={`font-bold ${(() => {
+                  {/* Desviación Temporal */}
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg">
+                    <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Desviación Temporal
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Horas estimadas:</span>
+                        <span className="font-medium">{costSummary?.targetHours || 0}h</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Horas reales:</span>
+                        <span className="font-medium">{costSummary?.filteredHours || 0}h</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t">
+                        <span>Desviación:</span>
+                        <span className={`font-bold ${(() => {
+                          const realHours = costSummary?.filteredHours || 0;
+                          const estimatedHours = costSummary?.targetHours || 0;
+                          const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
+                          return deviation > 0 ? 'text-red-600' : 'text-green-600';
+                        })()}`}>
+                          {(() => {
                             const realHours = costSummary?.filteredHours || 0;
                             const estimatedHours = costSummary?.targetHours || 0;
+                            if (estimatedHours === 0) return '0%';
                             const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
-                            return deviation > 0 ? 'text-red-600' : 'text-green-600';
-                          })()}`}>
-                            {(() => {
-                              const realHours = costSummary?.filteredHours || 0;
-                              const estimatedHours = costSummary?.targetHours || 0;
-                              if (estimatedHours === 0) return '0%';
-                              const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
-                              return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
-                            })()}
-                          </p>
-                        </div>
+                            return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                          })()}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <h4 className="font-semibold text-blue-800 mb-2">Proyección Final</h4>
-                      <p className="text-sm text-blue-700 mb-2">
-                        Basado en ritmo actual de trabajo
-                      </p>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-sm">
-                          <span>Costo proyectado:</span>
-                          <span className="font-medium">
-                            ${(() => {
-                              const currentCost = costSummary?.totalCost || 0;
-                              const currentHours = costSummary?.filteredHours || 0;
-                              const targetHours = costSummary?.targetHours || 0;
-                              if (currentHours === 0 || targetHours === 0) return '0';
-                              const projectedCost = (currentCost / currentHours) * targetHours;
-                              return projectedCost.toLocaleString();
-                            })()}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Markup proyectado:</span>
-                          <span className="font-medium">
-                            {(() => {
-                              const currentCost = costSummary?.totalCost || 0;
-                              const currentHours = costSummary?.filteredHours || 0;
-                              const targetHours = costSummary?.targetHours || 0;
-                              const quotationPrice = projectData.quotation?.totalAmount || 0;
-                              if (currentHours === 0 || targetHours === 0 || quotationPrice === 0) return '0x';
-                              const projectedCost = (currentCost / currentHours) * targetHours;
-                              const projectedMarkup = quotationPrice / projectedCost;
-                              return `${projectedMarkup.toFixed(1)}x`;
-                            })()}
-                          </span>
-                        </div>
+                  {/* Proyección Final */}
+                  <div className="p-4 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg">
+                    <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Proyección Final
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Markup proyectado:</span>
+                        <span className="font-bold text-orange-600">
+                          {(() => {
+                            const currentCost = costSummary?.totalCost || 0;
+                            const currentHours = costSummary?.filteredHours || 0;
+                            const targetHours = costSummary?.targetHours || 0;
+                            const quotationPrice = projectData.quotation?.totalAmount || 0;
+                            if (currentHours === 0 || targetHours === 0 || quotationPrice === 0) return '0x';
+                            const projectedCost = (currentCost / currentHours) * targetHours;
+                            const projectedMarkup = quotationPrice / projectedCost;
+                            return `${projectedMarkup.toFixed(1)}x`;
+                          })()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Costo proyectado:</span>
+                        <span className="font-medium">
+                          ${(() => {
+                            const currentCost = costSummary?.totalCost || 0;
+                            const currentHours = costSummary?.filteredHours || 0;
+                            const targetHours = costSummary?.targetHours || 0;
+                            if (currentHours === 0 || targetHours === 0) return '0';
+                            const projectedCost = (currentCost / currentHours) * targetHours;
+                            return projectedCost.toLocaleString();
+                          })()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t">
+                        <span>Ganancia neta:</span>
+                        <span className="font-bold text-green-600">
+                          ${(() => {
+                            const realCost = costSummary?.totalCost || 0;
+                            const quotationPrice = projectData.quotation?.totalAmount || 0;
+                            const profit = quotationPrice - realCost;
+                            return profit.toLocaleString();
+                          })()}
+                        </span>
                       </div>
                     </div>
-
-                    {project?.isAlwaysOnMacro && (
-                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-indigo-700 mb-1">
-                          <Zap className="h-4 w-4" />
-                          <span className="font-medium text-sm">Contrato Always-On</span>
-                        </div>
-                        <p className="text-xs text-indigo-600">
-                          Los cálculos de markup se ajustan mensualmente para este tipo de contrato
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1658,50 +1656,55 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Panel de acciones operativas */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-orange-600" />
-                    Herramientas de Gestión
+              {/* Acciones Rápidas del Equipo */}
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-green-600" />
+                      Acciones Rápidas
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      Gestión Operativa
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Button
                       variant="outline"
-                      className="h-20 flex flex-col items-center justify-center gap-2"
-                      onClick={() => setShowQuickRegister(true)}
-                    >
-                      <Clock className="h-6 w-6 text-blue-600" />
-                      <span className="text-sm font-medium">Registrar Tiempo</span>
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      className="h-20 flex flex-col items-center justify-center gap-2"
+                      className="h-16 flex items-center justify-center gap-3 hover:bg-green-50 hover:border-green-300"
                       onClick={() => setLocation(`/time-tracking?project=${projectId}`)}
                     >
-                      <History className="h-6 w-6 text-green-600" />
-                      <span className="text-sm font-medium">Ver Historial</span>
+                      <History className="h-5 w-5 text-green-600" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Historial Completo</div>
+                        <div className="text-xs text-gray-500">Ver todos los registros</div>
+                      </div>
                     </Button>
                     
                     <Button
                       variant="outline"
-                      className="h-20 flex flex-col items-center justify-center gap-2"
+                      className="h-16 flex items-center justify-center gap-3 hover:bg-purple-50 hover:border-purple-300"
                       onClick={() => console.log('Configure team')}
                     >
-                      <Settings className="h-6 w-6 text-purple-600" />
-                      <span className="text-sm font-medium">Configurar</span>
+                      <Settings className="h-5 w-5 text-purple-600" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Configurar Equipo</div>
+                        <div className="text-xs text-gray-500">Roles y permisos</div>
+                      </div>
                     </Button>
                     
                     <Button
                       variant="outline"
-                      className="h-20 flex flex-col items-center justify-center gap-2"
+                      className="h-16 flex items-center justify-center gap-3 hover:bg-orange-50 hover:border-orange-300"
                       onClick={() => console.log('Generate reports')}
                     >
-                      <FileText className="h-6 w-6 text-orange-600" />
-                      <span className="text-sm font-medium">Reportes</span>
+                      <FileText className="h-5 w-5 text-orange-600" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Generar Reportes</div>
+                        <div className="text-xs text-gray-500">Análisis y exportar</div>
+                      </div>
                     </Button>
                   </div>
                 </CardContent>
