@@ -1959,13 +1959,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log('📋 Datos finales antes de validación:', {
-        entryType: processedData.entryType,
-        hours: processedData.hours,
-        totalCost: processedData.totalCost,
-        hourlyRateAtTime: processedData.hourlyRateAtTime,
-        personnelId: processedData.personnelId
-      });
+      console.log('📋 Datos RECIBIDOS en backend:', JSON.stringify({
+        originalBody: req.body,
+        processedData: {
+          entryType: processedData.entryType,
+          hours: processedData.hours,
+          totalCost: processedData.totalCost,
+          hourlyRateAtTime: processedData.hourlyRateAtTime,
+          personnelId: processedData.personnelId
+        }
+      }, null, 2));
 
       // Validar que tenemos valores válidos y positivos
       if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost <= 0) {
