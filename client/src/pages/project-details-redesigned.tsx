@@ -1196,6 +1196,93 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
+            
+            {/* Análisis de Rentabilidad - Información clave que no está en las cards superiores */}
+            <Card className="border-l-4 border-l-yellow-500 bg-gradient-to-r from-yellow-50 to-amber-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-6 w-6 text-yellow-600" />
+                    Análisis de Rentabilidad - {dateFilter.label}
+                  </div>
+                  <Badge variant="outline" className="bg-white/80 border-yellow-200 text-yellow-700">
+                    Métricas Financieras
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Markup Calculation */}
+                  <div className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-5 w-5 text-yellow-600" />
+                      <p className="text-sm font-semibold text-yellow-800">Markup Actual</p>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {costSummary?.markup ? `${costSummary.markup.toFixed(2)}x` : '0.00x'}
+                    </p>
+                    <p className="text-xs text-yellow-600">
+                      {(() => {
+                        if (!costSummary?.markup) return 'Sin datos';
+                        const markup = costSummary.markup;
+                        if (markup >= 2.5) return 'Excelente rentabilidad';
+                        if (markup >= 1.8) return 'Buena rentabilidad';
+                        if (markup >= 1.2) return 'Rentabilidad aceptable';
+                        return 'Rentabilidad crítica';
+                      })()}
+                    </p>
+                  </div>
+
+                  {/* Precio vs Costo */}
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <p className="text-sm font-semibold text-green-800">Precio vs Costo</p>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">Precio:</span>
+                        <span className="font-medium">${costSummary?.targetClientPrice?.toLocaleString() || '0'}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600">Costo:</span>
+                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || '0'}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-bold pt-1 border-t border-green-200">
+                        <span className="text-green-600">Margen:</span>
+                        <span className="text-green-700">
+                          ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Eficiencia Presupuestaria */}
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-5 w-5 text-blue-600" />
+                      <p className="text-sm font-semibold text-blue-800">Eficiencia Presupuestaria</p>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {costSummary?.budgetUtilization ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      {(() => {
+                        if (!costSummary?.budgetUtilization) return 'Sin datos';
+                        const utilization = costSummary.budgetUtilization;
+                        if (utilization <= 80) return 'Excelente control';
+                        if (utilization <= 95) return 'Buen control';
+                        if (utilization <= 100) return 'En límite';
+                        return 'Excede presupuesto';
+                      })()}
+                    </p>
+                  </div>
+
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Grid principal del dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Progreso y Estado */}
