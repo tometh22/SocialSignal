@@ -1941,12 +1941,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Solo calcular si faltan datos, para no sobrescribir los cálculos del frontend
-      if (processedData.entryType === "hours" && !processedData.totalCost) {
-        // Si se registró por horas y no hay costo, calcularlo
-        processedData.totalCost = processedData.hours * processedData.hourlyRateAtTime;
-      } else if (processedData.entryType === "cost" && !processedData.hours) {
-        // Si se registró por costo y no hay horas, calcularlas
-        processedData.hours = processedData.totalCost / processedData.hourlyRateAtTime;
+      if (processedData.entryType === "hours" && (!processedData.totalCost || processedData.totalCost <= 0)) {
+        // Si se registró por horas y no hay costo válido, calcularlo
+        processedData.totalCost = (processedData.hours || 0) * (processedData.hourlyRateAtTime || 0);
+      } else if (processedData.entryType === "cost" && (!processedData.hours || processedData.hours <= 0)) {
+        // Si se registró por costo y no hay horas válidas, calcularlas
+        processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
+      }
+
+      // Validar que tenemos valores positivos
+      if (!processedData.totalCost || processedData.totalCost <= 0) {
+        return res.status(400).json({ 
+          message: "El costo total debe ser positivo",
+          debug: {
+            totalCost: processedData.totalCost,
+            hours: processedData.hours,
+            hourlyRateAtTime: processedData.hourlyRateAtTime
+          }
+        });
+      }
+
+      if (!processedData.hours || processedData.hours <= 0) {
+        return res.status(400).json({ 
+          message: "Las horas deben ser positivas",
+          debug: {
+            hours: processedData.hours,
+            totalCost: processedData.totalCost,
+            hourlyRateAtTime: processedData.hourlyRateAtTime
+          }
+        });
       }
 
       // Añadir por defecto que está aprobado y establecer la fecha de aprobación

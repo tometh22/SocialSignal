@@ -374,25 +374,50 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       const entries = teamMembers
         .map(member => {
           const memberData = teamHours[member.personnelId];
-          if (!memberData || !memberData.hours) return null;
+          if (!memberData || !memberData.hours || memberData.hours <= 0) return null;
           
-          const hourlyRate = memberData.customRate !== undefined ? memberData.customRate : (member.hourlyRate || 0);
+          // Asegurar que hourlyRate sea un número válido
+          const baseRate = member.hourlyRate || 10; // Rate por defecto mínimo
+          const hourlyRate = memberData.customRate !== undefined && memberData.customRate > 0 
+            ? memberData.customRate 
+            : baseRate;
           const totalCost = memberData.hours * hourlyRate;
+          
+          // Validar que los valores sean válidos
+          if (isNaN(totalCost) || totalCost <= 0 || isNaN(hourlyRate) || hourlyRate <= 0) {
+            console.error('Invalid cost calculation:', { 
+              personnelId: member.personnelId,
+              hours: memberData.hours, 
+              hourlyRate, 
+              totalCost,
+              baseRate: member.hourlyRate,
+              customRate: memberData.customRate
+            });
+            return null;
+          }
+          
+          console.log('Creating entry:', {
+            personnelId: member.personnelId,
+            hours: memberData.hours,
+            hourlyRate,
+            totalCost
+          });
           
           return {
             projectId,
             personnelId: member.personnelId,
-            roleId: member.roleId,
+            roleId: member.roleId || null,
             hours: memberData.hours,
             totalCost,
             hourlyRateAtTime: hourlyRate,
             entryType: 'hours' as const,
-            description: memberData.description || '',
+            description: memberData.description || `Trabajo en proyecto - ${periodName}`,
             date: startDate,
             periodDescription: periodName,
             isDateRange: true,
             startDate: startDate,
-            endDate: endDate || startDate
+            endDate: endDate || startDate,
+            billable: true
           };
         })
         .filter(Boolean);
