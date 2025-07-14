@@ -148,10 +148,19 @@ const CompactTimeForm: React.FC<{
 
   const createTimeEntryMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
+      // Obtener la tarifa horaria de la persona seleccionada
+      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
+      const hourlyRate = selectedPerson?.hourlyRate || 10; // Default mínimo
+      const totalCost = data.hours * hourlyRate;
+      
       return apiRequest("/api/time-entries", "POST", {
         ...data,
         projectId,
         date: data.date.toISOString(),
+        // Agregar campos requeridos
+        totalCost,
+        hourlyRateAtTime: hourlyRate,
+        entryType: 'hours' as const,
       });
     },
     onSuccess: (newEntry) => {
