@@ -377,19 +377,32 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
           if (!memberData || !memberData.hours || memberData.hours <= 0) return null;
           
           // Asegurar que hourlyRate sea un número válido
-          const baseRate = member.hourlyRate || 10; // Rate por defecto mínimo
-          const hourlyRate = memberData.customRate !== undefined && memberData.customRate > 0 
-            ? memberData.customRate 
-            : baseRate;
-          const totalCost = memberData.hours * hourlyRate;
+          const baseRate = Number(member.hourlyRate) || 10; // Rate por defecto mínimo
+          const customRate = memberData.customRate !== undefined ? Number(memberData.customRate) : null;
+          const hourlyRate = customRate !== null && customRate > 0 ? customRate : baseRate;
+          const hours = Number(memberData.hours) || 0;
+          const totalCost = Number((hours * hourlyRate).toFixed(2)); // Redondear a 2 decimales
+          
+          console.log('💰 Cálculo de costo:', {
+            personnelId: member.personnelId,
+            memberName: member.name,
+            hours: hours,
+            baseRate: baseRate,
+            customRate: customRate,
+            hourlyRate: hourlyRate,
+            totalCost: totalCost,
+            calculation: `${hours} * ${hourlyRate} = ${totalCost}`
+          });
           
           // Validar que los valores sean válidos
-          if (isNaN(totalCost) || totalCost <= 0 || isNaN(hourlyRate) || hourlyRate <= 0) {
-            console.error('Invalid cost calculation:', { 
+          if (typeof totalCost !== 'number' || isNaN(totalCost) || totalCost <= 0 || 
+              typeof hourlyRate !== 'number' || isNaN(hourlyRate) || hourlyRate <= 0 ||
+              typeof hours !== 'number' || isNaN(hours) || hours <= 0) {
+            console.error('❌ Validación fallida:', { 
               personnelId: member.personnelId,
-              hours: memberData.hours, 
-              hourlyRate, 
-              totalCost,
+              hours: { value: hours, type: typeof hours, isNaN: isNaN(hours) }, 
+              hourlyRate: { value: hourlyRate, type: typeof hourlyRate, isNaN: isNaN(hourlyRate) }, 
+              totalCost: { value: totalCost, type: typeof totalCost, isNaN: isNaN(totalCost) },
               baseRate: member.hourlyRate,
               customRate: memberData.customRate
             });
@@ -400,7 +413,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             projectId,
             personnelId: member.personnelId,
             roleId: member.roleId || null,
-            hours: memberData.hours,
+            hours,
             totalCost,
             hourlyRateAtTime: hourlyRate,
             entryType: 'hours' as const,

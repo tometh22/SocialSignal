@@ -1949,23 +1949,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
       }
 
-      // Validar que tenemos valores positivos
-      if (!processedData.totalCost || processedData.totalCost <= 0) {
+      // Validar que tenemos valores válidos y positivos
+      if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost <= 0) {
+        console.error('❌ Validación totalCost fallida:', {
+          totalCost: processedData.totalCost,
+          type: typeof processedData.totalCost,
+          isNaN: isNaN(processedData.totalCost),
+          hours: processedData.hours,
+          hourlyRateAtTime: processedData.hourlyRateAtTime
+        });
         return res.status(400).json({ 
-          message: "El costo total debe ser positivo",
+          message: "El costo total debe ser un número positivo",
           debug: {
             totalCost: processedData.totalCost,
+            type: typeof processedData.totalCost,
             hours: processedData.hours,
             hourlyRateAtTime: processedData.hourlyRateAtTime
           }
         });
       }
 
-      if (!processedData.hours || processedData.hours <= 0) {
+      if (typeof processedData.hours !== 'number' || isNaN(processedData.hours) || processedData.hours <= 0) {
+        console.error('❌ Validación hours fallida:', {
+          hours: processedData.hours,
+          type: typeof processedData.hours,
+          isNaN: isNaN(processedData.hours)
+        });
         return res.status(400).json({ 
-          message: "Las horas deben ser positivas",
+          message: "Las horas deben ser un número positivo",
           debug: {
             hours: processedData.hours,
+            type: typeof processedData.hours,
             totalCost: processedData.totalCost,
             hourlyRateAtTime: processedData.hourlyRateAtTime
           }
