@@ -1190,6 +1190,68 @@ export default function ProjectDetailsRedesigned() {
 
           <TabsContent value="dashboard" className="space-y-6">
 
+            {/* Indicadores Clave - Posicionado arriba */}
+            <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-6 w-6 text-blue-600" />
+                    Indicadores Clave - {dateFilter.label}
+                  </div>
+                  <Badge variant="outline" className="bg-white/80 border-blue-200 text-blue-700">
+                    Métricas Principales
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Percent className="h-5 w-5 text-orange-600" />
+                      <p className="text-sm font-semibold text-orange-800">Costo Real</p>
+                    </div>
+                    <p className="text-2xl font-bold text-orange-600">
+                      ${costSummary?.totalCost?.toLocaleString() || '0'}
+                    </p>
+                    <p className="text-xs text-orange-500">gasto efectivo</p>
+                  </div>
+                  
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-5 w-5 text-green-600" />
+                      <p className="text-sm font-semibold text-green-800">Horas Trabajadas</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600">
+                      {costSummary?.filteredHours || 0}h
+                    </p>
+                    <p className="text-xs text-green-500">tiempo invertido</p>
+                  </div>
+                  
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-5 w-5 text-purple-600" />
+                      <p className="text-sm font-semibold text-purple-800">Equipo Activo</p>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {teamStats ? teamStats.length : 0}
+                    </p>
+                    <p className="text-xs text-purple-500">miembros trabajando</p>
+                  </div>
+                  
+                  <div className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-5 w-5 text-yellow-600" />
+                      <p className="text-sm font-semibold text-yellow-800">Markup</p>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
+                    </p>
+                    <p className="text-xs text-yellow-500">multiplicador</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Grid principal del dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Progreso y Estado */}
@@ -1382,154 +1444,47 @@ export default function ProjectDetailsRedesigned() {
               </CardContent>
             </Card>
 
-            {/* KPIs Ejecutivos - Métricas críticas únicamente */}
-            <Card className="border-l-4 border-l-blue-500">
+            {/* Análisis de Desviaciones - Sección consolidada */}
+            <Card className="border-l-4 border-l-purple-500">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-blue-600" />
-                    Indicadores Clave - {dateFilter.label}
+                    <BarChart3 className="h-5 w-5 text-purple-600" />
+                    Análisis de Desviaciones vs Cotización
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {dateFilter.type === 'month' ? 'Mensual' : 'Período'}
+                    Comparación Real vs Estimado
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Markup - Métrica principal */}
-                  <div className="relative">
-                    <div className="text-center p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                      <div className="text-3xl font-bold text-amber-600 mb-2">
-                        {(() => {
-                          const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = projectData.quotation?.totalAmount || 0;
-                          if (realCost === 0 || quotationPrice === 0) return "0x";
-                          const markup = quotationPrice / realCost;
-                          return `${markup.toFixed(1)}x`;
-                        })()}
-                      </div>
-                      <div className="text-sm font-medium text-amber-800 mb-1">Markup Actual</div>
-                      <Badge variant={(() => {
-                        const realCost = costSummary?.totalCost || 0;
-                        const quotationPrice = projectData.quotation?.totalAmount || 0;
-                        if (realCost === 0 || quotationPrice === 0) return 'secondary';
-                        const markup = quotationPrice / realCost;
-                        if (markup >= 2.5) return 'default';
-                        if (markup >= 1.8) return 'secondary';
-                        return 'destructive';
-                      })()} className="text-xs">
-                        {(() => {
-                          const realCost = costSummary?.totalCost || 0;
-                          const quotationPrice = projectData.quotation?.totalAmount || 0;
-                          if (realCost === 0 || quotationPrice === 0) return 'Sin datos';
-                          const markup = quotationPrice / realCost;
-                          if (markup >= 2.5) return 'Excelente';
-                          if (markup >= 1.8) return 'Bueno';
-                          if (markup >= 1.2) return 'Aceptable';
-                          return 'Crítico';
-                        })()}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Financiero */}
-                  <div className="space-y-3">
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-sm text-gray-600">Costo Real</div>
-                          <div className="text-xl font-bold text-green-600">
-                            ${costSummary?.totalCost?.toLocaleString() || 0}
-                          </div>
-                        </div>
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                      </div>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-sm text-gray-600">Ingreso Cotizado</div>
-                          <div className="text-xl font-bold text-blue-600">
-                            ${projectData.quotation?.totalAmount?.toLocaleString() || 0}
-                          </div>
-                        </div>
-                        <TrendingUp className="h-5 w-5 text-blue-500" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Operacional */}
-                  <div className="space-y-3">
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-sm text-gray-600">Horas Trabajadas</div>
-                          <div className="text-xl font-bold text-purple-600">
-                            {costSummary?.filteredHours || 0}h
-                          </div>
-                        </div>
-                        <Clock className="h-5 w-5 text-purple-500" />
-                      </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="text-sm text-gray-600">Equipo Activo</div>
-                          <div className="text-xl font-bold text-gray-600">
-                            {baseTeam?.length || 0}
-                          </div>
-                        </div>
-                        <Users className="h-5 w-5 text-gray-500" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Análisis de Desviaciones - Comparación vs Cotización */}
-            <Card className="border-l-4 border-l-orange-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-orange-600" />
-                  Análisis de Desviaciones vs Cotización
-                </CardTitle>
-                <CardDescription>
-                  Comparación detallada del rendimiento real contra objetivos aprobados
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Desviación Financiera */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Desviación Financiera
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Presupuesto base:</span>
-                        <span className="font-medium">${projectData.quotation?.baseCost?.toLocaleString() || 0}</span>
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <DollarSign className="h-5 w-5 text-blue-600" />
+                      <h4 className="font-semibold text-blue-800">Financiera</h4>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Presupuesto</span>
+                        <span className="font-medium">${costSummary?.budget?.toLocaleString() || 0}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Costo real:</span>
+                      <div className="flex justify-between text-sm">
+                        <span>Costo Real</span>
                         <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || 0}</span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span>Desviación:</span>
-                        <span className={`font-bold ${(() => {
-                          const realCost = costSummary?.totalCost || 0;
-                          const estimatedCost = projectData.quotation?.baseCost || 0;
-                          const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
-                          return deviation > 0 ? 'text-red-600' : 'text-green-600';
-                        })()}`}>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span>Desviación</span>
+                        <span className={
+                          (costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? 'text-red-600' : 'text-green-600'
+                        }>
                           {(() => {
-                            const realCost = costSummary?.totalCost || 0;
-                            const estimatedCost = projectData.quotation?.baseCost || 0;
-                            if (estimatedCost === 0) return '0%';
-                            const deviation = ((realCost - estimatedCost) / estimatedCost) * 100;
-                            return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                            const cost = costSummary?.totalCost || 0;
+                            const budget = costSummary?.budget || 0;
+                            if (budget === 0) return '0%';
+                            const deviation = ((cost - budget) / budget) * 100;
+                            return `${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}%`;
                           })()}
                         </span>
                       </div>
@@ -1537,83 +1492,67 @@ export default function ProjectDetailsRedesigned() {
                   </div>
 
                   {/* Desviación Temporal */}
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg">
-                    <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Desviación Temporal
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Horas estimadas:</span>
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Clock className="h-5 w-5 text-green-600" />
+                      <h4 className="font-semibold text-green-800">Temporal</h4>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Horas estimadas</span>
                         <span className="font-medium">{costSummary?.targetHours || 0}h</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Horas reales:</span>
+                      <div className="flex justify-between text-sm">
+                        <span>Horas reales</span>
                         <span className="font-medium">{costSummary?.filteredHours || 0}h</span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span>Desviación:</span>
-                        <span className={`font-bold ${(() => {
-                          const realHours = costSummary?.filteredHours || 0;
-                          const estimatedHours = costSummary?.targetHours || 0;
-                          const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
-                          return deviation > 0 ? 'text-red-600' : 'text-green-600';
-                        })()}`}>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span>Desviación</span>
+                        <span className={
+                          (costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? 'text-red-600' : 'text-green-600'
+                        }>
                           {(() => {
-                            const realHours = costSummary?.filteredHours || 0;
-                            const estimatedHours = costSummary?.targetHours || 0;
-                            if (estimatedHours === 0) return '0%';
-                            const deviation = ((realHours - estimatedHours) / estimatedHours) * 100;
-                            return `${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%`;
+                            const actual = costSummary?.filteredHours || 0;
+                            const target = costSummary?.targetHours || 0;
+                            if (target === 0) return '0%';
+                            const deviation = ((actual - target) / target) * 100;
+                            return `${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}%`;
                           })()}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Proyección Final */}
-                  <div className="p-4 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg">
-                    <h4 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      Proyección Final
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Markup proyectado:</span>
-                        <span className="font-bold text-orange-600">
-                          {(() => {
-                            const currentCost = costSummary?.totalCost || 0;
-                            const currentHours = costSummary?.filteredHours || 0;
-                            const targetHours = costSummary?.targetHours || 0;
-                            const quotationPrice = projectData.quotation?.totalAmount || 0;
-                            if (currentHours === 0 || targetHours === 0 || quotationPrice === 0) return '0x';
-                            const projectedCost = (currentCost / currentHours) * targetHours;
-                            const projectedMarkup = quotationPrice / projectedCost;
-                            return `${projectedMarkup.toFixed(1)}x`;
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Costo proyectado:</span>
+                  {/* Proyección */}
+                  <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-5 w-5 text-orange-600" />
+                      <h4 className="font-semibold text-orange-800">Proyección</h4>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Markup final</span>
                         <span className="font-medium">
-                          ${(() => {
-                            const currentCost = costSummary?.totalCost || 0;
-                            const currentHours = costSummary?.filteredHours || 0;
-                            const targetHours = costSummary?.targetHours || 0;
-                            if (currentHours === 0 || targetHours === 0) return '0';
-                            const projectedCost = (currentCost / currentHours) * targetHours;
-                            return projectedCost.toLocaleString();
-                          })()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span>Ganancia neta:</span>
-                        <span className="font-bold text-green-600">
-                          ${(() => {
+                          {(() => {
                             const realCost = costSummary?.totalCost || 0;
                             const quotationPrice = projectData.quotation?.totalAmount || 0;
-                            const profit = quotationPrice - realCost;
-                            return profit.toLocaleString();
+                            if (realCost === 0 || quotationPrice === 0) return "0x";
+                            const markup = quotationPrice / realCost;
+                            return `${markup.toFixed(1)}x`;
+                          })()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Costo proyectado</span>
+                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span>Ganancia neta</span>
+                        <span className="text-green-600">
+                          ${(() => {
+                            const cost = costSummary?.totalCost || 0;
+                            const revenue = projectData.quotation?.totalAmount || 0;
+                            return Math.max(0, revenue - cost).toLocaleString();
                           })()}
                         </span>
                       </div>
@@ -1622,6 +1561,7 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardContent>
             </Card>
+            
           </TabsContent>
 
           <TabsContent value="team" className="space-y-6">
