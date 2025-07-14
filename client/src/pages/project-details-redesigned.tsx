@@ -908,6 +908,11 @@ export default function ProjectDetailsRedesigned() {
     
     const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
     
+    // Calcular markup usando precio de cotización vs costo real
+    const monthlyClientPrice = quotationData.totalAmount || 0;
+    const targetClientPrice = monthlyClientPrice * targetMultiplier;
+    const markup = actualCost > 0 ? targetClientPrice / actualCost : 0;
+    
     return {
       totalCost: actualCost,
       budget: targetBudget,
@@ -915,7 +920,9 @@ export default function ProjectDetailsRedesigned() {
       savings: targetBudget - actualCost,
       filteredHours: actualHours,
       targetHours,
-      targetMultiplier
+      targetMultiplier,
+      markup: markup,
+      targetClientPrice: targetClientPrice
     };
   }, [project, timeEntries, filterTimeEntriesByDateRange, dateFilter]);
 
@@ -1533,13 +1540,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="flex justify-between text-sm">
                         <span>Markup final</span>
                         <span className="font-medium">
-                          {(() => {
-                            const realCost = costSummary?.totalCost || 0;
-                            const quotationPrice = projectData.quotation?.totalAmount || 0;
-                            if (realCost === 0 || quotationPrice === 0) return "0x";
-                            const markup = quotationPrice / realCost;
-                            return `${markup.toFixed(1)}x`;
-                          })()}
+                          {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
