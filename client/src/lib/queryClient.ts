@@ -134,6 +134,12 @@ export async function apiRequest(
     
     if (data) {
       options.body = JSON.stringify(data);
+      console.log('📡 Enviando datos al servidor:', {
+        url,
+        method,
+        data,
+        body: options.body
+      });
     }
     
     // Realizar la solicitud
