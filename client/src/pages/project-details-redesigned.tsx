@@ -1212,49 +1212,24 @@ export default function ProjectDetailsRedesigned() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-lg border border-orange-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Percent className="h-5 w-5 text-orange-600" />
-                      <p className="text-sm font-semibold text-orange-800">Costo Real</p>
-                    </div>
-                    <p className="text-2xl font-bold text-orange-600">
-                      ${costSummary?.totalCost?.toLocaleString() || '0'}
-                    </p>
-                    <p className="text-xs text-orange-500">gasto efectivo</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-5 w-5 text-green-600" />
-                      <p className="text-sm font-semibold text-green-800">Horas Trabajadas</p>
-                    </div>
-                    <p className="text-2xl font-bold text-green-600">
-                      {costSummary?.filteredHours || 0}h
-                    </p>
-                    <p className="text-xs text-green-500">tiempo invertido</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="h-5 w-5 text-purple-600" />
-                      <p className="text-sm font-semibold text-purple-800">Equipo Activo</p>
-                    </div>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {teamStats ? teamStats.length : 0}
-                    </p>
-                    <p className="text-xs text-purple-500">miembros trabajando</p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-5 w-5 text-yellow-600" />
-                      <p className="text-sm font-semibold text-yellow-800">Markup</p>
-                    </div>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
-                    </p>
-                    <p className="text-xs text-yellow-500">multiplicador</p>
-                  </div>
+                  {/* USAR LAS MISMAS MÉTRICAS QUE LAS CARDS SUPERIORES PARA CONSISTENCIA */}
+                  {metrics.slice(0, 4).map((metric, index) => {
+                    const IconComponent = metric.icon;
+                    return (
+                      <div key={index} className={`p-4 ${metric.bgColor} rounded-lg border ${metric.color.includes('orange') ? 'border-orange-200' : metric.color.includes('green') ? 'border-green-200' : metric.color.includes('blue') ? 'border-blue-200' : 'border-gray-200'}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <IconComponent className={`h-5 w-5 ${metric.color}`} />
+                          <p className={`text-sm font-semibold ${metric.color}`}>{metric.label}</p>
+                        </div>
+                        <p className={`text-2xl font-bold ${metric.color}`}>
+                          {metric.value}
+                        </p>
+                        <p className={`text-xs ${metric.color.replace('-700', '-500')}`}>
+                          {metric.subtitle || 'valor del período'}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
