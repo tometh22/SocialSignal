@@ -1196,44 +1196,6 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-
-            {/* Indicadores Clave - Posicionado arriba */}
-            <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-6 w-6 text-blue-600" />
-                    Indicadores Clave - {dateFilter.label}
-                  </div>
-                  <Badge variant="outline" className="bg-white/80 border-blue-200 text-blue-700">
-                    Métricas Principales
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  {/* USAR LAS MISMAS MÉTRICAS QUE LAS CARDS SUPERIORES PARA CONSISTENCIA */}
-                  {metrics.slice(0, 4).map((metric, index) => {
-                    const IconComponent = metric.icon;
-                    return (
-                      <div key={index} className={`p-4 ${metric.bgColor} rounded-lg border ${metric.color.includes('orange') ? 'border-orange-200' : metric.color.includes('green') ? 'border-green-200' : metric.color.includes('blue') ? 'border-blue-200' : 'border-gray-200'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <IconComponent className={`h-5 w-5 ${metric.color}`} />
-                          <p className={`text-sm font-semibold ${metric.color}`}>{metric.label}</p>
-                        </div>
-                        <p className={`text-2xl font-bold ${metric.color}`}>
-                          {metric.value}
-                        </p>
-                        <p className={`text-xs ${metric.color.replace('-700', '-500')}`}>
-                          {metric.subtitle || 'valor del período'}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Grid principal del dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Progreso y Estado */}
