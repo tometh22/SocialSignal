@@ -1940,14 +1940,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         processedData.hourlyRateAtTime = person.hourlyRate || 50;
       }
 
-      // Solo calcular si faltan datos, para no sobrescribir los cálculos del frontend
-      if (processedData.entryType === "hours" && (!processedData.totalCost || processedData.totalCost <= 0)) {
-        // Si se registró por horas y no hay costo válido, calcularlo
+      // Solo calcular si faltan datos completamente
+      if (processedData.entryType === "hours" && (processedData.totalCost === undefined || processedData.totalCost === null)) {
+        // Si se registró por horas y no hay costo definido, calcularlo
         processedData.totalCost = (processedData.hours || 0) * (processedData.hourlyRateAtTime || 0);
-      } else if (processedData.entryType === "cost" && (!processedData.hours || processedData.hours <= 0)) {
-        // Si se registró por costo y no hay horas válidas, calcularlas
+        console.log('🔧 Calculando totalCost en backend:', {
+          hours: processedData.hours,
+          hourlyRateAtTime: processedData.hourlyRateAtTime,
+          totalCost: processedData.totalCost
+        });
+      } else if (processedData.entryType === "cost" && (processedData.hours === undefined || processedData.hours === null)) {
+        // Si se registró por costo y no hay horas definidas, calcularlas
         processedData.hours = (processedData.totalCost || 0) / (processedData.hourlyRateAtTime || 1);
+        console.log('🔧 Calculando hours en backend:', {
+          totalCost: processedData.totalCost,
+          hourlyRateAtTime: processedData.hourlyRateAtTime,
+          hours: processedData.hours
+        });
       }
+      
+      console.log('📋 Datos finales antes de validación:', {
+        entryType: processedData.entryType,
+        hours: processedData.hours,
+        totalCost: processedData.totalCost,
+        hourlyRateAtTime: processedData.hourlyRateAtTime,
+        personnelId: processedData.personnelId
+      });
 
       // Validar que tenemos valores válidos y positivos
       if (typeof processedData.totalCost !== 'number' || isNaN(processedData.totalCost) || processedData.totalCost <= 0) {
