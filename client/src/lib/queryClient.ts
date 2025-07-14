@@ -133,13 +133,18 @@ export async function apiRequest(
     };
     
     if (data) {
+      console.log('📡 Datos ANTES de stringify:', data);
+      console.log('📡 Propiedades del objeto:', Object.keys(data));
+      console.log('📡 totalCost valor:', data.totalCost, typeof data.totalCost);
+      console.log('📡 entryType valor:', data.entryType, typeof data.entryType);
+      
       options.body = JSON.stringify(data);
-      console.log('📡 Enviando datos al servidor:', {
-        url,
-        method,
-        data,
-        body: options.body
-      });
+      console.log('📡 JSON stringified:', options.body);
+      
+      // Verificar que se puede parsear correctamente
+      const parsed = JSON.parse(options.body);
+      console.log('📡 Parsed de vuelta:', parsed);
+      console.log('📡 totalCost después de parse:', parsed.totalCost, typeof parsed.totalCost);
     }
     
     // Realizar la solicitud
