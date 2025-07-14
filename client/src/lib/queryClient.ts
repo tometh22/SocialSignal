@@ -134,7 +134,6 @@ export async function apiRequest(
     
     if (data) {
       options.body = JSON.stringify(data);
-      console.log('📡 Enviando:', { url, method, keys: Object.keys(data), totalCost: data.totalCost, entryType: data.entryType });
     }
     
     // Realizar la solicitud

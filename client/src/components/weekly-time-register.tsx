@@ -444,6 +444,18 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
       // Crear todas las entradas
       console.log('📤 Enviando entradas:', entries);
       
+      // Log específico para debug
+      entries.forEach((entry, index) => {
+        console.log(`Entry ${index}:`, {
+          entryType: entry.entryType,
+          totalCost: entry.totalCost,
+          hourlyRateAtTime: entry.hourlyRateAtTime,
+          typeof_entryType: typeof entry.entryType,
+          typeof_totalCost: typeof entry.totalCost,
+          typeof_hourlyRateAtTime: typeof entry.hourlyRateAtTime
+        });
+      });
+      
       for (const entry of entries) {
         try {
           console.log('🔄 Procesando entrada individual:', entry);
