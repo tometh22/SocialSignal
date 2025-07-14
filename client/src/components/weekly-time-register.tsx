@@ -396,14 +396,7 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             return null;
           }
           
-          console.log('Creating entry:', {
-            personnelId: member.personnelId,
-            hours: memberData.hours,
-            hourlyRate,
-            totalCost
-          });
-          
-          return {
+          const entryData = {
             projectId,
             personnelId: member.personnelId,
             roleId: member.roleId || null,
@@ -419,6 +412,10 @@ export default function WeeklyTimeRegister({ projectId, onSuccess, onCancel }: W
             endDate: endDate || startDate,
             billable: true
           };
+          
+          console.log('Creating entry:', entryData);
+          
+          return entryData;
         })
         .filter(Boolean);
 
