@@ -452,7 +452,7 @@ export default function ProjectDetailsStreamlined() {
                     <p className="text-sm font-semibold text-yellow-800">Markup Actual</p>
                   </div>
                   <p className="text-2xl font-bold text-yellow-600">
-                    {costSummary?.markup ? `${costSummary.markup.toFixed(2)}x` : '0.00x'}
+                    {typeof costSummary?.markup === 'number' ? `${costSummary.markup.toFixed(2)}x` : '0.00x'}
                   </p>
                   <p className="text-xs text-yellow-600">
                     {(() => {
@@ -475,11 +475,11 @@ export default function ProjectDetailsStreamlined() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="text-green-600">Precio:</span>
-                      <span className="font-medium">${costSummary?.targetClientPrice?.toLocaleString() || '0'}</span>
+                      <span className="font-medium">${typeof costSummary?.targetClientPrice === 'number' ? costSummary.targetClientPrice.toLocaleString() : '0'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-green-600">Costo:</span>
-                      <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || '0'}</span>
+                      <span className="font-medium">${typeof costSummary?.totalCost === 'number' ? costSummary.totalCost.toLocaleString() : '0'}</span>
                     </div>
                     <div className="flex justify-between text-xs font-bold pt-1 border-t border-green-200">
                       <span className="text-green-600">Margen:</span>
@@ -497,7 +497,7 @@ export default function ProjectDetailsStreamlined() {
                     <p className="text-sm font-semibold text-blue-800">Eficiencia Presupuestaria</p>
                   </div>
                   <p className="text-2xl font-bold text-blue-600">
-                    {costSummary?.budgetUtilization ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
+                    {typeof costSummary?.budgetUtilization === 'number' ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
                   </p>
                   <p className="text-xs text-blue-600">
                     {(() => {
@@ -554,7 +554,7 @@ export default function ProjectDetailsStreamlined() {
                         <div className="flex justify-between text-sm mb-1">
                           <span>Utilización Presupuesto</span>
                           <span className="font-bold">
-                            {costSummary?.budgetUtilization ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
+                            {typeof costSummary?.budgetUtilization === 'number' ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
                           </span>
                         </div>
                         <Progress 
@@ -574,14 +574,14 @@ export default function ProjectDetailsStreamlined() {
                           <Clock className="h-4 w-4 text-blue-600" />
                           <span className="text-sm">Horas Trabajadas</span>
                         </div>
-                        <span className="font-bold">{costSummary?.filteredHours?.toFixed(1) || '0'}</span>
+                        <span className="font-bold">{typeof costSummary?.filteredHours === 'number' ? costSummary.filteredHours.toFixed(1) : '0'}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-green-600" />
                           <span className="text-sm">Costo Total</span>
                         </div>
-                        <span className="font-bold">${costSummary?.totalCost?.toLocaleString() || '0'}</span>
+                        <span className="font-bold">${typeof costSummary?.totalCost === 'number' ? costSummary.totalCost.toLocaleString() : '0'}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
@@ -694,7 +694,7 @@ export default function ProjectDetailsStreamlined() {
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <p className="text-sm font-bold">{(entry.hours || 0)}h</p>
-                            <p className="text-xs text-slate-600">${(entry.totalCost || 0).toLocaleString()}</p>
+                            <p className="text-xs text-slate-600">${typeof entry.totalCost === 'number' ? entry.totalCost.toLocaleString() : '0'}</p>
                           </div>
                           <Button
                             variant="ghost"
