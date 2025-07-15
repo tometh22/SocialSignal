@@ -136,15 +136,20 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     const absPercentage = Math.abs(percentage);
     const minHoursThreshold = budgetedHours * 0.3;
     
-    // Usar la misma lógica inteligente del backend para determinar criticidad
+    // Lógica clara y descriptiva de clasificación
     if (absPercentage > 50 && actualHours > minHoursThreshold) {
-      return { variant: 'destructive' as const, label: 'Crítico', className: 'bg-red-600 text-white' };
+      // Sobrecosto crítico: trabajó mucho Y excedió presupuesto significativamente
+      return { variant: 'destructive' as const, label: 'Sobrecosto Crítico', className: 'bg-red-600 text-white' };
+    } else if (absPercentage > 50 && actualHours <= minHoursThreshold) {
+      // Subrendimiento: gran desviación pero por trabajar muy poco
+      return { variant: 'secondary' as const, label: 'Subrendimiento', className: 'bg-purple-500 text-white' };
     } else if (absPercentage >= 25) {
-      return { variant: 'destructive' as const, label: 'Alto', className: 'bg-orange-500 text-white' };
+      // Alto riesgo: desviación considerable
+      return { variant: 'destructive' as const, label: 'Alto Riesgo', className: 'bg-orange-500 text-white' };
     } else if (absPercentage >= 10) {
       return { variant: 'outline' as const, label: 'Atención', className: 'bg-yellow-500 text-white' };
     } else {
-      return { variant: 'secondary' as const, label: 'Normal', className: 'bg-blue-500 text-white' };
+      return { variant: 'secondary' as const, label: 'Normal', className: 'bg-green-500 text-white' };
     }
   };
 
@@ -310,6 +315,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                         const absDeviation = Math.abs(deviation.deviationPercentage);
                         const minHoursThreshold = deviation.budgetedHours * 0.3;
                         if (absDeviation > 50 && deviation.actualHours > minHoursThreshold) return 'bg-red-25';
+                        if (absDeviation > 50 && deviation.actualHours <= minHoursThreshold) return 'bg-purple-25';
                         if (absDeviation >= 25) return 'bg-orange-25';
                         return '';
                       })()
@@ -326,6 +332,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                                 const absDeviation = Math.abs(deviation.deviationPercentage);
                                 const minHoursThreshold = deviation.budgetedHours * 0.3;
                                 if (absDeviation > 50 && deviation.actualHours > minHoursThreshold) return 'bg-red-500';
+                                if (absDeviation > 50 && deviation.actualHours <= minHoursThreshold) return 'bg-purple-500';
                                 if (absDeviation >= 25) return 'bg-orange-500';
                                 if (absDeviation >= 10) return 'bg-yellow-500';
                                 return 'bg-green-500';

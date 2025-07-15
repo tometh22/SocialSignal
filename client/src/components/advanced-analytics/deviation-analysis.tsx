@@ -148,28 +148,54 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
     return "text-red-600";
   };
 
-  const getVarianceBadge = (percentage: number) => {
+  const getVarianceBadge = (percentage: number, actualHours: number, budgetedHours: number) => {
+    // Si no hay horas registradas, mostrar estado especial
+    if (actualHours === 0) {
+      return { 
+        variant: 'secondary' as const, 
+        label: 'Sin Actividad',
+        className: 'bg-gray-400 text-white'
+      };
+    }
+
     const absPercentage = Math.abs(percentage);
-    if (absPercentage < 20) return { 
-      variant: "default" as const, 
-      label: "Normal",
-      className: "bg-blue-500 text-white border-blue-600 hover:bg-blue-600"
-    };
-    if (absPercentage < 50) return { 
-      variant: "secondary" as const, 
-      label: "Atención",
-      className: "bg-yellow-500 text-white border-yellow-600 hover:bg-yellow-600"
-    };
-    if (absPercentage < 100) return { 
-      variant: "outline" as const, 
-      label: "Alto",
-      className: "bg-orange-500 text-white border-orange-600 hover:bg-orange-600"
-    };
-    return { 
-      variant: "destructive" as const, 
-      label: "Crítico",
-      className: "bg-red-500 text-white border-red-600 hover:bg-red-600"
-    };
+    const minHoursThreshold = budgetedHours * 0.3;
+    
+    // Lógica clara y descriptiva de clasificación - igual que en team-deviation-analysis
+    if (absPercentage > 50 && actualHours > minHoursThreshold) {
+      // Sobrecosto crítico: trabajó mucho Y excedió presupuesto significativamente
+      return { 
+        variant: "destructive" as const, 
+        label: "Sobrecosto Crítico",
+        className: "bg-red-500 text-white border-red-600 hover:bg-red-600"
+      };
+    } else if (absPercentage > 50 && actualHours <= minHoursThreshold) {
+      // Subrendimiento: gran desviación pero por trabajar muy poco
+      return { 
+        variant: 'secondary' as const, 
+        label: 'Subrendimiento',
+        className: 'bg-purple-500 text-white border-purple-600 hover:bg-purple-600'
+      };
+    } else if (absPercentage >= 25) {
+      // Alto riesgo: desviación considerable
+      return { 
+        variant: "outline" as const, 
+        label: "Alto Riesgo",
+        className: "bg-orange-500 text-white border-orange-600 hover:bg-orange-600"
+      };
+    } else if (absPercentage >= 10) {
+      return { 
+        variant: "secondary" as const, 
+        label: "Atención",
+        className: "bg-yellow-500 text-white border-yellow-600 hover:bg-yellow-600"
+      };
+    } else {
+      return { 
+        variant: "default" as const, 
+        label: "Normal",
+        className: "bg-green-500 text-white border-green-600 hover:bg-green-600"
+      };
+    }
   };
 
   return (

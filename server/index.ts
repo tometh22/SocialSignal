@@ -146,12 +146,19 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       if (Math.abs(deviationPercentage) > 25 || Math.abs(costDeviation) > 500) {
         let severity = 'high';
         
-        // Critical: High deviation AND significant work done (not just underperformance)
+        // Clasificación más clara y descriptiva:
         const minHoursThreshold = budgetedHours * 0.3;
-        const isCritical = Math.abs(deviationPercentage) > 50 && actualHours > minHoursThreshold;
+        const absDeviation = Math.abs(deviationPercentage);
         
-        if (isCritical) {
+        if (absDeviation > 50 && actualHours > minHoursThreshold) {
+          // Sobrecosto crítico: trabajó mucho Y excedió presupuesto significativamente
           severity = 'critical';
+        } else if (absDeviation > 50 && actualHours <= minHoursThreshold) {
+          // Subrendimiento: gran desviación pero por trabajar muy poco
+          severity = 'underperforming';
+        } else if (absDeviation >= 25) {
+          // Alto riesgo: desviación considerable
+          severity = 'high';
         }
         
         console.log(`🔍 ${deviation.personnelName}: ${Math.abs(deviationPercentage).toFixed(1)}% dev, ${actualHours}h actual, ${budgetedHours}h budget, threshold: ${minHoursThreshold.toFixed(1)}h → ${severity}`);
