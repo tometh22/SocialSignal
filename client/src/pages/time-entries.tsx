@@ -163,11 +163,47 @@ const CompactTimeForm: React.FC<{
         entryType: 'hours' as const,
       });
     },
-    onSuccess: (newEntry) => {
-      updateLocalEntries(newEntry);
+    onMutate: async (data: z.infer<typeof formSchema>) => {
+      // Crear un registro temporal para animación optimista
+      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
+      const tempEntry: TimeEntry = {
+        id: Date.now(), // ID temporal
+        projectId,
+        personnelId: data.personnelId,
+        componentId: data.componentId || null,
+        date: data.date.toISOString(),
+        hours: data.hours,
+        description: data.description || null,
+        approved: false,
+        approvedBy: null,
+        approvedDate: null,
+        billable: data.billable,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Agregar inmediatamente a la lista local
+      updateLocalEntries(tempEntry);
+      
+      // También actualizar el cache de React Query
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
-        return [...oldData, newEntry];
+        return [tempEntry, ...oldData];
       });
+
+      return { tempEntry };
+    },
+    onSuccess: (newEntry, variables, context) => {
+      // Reemplazar el registro temporal con el real
+      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+        return oldData.map(entry => 
+          entry.id === context?.tempEntry.id ? newEntry : entry
+        );
+      });
+
+      setLocalTimeEntries(prev => 
+        prev.map(entry => 
+          entry.id === context?.tempEntry.id ? newEntry : entry
+        )
+      );
 
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
@@ -187,7 +223,18 @@ const CompactTimeForm: React.FC<{
 
       onSuccess();
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // En caso de error, remover el registro temporal
+      if (context?.tempEntry) {
+        queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+          return oldData.filter(entry => entry.id !== context.tempEntry.id);
+        });
+
+        setLocalTimeEntries(prev => 
+          prev.filter(entry => entry.id !== context.tempEntry.id)
+        );
+      }
+
       toast({
         title: "❌ Error",
         description: error.message || "No se pudo crear el registro",
@@ -454,13 +501,30 @@ const TimeEntries: React.FC = () => {
       return apiRequest(`/api/time-entries/${entryId}`, "DELETE");
     },
     onMutate: async (entryId: number) => {
-      // Actualización optimista: remover inmediatamente de la lista local
-      setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
-      
-      // También actualizar el cache de React Query
-      queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
-        return oldData.filter(entry => entry.id !== entryId);
-      });
+      // Agregar animación de salida antes de remover
+      const element = document.querySelector(`[data-entry-id="${entryId}"]`) as HTMLElement;
+      if (element) {
+        element.style.transition = 'all 300ms ease-out';
+        element.style.transform = 'translateX(100%)';
+        element.style.opacity = '0';
+        
+        // Esperar que termine la animación antes de remover del estado
+        setTimeout(() => {
+          setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
+          
+          // También actualizar el cache de React Query
+          queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+            return oldData.filter(entry => entry.id !== entryId);
+          });
+        }, 300);
+      } else {
+        // Fallback si no se encuentra el elemento
+        setLocalTimeEntries(prev => prev.filter(entry => entry.id !== entryId));
+        
+        queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
+          return oldData.filter(entry => entry.id !== entryId);
+        });
+      }
     },
     onSuccess: () => {
       // Invalidar cache para asegurar sincronización
@@ -648,12 +712,31 @@ const TimeEntries: React.FC = () => {
                   <div className="divide-y divide-gray-100">
                     {filteredEntries.map((entry) => {
                       const person = personnel?.find(p => p.id === entry.personnelId);
+                      const isTemporary = entry.id > 1000000000000; // Detectar registros temporales
+                      
                       return (
-                        <div key={entry.id} className="flex items-center justify-between p-4 hover:bg-gray-50/50 transition-colors">
+                        <div 
+                          key={entry.id}
+                          data-entry-id={entry.id}
+                          className={cn(
+                            "flex items-center justify-between p-4 hover:bg-gray-50/50 transition-all duration-300 ease-in-out",
+                            "animate-in slide-in-from-top-2 fade-in-50",
+                            isTemporary && "opacity-70 bg-blue-50/30"
+                          )}
+                          style={{
+                            animationDelay: '0ms',
+                            animationDuration: '300ms'
+                          }}
+                        >
                           <div className="flex items-center gap-4">
                             <PersonAvatar name={person?.name || "Usuario"} className="h-10 w-10" />
                             <div>
-                              <div className="font-medium text-sm">{person?.name}</div>
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                {person?.name}
+                                {isTemporary && (
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+                                )}
+                              </div>
                               <div className="text-xs text-muted-foreground">
                                 {format(new Date(entry.date), "EEEE, dd MMM", { locale: es })}
                               </div>
@@ -682,7 +765,7 @@ const TimeEntries: React.FC = () => {
 
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" disabled={isTemporary}>
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
