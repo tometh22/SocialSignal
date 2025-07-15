@@ -124,7 +124,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
             Análisis Detallado de Desviaciones
           </div>
           <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">
-            {deviationData.majorDeviations.length} Desviaciones Críticas
+            {deviationData.majorDeviations.filter(d => d.severity === 'critical').length} Desviaciones Críticas
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -214,6 +214,56 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   </p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Desviaciones Críticas Detalladas */}
+        {deviationData.majorDeviations && deviationData.majorDeviations.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-sm mb-3 text-gray-700">Desviaciones Críticas Identificadas</h4>
+            <div className="space-y-3">
+              {deviationData.majorDeviations
+                .filter(deviation => deviation.severity === 'critical')
+                .map((deviation, index) => (
+                  <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-sm text-red-800">
+                          {deviation.personnelName || `Personal #${deviation.personnelId}`}
+                        </p>
+                        <p className="text-xs text-red-600">
+                          Desviación crítica: +{deviation.deviationPercentage?.toFixed(1)}%
+                        </p>
+                      </div>
+                      <Badge variant="destructive">CRÍTICO</Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <p className="text-gray-600 mb-1">Horas</p>
+                        <div className="flex justify-between">
+                          <span>Presup: {deviation.budgetedHours}h</span>
+                          <span>Real: {deviation.actualHours}h</span>
+                        </div>
+                        <p className="text-red-600 font-medium mt-1">
+                          Exceso: +{deviation.hourDeviation?.toFixed(1)}h
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-600 mb-1">Costo</p>
+                        <div className="flex justify-between">
+                          <span>Presup: ${deviation.budgetedCost?.toLocaleString()}</span>
+                          <span>Real: ${deviation.actualCost?.toLocaleString()}</span>
+                        </div>
+                        <p className="text-red-600 font-medium mt-1">
+                          Sobrecosto: ${Math.abs(deviation.costDeviation || 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         )}

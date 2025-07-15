@@ -195,7 +195,10 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       analysis
     };
     
+    const criticalDeviations = majorDeviations.filter(d => d.severity === 'critical');
     console.log(`🎯 Returning analysis: ${deviationByRole.length} members, variance: ${totalVariance.toFixed(2)}`);
+    console.log(`🚨 Critical deviations: ${criticalDeviations.length}, Major deviations: ${majorDeviations.length}`);
+    
     res.json(response);
   } catch (error) {
     console.error("❌ Error in deviation analysis:", error);
