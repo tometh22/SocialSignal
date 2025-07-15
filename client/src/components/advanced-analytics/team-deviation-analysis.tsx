@@ -74,6 +74,17 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     }
   };
 
+  const getSeverityScore = (deviation: Deviation) => {
+    // Si no hay horas registradas, dar la puntuación más baja
+    if (deviation.actualHours === 0) return -1;
+    
+    const absPercentage = Math.abs(deviation.deviationPercentage);
+    if (absPercentage >= 100) return 4; // Crítico
+    if (absPercentage >= 50) return 3;  // Alto
+    if (absPercentage >= 20) return 2;  // Atención
+    return 1; // Normal
+  };
+
   const getSortedData = () => {
     if (!deviationData?.deviationByRole) return [];
     
@@ -84,6 +95,15 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
       
       switch (sortField) {
         case 'deviation':
+          // Primero ordenar por severidad, luego por porcentaje absoluto
+          const severityA = getSeverityScore(a);
+          const severityB = getSeverityScore(b);
+          
+          if (severityA !== severityB) {
+            return sortDirection === 'desc' ? severityB - severityA : severityA - severityB;
+          }
+          
+          // Si tienen la misma severidad, ordenar por porcentaje absoluto
           valueA = Math.abs(a.deviationPercentage);
           valueB = Math.abs(b.deviationPercentage);
           break;
