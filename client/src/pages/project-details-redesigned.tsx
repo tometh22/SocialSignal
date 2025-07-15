@@ -1843,7 +1843,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-indigo-100 text-indigo-800 text-xs">
-                      {baseTeam?.filter((member: any) => getTimeWorkedByMember(member.personnelId) > 0).length || 0} activos
+                      {teamStats?.filter(member => member.hours > 0).length || 0} activos
                     </Badge>
                     <Button
                       size="sm"
