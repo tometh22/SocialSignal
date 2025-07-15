@@ -44,7 +44,7 @@ interface DeviationAnalysisData {
 }
 
 export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisProps) {
-  const [criticalOpen, setCriticalOpen] = useState(true);
+  const [criticalOpen, setCriticalOpen] = useState(false);
   const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
   
   const queryParams = dateFilter 
