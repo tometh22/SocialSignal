@@ -140,11 +140,25 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
 
       deviationByRole.push(deviation);
 
-      // Track major deviations
+      // Track major deviations with intelligent logic
+      // Only consider someone "critical" if they worked significant hours AND exceed budget significantly
+      // People with very low hours are "underperforming", not "critical cost overruns"
       if (Math.abs(deviationPercentage) > 25 || Math.abs(costDeviation) > 500) {
+        let severity = 'high';
+        
+        // Critical: High deviation AND significant work done (not just underperformance)
+        const minHoursThreshold = budgetedHours * 0.3;
+        const isCritical = Math.abs(deviationPercentage) > 50 && actualHours > minHoursThreshold;
+        
+        if (isCritical) {
+          severity = 'critical';
+        }
+        
+        console.log(`🔍 ${deviation.personnelName}: ${Math.abs(deviationPercentage).toFixed(1)}% dev, ${actualHours}h actual, ${budgetedHours}h budget, threshold: ${minHoursThreshold.toFixed(1)}h → ${severity}`);
+        
         majorDeviations.push({
           ...deviation,
-          severity: Math.abs(deviationPercentage) > 50 ? 'critical' : 'high'
+          severity
         });
       }
     }

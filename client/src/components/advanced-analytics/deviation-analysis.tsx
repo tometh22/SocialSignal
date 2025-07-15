@@ -110,8 +110,13 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
   // Debug logs para verificar datos
   console.log('🔍 DeviationAnalysis - Datos recibidos:', deviationData);
   if (deviationData?.deviationByRole) {
-    const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
-    console.log('🚨 DeviationAnalysis - Críticas calculadas (>50%):', criticalCount);
+    // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
+    const criticalCount = deviationData.deviationByRole.filter(d => {
+      const absDeviation = Math.abs(d.deviationPercentage);
+      const minHoursThreshold = d.budgetedHours * 0.3;
+      return absDeviation > 50 && d.actualHours > minHoursThreshold;
+    }).length;
+    console.log('🚨 DeviationAnalysis - Críticas calculadas (lógica inteligente):', criticalCount);
     console.log('🚨 DeviationAnalysis - Miembros con horas:', deviationData.deviationByRole.filter(d => d.actualHours > 0));
   }
 
@@ -177,8 +182,13 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
           </div>
           <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">
             {(() => {
-              const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
-              console.log('🎯 BADGE DeviationAnalysis - Críticas en badge (>50%):', criticalCount);
+              // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
+              const criticalCount = deviationData.deviationByRole.filter(d => {
+                const absDeviation = Math.abs(d.deviationPercentage);
+                const minHoursThreshold = d.budgetedHours * 0.3;
+                return absDeviation > 50 && d.actualHours > minHoursThreshold;
+              }).length;
+              console.log('🎯 BADGE DeviationAnalysis - Críticas en badge (lógica inteligente):', criticalCount);
               return criticalCount;
             })()} Desviaciones Críticas
           </Badge>

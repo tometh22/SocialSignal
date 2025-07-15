@@ -123,7 +123,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     });
   };
 
-  const getVarianceBadge = (percentage: number, actualHours: number) => {
+  const getVarianceBadge = (percentage: number, actualHours: number, budgetedHours: number) => {
     // Si no hay horas registradas, mostrar estado especial
     if (actualHours === 0) {
       return { 
@@ -134,7 +134,10 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     }
 
     const absPercentage = Math.abs(percentage);
-    if (absPercentage > 50) {
+    const minHoursThreshold = budgetedHours * 0.3;
+    
+    // Usar la misma lógica inteligente del backend para determinar criticidad
+    if (absPercentage > 50 && actualHours > minHoursThreshold) {
       return { variant: 'destructive' as const, label: 'Crítico', className: 'bg-red-600 text-white' };
     } else if (absPercentage >= 25) {
       return { variant: 'destructive' as const, label: 'Alto', className: 'bg-orange-500 text-white' };
@@ -170,8 +173,13 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
   // Debug logs para verificar datos
   console.log('🔍 TeamDeviationAnalysis - Datos recibidos:', deviationData);
   if (deviationData?.deviationByRole) {
-    const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
-    console.log('🚨 TeamDeviationAnalysis - Críticas calculadas (>50%):', criticalCount);
+    // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
+    const criticalCount = deviationData.deviationByRole.filter(d => {
+      const absDeviation = Math.abs(d.deviationPercentage);
+      const minHoursThreshold = d.budgetedHours * 0.3;
+      return absDeviation > 50 && d.actualHours > minHoursThreshold;
+    }).length;
+    console.log('🚨 TeamDeviationAnalysis - Críticas calculadas (lógica inteligente):', criticalCount);
     console.log('🚨 TeamDeviationAnalysis - Miembros con horas:', deviationData.deviationByRole.filter(d => d.actualHours > 0));
   }
 
@@ -194,8 +202,13 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
           </div>
           <div className="text-2xl font-bold text-red-600">
             {(() => {
-              const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
-              console.log('🎯 TEAM TeamDeviationAnalysis - Críticas en resumen (>50%):', criticalCount);
+              // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
+              const criticalCount = deviationData.deviationByRole.filter(d => {
+                const absDeviation = Math.abs(d.deviationPercentage);
+                const minHoursThreshold = d.budgetedHours * 0.3;
+                return absDeviation > 50 && d.actualHours > minHoursThreshold;
+              }).length;
+              console.log('🎯 TEAM TeamDeviationAnalysis - Críticas en resumen (lógica inteligente):', criticalCount);
               return criticalCount;
             })()}
           </div>
@@ -288,13 +301,18 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <tbody className="bg-white divide-y divide-gray-200">
               {getSortedData()
                 .map((deviation, index) => {
-                  const badge = getVarianceBadge(deviation.deviationPercentage, deviation.actualHours);
+                  const badge = getVarianceBadge(deviation.deviationPercentage, deviation.actualHours, deviation.budgetedHours);
                   const progressPercentage = deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0;
                   
                   return (
                     <tr key={index} className={`hover:bg-gray-50 transition-colors ${
-                      Math.abs(deviation.deviationPercentage) > 50 ? 'bg-red-25' :
-                      Math.abs(deviation.deviationPercentage) >= 25 ? 'bg-orange-25' : ''
+                      (() => {
+                        const absDeviation = Math.abs(deviation.deviationPercentage);
+                        const minHoursThreshold = deviation.budgetedHours * 0.3;
+                        if (absDeviation > 50 && deviation.actualHours > minHoursThreshold) return 'bg-red-25';
+                        if (absDeviation >= 25) return 'bg-orange-25';
+                        return '';
+                      })()
                     }`}>
                       {/* Miembro */}
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -304,9 +322,14 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                           </div>
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className={`text-xs text-white font-semibold ${
-                              Math.abs(deviation.deviationPercentage) > 50 ? 'bg-red-500' : 
-                              Math.abs(deviation.deviationPercentage) >= 25 ? 'bg-orange-500' : 
-                              Math.abs(deviation.deviationPercentage) >= 10 ? 'bg-yellow-500' : 'bg-green-500'
+                              (() => {
+                                const absDeviation = Math.abs(deviation.deviationPercentage);
+                                const minHoursThreshold = deviation.budgetedHours * 0.3;
+                                if (absDeviation > 50 && deviation.actualHours > minHoursThreshold) return 'bg-red-500';
+                                if (absDeviation >= 25) return 'bg-orange-500';
+                                if (absDeviation >= 10) return 'bg-yellow-500';
+                                return 'bg-green-500';
+                              })()
                             }`}>
                               {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
                             </AvatarFallback>
