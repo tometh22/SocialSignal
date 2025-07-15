@@ -10,6 +10,7 @@ interface DeviationAnalysisProps {
     startDate: string;
     endDate: string;
   };
+  onNavigateToTab?: (tabValue: string) => void;
 }
 
 interface Deviation {
@@ -41,7 +42,7 @@ interface DeviationAnalysisData {
   }>;
 }
 
-export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisProps) {
+export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: DeviationAnalysisProps) {
   
   const queryParams = dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
@@ -61,6 +62,30 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
     },
     enabled: !!projectId
   });
+
+  // Función para determinar a qué pestaña navegar según el tipo de alerta
+  const getNavigationTab = (alertType: string) => {
+    switch (alertType) {
+      case 'critical_deviations':
+      case 'high_variance':
+      case 'team_efficiency':
+        return 'team-analysis'; // Navegar a Análisis de Equipo
+      case 'budget_overrun':
+      case 'efficiency_opportunity':
+        return 'details'; // Navegar a Análisis Mensual
+      case 'scope_change':
+        return 'time-management'; // Navegar a Registro de Tiempo
+      default:
+        return 'team-analysis'; // Por defecto ir a Análisis de Equipo
+    }
+  };
+
+  const handleAlertClick = (alertType: string) => {
+    if (onNavigateToTab) {
+      const targetTab = getNavigationTab(alertType);
+      onNavigateToTab(targetTab);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -239,11 +264,16 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   return severityOrder[b.severity] - severityOrder[a.severity];
                 })
                 .map((item, index) => (
-                <div key={index} className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
-                  item.severity === 'high' ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300 shadow-md' : 
-                  item.severity === 'medium' ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300' :
-                  'bg-gradient-to-r from-green-50 to-green-100 border-green-300'
-                }`}>
+                <div 
+                  key={index} 
+                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer hover:scale-[1.02] ${
+                    item.severity === 'high' ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300 shadow-md hover:border-red-400' : 
+                    item.severity === 'medium' ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300 hover:border-yellow-400' :
+                    'bg-gradient-to-r from-green-50 to-green-100 border-green-300 hover:border-green-400'
+                  }`}
+                  onClick={() => handleAlertClick(item.type)}
+                  title="Haz clic para navegar a la sección relevante"
+                >
                   <div className="flex items-center gap-3 mb-2">
                     <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
                       item.severity === 'high' ? 'bg-red-600' : 

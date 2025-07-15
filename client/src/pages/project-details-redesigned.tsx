@@ -1377,6 +1377,7 @@ export default function ProjectDetailsRedesigned() {
                     startDate: dateFilter.startDate.toISOString(),
                     endDate: dateFilter.endDate.toISOString()
                   }}
+                  onNavigateToTab={setActiveTab}
                 />
               </div>
               
