@@ -1289,7 +1289,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {costSummary?.hoursProgress || 0}%
+                      {(costSummary?.hoursProgress || 0).toFixed(1)}%
                     </p>
                     <Progress value={costSummary?.hoursProgress || 0} className="h-2" />
                   </div>
@@ -1314,7 +1314,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {costSummary?.budgetUtilization || 0}%
+                      {(costSummary?.budgetUtilization || 0).toFixed(1)}%
                     </p>
                     <Progress 
                       value={costSummary?.budgetUtilization || 0} 

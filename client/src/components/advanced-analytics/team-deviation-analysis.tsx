@@ -366,7 +366,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                               style={{ width: `${Math.min(100, progressPercentage)}%` }}
                             />
                           </div>
-                          <div className="text-xs text-gray-500">{progressPercentage.toFixed(0)}% progreso</div>
+                          <div className="text-xs text-gray-500">{progressPercentage.toFixed(1)}% progreso</div>
                         </div>
                       </td>
 
@@ -380,7 +380,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                             Presup: ${deviation.budgetedCost.toLocaleString()}
                           </div>
                           <div className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
-                            {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
+                            {deviation.deviationPercentage > 0 ? '+' : ''}{(deviation.deviationPercentage || 0).toFixed(1)}%
                           </div>
                         </div>
                       </td>
@@ -389,10 +389,10 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                       <td className="px-6 py-4 text-center">
                         <div className="space-y-1">
                           <div className={`text-lg font-bold ${getVarianceColor(deviation.deviationPercentage)}`}>
-                            {deviation.deviationPercentage > 0 ? '+' : ''}{Math.abs(deviation.deviationPercentage)?.toFixed(1) || '0'}%
+                            {deviation.deviationPercentage > 0 ? '+' : ''}{Math.abs(deviation.deviationPercentage || 0).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
-                            {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h diferencia
+                            {deviation.hourDeviation > 0 ? '+' : ''}{(deviation.hourDeviation || 0).toFixed(1)}h diferencia
                           </div>
                         </div>
                       </td>
