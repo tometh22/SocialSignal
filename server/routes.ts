@@ -4582,6 +4582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
       
+      console.log(`🔍 Recommendations - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });

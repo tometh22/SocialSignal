@@ -75,7 +75,50 @@ export function Recommendations({ projectId, dateFilter }: RecommendationsProps)
     );
   }
 
-  if (!recommendationsData) return null;
+  // Verificar si no hay datos o si las recomendaciones están vacías  
+  if (!recommendationsData || !recommendationsData.recommendations || recommendationsData.recommendations.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Estado vacío para predicciones */}
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              Predicciones del Proyecto
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No hay datos suficientes para generar predicciones</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Las predicciones aparecerán cuando haya registros de tiempo en el período seleccionado
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Estado vacío para recomendaciones */}
+        <Card className="border-l-4 border-l-green-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-green-600" />
+              Recomendaciones Automáticas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Lightbulb className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No hay recomendaciones disponibles</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Las sugerencias aparecerán cuando haya actividad en el rango de fechas elegido
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

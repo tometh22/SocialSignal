@@ -86,7 +86,28 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
     );
   }
 
-  if (!deviationData) return null;
+  // Verificar si no hay datos o si los datos están vacíos
+  if (!deviationData || !deviationData.deviationByRole || deviationData.deviationByRole.length === 0) {
+    return (
+      <Card className="border-l-4 border-l-orange-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-600" />
+            Análisis Detallado de Desviaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500">No hay registros de tiempo para el período seleccionado</p>
+            <p className="text-sm text-gray-400 mt-1">
+              El análisis aparecerá cuando haya entradas de tiempo en el rango de fechas elegido
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const getVarianceColor = (percentage: number) => {
     if (Math.abs(percentage) < 10) return "text-green-600";
