@@ -1466,66 +1466,88 @@ export default function ProjectDetailsRedesigned() {
           <TabsContent value="team-analysis" className="space-y-6">
             {/* Análisis operativo del equipo */}
             <div className="space-y-6">
-              {/* Métricas de Rendimiento del Equipo */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    <p className="text-sm font-medium text-blue-800">Miembros Activos</p>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {teamStats?.length || 0}
-                  </p>
-                  <p className="text-xs text-blue-600">en el período</p>
-                </div>
-
-                <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-800">Horas Trabajadas</p>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">
-                    {costSummary?.filteredHours || 0}h
-                  </p>
-                  <p className="text-xs text-green-600">total acumulado</p>
-                </div>
-
-                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-purple-600" />
-                    <p className="text-sm font-medium text-purple-800">Eficiencia</p>
-                  </div>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {costSummary?.targetHours && costSummary?.filteredHours 
-                      ? ((costSummary.filteredHours / costSummary.targetHours) * 100).toFixed(0)
-                      : '0'}%
-                  </p>
-                  <p className="text-xs text-purple-600">vs. objetivo</p>
-                </div>
-
-                <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-4 w-4 text-orange-600" />
-                    <p className="text-sm font-medium text-orange-800">Promedio/Miembro</p>
-                  </div>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {teamStats && teamStats.length > 0 
-                      ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length).toFixed(1)
-                      : '0.0'}h
-                  </p>
-                  <p className="text-xs text-orange-600">por persona</p>
-                </div>
-              </div>
-
-              {/* Análisis de Desviaciones por Miembro */}
-              <Card className="border-l-4 border-l-red-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                    Análisis de Desviaciones por Miembro
+              
+              {/* Resumen de Métricas Clave */}
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-gray-50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <BarChart3 className="h-6 w-6 text-blue-600" />
+                    </div>
+                    Resumen Operativo del Equipo
                   </CardTitle>
-                  <CardDescription>
-                    Desviaciones de presupuesto y tiempo para cada miembro del equipo en el período seleccionado
+                  <CardDescription className="text-base">
+                    Métricas clave de rendimiento para el período {dateFilter.label}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {/* Miembros Activos */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
+                        <Users className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-blue-600 mb-1">
+                        {teamStats?.length || 0}
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Miembros Activos</div>
+                      <div className="text-xs text-gray-500 mt-1">con actividad registrada</div>
+                    </div>
+
+                    {/* Horas Trabajadas */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-green-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
+                        <Clock className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-green-600 mb-1">
+                        {costSummary?.filteredHours || 0}h
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Horas Trabajadas</div>
+                      <div className="text-xs text-gray-500 mt-1">total del período</div>
+                    </div>
+
+                    {/* Eficiencia */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-purple-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
+                        <Target className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-purple-600 mb-1">
+                        {costSummary?.targetHours && costSummary?.filteredHours 
+                          ? ((costSummary.filteredHours / costSummary.targetHours) * 100).toFixed(0)
+                          : '0'}%
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Progreso</div>
+                      <div className="text-xs text-gray-500 mt-1">vs. objetivo planeado</div>
+                    </div>
+
+                    {/* Promedio por Miembro */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
+                        <Activity className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-orange-600 mb-1">
+                        {teamStats && teamStats.length > 0 
+                          ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length).toFixed(1)
+                          : '0.0'}h
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Promedio</div>
+                      <div className="text-xs text-gray-500 mt-1">horas por persona</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análisis de Desviaciones - Tabla Mejorada */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <AlertTriangle className="h-6 w-6 text-red-600" />
+                    </div>
+                    Análisis de Desviaciones del Equipo
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    Comparativa de rendimiento vs. objetivos presupuestados
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface TeamDeviationAnalysisProps {
   projectId: number;
@@ -103,70 +104,156 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
 
   return (
     <div className="space-y-4">
-      {deviationData.deviationByRole
-        .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
-        .map((deviation, index) => {
-          const badge = getVarianceBadge(deviation.deviationPercentage);
-          return (
-            <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                      {index + 1}
-                    </div>
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className={`text-xs text-white font-semibold ${
-                        deviation.severity === 'critical' ? 'bg-red-500' : 
-                        deviation.severity === 'high' ? 'bg-orange-500' : 
-                        deviation.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                      }`}>
-                        {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-gray-800">
-                      {deviation.personnelName || `Personal #${deviation.personnelId}`}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
-                    </p>
-                  </div>
-                </div>
-                <Badge variant={badge.variant} className={`px-2 py-1 text-xs ${badge.className}`}>{badge.label}</Badge>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-2 rounded">
-                <div className="space-y-1">
-                  <p className="text-gray-700 font-medium">Horas</p>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Presup: {deviation.budgetedHours}h</span>
-                    <span>Real: {deviation.actualHours}h</span>
-                  </div>
-                  <Progress 
-                    value={Math.min(100, deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0)} 
-                    className="h-1 mt-1"
-                  />
-                  <p className={`text-xs font-semibold ${getVarianceColor((deviation.hourDeviation / Math.max(deviation.budgetedHours, 1)) * 100)}`}>
-                    Diferencia: {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h
-                  </p>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-gray-700 font-medium">Costo</p>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Presup: ${deviation.budgetedCost.toLocaleString()}</span>
-                    <span>Real: ${deviation.actualCost?.toLocaleString() || '0'}</span>
-                  </div>
-                  <p className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
-                    Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      {/* Resumen General */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <span className="text-sm font-medium text-red-800">Críticas</span>
+          </div>
+          <div className="text-2xl font-bold text-red-600">
+            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) >= 100).length}
+          </div>
+          <div className="text-xs text-red-600">desviaciones ≥100%</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <span className="text-sm font-medium text-orange-800">Altas</span>
+          </div>
+          <div className="text-2xl font-bold text-orange-600">
+            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) >= 50 && Math.abs(d.deviationPercentage) < 100).length}
+          </div>
+          <div className="text-xs text-orange-600">desviaciones 50-99%</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span className="text-sm font-medium text-green-800">Normales</span>
+          </div>
+          <div className="text-2xl font-bold text-green-600">
+            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) < 20).length}
+          </div>
+          <div className="text-xs text-green-600">desviaciones &lt;20%</div>
+        </div>
+      </div>
+
+      {/* Tabla de Análisis Detallado */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">Análisis Detallado por Miembro</h3>
+          <p className="text-sm text-gray-600 mt-1">Ordenado por severidad de desviación</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miembro</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Horas</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Desviación</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {deviationData.deviationByRole
+                .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
+                .map((deviation, index) => {
+                  const badge = getVarianceBadge(deviation.deviationPercentage);
+                  const progressPercentage = deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0;
+                  
+                  return (
+                    <tr key={index} className={`hover:bg-gray-50 transition-colors ${
+                      Math.abs(deviation.deviationPercentage) >= 100 ? 'bg-red-25' :
+                      Math.abs(deviation.deviationPercentage) >= 50 ? 'bg-orange-25' : ''
+                    }`}>
+                      {/* Miembro */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold">
+                            {index + 1}
+                          </div>
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className={`text-xs text-white font-semibold ${
+                              Math.abs(deviation.deviationPercentage) >= 100 ? 'bg-red-500' : 
+                              Math.abs(deviation.deviationPercentage) >= 50 ? 'bg-orange-500' : 
+                              Math.abs(deviation.deviationPercentage) >= 20 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}>
+                              {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {deviation.personnelName || `Personal #${deviation.personnelId}`}
+                            </div>
+                            <div className="text-xs text-gray-500">ID: {deviation.personnelId}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Horas */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="space-y-1">
+                          <div className="text-sm text-gray-900">
+                            <span className="font-medium">{deviation.actualHours}h</span>
+                            <span className="text-gray-500"> / {deviation.budgetedHours}h</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                progressPercentage > 100 ? 'bg-red-500' :
+                                progressPercentage > 80 ? 'bg-orange-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(100, progressPercentage)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500">{progressPercentage.toFixed(0)}% progreso</div>
+                        </div>
+                      </td>
+
+                      {/* Costo */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            ${deviation.actualCost?.toLocaleString() || '0'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Presup: ${deviation.budgetedCost.toLocaleString()}
+                          </div>
+                          <div className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
+                            {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Desviación */}
+                      <td className="px-6 py-4 text-center">
+                        <div className="space-y-1">
+                          <div className={`text-lg font-bold ${getVarianceColor(deviation.deviationPercentage)}`}>
+                            {deviation.deviationPercentage > 0 ? '+' : ''}{Math.abs(deviation.deviationPercentage)?.toFixed(1) || '0'}%
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h diferencia
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Estado */}
+                      <td className="px-6 py-4 text-center">
+                        <Badge variant={badge.variant} className={`px-3 py-1 text-xs font-medium ${badge.className}`}>
+                          {badge.label}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
