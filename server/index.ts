@@ -122,8 +122,13 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         membersUnderBudget++;
       }
 
+      // Get personnel name
+      const personnelInfo = personnelMap.get(member.personnelId);
+      const personnelName = personnelInfo?.name || `Personal ${member.personnelId}`;
+
       const deviation = {
         personnelId: member.personnelId,
+        personnelName,
         budgetedHours,
         actualHours,
         budgetedCost,
@@ -144,12 +149,12 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       }
     }
 
-    // Generate analysis
+    // Generate analysis in Spanish
     const analysis = [];
     if (totalVariance > 1000) {
       analysis.push({
         type: 'budget_overrun',
-        message: `Project is ${totalVariance.toFixed(2)} USD over budget`,
+        message: `El proyecto tiene un sobrecosto de $${totalVariance.toFixed(2)} USD respecto al presupuesto`,
         severity: 'high'
       });
     }
@@ -157,8 +162,28 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     if (membersOverBudget > teamMembers.length * 0.3) {
       analysis.push({
         type: 'team_efficiency',
-        message: `${membersOverBudget} team members are significantly over budget`,
+        message: `${membersOverBudget} miembros del equipo superan significativamente el presupuesto asignado`,
         severity: 'medium'
+      });
+    }
+
+    // Add more analysis insights
+    if (majorDeviations.length > 0) {
+      const criticalCount = majorDeviations.filter(d => d.severity === 'critical').length;
+      if (criticalCount > 0) {
+        analysis.push({
+          type: 'critical_deviations',
+          message: `Se detectaron ${criticalCount} desviaciones críticas que requieren atención inmediata`,
+          severity: 'high'
+        });
+      }
+    }
+
+    if (membersUnderBudget > membersOverBudget) {
+      analysis.push({
+        type: 'efficiency_opportunity',
+        message: `${membersUnderBudget} miembros están por debajo del presupuesto, lo que indica buena eficiencia`,
+        severity: 'low'
       });
     }
 

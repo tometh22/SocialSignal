@@ -135,13 +135,13 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">Varianza Total</span>
+              <span className="text-sm font-medium text-blue-800">Diferencia vs Presupuesto</span>
             </div>
             <p className="text-xl font-bold text-blue-600">
               ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
             </p>
             <p className="text-xs text-blue-600">
-              {deviationData.totalVariance.variance > 0 ? "Sobrecosto" : "Bajo presupuesto"}
+              {deviationData.totalVariance.variance > 0 ? "Por encima del presupuesto" : "Por debajo del presupuesto"}
             </p>
           </div>
 
@@ -186,21 +186,29 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
             <div className="space-y-2">
               {deviationData.analysis.map((item, index) => (
                 <div key={index} className={`p-3 rounded-lg border ${
-                  item.severity === 'high' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                  item.severity === 'high' ? 'bg-red-50 border-red-200' : 
+                  item.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                  'bg-green-50 border-green-200'
                 }`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={`font-medium text-sm ${
-                      item.severity === 'high' ? 'text-red-800' : 'text-yellow-800'
+                      item.severity === 'high' ? 'text-red-800' : 
+                      item.severity === 'medium' ? 'text-yellow-800' : 'text-green-800'
                     }`}>
                       {item.type === 'budget_overrun' ? 'Sobrecosto del Proyecto' : 
-                       item.type === 'team_efficiency' ? 'Eficiencia del Equipo' : item.type}
+                       item.type === 'team_efficiency' ? 'Eficiencia del Equipo' : 
+                       item.type === 'critical_deviations' ? 'Desviaciones Críticas' :
+                       item.type === 'efficiency_opportunity' ? 'Oportunidad de Eficiencia' :
+                       item.type === 'high_variance' ? 'Alta Variabilidad' :
+                       item.type === 'scope_change' ? 'Cambio de Alcance' : item.type}
                     </span>
                     <Badge variant={item.severity === 'high' ? 'destructive' : 'secondary'}>
                       {item.severity === 'high' ? 'Alto' : item.severity === 'medium' ? 'Medio' : 'Bajo'}
                     </Badge>
                   </div>
                   <p className={`text-xs ${
-                    item.severity === 'high' ? 'text-red-600' : 'text-yellow-600'
+                    item.severity === 'high' ? 'text-red-600' : 
+                    item.severity === 'medium' ? 'text-yellow-600' : 'text-green-600'
                   }`}>
                     {item.message}
                   </p>
@@ -223,9 +231,15 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   <div key={index} className="bg-gray-50 p-4 rounded-lg border">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="font-medium text-sm">Personnel ID: {deviation.personnelId}</p>
+                        <p className="font-medium text-sm">
+                          {deviation.personnelName || `Personal #${deviation.personnelId}`}
+                        </p>
                         {deviation.severity && (
-                          <p className="text-xs text-gray-500 capitalize">{deviation.severity}</p>
+                          <p className="text-xs text-gray-500">
+                            Prioridad: {deviation.severity === 'critical' ? 'Crítica' : 
+                                      deviation.severity === 'high' ? 'Alta' : 
+                                      deviation.severity === 'medium' ? 'Media' : 'Baja'}
+                          </p>
                         )}
                       </div>
                       <Badge variant={badge.variant}>{badge.label}</Badge>
@@ -235,7 +249,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                       <div>
                         <p className="text-gray-600 mb-1">Horas</p>
                         <div className="flex justify-between">
-                          <span>Estimado: {deviation.budgetedHours}h</span>
+                          <span>Presup: {deviation.budgetedHours}h</span>
                           <span>Real: {deviation.actualHours}h</span>
                         </div>
                         <Progress 
@@ -243,18 +257,18 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                           className="h-1 mt-1"
                         />
                         <p className={`text-xs font-medium mt-1 ${getVarianceColor((deviation.hourDeviation / Math.max(deviation.budgetedHours, 1)) * 100)}`}>
-                          {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h
+                          Diferencia: {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h
                         </p>
                       </div>
                       
                       <div>
                         <p className="text-gray-600 mb-1">Costo</p>
                         <div className="flex justify-between">
-                          <span>Est: ${deviation.budgetedCost.toLocaleString()}</span>
+                          <span>Presup: ${deviation.budgetedCost.toLocaleString()}</span>
                           <span>Real: ${deviation.actualCost?.toLocaleString() || '0'}</span>
                         </div>
                         <p className={`text-xs font-medium mt-1 ${getVarianceColor(deviation.deviationPercentage)}`}>
-                          {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
+                          Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
                         </p>
                       </div>
                     </div>
