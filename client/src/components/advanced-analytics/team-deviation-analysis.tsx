@@ -134,11 +134,11 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     }
 
     const absPercentage = Math.abs(percentage);
-    if (absPercentage >= 100) {
+    if (absPercentage > 50) {
       return { variant: 'destructive' as const, label: 'Crítico', className: 'bg-red-600 text-white' };
-    } else if (absPercentage >= 50) {
+    } else if (absPercentage >= 25) {
       return { variant: 'destructive' as const, label: 'Alto', className: 'bg-orange-500 text-white' };
-    } else if (absPercentage >= 20) {
+    } else if (absPercentage >= 10) {
       return { variant: 'outline' as const, label: 'Atención', className: 'bg-yellow-500 text-white' };
     } else {
       return { variant: 'secondary' as const, label: 'Normal', className: 'bg-blue-500 text-white' };
@@ -167,6 +167,14 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     );
   }
 
+  // Debug logs para verificar datos
+  console.log('🔍 TeamDeviationAnalysis - Datos recibidos:', deviationData);
+  if (deviationData?.deviationByRole) {
+    const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
+    console.log('🚨 TeamDeviationAnalysis - Críticas calculadas (>50%):', criticalCount);
+    console.log('🚨 TeamDeviationAnalysis - Miembros con horas:', deviationData.deviationByRole.filter(d => d.actualHours > 0));
+  }
+
   if (!deviationData.deviationByRole || deviationData.deviationByRole.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -185,9 +193,13 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-red-800">Críticas</span>
           </div>
           <div className="text-2xl font-bold text-red-600">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length}
+            {(() => {
+              const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
+              console.log('🎯 TEAM TeamDeviationAnalysis - Críticas en resumen (>50%):', criticalCount);
+              return criticalCount;
+            })()}
           </div>
-          <div className="text-xs text-red-600">desviaciones ≥100%</div>
+          <div className="text-xs text-red-600">desviaciones &gt;50%</div>
         </div>
 
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
@@ -196,9 +208,9 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-orange-800">Altas</span>
           </div>
           <div className="text-2xl font-bold text-orange-600">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 50 && Math.abs(d.deviationPercentage) < 100).length}
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 25 && Math.abs(d.deviationPercentage) <= 50).length}
           </div>
-          <div className="text-xs text-orange-600">desviaciones 50-99%</div>
+          <div className="text-xs text-orange-600">desviaciones 25-50%</div>
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
@@ -207,9 +219,9 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-green-800">Normales</span>
           </div>
           <div className="text-2xl font-bold text-green-600">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) < 20).length}
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) < 10).length}
           </div>
-          <div className="text-xs text-green-600">desviaciones &lt;20%</div>
+          <div className="text-xs text-green-600">desviaciones &lt;10%</div>
         </div>
       </div>
 
@@ -281,8 +293,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                   
                   return (
                     <tr key={index} className={`hover:bg-gray-50 transition-colors ${
-                      Math.abs(deviation.deviationPercentage) >= 100 ? 'bg-red-25' :
-                      Math.abs(deviation.deviationPercentage) >= 50 ? 'bg-orange-25' : ''
+                      Math.abs(deviation.deviationPercentage) > 50 ? 'bg-red-25' :
+                      Math.abs(deviation.deviationPercentage) >= 25 ? 'bg-orange-25' : ''
                     }`}>
                       {/* Miembro */}
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -292,9 +304,9 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                           </div>
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className={`text-xs text-white font-semibold ${
-                              Math.abs(deviation.deviationPercentage) >= 100 ? 'bg-red-500' : 
-                              Math.abs(deviation.deviationPercentage) >= 50 ? 'bg-orange-500' : 
-                              Math.abs(deviation.deviationPercentage) >= 20 ? 'bg-yellow-500' : 'bg-green-500'
+                              Math.abs(deviation.deviationPercentage) > 50 ? 'bg-red-500' : 
+                              Math.abs(deviation.deviationPercentage) >= 25 ? 'bg-orange-500' : 
+                              Math.abs(deviation.deviationPercentage) >= 10 ? 'bg-yellow-500' : 'bg-green-500'
                             }`}>
                               {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
                             </AvatarFallback>

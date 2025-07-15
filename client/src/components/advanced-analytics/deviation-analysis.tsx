@@ -107,6 +107,14 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
   }
 
   // Verificar si no hay datos o si los datos están vacíos
+  // Debug logs para verificar datos
+  console.log('🔍 DeviationAnalysis - Datos recibidos:', deviationData);
+  if (deviationData?.deviationByRole) {
+    const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
+    console.log('🚨 DeviationAnalysis - Críticas calculadas (>50%):', criticalCount);
+    console.log('🚨 DeviationAnalysis - Miembros con horas:', deviationData.deviationByRole.filter(d => d.actualHours > 0));
+  }
+
   if (!deviationData || !deviationData.deviationByRole || deviationData.deviationByRole.length === 0) {
     return (
       <Card className="border-l-4 border-l-orange-500">
@@ -168,7 +176,11 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
             Análisis Detallado de Desviaciones
           </div>
           <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length} Desviaciones Críticas
+            {(() => {
+              const criticalCount = deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) > 50).length;
+              console.log('🎯 BADGE DeviationAnalysis - Críticas en badge (>50%):', criticalCount);
+              return criticalCount;
+            })()} Desviaciones Críticas
           </Badge>
         </CardTitle>
       </CardHeader>
