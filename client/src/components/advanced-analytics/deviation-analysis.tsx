@@ -296,6 +296,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
               <div className="space-y-3">
                 {deviationData.majorDeviations
                   .filter(deviation => deviation.severity === 'critical')
+                  .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
                   .map((deviation, index) => (
                     <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
                       <div className="flex items-center justify-between mb-2">
