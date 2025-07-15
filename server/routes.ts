@@ -4489,13 +4489,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
-      const projectTimeEntries = await db.select({
-        timeEntry: timeEntries,
-        personnel: personnel
-      })
+      console.log(`🔍 Building query with conditions:`, whereConditions);
+      
+      // Simplificar la consulta para evitar problemas de relaciones
+      const projectTimeEntries = await db.select()
         .from(timeEntries)
-        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
         .where(and(...whereConditions));
+      
+      console.log(`🔍 Found ${projectTimeEntries.length} time entries before joining with personnel`);
+      
+      // Obtener información del personal por separado
+      const personnelIds = [...new Set(projectTimeEntries.map(entry => entry.personnelId))];
+      const personnelData = personnelIds.length > 0 ? await db.select()
+        .from(personnel)
+        .where(sql`${personnel.id} IN (${personnelIds.join(',')})`) : [];
+      
+      console.log(`🔍 Found ${personnelData.length} personnel records`);
       
       console.log(`🔍 Deviation analysis - Found ${projectTimeEntries.length} time entries after filtering`);
 
@@ -4513,27 +4522,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calcular desviaciones solo para miembros que tienen registros en el período filtrado
       const membersWithTimeEntries = teamMembers.filter(member => 
-        projectTimeEntries.some(entry => entry.timeEntry.personnelId === member.personnelId)
+        projectTimeEntries.some(entry => entry.personnelId === member.personnelId)
       );
 
       console.log(`🔍 Deviation analysis - Found ${membersWithTimeEntries.length} team members with time entries in filtered period`);
 
       const deviationByRole = membersWithTimeEntries.map(member => {
         const memberTimeEntries = projectTimeEntries.filter(entry => 
-          entry.timeEntry.personnelId === member.personnelId
+          entry.personnelId === member.personnelId
         );
         
+        const memberPersonnel = personnelData.find(p => p.id === member.personnelId);
+        
         const actualHours = memberTimeEntries.reduce((sum, entry) => 
-          sum + entry.timeEntry.hours, 0);
+          sum + entry.hours, 0);
         const actualCost = memberTimeEntries.reduce((sum, entry) => 
-          sum + (entry.timeEntry.hours * (entry.timeEntry.hourlyRateAtTime || member.rate)), 0);
+          sum + (entry.hours * (entry.hourlyRateAtTime || member.rate)), 0);
 
         const hoursVariance = actualHours - member.hours;
         const costVariance = actualCost - member.cost;
 
         return {
           personnelId: member.personnelId,
-          personnelName: memberTimeEntries[0]?.personnel.name || 'Unknown',
+          personnelName: memberPersonnel?.name || 'Unknown',
           roleName: 'Team Member',
           estimated: {
             hours: member.hours,
@@ -4555,7 +4566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calcular totales
       const totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
       const totalActualCost = projectTimeEntries.reduce((sum, entry) => 
-        sum + (entry.timeEntry.hours * (entry.timeEntry.hourlyRateAtTime || 100)), 0);
+        sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
       const totalVariance = totalActualCost - totalEstimatedCost;
 
       // Identificar desviaciones mayores (>20%)
