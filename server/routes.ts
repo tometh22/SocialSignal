@@ -46,7 +46,7 @@ import {
   monthlyInflation,
   systemConfig
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, asc } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, asc, gte, lte } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";

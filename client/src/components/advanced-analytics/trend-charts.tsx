@@ -91,7 +91,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
     );
   }
 
-  if (!trendData || trendData.trendData.length === 0) {
+  if (!trendData || !trendData.trendData || trendData.trendData.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -114,7 +114,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
   }
 
   const formatPeriodLabel = (period: string) => {
-    if (trendData.period === 'weekly') {
+    if (trendData?.period === 'weekly') {
       return new Date(period).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
     } else {
       const [year, month] = period.split('-');
@@ -141,11 +141,11 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
   };
 
   // Preparar datos para los gráficos
-  const chartData = trendData.trendData.map(point => ({
+  const chartData = trendData?.trendData?.map(point => ({
     ...point,
     periodLabel: formatPeriodLabel(point.period),
     formattedCost: point.cost / 1000 // Para mostrar en miles
-  }));
+  })) || [];
 
   return (
     <div className="space-y-6">
