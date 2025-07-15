@@ -568,7 +568,12 @@ export default function ProjectDetailsRedesigned() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  
+  // Verificar si hay parámetro de tab en la URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabFromUrl = urlParams.get('tab');
+  
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);

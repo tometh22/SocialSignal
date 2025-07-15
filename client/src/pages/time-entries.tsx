@@ -551,11 +551,11 @@ const TimeEntries: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLocation("/active-projects")}
-                  className="mb-3 text-muted-foreground hover:text-foreground"
+                  onClick={() => setLocation(`/project-details/${projectId}?tab=time-management`)}
+                  className="mb-3 text-muted-foreground hover:text-white hover:bg-blue-600"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Volver a proyectos
+                  Volver al proyecto
                 </Button>
                 <div>
                   <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
