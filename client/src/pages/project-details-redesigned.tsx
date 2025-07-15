@@ -56,6 +56,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { DeviationAnalysis } from "@/components/advanced-analytics/deviation-analysis";
 import { Recommendations } from "@/components/advanced-analytics/recommendations";
 import { TrendCharts } from "@/components/advanced-analytics/trend-charts";
+import { TeamDeviationAnalysis } from "@/components/advanced-analytics/team-deviation-analysis";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
@@ -1613,6 +1614,28 @@ export default function ProjectDetailsRedesigned() {
                       </div>
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Análisis de Desviaciones por Miembro */}
+              <Card className="border-l-4 border-l-red-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    Análisis de Desviaciones por Miembro
+                  </CardTitle>
+                  <CardDescription>
+                    Desviaciones de presupuesto y tiempo para cada miembro del equipo en el período seleccionado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TeamDeviationAnalysis 
+                    projectId={projectId!} 
+                    dateFilter={{
+                      startDate: dateFilter.startDate.toISOString(),
+                      endDate: dateFilter.endDate.toISOString()
+                    }}
+                  />
                 </CardContent>
               </Card>
             </div>

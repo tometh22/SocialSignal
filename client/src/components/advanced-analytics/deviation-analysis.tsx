@@ -45,7 +45,6 @@ interface DeviationAnalysisData {
 
 export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisProps) {
   const [criticalOpen, setCriticalOpen] = useState(false);
-  const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
   
   const queryParams = dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
@@ -355,94 +354,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
           </Collapsible>
         )}
 
-        {/* Análisis Detallado por Miembro */}
-        <Collapsible open={teamAnalysisOpen} onOpenChange={setTeamAnalysisOpen}>
-          <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:from-gray-100 hover:to-gray-150 hover:shadow-md transition-all duration-200 group">
-            <div className="flex items-center gap-3">
-              <div className="bg-gray-200 p-2 rounded-lg group-hover:bg-gray-300 transition-colors">
-                <Users className="h-5 w-5 text-gray-700" />
-              </div>
-              <div>
-                <span className="font-semibold text-base text-gray-800">
-                  Análisis por Miembro del Equipo
-                </span>
-                <p className="text-xs text-gray-600">
-                  {deviationData.deviationByRole.length} miembros analizados con detalles de desviación
-                </p>
-              </div>
-            </div>
-            <div className="bg-gray-200 p-2 rounded-lg group-hover:bg-gray-300 transition-colors">
-              {teamAnalysisOpen ? <ChevronDown className="h-4 w-4 text-gray-700" /> : <ChevronRight className="h-4 w-4 text-gray-700" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3">
-            <div className="space-y-3">
-              {deviationData.deviationByRole
-                .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
-                .slice(0, 8)
-                .map((deviation, index) => {
-                const badge = getVarianceBadge(deviation.deviationPercentage);
-                return (
-                  <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-shrink-0 w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                            {index + 1}
-                          </div>
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs ${
-                            deviation.severity === 'critical' ? 'bg-red-500' : 
-                            deviation.severity === 'high' ? 'bg-orange-500' : 
-                            deviation.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}>
-                            {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-gray-800">
-                            {deviation.personnelName || `Personal #${deviation.personnelId}`}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={badge.variant} className={`px-2 py-1 text-xs ${badge.className}`}>{badge.label}</Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-2 rounded">
-                      <div className="space-y-1">
-                        <p className="text-gray-700 font-medium">Horas</p>
-                        <div className="flex justify-between text-gray-600">
-                          <span>Presup: {deviation.budgetedHours}h</span>
-                          <span>Real: {deviation.actualHours}h</span>
-                        </div>
-                        <Progress 
-                          value={Math.min(100, deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0)} 
-                          className="h-1 mt-1"
-                        />
-                        <p className={`text-xs font-semibold ${getVarianceColor((deviation.hourDeviation / Math.max(deviation.budgetedHours, 1)) * 100)}`}>
-                          Diferencia: {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <p className="text-gray-700 font-medium">Costo</p>
-                        <div className="flex justify-between text-gray-600">
-                          <span>Presup: ${deviation.budgetedCost.toLocaleString()}</span>
-                          <span>Real: ${deviation.actualCost?.toLocaleString() || '0'}</span>
-                        </div>
-                        <p className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
-                          Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+
 
       </CardContent>
     </Card>
