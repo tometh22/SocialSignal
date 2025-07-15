@@ -4462,6 +4462,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
       
+      console.log(`🔍 Deviation analysis - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
@@ -4487,6 +4489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(timeEntries)
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
         .where(and(...whereConditions));
+      
+      console.log(`🔍 Deviation analysis - Found ${projectTimeEntries.length} time entries after filtering`);
 
       // Calcular desviaciones por miembro
       const deviationByRole = teamMembers.map(member => {
