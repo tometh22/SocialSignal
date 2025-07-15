@@ -394,18 +394,19 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
 
   if (!baseTeam || baseTeam.length === 0) {
     return (
-      <div className="text-center py-8">
-        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground mb-3">No hay equipo asignado a este proyecto</p>
+      <div className="text-center py-8 text-purple-500">
+        <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+        <p className="text-sm mb-3">No hay equipo asignado a este proyecto</p>
         <Button 
           variant="outline" 
           size="sm"
           onClick={() => copyTeamMutation.mutate()}
           disabled={copyTeamMutation.isPending}
+          className="border-purple-200 hover:bg-purple-50"
         >
           {copyTeamMutation.isPending ? (
             <>
-              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-purple-600" />
               Copiando...
             </>
           ) : (
@@ -426,62 +427,33 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
         const progressPercent = getProgressPercentage(workedHours, member.estimatedHours || 0);
 
         return (
-          <div key={member.id} className="p-4 border rounded-lg bg-muted/30 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-medium">
-                    {member.personnel?.name?.split(' ').map((n: string) => n[0]).join('') || 'MB'}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium text-sm">{member.personnel?.name || 'Miembro del Equipo'}</p>
-                  <p className="text-xs text-muted-foreground">{member.role?.name || 'Rol no especificado'}</p>
-                </div>
+          <div key={member.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">
+                  {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
+                </span>
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    {member.estimatedHours || 0}h est.
-                  </Badge>
-                  <span className="text-sm font-medium">${member.hourlyRate || 0}/h</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {member.isActive ? 'Activo' : 'Inactivo'}
-                </p>
+              <div>
+                <div className="font-medium text-sm text-purple-900">{member.personnel?.name || 'Miembro del Equipo'}</div>
+                <div className="text-xs text-purple-600">{member.role?.name || 'Operations Lead'}</div>
               </div>
             </div>
-
-            {/* Barra de progreso y tiempo registrado */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Registrado: {workedHours}h de {member.estimatedHours || 0}h
-                </span>
-                <span className="font-medium text-blue-600">
-                  {progressPercent}%
-                </span>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-purple-700">Registrado: {workedHours.toFixed(1)}h</div>
+                <div className="text-xs text-purple-500">Activo</div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-32 bg-purple-100 rounded-full h-2">
                 <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    progressPercent >= 100 ? 'bg-green-500' : 
-                    progressPercent >= 75 ? 'bg-yellow-500' : 'bg-blue-500'
-                  }`}
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" 
                   style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                />
+                ></div>
               </div>
-              {workedHours > 0 && (
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Costo real: ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}</span>
-                  <span>
-                    {progressPercent > 100 ? 
-                      `+${(workedHours - (member.estimatedHours || 0)).toFixed(1)}h extra` : 
-                      `${((member.estimatedHours || 0) - workedHours).toFixed(1)}h restantes`
-                    }
-                  </span>
-                </div>
-              )}
+              <div className="text-right">
+                <div className="text-sm font-medium text-purple-900">${(workedHours * (member.hourlyRate || 0)).toFixed(0)}</div>
+                <div className="text-xs text-purple-600">Costo real</div>
+              </div>
             </div>
           </div>
         );
@@ -1823,43 +1795,13 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="space-y-4">
-                  {teamStats && teamStats.length > 0 ? (
-                    teamStats.map((member, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-sm font-bold">
-                              {member.personnelName.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm text-purple-900">{member.personnelName}</div>
-                            <div className="text-xs text-purple-600">Operations Lead</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-sm text-purple-700">Registrado: {member.hours}h</div>
-                            <div className="text-xs text-purple-500">Activo</div>
-                          </div>
-                          <div className="w-32 bg-purple-100 rounded-full h-2">
-                            <div className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" style={{ width: `${Math.min((member.hours / 80) * 100, 100)}%` }}></div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-purple-900">${(member.cost || 0).toFixed(0)}</div>
-                            <div className="text-xs text-purple-600">Costo real</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-purple-500">
-                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No hay datos de equipo disponibles para {dateFilter.label}</p>
-                    </div>
-                  )}
-                </div>
+                <ProjectTeamSection 
+                  projectId={projectId!} 
+                  timeEntries={timeEntries}
+                  project={project}
+                  dateFilter={dateFilter}
+                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
+                />
               </CardContent>
             </Card>
           </TabsContent>
