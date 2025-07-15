@@ -57,7 +57,7 @@ export function TrendCharts({ projectId }: TrendChartsProps) {
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
 
   const { data: trendData, isLoading } = useQuery<TrendData>({
-    queryKey: ['/api/projects', projectId, 'trend-data', { period }],
+    queryKey: [`/api/projects/${projectId}/trend-data?period=${period}`],
     enabled: !!projectId
   });
 

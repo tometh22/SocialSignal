@@ -43,7 +43,7 @@ interface RecommendationsData {
 
 export function Recommendations({ projectId }: RecommendationsProps) {
   const { data: recommendationsData, isLoading } = useQuery<RecommendationsData>({
-    queryKey: ['/api/projects', projectId, 'recommendations'],
+    queryKey: [`/api/projects/${projectId}/recommendations`],
     enabled: !!projectId
   });
 

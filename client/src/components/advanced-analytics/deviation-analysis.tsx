@@ -54,7 +54,7 @@ interface DeviationAnalysisData {
 
 export function DeviationAnalysis({ projectId }: DeviationAnalysisProps) {
   const { data: deviationData, isLoading } = useQuery<DeviationAnalysisData>({
-    queryKey: ['/api/projects', projectId, 'deviation-analysis'],
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`],
     enabled: !!projectId
   });
 
