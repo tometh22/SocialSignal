@@ -685,13 +685,15 @@ export default function ProjectDetailsStreamlined() {
                           </Avatar>
                           <div>
                             <p className="text-sm font-medium">{entry.personnelName || 'Usuario Desconocido'}</p>
-                            <p className="text-xs text-slate-600">{format(new Date(entry.date), 'dd MMM yyyy', { locale: es })}</p>
+                            <p className="text-xs text-slate-600">
+                              {entry.date ? format(new Date(entry.date), 'dd MMM yyyy', { locale: es }) : 'Sin fecha'}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <p className="text-sm font-bold">{entry.hours}h</p>
-                            <p className="text-xs text-slate-600">${entry.totalCost.toLocaleString()}</p>
+                            <p className="text-sm font-bold">{(entry.hours || 0)}h</p>
+                            <p className="text-xs text-slate-600">${(entry.totalCost || 0).toLocaleString()}</p>
                           </div>
                           <Button
                             variant="ghost"
