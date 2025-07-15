@@ -166,8 +166,9 @@ const CompactTimeForm: React.FC<{
     onMutate: async (data: z.infer<typeof formSchema>) => {
       // Crear un registro temporal para animación optimista
       const selectedPerson = personnel?.find(p => p.id === data.personnelId);
+      const tempId = Math.floor(Math.random() * 1000000) + 999999999; // ID temporal más corto
       const tempEntry: TimeEntry = {
-        id: Date.now(), // ID temporal
+        id: tempId,
         projectId,
         personnelId: data.personnelId,
         componentId: data.componentId || null,
@@ -207,7 +208,7 @@ const CompactTimeForm: React.FC<{
 
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      }, 300);
+      }, 100);
 
       toast({
         title: "✅ Tiempo registrado",
@@ -221,7 +222,10 @@ const CompactTimeForm: React.FC<{
         componentId: null,
       });
 
-      onSuccess();
+      // Cerrar el modal automáticamente después del éxito
+      setTimeout(() => {
+        onSuccess();
+      }, 200);
     },
     onError: (error: any, variables, context) => {
       // En caso de error, remover el registro temporal
@@ -712,7 +716,7 @@ const TimeEntries: React.FC = () => {
                   <div className="divide-y divide-gray-100">
                     {filteredEntries.map((entry) => {
                       const person = personnel?.find(p => p.id === entry.personnelId);
-                      const isTemporary = entry.id > 1000000000000; // Detectar registros temporales
+                      const isTemporary = entry.id > 999999999; // Detectar registros temporales
                       
                       return (
                         <div 
@@ -803,11 +807,7 @@ const TimeEntries: React.FC = () => {
                 <CompactTimeForm
                   personnel={personnel}
                   projectId={projectId}
-                  onSuccess={() => {
-                    setTimeout(() => {
-                      setDialogOpen(false);
-                    }, 300);
-                  }}
+                  onSuccess={() => setDialogOpen(false)}
                   onCancel={() => setDialogOpen(false)}
                   updateLocalEntries={updateLocalEntries}
                 />

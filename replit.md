@@ -103,6 +103,10 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 15, 2025: **OPTIMISTIC ANIMATIONS RESTORED** - Restored smooth optimistic animations for time entry creation and deletion with proper visual feedback and automatic modal closure
+- July 15, 2025: **UX IMPROVEMENTS** - Modal now closes automatically after successful registration, reduced loader display time from 300ms to 100ms for better responsiveness
+- July 15, 2025: **VISUAL FEEDBACK ENHANCEMENT** - Added temporary loading states with spinner and blue background for pending records, slide-out animation for deletions
+- July 15, 2025: **INTERFACE CONSISTENCY** - Fixed undefined member.personnelName.split() error and unified purple gradient styling across all time management tabs
 - July 14, 2025: **TEAM ACTIONS FUNCTIONALITY** - Implemented full functionality for team management buttons: Historial Completo (navigates to time-entries), Configurar Equipo (opens time registration), and Generar Reportes (exports team data as CSV)
 - July 14, 2025: **FINANCIAL ANALYSIS ENHANCEMENT** - Added dedicated "Análisis de Rentabilidad" section with markup calculation, price vs cost breakdown, and budget efficiency metrics providing key financial insights not available in header cards
 - July 14, 2025: **UX CONSOLIDATION - ELIMINATED REDUNDANT INDICATORS SECTION** - Removed duplicate "Indicadores Clave" section within dashboard tab as it showed identical information to header cards, improving UI clarity and reducing cognitive load
