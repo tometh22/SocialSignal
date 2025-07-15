@@ -744,6 +744,49 @@ export default function ProjectDetailsRedesigned() {
     const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
 
+    // SI NO HAY DATOS REALES EN EL PERÍODO, MOSTRAR ESTADO VACÍO
+    const hasDataInPeriod = filteredTimeEntries.length > 0;
+    
+    if (!hasDataInPeriod) {
+      return [
+        {
+          label: "Markup",
+          value: "0.0x",
+          subtitle: "Sin datos en el período",
+          icon: Percent,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+          change: 0
+        },
+        {
+          label: "Progreso",
+          value: "0%",
+          subtitle: "Sin actividad registrada",
+          icon: Target,
+          color: "text-gray-600", 
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+          change: 0
+        },
+        {
+          label: "Presupuesto",
+          value: "$0",
+          subtitle: "Sin costos registrados",
+          icon: DollarSign,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+          change: 0
+        },
+        {
+          label: "Estado",
+          value: "Crítico",
+          subtitle: "Sin actividad en el período",
+          icon: AlertTriangle,
+          color: "text-red-700",
+          bgColor: "bg-gradient-to-br from-red-50 to-red-100",
+        }
+      ];
+    }
+
     // CALCULAR EFICIENCIAS Y DESVIACIONES
     const costEfficiency = targetBaseCost > 0 ? ((targetBaseCost - actualCost) / targetBaseCost) * 100 : 0;
     const hourEfficiency = targetHours > 0 ? ((targetHours - actualHours) / targetHours) * 100 : 0;
@@ -878,6 +921,24 @@ export default function ProjectDetailsRedesigned() {
       return null;
     }
 
+    // SI NO HAY DATOS EN EL PERÍODO, RETORNAR VALORES EN CERO
+    const hasDataInPeriod = filteredTimeEntries.length > 0;
+    
+    if (!hasDataInPeriod) {
+      return {
+        totalCost: 0,
+        budget: 0,
+        budgetUtilization: 0,
+        savings: 0,
+        filteredHours: 0,
+        targetHours: 0,
+        targetMultiplier: 0,
+        markup: 0,
+        targetClientPrice: 0,
+        hoursProgress: 0
+      };
+    }
+
     const monthlyBaseCost = quotationData.baseCost;
     const monthlyEstimatedHours = quotationData.estimatedHours || 0;
 
@@ -910,6 +971,9 @@ export default function ProjectDetailsRedesigned() {
     const monthlyClientPrice = quotationData.totalAmount || 0;
     const targetClientPrice = monthlyClientPrice * targetMultiplier;
     const markup = actualCost > 0 ? targetClientPrice / actualCost : 0;
+    
+    // Calcular progreso de horas
+    const hoursProgress = targetHours > 0 ? Math.min(100, (actualHours / targetHours) * 100) : 0;
 
     return {
       totalCost: actualCost,
@@ -920,7 +984,8 @@ export default function ProjectDetailsRedesigned() {
       targetHours,
       targetMultiplier,
       markup: markup,
-      targetClientPrice: targetClientPrice
+      targetClientPrice: targetClientPrice,
+      hoursProgress: hoursProgress
     };
   }, [project, filteredTimeEntries, dateFilter]);
 
