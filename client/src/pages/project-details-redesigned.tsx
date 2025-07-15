@@ -1110,44 +1110,7 @@ export default function ProjectDetailsRedesigned() {
             </div>
           </div>
 
-          {/* Métricas principales con colores atractivos */}
-          <div className="grid grid-cols-4 gap-3 mt-4">
-            {metrics.map((metric, index) => {
-              const IconComponent = metric.icon;
-              return (
-                <Card key={index} className={`${metric.bgColor} border-0 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-medium text-gray-600">{metric.label}</p>
-                        <p className={`text-lg font-bold ${metric.color}`}>{metric.value}</p>
-                        {metric.subtitle && (
-                          <p className="text-xs text-gray-500 mt-0.5">{metric.subtitle}</p>
-                        )}
-                      </div>
-                      <div className={`p-2 rounded-full shadow-lg ${metric.color.replace('text-', 'bg-').replace('-700', '-500')}`}>
-                        <IconComponent className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                    {metric.change !== undefined && (
-                      <div className="mt-2 pt-2 border-t border-white/30">
-                        <div className={`flex items-center text-xs ${metric.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {metric.change >= 0 ? (
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 mr-1" />
-                          )}
-                          <span className="font-medium">
-                            {metric.change >= 0 ? '+' : ''}{metric.change.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+
         </div>
       </div>
 
