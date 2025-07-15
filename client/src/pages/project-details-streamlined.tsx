@@ -147,11 +147,12 @@ export default function ProjectDetailsStreamlined() {
     
     // Calcular multiplicador según el período
     const getTargetMultiplier = () => {
-      if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
+      const label = dateFilter?.label || 'Este mes';
+      if (label.includes('trimestre') || label.includes('3 meses')) {
         return 3;
-      } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
+      } else if (label.includes('semestre') || label.includes('6 meses')) {
         return 6;
-      } else if (dateFilter.label.includes('año') || dateFilter.label.includes('12 meses')) {
+      } else if (label.includes('año') || label.includes('12 meses')) {
         return 12;
       } else {
         return 1; // Por defecto, un mes
@@ -405,7 +406,7 @@ export default function ProjectDetailsStreamlined() {
             <span className="text-sm font-medium text-slate-700">Período:</span>
           </div>
           <Select
-            value={dateFilter.label}
+            value={dateFilter?.label || "Este mes"}
             onValueChange={(value) => {
               const option = getDateFilterOptions().find(opt => opt.label === value);
               if (option) {
@@ -434,7 +435,7 @@ export default function ProjectDetailsStreamlined() {
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-6 w-6 text-yellow-600" />
-                  Análisis de Rentabilidad - {dateFilter.label}
+                  Análisis de Rentabilidad - {dateFilter?.label || 'Este mes'}
                 </div>
                 <Badge variant="outline" className="bg-white/80 border-yellow-200 text-yellow-700">
                   Métricas Financieras
@@ -645,7 +646,7 @@ export default function ProjectDetailsStreamlined() {
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <History className="h-5 w-5 text-purple-600" />
-                    Actividad Reciente - {dateFilter.label}
+                    Actividad Reciente - {dateFilter?.label || 'Este mes'}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button 
