@@ -56,6 +56,7 @@ import { apiRequest } from "@/lib/queryClient";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
+import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
 
 interface ProjectMetric {
   label: string;
@@ -320,7 +321,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
   filterTimeEntriesByDateRange: (entries: any[]) => any[];
 }) {
   const { toast } = useToast();
-  
+
   const { data: baseTeam = [], isLoading: teamLoading, refetch } = useQuery({
     queryKey: ["/api/projects", projectId, "base-team"],
     queryFn: async () => {
@@ -419,7 +420,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
       {baseTeam.map((member: any) => {
         const workedHours = getTimeWorkedByMember(member.personnelId);
         const progressPercent = getProgressPercentage(workedHours, member.estimatedHours || 0);
-        
+
         return (
           <div key={member.id} className="p-4 border rounded-lg bg-muted/30 space-y-3">
             <div className="flex items-center justify-between">
@@ -446,7 +447,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                 </p>
               </div>
             </div>
-            
+
             {/* Barra de progreso y tiempo registrado */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
@@ -481,7 +482,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
           </div>
         );
       })}
-      
+
       <div className="pt-3 border-t space-y-2">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -518,7 +519,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
             </div>
           </div>
         </div>
-        
+
         {/* Progreso general del proyecto */}
         <div className="pt-2">
           <div className="flex justify-between text-xs mb-1">
@@ -567,7 +568,7 @@ export default function ProjectDetailsRedesigned() {
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
-  
+
   // Estado del filtro temporal - configurado por defecto para mostrar el mes actual
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
     const now = new Date();
@@ -619,7 +620,7 @@ export default function ProjectDetailsRedesigned() {
         startDateRaw: dateFilter.startDate,
         endDateRaw: dateFilter.endDate
       });
-      
+
       // Mostrar todas las entradas disponibles para debug
       console.log('🔍 TODAS LAS ENTRADAS EN BD:', entries.map(e => ({
         fecha: e.date,
@@ -629,17 +630,17 @@ export default function ProjectDetailsRedesigned() {
         horas: e.hours,
         persona: e.personnelName
       })));
-      
+
       const filtered = entries.filter((entry: TimeEntry) => {
         // Asegurar que la fecha se parsee correctamente
         const entryDate = new Date(entry.date);
-        
+
         // Verificar que la fecha es válida
         if (isNaN(entryDate.getTime())) {
           console.warn('Fecha inválida encontrada:', entry.date);
           return false;
         }
-        
+
         // Debug mejorado
         if (dateFilter.label.includes('pasado')) {
           console.log('🔍 ENTRADA ANALIZADA:', {
@@ -651,17 +652,17 @@ export default function ProjectDetailsRedesigned() {
             persona: entry.personnelName || 'Sin nombre'
           });
         }
-        
+
         // Usar comparación por rango de fechas para todos los casos
         const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
         const startDateOnly = new Date(dateFilter.startDate.getFullYear(), dateFilter.startDate.getMonth(), dateFilter.startDate.getDate());
         const endDateOnly = new Date(dateFilter.endDate.getFullYear(), dateFilter.endDate.getMonth(), dateFilter.endDate.getDate());
-        
+
         const isInRange = entryDateOnly >= startDateOnly && entryDateOnly <= endDateOnly;
-        
+
         return isInRange;
       });
-      
+
       return filtered;
     };
   }, [dateFilter]);
@@ -672,48 +673,48 @@ export default function ProjectDetailsRedesigned() {
 
     const projectData = project as any;
     const quotationData = projectData.quotation;
-    
 
-    
+
+
     // APLICAR EL FILTRO TEMPORAL
     const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
-    
+
     // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA ASOCIADA AL PROYECTO
     if (!quotationData) {
       console.warn('⚠️ No hay cotización asociada al proyecto:', projectData.id);
       return [];
     }
-    
+
     const monthlyClientPrice = quotationData.totalAmount; // Precio mensual al cliente
     const monthlyBaseCost = quotationData.baseCost; // Costo base mensual estimado
     const monthlyMarkup = quotationData.markupAmount || 0; // Markup mensual
-    
+
     // Obtener horas estimadas desde la cotización (calculadas desde los miembros del equipo)
     const monthlyEstimatedHours = quotationData.estimatedHours || 0;
-    
 
-    
+
+
     // IMPLEMENTAR LÓGICA DIFERENCIADA SEGÚN TIPO DE PROYECTO
     // Fuente de verdad: quotationData.projectType determina si es 'always-on' o 'one-shot'
     const isAlwaysOnProject = quotationData.projectType === 'always-on';
-    
+
     console.log('🎯 TIPO DE PROYECTO DETECTADO:', {
       projectType: quotationData.projectType,
       isAlwaysOn: isAlwaysOnProject,
       filtroActual: dateFilter.label,
       factorMultiplicador: isAlwaysOnProject ? 'Variable según período' : 'Siempre 1 (valor total)'
     });
-    
+
     const getTargetMultiplier = () => {
       // Para proyectos One-Shot, siempre usar el valor total (multiplicador = 1)
       if (!isAlwaysOnProject) {
         return 1;
       }
-      
+
       // Para proyectos Always-On, calcular multiplicador según período seleccionado
       const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
       const daysInMonth = 30;
-      
+
       if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
         return 3; // Trimestre = 3 meses
       } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
@@ -726,19 +727,19 @@ export default function ProjectDetailsRedesigned() {
         return daysDiff / daysInMonth; // Proporción de mes
       }
     };
-    
+
     const targetMultiplier = getTargetMultiplier();
-    
+
     // Aplicar multiplicador solo para proyectos Always-On
     const targetClientPrice = monthlyClientPrice * targetMultiplier;
     const targetBaseCost = monthlyBaseCost * targetMultiplier;
     const targetHours = monthlyEstimatedHours * targetMultiplier;
-    
+
     // CALCULAR DATOS REALES DEL PERÍODO FILTRADO
     const actualHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
     const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
-    
+
     // CALCULAR EFICIENCIAS Y DESVIACIONES
     const costEfficiency = targetBaseCost > 0 ? ((targetBaseCost - actualCost) / targetBaseCost) * 100 : 0;
     const hourEfficiency = targetHours > 0 ? ((targetHours - actualHours) / targetHours) * 100 : 0;
@@ -824,10 +825,10 @@ export default function ProjectDetailsRedesigned() {
 
   const recentTimeEntries = useMemo(() => {
     if (!Array.isArray(timeEntries)) return [];
-    
+
     // Aplicar filtro temporal para mostrar solo entradas del período seleccionado
     const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-    
+
     return filteredEntries
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
@@ -835,12 +836,12 @@ export default function ProjectDetailsRedesigned() {
 
   const teamStats = useMemo(() => {
     if (!Array.isArray(timeEntries) || !Array.isArray(baseTeam)) return [];
-    
+
     // Aplicar filtro temporal para calcular estadísticas del período seleccionado
     const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-    
+
     const memberStats = new Map();
-    
+
     filteredEntries.forEach((entry: TimeEntry) => {
       if (!memberStats.has(entry.personnelId)) {
         memberStats.set(entry.personnelId, {
@@ -851,11 +852,11 @@ export default function ProjectDetailsRedesigned() {
           lastActivity: entry.date
         });
       }
-      
+
       const stats = memberStats.get(entry.personnelId);
       stats.hours += entry.hours;
       stats.entries += 1;
-      
+
       if (new Date(entry.date) > new Date(stats.lastActivity)) {
         stats.lastActivity = entry.date;
       }
@@ -869,20 +870,20 @@ export default function ProjectDetailsRedesigned() {
   // Cálculo de resumen de costos usando objetivos de cotización
   const costSummary = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return null;
-    
+
     const projectData = project as any;
     const quotationData = projectData.quotation;
     const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-    
+
     // Obtener objetivos mensuales de la cotización asociada al proyecto
     if (!quotationData) {
       console.warn('⚠️ No hay cotización asociada al proyecto para costSummary:', projectData.id);
       return null;
     }
-    
+
     const monthlyBaseCost = quotationData.baseCost;
     const monthlyEstimatedHours = quotationData.estimatedHours || 0;
-    
+
     // Calcular multiplicador según el período
     const getTargetMultiplier = () => {
       if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
@@ -895,24 +896,24 @@ export default function ProjectDetailsRedesigned() {
         return 1; // Por defecto, un mes
       }
     };
-    
+
     const targetMultiplier = getTargetMultiplier();
     const targetBudget = monthlyBaseCost * targetMultiplier;
     const targetHours = monthlyEstimatedHours * targetMultiplier;
-    
+
     // Calcular datos reales
     const actualCost = filteredEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
-    
+
     const actualHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-    
+
     const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
-    
+
     // Calcular markup usando precio de cotización vs costo real
     const monthlyClientPrice = quotationData.totalAmount || 0;
     const targetClientPrice = monthlyClientPrice * targetMultiplier;
     const markup = actualCost > 0 ? targetClientPrice / actualCost : 0;
-    
+
     return {
       totalCost: actualCost,
       budget: targetBudget,
@@ -1003,7 +1004,7 @@ export default function ProjectDetailsRedesigned() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 {projectName}
               </h1>
-              
+
               {/* Filtro temporal */}
               <TimeRangeFilter 
                 selectedFilter={dateFilter}
@@ -1012,7 +1013,7 @@ export default function ProjectDetailsRedesigned() {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
               {/* Botón Proyectos alineado con los otros botones */}
@@ -1044,12 +1045,12 @@ export default function ProjectDetailsRedesigned() {
                   <Timer className="h-3 w-3 mr-1" />
                   Registrar Tiempo
                 </Button>
-                
+
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/project-analytics/${projectId}`)} className="h-8">
                   <BarChart3 className="h-3 w-3 mr-1" />
                   Analíticas
                 </Button>
-                
+
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -1060,7 +1061,7 @@ export default function ProjectDetailsRedesigned() {
                   Configurar
                 </Button>
               </div>
-              
+
               {/* Badges de estado e información del cliente */}
               <div className="flex items-center gap-3">
                 <Badge 
@@ -1074,7 +1075,7 @@ export default function ProjectDetailsRedesigned() {
                     Always-On
                   </Badge>
                 )}
-                
+
                 {/* Logo e información del cliente compacta */}
                 <div className="flex items-center gap-2 text-gray-600 bg-white/60 backdrop-blur-sm px-3 py-2 rounded-full border border-gray-200">
                   {clientData?.logoUrl ? (
@@ -1196,7 +1197,7 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            
+
             {/* Análisis de Rentabilidad - Información clave que no está en las cards superiores */}
             <Card className="border-l-4 border-l-yellow-500 bg-gradient-to-r from-yellow-50 to-amber-50">
               <CardHeader className="pb-4">
@@ -1212,7 +1213,7 @@ export default function ProjectDetailsRedesigned() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
+
                   {/* Markup Calculation */}
                   <div className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
                     <div className="flex items-center gap-2 mb-2">
@@ -1586,7 +1587,7 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardContent>
             </Card>
-            
+
           </TabsContent>
 
           <TabsContent value="team" className="space-y-6">
@@ -1647,7 +1648,7 @@ export default function ProjectDetailsRedesigned() {
                         <div className="text-xs text-gray-500">Ver todos los registros</div>
                       </div>
                     </Button>
-                    
+
                     <Button
                       variant="outline"
                       className="h-16 flex items-center justify-center gap-3 hover:bg-purple-50 hover:border-purple-300"
@@ -1666,7 +1667,7 @@ export default function ProjectDetailsRedesigned() {
                         <div className="text-xs text-gray-500">Registrar tiempo</div>
                       </div>
                     </Button>
-                    
+
                     <Button
                       variant="outline"
                       className="h-16 flex items-center justify-center gap-3 hover:bg-orange-50 hover:border-orange-300"
@@ -1674,7 +1675,7 @@ export default function ProjectDetailsRedesigned() {
                         try {
                           // Generar datos del reporte usando la información real del equipo
                           const reportData = [];
-                          
+
                           // Agregar datos del proyecto
                           reportData.push({
                             seccion: "Información del Proyecto",
@@ -1682,7 +1683,7 @@ export default function ProjectDetailsRedesigned() {
                             valor: `Cliente: ${project?.client?.name || 'N/A'}`,
                             fecha: new Date().toLocaleDateString('es-ES')
                           });
-                          
+
                           // Agregar estadísticas del equipo
                           if (teamStats && teamStats.length > 0) {
                             teamStats.forEach(member => {
@@ -1694,7 +1695,7 @@ export default function ProjectDetailsRedesigned() {
                               });
                             });
                           }
-                          
+
                           // Agregar resumen financiero
                           if (costSummary) {
                             reportData.push({
@@ -1710,14 +1711,14 @@ export default function ProjectDetailsRedesigned() {
                               fecha: dateFilter.label
                             });
                           }
-                          
+
                           // Crear CSV
                           const csvContent = "data:text/csv;charset=utf-8," + 
                             "Sección,Nombre,Valor,Fecha\n" +
                             reportData.map(row => 
                               `"${row.seccion}","${row.nombre}","${row.valor}","${row.fecha}"`
                             ).join("\n");
-                          
+
                           const encodedUri = encodeURI(csvContent);
                           const link = document.createElement("a");
                           link.setAttribute("href", encodedUri);
@@ -1725,7 +1726,7 @@ export default function ProjectDetailsRedesigned() {
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
-                          
+
                           toast({
                             title: "Reporte Generado",
                             description: `Descargado reporte completo del proyecto con ${reportData.length} elementos`,
@@ -1789,7 +1790,7 @@ export default function ProjectDetailsRedesigned() {
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -1828,21 +1829,21 @@ export default function ProjectDetailsRedesigned() {
                               <div key={i} className="bg-gray-200 rounded-t w-full h-4"></div>
                             ));
                           }
-                          
+
                           // Agrupar por semana
                           const weeklyData = filteredEntries.reduce((acc: any, entry: TimeEntry) => {
                             const date = new Date(entry.date);
                             const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
                             const weekKey = weekStart.toISOString().split('T')[0];
-                            
+
                             if (!acc[weekKey]) acc[weekKey] = 0;
                             acc[weekKey] += entry.hours;
                             return acc;
                           }, {});
-                          
+
                           const weeks = Object.entries(weeklyData).slice(-7);
                           const maxHours = Math.max(...weeks.map(([, hours]) => hours as number));
-                          
+
                           return weeks.map(([week, hours], i) => (
                             <div key={week} className="flex flex-col items-center gap-1 w-full">
                               <div 
@@ -1911,7 +1912,7 @@ export default function ProjectDetailsRedesigned() {
                       <AlertTriangle className="h-4 w-4 text-orange-600" />
                       Alertas
                     </h5>
-                    
+
                     {/* Alerta de presupuesto */}
                     {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.8 && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1924,7 +1925,7 @@ export default function ProjectDetailsRedesigned() {
                         </p>
                       </div>
                     )}
-                    
+
                     {/* Alerta de horas */}
                     {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.9 && (
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -1937,7 +1938,7 @@ export default function ProjectDetailsRedesigned() {
                         </p>
                       </div>
                     )}
-                    
+
                     {/* Estado saludable */}
                     {(costSummary?.totalCost || 0) <= (costSummary?.budget || 0) * 0.8 && 
                      (costSummary?.filteredHours || 0) <= (costSummary?.targetHours || 0) * 0.9 && (
@@ -1996,7 +1997,7 @@ export default function ProjectDetailsRedesigned() {
                             </p>
                           </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
@@ -2018,7 +2019,7 @@ export default function ProjectDetailsRedesigned() {
                               ></div>
                             </div>
                           </div>
-                          
+
                           <div className="text-center">
                             <p className="text-sm text-gray-500">Última actividad</p>
                             <p className="font-medium text-gray-900">
@@ -2028,7 +2029,7 @@ export default function ProjectDetailsRedesigned() {
                               })}
                             </p>
                           </div>
-                          
+
                           <div className="text-center">
                             <p className="text-sm text-gray-500">Promedio diario</p>
                             <p className="font-medium text-gray-900">
@@ -2109,3 +2110,141 @@ export default function ProjectDetailsRedesigned() {
     </div>
   );
 } 
+
+const QuickTimeRegister = ({ projectId, onClose }: { projectId: string, onClose: () => void }) => {
+  const [personnel, setPersonnel] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [selectedPersonnel, setSelectedPersonnel] = useState<number | null>(null);
+  const [selectedRole, setSelectedRole] = useState<number | null>(null);
+  const [hours, setHours] = useState<number>(8);
+  const [description, setDescription] = useState<string>("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Fetch personnel
+    fetch('/api/personnel')
+      .then(res => res.json())
+      .then(data => setPersonnel(data));
+
+    // Fetch roles
+    fetch('/api/roles')
+      .then(res => res.json())
+      .then(data => setRoles(data));
+  }, []);
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+
+    if (!selectedPersonnel || !selectedRole) {
+      toast({
+        title: "Error",
+        description: "Por favor, selecciona un miembro del equipo y un rol.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const data = {
+      projectId: projectId,
+      personnelId: selectedPersonnel,
+      roleId: selectedRole,
+      date: new Date().toISOString(),
+      hours: hours,
+      description: description
+    };
+
+    try {
+      const response = await fetch('/api/time-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Éxito",
+          description: "Registro de tiempo creado correctamente.",
+        });
+        queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
+        onClose();
+      } else {
+        throw new Error('Failed to create time entry');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear el registro de tiempo",
+        variant: "destructive"
+      });
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+        <h2 className="text-lg font-semibold mb-4">Registro Rápido de Tiempo</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="personnel" className="block text-sm font-medium text-gray-700">Miembro del Equipo</Label>
+            <Select onValueChange={(value) => setSelectedPersonnel(parseInt(value))} defaultValue={selectedPersonnel?.toString() || ""}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar miembro" />
+              </SelectTrigger>
+              <SelectContent>
+                {personnel.map((p) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</Label>
+            <Select onValueChange={(value) => setSelectedRole(parseInt(value))} defaultValue={selectedRole?.toString() || ""}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="hours" className="block text-sm font-medium text-gray-700">Horas</Label>
+            <Input
+              type="number"
+              id="hours"
+              value={hours}
+              onChange={(e) => setHours(parseInt(e.target.value))}
+              min="1"
+              max="24"
+              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+            />
+          </div>
+          <div>
+            <Label htmlFor="description" className="block text-sm font-medium text-gray-700">Descripción</Label>
+            <Input
+              type="text"
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+              Registrar
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
