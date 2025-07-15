@@ -3973,9 +3973,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== ANÁLISIS AVANZADO Y RECOMENDACIONES ====================
 
-  // Punto 2: Análisis detallado de desviaciones
-  app.get("/api/projects/:id/deviation-analysis", requireAuth, async (req, res) => {
-    try {
+  // Punto 2: Análisis detallado de desviaciones - COMENTADO (duplicado más abajo con filtros temporales)
+  // app.get("/api/projects/:id/deviation-analysis", requireAuth, async (req, res) => {
+    /*try {
       const projectId = parseInt(req.params.id);
       if (isNaN(projectId)) {
         return res.status(400).json({ message: "Invalid project ID" });
@@ -4088,7 +4088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error in deviation analysis:", error);
       res.status(500).json({ message: "Failed to analyze project deviations" });
     }
-  });
+  });*/
 
   // Punto 3: Recomendaciones automáticas
   app.get("/api/projects/:id/recommendations", requireAuth, async (req, res) => {
