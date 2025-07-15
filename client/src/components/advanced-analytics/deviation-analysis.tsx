@@ -115,8 +115,10 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
   };
 
   const getVarianceBadge = (percentage: number) => {
-    if (Math.abs(percentage) < 10) return { variant: "default" as const, label: "Normal" };
-    if (Math.abs(percentage) < 25) return { variant: "secondary" as const, label: "Atención" };
+    const absPercentage = Math.abs(percentage);
+    if (absPercentage < 20) return { variant: "default" as const, label: "Normal" };
+    if (absPercentage < 50) return { variant: "secondary" as const, label: "Atención" };
+    if (absPercentage < 100) return { variant: "outline" as const, label: "Alto" };
     return { variant: "destructive" as const, label: "Crítico" };
   };
 
