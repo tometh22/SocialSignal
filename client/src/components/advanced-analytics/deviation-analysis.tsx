@@ -60,10 +60,19 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
   const queryParams = dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
+
+  console.log(`🔍🔍🔍 DeviationAnalysis - ProjectId: ${projectId}, DateFilter:`, dateFilter, `URL: /api/projects/${projectId}/deviation-analysis${queryParams}`);
     
-  const { data: deviationData, isLoading } = useQuery<DeviationAnalysisData>({
+  const { data: deviationData, isLoading, error } = useQuery<DeviationAnalysisData>({
     queryKey: [`/api/projects/${projectId}/deviation-analysis`, dateFilter],
-    queryFn: () => fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`).then(res => res.json()),
+    queryFn: async () => {
+      console.log(`🌐 Making request to: /api/projects/${projectId}/deviation-analysis${queryParams}`);
+      const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
+      console.log(`🔥 Response status:`, response.status);
+      const data = await response.json();
+      console.log(`📊 Response data:`, data);
+      return data;
+    },
     enabled: !!projectId
   });
 

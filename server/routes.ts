@@ -78,6 +78,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply input sanitization to all routes
   app.use(sanitizeInput);
 
+  // Debug middleware para todas las rutas de proyectos
+  app.use('/api/projects', (req, res, next) => {
+    console.log(`🌟 PROJECT API CALL: ${req.method} ${req.url}`);
+    next();
+  });
+
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
@@ -4458,6 +4464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Endpoint para análisis de desviaciones
   app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
+    console.log(`🚀🚀🚀 DEVIATION ANALYSIS ENDPOINT HIT - ID: ${req.params.id}`);
     try {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
