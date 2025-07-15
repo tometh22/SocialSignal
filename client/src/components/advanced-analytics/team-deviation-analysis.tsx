@@ -59,7 +59,16 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     enabled: !!projectId,
   });
 
-  const getVarianceBadge = (percentage: number) => {
+  const getVarianceBadge = (percentage: number, actualHours: number) => {
+    // Si no hay horas registradas, mostrar estado especial
+    if (actualHours === 0) {
+      return { 
+        variant: 'secondary' as const, 
+        label: 'Sin Actividad',
+        className: 'bg-gray-400 text-white'
+      };
+    }
+
     const absPercentage = Math.abs(percentage);
     if (absPercentage >= 100) {
       return { variant: 'destructive' as const, label: 'Crítico', className: 'bg-red-600 text-white' };
@@ -112,7 +121,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-red-800">Críticas</span>
           </div>
           <div className="text-2xl font-bold text-red-600">
-            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) >= 100).length}
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length}
           </div>
           <div className="text-xs text-red-600">desviaciones ≥100%</div>
         </div>
@@ -123,7 +132,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-orange-800">Altas</span>
           </div>
           <div className="text-2xl font-bold text-orange-600">
-            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) >= 50 && Math.abs(d.deviationPercentage) < 100).length}
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 50 && Math.abs(d.deviationPercentage) < 100).length}
           </div>
           <div className="text-xs text-orange-600">desviaciones 50-99%</div>
         </div>
@@ -134,7 +143,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
             <span className="text-sm font-medium text-green-800">Normales</span>
           </div>
           <div className="text-2xl font-bold text-green-600">
-            {deviationData.deviationByRole.filter(d => Math.abs(d.deviationPercentage) < 20).length}
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) < 20).length}
           </div>
           <div className="text-xs text-green-600">desviaciones &lt;20%</div>
         </div>
@@ -162,7 +171,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
               {deviationData.deviationByRole
                 .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
                 .map((deviation, index) => {
-                  const badge = getVarianceBadge(deviation.deviationPercentage);
+                  const badge = getVarianceBadge(deviation.deviationPercentage, deviation.actualHours);
                   const progressPercentage = deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0;
                   
                   return (

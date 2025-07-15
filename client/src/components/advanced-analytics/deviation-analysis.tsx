@@ -146,7 +146,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
             Análisis Detallado de Desviaciones
           </div>
           <Badge variant="outline" className="bg-orange-50 border-orange-200 text-orange-700">
-            {deviationData.majorDeviations.filter(d => d.severity === 'critical').length} Desviaciones Críticas
+            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length} Desviaciones Críticas
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -289,7 +289,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
         )}
 
         {/* Desviaciones Críticas Detalladas */}
-        {deviationData.majorDeviations && deviationData.majorDeviations.filter(d => d.severity === 'critical').length > 0 && (
+        {deviationData.deviationByRole && deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length > 0 && (
           <Collapsible open={criticalOpen} onOpenChange={setCriticalOpen}>
             <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-xl border border-red-200 hover:from-red-100 hover:to-red-150 hover:shadow-md transition-all duration-200 group">
               <div className="flex items-center gap-3">
@@ -301,7 +301,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                     Desviaciones Críticas
                   </span>
                   <p className="text-xs text-red-600">
-                    {deviationData.majorDeviations.filter(d => d.severity === 'critical').length} miembros requieren atención inmediata
+                    {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 100).length} miembros requieren atención inmediata
                   </p>
                 </div>
               </div>
@@ -311,8 +311,8 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               <div className="space-y-3">
-                {deviationData.majorDeviations
-                  .filter(deviation => deviation.severity === 'critical')
+                {deviationData.deviationByRole
+                  .filter(deviation => deviation.actualHours > 0 && Math.abs(deviation.deviationPercentage) >= 100)
                   .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
                   .map((deviation, index) => (
                     <div key={index} className="bg-white border border-red-200 rounded-lg p-2.5 shadow-sm hover:shadow-md transition-shadow">
