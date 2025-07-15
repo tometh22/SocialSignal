@@ -51,6 +51,48 @@ app.use(
   })
 );
 
+// ENDPOINT DE PRUEBA CON PATH DIFERENTE - PARA EVITAR CONFLICTO CON VITE
+app.get("/api/test-project/:id/diagnosis", (req, res) => {
+  console.log(`🟢🟢🟢 DIAGNOSTIC ENDPOINT HIT - ID: ${req.params.id}`);
+  res.json({ 
+    test: 'working with different path', 
+    id: req.params.id, 
+    query: req.query,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ENDPOINT TEMPORAL PARA DEVIATION ANALYSIS (MOVED FROM ROUTES.TS)
+app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
+  console.log(`🎯🎯🎯 DEVIATION ANALYSIS WORKING - ID: ${req.params.id}, Query:`, req.query);
+  
+  try {
+    const projectId = parseInt(req.params.id);
+    const { startDate, endDate } = req.query;
+    
+    // Return empty state for now to test basic functionality
+    const response = {
+      deviationByRole: [],
+      totalVariance: { variance: 0 },
+      summary: { membersOverBudget: 0, membersUnderBudget: 0 },
+      majorDeviations: [],
+      analysis: [],
+      debug: {
+        projectId,
+        startDate,
+        endDate,
+        message: 'Endpoint working from index.ts - showing empty state for filtered data'
+      }
+    };
+    
+    console.log(`🎯 Returning response:`, response);
+    res.json(response);
+  } catch (error) {
+    console.error("Error in deviation analysis:", error);
+    res.status(500).json({ message: "Failed to analyze project deviations" });
+  }
+});
+
 // Ruta pública para contador de proyectos (sin autenticación)
 app.get("/api/active-projects/count", async (req, res) => {
   try {

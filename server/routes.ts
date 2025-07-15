@@ -84,6 +84,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+  // TEST ENDPOINT DIRECTO - JUSTO DESPUÉS DEL MIDDLEWARE DE DEBUG
+  app.get('/api/projects/:id/test-simple', (req, res) => {
+    console.log(`🔥🔥🔥 SIMPLE TEST ENDPOINT HIT - ID: ${req.params.id}`);
+    res.json({ 
+      message: 'Test endpoint working', 
+      id: req.params.id, 
+      query: req.query,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
@@ -4461,6 +4472,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       confidence: trendData.length > 8 ? 'high' : trendData.length > 4 ? 'medium' : 'low'
     };
   }
+
+  // Endpoint TEST sin auth para diagnosis
+  app.get('/api/projects/:id/deviation-analysis-test', async (req, res) => {
+    console.log(`🟢🟢🟢 TEST ENDPOINT HIT - ID: ${req.params.id}, Query:`, req.query);
+    res.json({ test: 'working', params: req.params, query: req.query });
+  });
 
   // Endpoint para análisis de desviaciones
   app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
