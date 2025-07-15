@@ -8,6 +8,10 @@ import { useState } from "react";
 
 interface TrendChartsProps {
   projectId: number;
+  dateFilter?: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 interface TrendDataPoint {
@@ -53,11 +57,18 @@ interface TrendData {
   };
 }
 
-export function TrendCharts({ projectId }: TrendChartsProps) {
+export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
 
+  const queryParams = new URLSearchParams({ period });
+  if (dateFilter) {
+    queryParams.set('startDate', dateFilter.startDate);
+    queryParams.set('endDate', dateFilter.endDate);
+  }
+
   const { data: trendData, isLoading } = useQuery<TrendData>({
-    queryKey: [`/api/projects/${projectId}/trend-data?period=${period}`],
+    queryKey: [`/api/projects/${projectId}/trend-data`, period, dateFilter],
+    queryFn: () => fetch(`/api/projects/${projectId}/trend-data?${queryParams.toString()}`).then(res => res.json()),
     enabled: !!projectId
   });
 

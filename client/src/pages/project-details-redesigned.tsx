@@ -1363,19 +1363,37 @@ export default function ProjectDetailsRedesigned() {
               
               {/* Análisis de Desviaciones */}
               <div className="space-y-4">
-                <DeviationAnalysis projectId={projectId!} />
+                <DeviationAnalysis 
+                  projectId={projectId!} 
+                  dateFilter={{
+                    startDate: dateFilter.startDate.toISOString(),
+                    endDate: dateFilter.endDate.toISOString()
+                  }}
+                />
               </div>
               
               {/* Recomendaciones Automáticas */}
               <div className="space-y-4">
-                <Recommendations projectId={projectId!} />
+                <Recommendations 
+                  projectId={projectId!} 
+                  dateFilter={{
+                    startDate: dateFilter.startDate.toISOString(),
+                    endDate: dateFilter.endDate.toISOString()
+                  }}
+                />
               </div>
               
             </div>
 
             {/* SECCIÓN 3: Gráficos de Tendencias - Full Width */}
             <div className="w-full">
-              <TrendCharts projectId={projectId!} />
+              <TrendCharts 
+                projectId={projectId!} 
+                dateFilter={{
+                  startDate: dateFilter.startDate.toISOString(),
+                  endDate: dateFilter.endDate.toISOString()
+                }}
+              />
             </div>
 
             {/* SECCIÓN 4: Actividad Reciente - Optimizada */}

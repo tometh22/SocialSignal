@@ -4255,6 +4255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const projectId = parseInt(req.params.id);
       const period = req.query.period as string || 'weekly'; // weekly, monthly
+      const { startDate, endDate } = req.query;
       
       if (isNaN(projectId)) {
         return res.status(400).json({ message: "Invalid project ID" });
@@ -4265,8 +4266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Obtener todas las entradas de tiempo del proyecto
-      const projectTimeEntries3 = await db.select({
+      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
+      let timeEntriesQuery = db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
@@ -4274,6 +4275,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
         .where(eq(timeEntries.projectId, projectId))
         .orderBy(asc(timeEntries.date));
+
+      if (startDate && endDate) {
+        timeEntriesQuery = timeEntriesQuery.where(
+          and(
+            eq(timeEntries.projectId, projectId),
+            gte(timeEntries.date, startDate as string),
+            lte(timeEntries.date, endDate as string)
+          )
+        );
+      }
+
+      const projectTimeEntries3 = await timeEntriesQuery;
 
       // Agrupar por período
       const groupedData = new Map();
@@ -4447,24 +4460,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Endpoint para análisis de desviaciones
-  app.get('/api/projects/:id/deviation-analysis', async (req, res) => {
+  app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const project = await storage.getActiveProject(projectId);
+      const { startDate, endDate } = req.query;
       
+      const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
       const quotation = await storage.getQuotation(project.quotationId);
       const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
-      const projectTimeEntries = await db.select({
+      
+      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
+      let timeEntriesQuery = db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
         .from(timeEntries)
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
         .where(eq(timeEntries.projectId, projectId));
+
+      if (startDate && endDate) {
+        timeEntriesQuery = timeEntriesQuery.where(
+          and(
+            eq(timeEntries.projectId, projectId),
+            gte(timeEntries.date, startDate as string),
+            lte(timeEntries.date, endDate as string)
+          )
+        );
+      }
+
+      const projectTimeEntries = await timeEntriesQuery;
 
       // Calcular desviaciones por miembro
       const deviationByRole = teamMembers.map(member => {
@@ -4551,20 +4579,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint para recomendaciones
-  app.get('/api/projects/:id/recommendations', async (req, res) => {
+  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const project = await storage.getActiveProject(projectId);
+      const { startDate, endDate } = req.query;
       
+      const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
       const quotation = await storage.getQuotation(project.quotationId);
       const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
-      const projectEntries = await db.select()
+      
+      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
+      let projectEntriesQuery = db.select()
         .from(timeEntries)
         .where(eq(timeEntries.projectId, projectId));
+
+      if (startDate && endDate) {
+        projectEntriesQuery = projectEntriesQuery.where(
+          and(
+            eq(timeEntries.projectId, projectId),
+            gte(timeEntries.date, startDate as string),
+            lte(timeEntries.date, endDate as string)
+          )
+        );
+      }
+
+      const projectEntries = await projectEntriesQuery;
 
       const totalActualCost = projectEntries.reduce((sum, entry) => 
         sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);

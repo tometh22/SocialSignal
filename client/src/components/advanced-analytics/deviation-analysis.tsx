@@ -6,6 +6,10 @@ import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign } from "luci
 
 interface DeviationAnalysisProps {
   projectId: number;
+  dateFilter?: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 interface Deviation {
@@ -52,9 +56,14 @@ interface DeviationAnalysisData {
   };
 }
 
-export function DeviationAnalysis({ projectId }: DeviationAnalysisProps) {
+export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisProps) {
+  const queryParams = dateFilter 
+    ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
+    : '';
+    
   const { data: deviationData, isLoading } = useQuery<DeviationAnalysisData>({
-    queryKey: [`/api/projects/${projectId}/deviation-analysis`],
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`, dateFilter],
+    queryFn: () => fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`).then(res => res.json()),
     enabled: !!projectId
   });
 
