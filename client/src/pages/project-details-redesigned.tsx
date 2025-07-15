@@ -53,6 +53,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { DeviationAnalysis } from "@/components/advanced-analytics/deviation-analysis";
+import { Recommendations } from "@/components/advanced-analytics/recommendations";
+import { TrendCharts } from "@/components/advanced-analytics/trend-charts";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
@@ -1439,117 +1442,12 @@ export default function ProjectDetailsRedesigned() {
               </CardContent>
             </Card>
 
-            {/* Análisis de Desviaciones - Sección consolidada */}
-            <Card className="border-l-4 border-l-purple-500">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    Análisis de Desviaciones vs Cotización
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Comparación Real vs Estimado
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Desviación Financiera */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <DollarSign className="h-5 w-5 text-blue-600" />
-                      <h4 className="font-semibold text-blue-800">Financiera</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Presupuesto</span>
-                        <span className="font-medium">${costSummary?.budget?.toLocaleString() || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Costo Real</span>
-                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span>Desviación</span>
-                        <span className={
-                          (costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? 'text-red-600' : 'text-green-600'
-                        }>
-                          {(() => {
-                            const cost = costSummary?.totalCost || 0;
-                            const budget = costSummary?.budget || 0;
-                            if (budget === 0) return '0%';
-                            const deviation = ((cost - budget) / budget) * 100;
-                            return `${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}%`;
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Desviación Temporal */}
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-5 w-5 text-green-600" />
-                      <h4 className="font-semibold text-green-800">Temporal</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Horas estimadas</span>
-                        <span className="font-medium">{costSummary?.targetHours || 0}h</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Horas reales</span>
-                        <span className="font-medium">{costSummary?.filteredHours || 0}h</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span>Desviación</span>
-                        <span className={
-                          (costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? 'text-red-600' : 'text-green-600'
-                        }>
-                          {(() => {
-                            const actual = costSummary?.filteredHours || 0;
-                            const target = costSummary?.targetHours || 0;
-                            if (target === 0) return '0%';
-                            const deviation = ((actual - target) / target) * 100;
-                            return `${deviation >= 0 ? '+' : ''}${deviation.toFixed(1)}%`;
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Proyección */}
-                  <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="h-5 w-5 text-orange-600" />
-                      <h4 className="font-semibold text-orange-800">Proyección</h4>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Markup final</span>
-                        <span className="font-medium">
-                          {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Costo proyectado</span>
-                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span>Ganancia neta</span>
-                        <span className="text-green-600">
-                          ${(() => {
-                            const cost = costSummary?.totalCost || 0;
-                            const revenue = projectData.quotation?.totalAmount || 0;
-                            return Math.max(0, revenue - cost).toLocaleString();
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Nuevos Componentes de Análisis Avanzado */}
+            <DeviationAnalysis projectId={projectId!} />
+            
+            <Recommendations projectId={projectId!} />
+            
+            <TrendCharts projectId={projectId!} />
 
           </TabsContent>
 

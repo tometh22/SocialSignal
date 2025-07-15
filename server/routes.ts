@@ -3971,5 +3971,480 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ANÁLISIS AVANZADO Y RECOMENDACIONES ====================
+
+  // Punto 2: Análisis detallado de desviaciones
+  app.get("/api/projects/:id/deviation-analysis", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const quotation = await storage.getQuotation(project.quotationId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      // Obtener entradas de tiempo del proyecto
+      const timeEntries = await db.select({
+        timeEntry: timeEntries,
+        personnel: personnel,
+        role: roles
+      })
+        .from(timeEntries)
+        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .leftJoin(roles, eq(personnel.roleId, roles.id))
+        .where(eq(timeEntries.projectId, projectId));
+
+      // Obtener miembros del equipo de la cotización
+      const quotationTeam = await storage.getQuotationTeamMembers(project.quotationId);
+
+      // Análisis por categorías/roles
+      const deviationByRole = new Map();
+      
+      for (const member of quotationTeam) {
+        const roleEntries = timeEntries.filter(entry => 
+          entry.timeEntry.personnelId === member.personnelId
+        );
+        
+        const actualHours = roleEntries.reduce((sum, entry) => sum + entry.timeEntry.hours, 0);
+        const actualCost = roleEntries.reduce((sum, entry) => sum + (entry.timeEntry.hours * entry.personnel.hourlyRate), 0);
+        
+        const deviation = {
+          personnelId: member.personnelId,
+          personnelName: roleEntries[0]?.personnel.name || 'Unknown',
+          roleName: roleEntries[0]?.role?.name || 'No role',
+          estimated: {
+            hours: member.hours,
+            cost: member.cost
+          },
+          actual: {
+            hours: actualHours,
+            cost: actualCost
+          },
+          variance: {
+            hours: actualHours - member.hours,
+            cost: actualCost - member.cost,
+            hoursPercentage: member.hours > 0 ? ((actualHours - member.hours) / member.hours) * 100 : 0,
+            costPercentage: member.cost > 0 ? ((actualCost - member.cost) / member.cost) * 100 : 0
+          }
+        };
+        
+        deviationByRole.set(member.personnelId, deviation);
+      }
+
+      // Detectar principales causas de desviación
+      const deviations = Array.from(deviationByRole.values());
+      const majorDeviations = deviations.filter(d => Math.abs(d.variance.costPercentage) > 20);
+      const overBudgetMembers = deviations.filter(d => d.variance.costPercentage > 0);
+      const underBudgetMembers = deviations.filter(d => d.variance.costPercentage < 0);
+
+      // Resumen de causas
+      const causes = [];
+      if (overBudgetMembers.length > underBudgetMembers.length) {
+        causes.push({
+          type: 'cost_overrun',
+          severity: 'high',
+          description: `${overBudgetMembers.length} miembros del equipo han excedido sus presupuestos`,
+          affectedMembers: overBudgetMembers.map(m => m.personnelName)
+        });
+      }
+
+      if (majorDeviations.length > 0) {
+        causes.push({
+          type: 'scope_change',
+          severity: 'medium',
+          description: `${majorDeviations.length} roles muestran desviaciones significativas (>20%)`,
+          affectedRoles: majorDeviations.map(m => m.roleName)
+        });
+      }
+
+      const analysis = {
+        projectId,
+        projectName: quotation.projectName,
+        totalVariance: {
+          estimatedCost: quotationTeam.reduce((sum, m) => sum + m.cost, 0),
+          actualCost: deviations.reduce((sum, d) => sum + d.actual.cost, 0),
+          variance: deviations.reduce((sum, d) => sum + d.variance.cost, 0)
+        },
+        deviationByRole: deviations,
+        majorDeviations,
+        causes,
+        summary: {
+          membersOverBudget: overBudgetMembers.length,
+          membersUnderBudget: underBudgetMembers.length,
+          averageVariancePercentage: deviations.reduce((sum, d) => sum + d.variance.costPercentage, 0) / deviations.length
+        }
+      };
+
+      res.json(analysis);
+    } catch (error) {
+      console.error("Error in deviation analysis:", error);
+      res.status(500).json({ message: "Failed to analyze project deviations" });
+    }
+  });
+
+  // Punto 3: Recomendaciones automáticas
+  app.get("/api/projects/:id/recommendations", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const costSummary = await storage.getProjectCostSummary(projectId);
+      const quotation = await storage.getQuotation(project.quotationId);
+
+      const recommendations = [];
+
+      // Análisis de presupuesto
+      if (costSummary.budgetUtilization > 90) {
+        recommendations.push({
+          type: 'budget_alert',
+          priority: 'high',
+          title: 'Presupuesto crítico',
+          description: `El proyecto ha utilizado ${costSummary.budgetUtilization.toFixed(1)}% del presupuesto`,
+          actions: [
+            'Revisar scope del proyecto inmediatamente',
+            'Negociar presupuesto adicional con el cliente',
+            'Optimizar recursos del equipo'
+          ],
+          impact: 'financial'
+        });
+      } else if (costSummary.budgetUtilization > 75) {
+        recommendations.push({
+          type: 'budget_warning',
+          priority: 'medium',
+          title: 'Monitoreo de presupuesto',
+          description: `Presupuesto al ${costSummary.budgetUtilization.toFixed(1)}% - requiere atención`,
+          actions: [
+            'Planificar entregables restantes cuidadosamente',
+            'Revisar eficiencia del equipo semanalmente'
+          ],
+          impact: 'financial'
+        });
+      }
+
+      // Análisis de markup
+      if (costSummary.markup < 1.2) {
+        recommendations.push({
+          type: 'markup_critical',
+          priority: 'high',
+          title: 'Rentabilidad crítica',
+          description: `Markup actual de ${costSummary.markup.toFixed(2)}x está por debajo del mínimo`,
+          actions: [
+            'Evaluar reducción de scope no crítico',
+            'Incrementar eficiencia operativa',
+            'Considerar renegociación con cliente'
+          ],
+          impact: 'profitability'
+        });
+      } else if (costSummary.markup < 1.8) {
+        recommendations.push({
+          type: 'markup_warning',
+          priority: 'medium',
+          title: 'Mejorar rentabilidad',
+          description: `Markup de ${costSummary.markup.toFixed(2)}x puede optimizarse`,
+          actions: [
+            'Identificar tareas de alto valor',
+            'Optimizar procesos internos'
+          ],
+          impact: 'profitability'
+        });
+      }
+
+      // Análisis temporal
+      if (project.expectedEndDate) {
+        const daysUntilDeadline = Math.ceil((new Date(project.expectedEndDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        const progressPercentage = costSummary.targetHours > 0 ? (costSummary.filteredHours / costSummary.targetHours) * 100 : 0;
+        
+        if (daysUntilDeadline < 0) {
+          recommendations.push({
+            type: 'deadline_overdue',
+            priority: 'high',
+            title: 'Proyecto retrasado',
+            description: `El proyecto está ${Math.abs(daysUntilDeadline)} días retrasado`,
+            actions: [
+              'Comunicar nueva fecha estimada al cliente',
+              'Revisar recursos disponibles',
+              'Priorizar entregables críticos'
+            ],
+            impact: 'timeline'
+          });
+        } else if (daysUntilDeadline < 7 && progressPercentage < 80) {
+          recommendations.push({
+            type: 'deadline_risk',
+            priority: 'high',
+            title: 'Riesgo de incumplimiento',
+            description: `Faltan ${daysUntilDeadline} días y el progreso es ${progressPercentage.toFixed(1)}%`,
+            actions: [
+              'Asignar recursos adicionales urgentemente',
+              'Comunicar riesgos al cliente proactivamente'
+            ],
+            impact: 'timeline'
+          });
+        }
+      }
+
+      // Análisis de eficiencia del equipo
+      const timeEntries = await db.select({
+        timeEntry: timeEntries,
+        personnel: personnel
+      })
+        .from(timeEntries)
+        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .where(eq(timeEntries.projectId, projectId));
+
+      const last7Days = timeEntries.filter(entry => {
+        const entryDate = new Date(entry.timeEntry.date);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return entryDate >= weekAgo;
+      });
+
+      if (last7Days.length === 0) {
+        recommendations.push({
+          type: 'activity_low',
+          priority: 'medium',
+          title: 'Baja actividad reciente',
+          description: 'No se han registrado horas en los últimos 7 días',
+          actions: [
+            'Verificar estado del equipo',
+            'Revisar bloqueos del proyecto'
+          ],
+          impact: 'productivity'
+        });
+      }
+
+      // Predicciones
+      const velocityData = await calculateProjectVelocity(projectId);
+      
+      const predictions = {
+        estimatedCompletionDate: velocityData.estimatedCompletion,
+        projectedFinalCost: velocityData.projectedCost,
+        projectedFinalMarkup: velocityData.projectedMarkup,
+        confidenceLevel: velocityData.confidence
+      };
+
+      res.json({
+        projectId,
+        projectName: quotation?.projectName || 'Unknown Project',
+        recommendations,
+        predictions,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ message: "Failed to generate recommendations" });
+    }
+  });
+
+  // Punto 4: Datos para gráficos de tendencias
+  app.get("/api/projects/:id/trend-data", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const period = req.query.period as string || 'weekly'; // weekly, monthly
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Obtener todas las entradas de tiempo del proyecto
+      const timeEntries = await db.select({
+        timeEntry: timeEntries,
+        personnel: personnel
+      })
+        .from(timeEntries)
+        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .where(eq(timeEntries.projectId, projectId))
+        .orderBy(asc(timeEntries.date));
+
+      // Agrupar por período
+      const groupedData = new Map();
+      const quotation = await storage.getQuotation(project.quotationId);
+      
+      for (const entry of timeEntries) {
+        const date = new Date(entry.timeEntry.date);
+        let periodKey;
+        
+        if (period === 'weekly') {
+          // Obtener inicio de semana (lunes)
+          const monday = new Date(date);
+          monday.setDate(date.getDate() - date.getDay() + 1);
+          periodKey = monday.toISOString().split('T')[0];
+        } else {
+          // Mensual
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        if (!groupedData.has(periodKey)) {
+          groupedData.set(periodKey, {
+            period: periodKey,
+            hours: 0,
+            cost: 0,
+            entries: 0,
+            uniqueMembers: new Set()
+          });
+        }
+
+        const periodData = groupedData.get(periodKey);
+        periodData.hours += entry.timeEntry.hours;
+        periodData.cost += entry.timeEntry.hours * entry.personnel.hourlyRate;
+        periodData.entries += 1;
+        periodData.uniqueMembers.add(entry.timeEntry.personnelId);
+      }
+
+      // Convertir a array y agregar métricas acumulativas
+      const trendData = Array.from(groupedData.values()).map(data => ({
+        ...data,
+        uniqueMembers: data.uniqueMembers.size,
+        averageHoursPerMember: data.uniqueMembers.size > 0 ? data.hours / data.uniqueMembers.size : 0
+      }));
+
+      // Calcular métricas acumulativas
+      let cumulativeHours = 0;
+      let cumulativeCost = 0;
+      const targetCost = quotation?.baseCost || 0;
+      const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
+
+      const enhancedTrendData = trendData.map(data => {
+        cumulativeHours += data.hours;
+        cumulativeCost += data.cost;
+        
+        return {
+          ...data,
+          cumulativeHours,
+          cumulativeCost,
+          progressPercentage: targetHours > 0 ? (cumulativeHours / targetHours) * 100 : 0,
+          budgetUtilization: targetCost > 0 ? (cumulativeCost / targetCost) * 100 : 0,
+          currentMarkup: cumulativeCost > 0 ? (quotation?.totalAmount || 0) / cumulativeCost : 0
+        };
+      });
+
+      // Análisis de velocidad
+      const velocityAnalysis = calculateVelocityTrends(enhancedTrendData);
+
+      // Predicciones futuras
+      const futureProjections = generateProjections(enhancedTrendData, targetHours, targetCost);
+
+      res.json({
+        projectId,
+        period,
+        trendData: enhancedTrendData,
+        velocityAnalysis,
+        futureProjections,
+        summary: {
+          totalPeriods: enhancedTrendData.length,
+          averageHoursPerPeriod: trendData.reduce((sum, d) => sum + d.hours, 0) / trendData.length || 0,
+          averageCostPerPeriod: trendData.reduce((sum, d) => sum + d.cost, 0) / trendData.length || 0,
+          peakActivity: trendData.reduce((max, d) => d.hours > max.hours ? d : max, { hours: 0 })
+        }
+      });
+    } catch (error) {
+      console.error("Error generating trend data:", error);
+      res.status(500).json({ message: "Failed to generate trend data" });
+    }
+  });
+
+  // Funciones auxiliares para cálculos avanzados
+  async function calculateProjectVelocity(projectId: number) {
+    const timeEntries = await db.select()
+      .from(timeEntries)
+      .where(eq(timeEntries.projectId, projectId))
+      .orderBy(asc(timeEntries.date));
+
+    if (timeEntries.length < 2) {
+      return {
+        estimatedCompletion: null,
+        projectedCost: 0,
+        projectedMarkup: 0,
+        confidence: 'low'
+      };
+    }
+
+    // Calcular velocidad promedio (horas por día)
+    const first = new Date(timeEntries[0].date);
+    const last = new Date(timeEntries[timeEntries.length - 1].date);
+    const daysDiff = (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24);
+    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const velocity = daysDiff > 0 ? totalHours / daysDiff : 0;
+
+    const project = await storage.getActiveProject(projectId);
+    const quotation = project ? await storage.getQuotation(project.quotationId) : null;
+    const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
+    
+    const remainingHours = Math.max(0, targetHours - totalHours);
+    const daysToComplete = velocity > 0 ? remainingHours / velocity : null;
+    
+    const estimatedCompletion = daysToComplete ? 
+      new Date(Date.now() + daysToComplete * 24 * 60 * 60 * 1000) : null;
+
+    return {
+      estimatedCompletion,
+      projectedCost: quotation?.baseCost || 0,
+      projectedMarkup: quotation ? (quotation.totalAmount / (quotation.baseCost || 1)) : 0,
+      confidence: timeEntries.length > 10 ? 'high' : timeEntries.length > 5 ? 'medium' : 'low'
+    };
+  }
+
+  async function calculateEstimatedHours(quotationId: number): Promise<number> {
+    const teamMembers = await storage.getQuotationTeamMembers(quotationId);
+    return teamMembers.reduce((total, member) => total + member.hours, 0);
+  }
+
+  function calculateVelocityTrends(trendData: any[]) {
+    if (trendData.length < 2) return { trend: 'insufficient_data' };
+
+    const recentPeriods = trendData.slice(-3);
+    const earlierPeriods = trendData.slice(0, -3);
+
+    const recentAvg = recentPeriods.reduce((sum, d) => sum + d.hours, 0) / recentPeriods.length;
+    const earlierAvg = earlierPeriods.length > 0 ? 
+      earlierPeriods.reduce((sum, d) => sum + d.hours, 0) / earlierPeriods.length : recentAvg;
+
+    const velocityChange = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+
+    return {
+      trend: velocityChange > 10 ? 'accelerating' : velocityChange < -10 ? 'decelerating' : 'stable',
+      velocityChange,
+      recentAverage: recentAvg,
+      historicalAverage: earlierAvg
+    };
+  }
+
+  function generateProjections(trendData: any[], targetHours: number, targetCost: number) {
+    if (trendData.length < 2) return { available: false };
+
+    const lastPeriod = trendData[trendData.length - 1];
+    const avgHoursPerPeriod = trendData.reduce((sum, d) => sum + d.hours, 0) / trendData.length;
+    
+    const remainingHours = Math.max(0, targetHours - lastPeriod.cumulativeHours);
+    const estimatedPeriodsRemaining = avgHoursPerPeriod > 0 ? Math.ceil(remainingHours / avgHoursPerPeriod) : 0;
+
+    return {
+      available: true,
+      estimatedPeriodsToComplete: estimatedPeriodsRemaining,
+      projectedFinalCost: lastPeriod.cumulativeCost + (remainingHours * (lastPeriod.cumulativeCost / lastPeriod.cumulativeHours || 0)),
+      projectedCompletionDate: new Date(Date.now() + estimatedPeriodsRemaining * 7 * 24 * 60 * 60 * 1000),
+      confidence: trendData.length > 8 ? 'high' : trendData.length > 4 ? 'medium' : 'low'
+    };
+  }
+
   return httpServer;
 }
