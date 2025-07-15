@@ -1673,74 +1673,96 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
 
           <TabsContent value="time-management" className="space-y-6">
-            {/* Gestión y registro de tiempo */}
-            <div className="space-y-6">
-              {/* Panel de Registro de Tiempo */}
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
+            {/* SECCIÓN 1: Métricas de Tiempo Compactas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Timer className="h-5 w-5 text-purple-600" />
-                      Registro de Tiempo del Equipo
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <span className="text-sm font-medium text-purple-700">Total Registrado</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
+                      {costSummary?.filteredHours || 0}h
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      de {costSummary?.targetHours || 0}h estimadas
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Users className="h-4 w-4 text-green-600" />
+                      </div>
+                      <span className="text-sm font-medium text-green-700">Miembros Activos</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      {teamStats?.filter(member => member.hours > 0).length || 0}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {teamStats?.length || 0}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      con registro de tiempo
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Activity className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <span className="text-sm font-medium text-orange-700">Promedio Diario</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
+                      {dateFilter.label}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {teamStats && teamStats.length > 0 
+                        ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length / 30).toFixed(1)
+                        : '0.0'}h
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      por miembro del equipo
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* SECCIÓN 2: Acciones Rápidas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Settings className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-blue-700">Configurar Equipo</span>
                     </div>
                     <Button
                       size="sm"
-                      onClick={() => setShowQuickRegister(true)}
-                      className="bg-purple-600 hover:bg-purple-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Registrar Tiempo
-                    </Button>
-                  </CardTitle>
-                  <CardDescription>
-                    Gestión centralizada de registros de tiempo para el proyecto
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {/* Estadísticas de tiempo */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-4 w-4 text-purple-600" />
-                        <p className="text-sm font-medium text-purple-800">Total Registrado</p>
-                      </div>
-                      <p className="text-2xl font-bold text-purple-600">
-                        {costSummary?.filteredHours || 0}h
-                      </p>
-                      <p className="text-xs text-purple-600">en el período seleccionado</p>
-                    </div>
-
-                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Users className="h-4 w-4 text-green-600" />
-                        <p className="text-sm font-medium text-green-800">Miembros Activos</p>
-                      </div>
-                      <p className="text-2xl font-bold text-green-600">
-                        {teamStats?.length || 0}
-                      </p>
-                      <p className="text-xs text-green-600">con registros de tiempo</p>
-                    </div>
-
-                    <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Activity className="h-4 w-4 text-orange-600" />
-                        <p className="text-sm font-medium text-orange-800">Promedio Diario</p>
-                      </div>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {teamStats && teamStats.length > 0 
-                          ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length / 30).toFixed(1)
-                          : '0.0'}h
-                      </p>
-                      <p className="text-xs text-orange-600">por miembro del equipo</p>
-                    </div>
-                  </div>
-
-                  {/* Acciones de gestión */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-purple-50 hover:border-purple-300"
                       onClick={() => {
                         setShowQuickRegister(true);
                         toast({
@@ -1748,52 +1770,103 @@ export default function ProjectDetailsRedesigned() {
                           description: "Configura las horas de trabajo para todo el equipo",
                         });
                       }}
+                      className="bg-blue-600 hover:bg-blue-700 h-8"
                     >
-                      <Settings className="h-6 w-6 text-purple-600" />
-                      <div className="text-center">
-                        <div className="font-medium text-sm">Configurar Equipo</div>
-                        <div className="text-xs text-gray-500">Registro semanal masivo</div>
-                      </div>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Configurar
                     </Button>
-
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-orange-50 hover:border-orange-300"
-                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
-                    >
-                      <FileText className="h-6 w-6 text-orange-600" />
-                      <div className="text-center">
-                        <div className="font-medium text-sm">Gestionar Registros</div>
-                        <div className="text-xs text-gray-500">Editar, revisar, aprobar</div>
-                      </div>
-                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Registro semanal masivo para todo el equipo
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-blue-600">Próximo: </span>
+                    <span className="text-gray-500">
+                      {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES', { 
+                        weekday: 'long', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Vista del equipo para registro */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-600" />
-                    Equipo del Proyecto - Vista de Registro
-                  </CardTitle>
-                  <CardDescription>
-                    Estado actual del equipo y facilidades de registro de tiempo
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ProjectTeamSection 
-                    projectId={projectId!} 
-                    timeEntries={timeEntries}
-                    project={project}
-                    dateFilter={dateFilter}
-                    filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-                  />
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-100 rounded-lg">
+                        <History className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <span className="text-sm font-medium text-emerald-700">Gestionar Registros</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
+                      className="border-emerald-200 hover:bg-emerald-50 h-8"
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Ver Todo
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Editar, revisar y aprobar registros existentes
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-emerald-600">Registros: </span>
+                    <span className="text-gray-500">
+                      {filteredTimeEntries.length} en {dateFilter.label}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* SECCIÓN 3: Vista Inteligente del Equipo */}
+            <Card className="border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 to-white shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-indigo-100 rounded-lg">
+                      <Users className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold text-indigo-900">
+                        Equipo del Proyecto - Vista de Registro
+                      </CardTitle>
+                      <CardDescription className="text-sm text-indigo-700">
+                        Estado actual del equipo y facilidades de registro de tiempo
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-indigo-100 text-indigo-800 text-xs">
+                      {baseTeam?.filter((member: any) => getTimeWorkedByMember(member.personnelId) > 0).length || 0} activos
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
+                      className="border-indigo-200 hover:bg-indigo-50 h-8"
+                    >
+                      <BarChart3 className="h-3 w-3 mr-1" />
+                      Analizar
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ProjectTeamSection 
+                  projectId={projectId!} 
+                  timeEntries={timeEntries}
+                  project={project}
+                  dateFilter={dateFilter}
+                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
