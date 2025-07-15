@@ -4462,7 +4462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
       
-      console.log(`🔍 Deviation analysis - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      console.log(`🔍🔍🔍 DEVIATION ANALYSIS CALLED - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
       if (!project) {
@@ -4600,7 +4600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectId = parseInt(req.params.id);
       const { startDate, endDate } = req.query;
       
-      console.log(`🔍 Recommendations - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
       if (!project) {
