@@ -1163,291 +1163,218 @@ export default function ProjectDetailsRedesigned() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-
-            {/* Análisis de Rentabilidad - Información clave que no está en las cards superiores */}
-            <Card className="border-l-4 border-l-yellow-500 bg-gradient-to-r from-yellow-50 to-amber-50">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-6 w-6 text-yellow-600" />
-                    Análisis de Rentabilidad - {dateFilter.label}
-                  </div>
-                  <Badge variant="outline" className="bg-white/80 border-yellow-200 text-yellow-700">
-                    Métricas Financieras
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                  {/* Markup Calculation */}
-                  <div className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-5 w-5 text-yellow-600" />
-                      <p className="text-sm font-semibold text-yellow-800">Markup Actual</p>
+            
+            {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              
+              {/* Markup Card - Métrica más importante */}
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Percent className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {costSummary?.markup ? `${costSummary.markup.toFixed(2)}x` : '0.00x'}
-                    </p>
-                    <p className="text-xs text-yellow-600">
+                    <Badge variant={(() => {
+                      const markup = costSummary?.markup || 0;
+                      if (markup >= 2.5) return 'default';
+                      if (markup >= 1.8) return 'secondary';
+                      if (markup >= 1.2) return 'destructive';
+                      return 'destructive';
+                    })()} className="text-xs">
                       {(() => {
-                        if (!costSummary?.markup) return 'Sin datos';
-                        const markup = costSummary.markup;
-                        if (markup >= 2.5) return 'Excelente rentabilidad';
-                        if (markup >= 1.8) return 'Buena rentabilidad';
-                        if (markup >= 1.2) return 'Rentabilidad aceptable';
-                        return 'Rentabilidad crítica';
+                        const markup = costSummary?.markup || 0;
+                        if (markup >= 2.5) return 'Excelente';
+                        if (markup >= 1.8) return 'Bueno';
+                        if (markup >= 1.2) return 'Aceptable';
+                        return 'Crítico';
                       })()}
-                    </p>
+                    </Badge>
                   </div>
-
-                  {/* Precio vs Costo */}
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
-                      <p className="text-sm font-semibold text-green-800">Precio vs Costo</p>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Precio:</span>
-                        <span className="font-medium">${costSummary?.targetClientPrice?.toLocaleString() || '0'}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-green-600">Costo:</span>
-                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || '0'}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-bold pt-1 border-t border-green-200">
-                        <span className="text-green-600">Margen:</span>
-                        <span className="text-green-700">
-                          ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Eficiencia Presupuestaria */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-5 w-5 text-blue-600" />
-                      <p className="text-sm font-semibold text-blue-800">Eficiencia Presupuestaria</p>
-                    </div>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {costSummary?.budgetUtilization ? `${costSummary.budgetUtilization.toFixed(1)}%` : '0.0%'}
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
                     </p>
-                    <p className="text-xs text-blue-600">
-                      {(() => {
-                        if (!costSummary?.budgetUtilization) return 'Sin datos';
-                        const utilization = costSummary.budgetUtilization;
-                        if (utilization <= 80) return 'Excelente control';
-                        if (utilization <= 95) return 'Buen control';
-                        if (utilization <= 100) return 'En límite';
-                        return 'Excede presupuesto';
-                      })()}
+                    <p className="text-xs text-gray-500">
+                      Rentabilidad del proyecto
                     </p>
-                  </div>
-
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Grid principal del dashboard */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Progreso y Estado */}
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Gauge className="h-5 w-5 text-blue-600" />
-                    Vista General del Proyecto
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Progreso Visual */}
-                    <div>
-                      <h4 className="font-semibold text-sm mb-3">Progreso del Proyecto</h4>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Avance General</span>
-                            <span className="font-bold">
-                              {(() => {
-                                if (!costSummary || !costSummary.targetHours) return "0.0%";
-                                const progressPercentage = Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
-                                return `${progressPercentage.toFixed(1)}%`;
-                              })()}
-                            </span>
-                          </div>
-                          <Progress 
-                            value={(() => {
-                              if (!costSummary || !costSummary.targetHours) return 0;
-                              return Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
-                            })()} 
-                            className="h-2"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Utilización Presupuesto</span>
-                            <span className="font-bold">
-                              {(() => {
-                                if (!costSummary) return "$0";
-                                const utilization = costSummary.budgetUtilization;
-                                return `${utilization.toFixed(1)}%`;
-                              })()}
-                            </span>
-                          </div>
-                          <Progress 
-                            value={costSummary?.budgetUtilization || 0} 
-                            className="h-2"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Información Clave */}
-                    <div>
-                      <h4 className="font-semibold text-sm mb-3">Información Clave</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Cliente</span>
-                          <span className="font-medium">{clientName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Estado</span>
-                          <Badge variant={projectData.status === 'active' ? 'default' : 'secondary'}>
-                            {metrics[3]?.value}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Tipo</span>
-                          <span className="font-medium">{projectData.deliverableType || "No especificado"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Fecha límite</span>
-                          <span className="font-medium">
-                            {projectData.expectedEndDate ? 
-                              new Date(projectData.expectedEndDate).toLocaleDateString('es-ES') : 
-                              "No definida"
-                            }
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Alertas y Estado */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    Centro de Alertas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {/* Alertas dinámicas */}
-                    {costSummary?.budgetUtilization && costSummary.budgetUtilization > 100 && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-red-700 mb-1">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span className="font-medium text-sm">Presupuesto Excedido</span>
-                        </div>
-                        <p className="text-xs text-red-600">
-                          El proyecto ha superado el presupuesto asignado en {(costSummary.budgetUtilization - 100).toFixed(1)}%
-                        </p>
+              {/* Progreso de Horas */}
+              <Card className="border-l-4 border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-green-600" />
                       </div>
-                    )}
+                      <span className="text-sm font-medium text-green-700">Progreso</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">
+                        {costSummary?.filteredHours || 0}h / {costSummary?.targetHours || 0}h
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {costSummary?.hoursProgress || 0}%
+                    </p>
+                    <Progress value={costSummary?.hoursProgress || 0} className="h-2" />
+                  </div>
+                </CardContent>
+              </Card>
 
-                    {project?.expectedEndDate && new Date(project.expectedEndDate) < new Date() && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-red-700 mb-1">
-                          <CalendarClock className="h-4 w-4" />
-                          <span className="font-medium text-sm">Proyecto Retrasado</span>
-                        </div>
-                        <p className="text-xs text-red-600">
-                          El proyecto ha superado su fecha límite estimada
-                        </p>
+              {/* Uso del Presupuesto */}
+              <Card className="border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-orange-600" />
                       </div>
-                    )}
+                      <span className="text-sm font-medium text-orange-700">Presupuesto</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">
+                        ${costSummary?.totalCost?.toLocaleString() || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {costSummary?.budgetUtilization || 0}%
+                    </p>
+                    <Progress 
+                      value={costSummary?.budgetUtilization || 0} 
+                      className="h-2"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-                    {costSummary?.budgetUtilization && costSummary.budgetUtilization > 80 && costSummary.budgetUtilization <= 100 && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-yellow-700 mb-1">
-                          <DollarSign className="h-4 w-4" />
-                          <span className="font-medium text-sm">Presupuesto Crítico</span>
-                        </div>
-                        <p className="text-xs text-yellow-600">
-                          El presupuesto está al {costSummary.budgetUtilization.toFixed(1)}% de utilización
-                        </p>
+              {/* Estado General */}
+              <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Gauge className="h-4 w-4 text-purple-600" />
                       </div>
-                    )}
-
-                    {/* Estado general */}
-                    {(!costSummary?.budgetUtilization || costSummary.budgetUtilization <= 80) && 
-                     (!project?.expectedEndDate || new Date(project.expectedEndDate) >= new Date()) && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2 text-green-700 mb-1">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span className="font-medium text-sm">Proyecto Saludable</span>
-                        </div>
-                        <p className="text-xs text-green-600">
-                          El proyecto está dentro de los parámetros normales
-                        </p>
-                      </div>
-                    )}
+                      <span className="text-sm font-medium text-purple-700">Estado</span>
+                    </div>
+                    <Badge variant={(() => {
+                      const budgetUtil = costSummary?.budgetUtilization || 0;
+                      const markup = costSummary?.markup || 0;
+                      if (budgetUtil > 90 || markup < 1.2) return 'destructive';
+                      if (budgetUtil > 75 || markup < 1.8) return 'secondary';
+                      return 'default';
+                    })()} className="text-xs">
+                      {(() => {
+                        const budgetUtil = costSummary?.budgetUtilization || 0;
+                        const markup = costSummary?.markup || 0;
+                        if (budgetUtil > 90 || markup < 1.2) return 'Crítico';
+                        if (budgetUtil > 75 || markup < 1.8) return 'Atención';
+                        return 'Saludable';
+                      })()}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-bold text-gray-900">
+                      {(() => {
+                        const budgetUtil = costSummary?.budgetUtilization || 0;
+                        const markup = costSummary?.markup || 0;
+                        if (budgetUtil > 90 || markup < 1.2) return 'Crítico';
+                        if (budgetUtil > 75 || markup < 1.8) return 'Atención';
+                        return 'Saludable';
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500">Evaluación integral</p>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Actividad Reciente */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-green-600" />
-                  Actividad Reciente del Equipo
+            {/* SECCIÓN 2: Análisis Avanzado - Grid Profesional 2x2 */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              
+              {/* Análisis de Desviaciones */}
+              <div className="space-y-4">
+                <DeviationAnalysis projectId={projectId!} />
+              </div>
+              
+              {/* Recomendaciones Automáticas */}
+              <div className="space-y-4">
+                <Recommendations projectId={projectId!} />
+              </div>
+              
+            </div>
+
+            {/* SECCIÓN 3: Gráficos de Tendencias - Full Width */}
+            <div className="w-full">
+              <TrendCharts projectId={projectId!} />
+            </div>
+
+            {/* SECCIÓN 4: Actividad Reciente - Optimizada */}
+            <Card className="border-l-4 border-l-indigo-500 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-lg">
+                      <Activity className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Actividad Reciente</h3>
+                      <p className="text-sm text-gray-500">Últimos registros de tiempo del equipo</p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {filteredTimeEntries.length} registros
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {recentTimeEntries.length > 0 ? (
-                    recentTimeEntries.slice(0, 6).map((entry: TimeEntry) => (
-                      <div key={entry.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-blue-500 text-white text-sm">
-                            {entry.personnelName.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
+                  {filteredTimeEntries.length > 0 ? (
+                    filteredTimeEntries.slice(0, 12).map((entry, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                        <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                          <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
+                            {entry.personnelName.split(' ').map(n => n[0]).join('').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{entry.personnelName}</p>
-                          <p className="text-xs text-gray-500">{entry.roleName}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-900 truncate">{entry.personnelName}</p>
+                          <p className="text-xs text-gray-500 truncate">{entry.roleName}</p>
                           <p className="text-xs text-gray-400">
-                            {new Date(entry.date).toLocaleDateString('es-ES')}
+                            {new Date(entry.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-lg text-blue-600">{entry.hours}h</p>
+                          <p className="font-bold text-lg text-indigo-600">{entry.hours}h</p>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="col-span-full text-center py-8 text-gray-500">
-                      <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No hay actividad registrada aún</p>
+                    <div className="col-span-full text-center py-12 text-gray-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-3 bg-gray-100 rounded-full">
+                          <Clock className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-600">Sin actividad reciente</p>
+                          <p className="text-sm text-gray-500">No hay registros de tiempo en el período seleccionado</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Nuevos Componentes de Análisis Avanzado */}
-            <DeviationAnalysis projectId={projectId!} />
-            
-            <Recommendations projectId={projectId!} />
-            
-            <TrendCharts projectId={projectId!} />
 
           </TabsContent>
 

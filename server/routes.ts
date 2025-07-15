@@ -3992,7 +3992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Obtener entradas de tiempo del proyecto
-      const timeEntries = await db.select({
+      const projectTimeEntries = await db.select({
         timeEntry: timeEntries,
         personnel: personnel,
         role: roles
@@ -4009,7 +4009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const deviationByRole = new Map();
       
       for (const member of quotationTeam) {
-        const roleEntries = timeEntries.filter(entry => 
+        const roleEntries = projectTimeEntries.filter(entry => 
           entry.timeEntry.personnelId === member.personnelId
         );
         
@@ -4198,7 +4198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Análisis de eficiencia del equipo
-      const timeEntries = await db.select({
+      const projectTimeEntries2 = await db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
@@ -4206,7 +4206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
         .where(eq(timeEntries.projectId, projectId));
 
-      const last7Days = timeEntries.filter(entry => {
+      const last7Days = projectTimeEntries2.filter(entry => {
         const entryDate = new Date(entry.timeEntry.date);
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
@@ -4266,7 +4266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Obtener todas las entradas de tiempo del proyecto
-      const timeEntries = await db.select({
+      const projectTimeEntries3 = await db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
@@ -4279,7 +4279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const groupedData = new Map();
       const quotation = await storage.getQuotation(project.quotationId);
       
-      for (const entry of timeEntries) {
+      for (const entry of projectTimeEntries3) {
         const date = new Date(entry.timeEntry.date);
         let periodKey;
         
@@ -4364,12 +4364,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Funciones auxiliares para cálculos avanzados
   async function calculateProjectVelocity(projectId: number) {
-    const timeEntries = await db.select()
+    const projectEntries = await db.select()
       .from(timeEntries)
       .where(eq(timeEntries.projectId, projectId))
       .orderBy(asc(timeEntries.date));
 
-    if (timeEntries.length < 2) {
+    if (projectEntries.length < 2) {
       return {
         estimatedCompletion: null,
         projectedCost: 0,
@@ -4379,10 +4379,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Calcular velocidad promedio (horas por día)
-    const first = new Date(timeEntries[0].date);
-    const last = new Date(timeEntries[timeEntries.length - 1].date);
+    const first = new Date(projectEntries[0].date);
+    const last = new Date(projectEntries[projectEntries.length - 1].date);
     const daysDiff = (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24);
-    const totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const totalHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
     const velocity = daysDiff > 0 ? totalHours / daysDiff : 0;
 
     const project = await storage.getActiveProject(projectId);
@@ -4399,7 +4399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       estimatedCompletion,
       projectedCost: quotation?.baseCost || 0,
       projectedMarkup: quotation ? (quotation.totalAmount / (quotation.baseCost || 1)) : 0,
-      confidence: timeEntries.length > 10 ? 'high' : timeEntries.length > 5 ? 'medium' : 'low'
+      confidence: projectEntries.length > 10 ? 'high' : projectEntries.length > 5 ? 'medium' : 'low'
     };
   }
 
