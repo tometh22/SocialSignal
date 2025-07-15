@@ -4446,5 +4446,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
+  // Endpoint para análisis de desviaciones
+  app.get('/api/projects/:id/deviation-analysis', async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getActiveProject(projectId);
+      
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const quotation = await storage.getQuotation(project.quotationId);
+      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
+      const projectTimeEntries = await db.select({
+        timeEntry: timeEntries,
+        personnel: personnel
+      })
+        .from(timeEntries)
+        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+        .where(eq(timeEntries.projectId, projectId));
+
+      // Calcular desviaciones por miembro
+      const deviationByRole = teamMembers.map(member => {
+        const memberTimeEntries = projectTimeEntries.filter(entry => 
+          entry.timeEntry.personnelId === member.personnelId
+        );
+        
+        const actualHours = memberTimeEntries.reduce((sum, entry) => 
+          sum + entry.timeEntry.hours, 0);
+        const actualCost = memberTimeEntries.reduce((sum, entry) => 
+          sum + (entry.timeEntry.hours * (entry.timeEntry.hourlyRateAtTime || member.rate)), 0);
+
+        const hoursVariance = actualHours - member.hours;
+        const costVariance = actualCost - member.cost;
+
+        return {
+          personnelId: member.personnelId,
+          personnelName: memberTimeEntries[0]?.personnel.name || 'Unknown',
+          roleName: 'Team Member',
+          estimated: {
+            hours: member.hours,
+            cost: member.cost
+          },
+          actual: {
+            hours: actualHours,
+            cost: actualCost
+          },
+          variance: {
+            hours: hoursVariance,
+            cost: costVariance,
+            hoursPercentage: member.hours > 0 ? (hoursVariance / member.hours) * 100 : 0,
+            costPercentage: member.cost > 0 ? (costVariance / member.cost) * 100 : 0
+          }
+        };
+      });
+
+      // Calcular totales
+      const totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+      const totalActualCost = projectTimeEntries.reduce((sum, entry) => 
+        sum + (entry.timeEntry.hours * (entry.timeEntry.hourlyRateAtTime || 100)), 0);
+      const totalVariance = totalActualCost - totalEstimatedCost;
+
+      // Identificar desviaciones mayores (>20%)
+      const majorDeviations = deviationByRole.filter(deviation => 
+        Math.abs(deviation.variance.costPercentage) > 20
+      );
+
+      // Generar causas basadas en análisis
+      const causes = [];
+      if (majorDeviations.length > 0) {
+        causes.push({
+          type: 'budget_overrun',
+          severity: 'high',
+          description: 'Algunos miembros del equipo excedieron significativamente el presupuesto estimado',
+          affectedMembers: majorDeviations.map(d => d.personnelName)
+        });
+      }
+
+      const membersOverBudget = deviationByRole.filter(d => d.variance.costPercentage > 0).length;
+      const membersUnderBudget = deviationByRole.filter(d => d.variance.costPercentage < 0).length;
+
+      res.json({
+        projectId,
+        projectName: project.name,
+        totalVariance: {
+          estimatedCost: totalEstimatedCost,
+          actualCost: totalActualCost,
+          variance: totalVariance
+        },
+        deviationByRole,
+        majorDeviations,
+        causes,
+        summary: {
+          membersOverBudget,
+          membersUnderBudget,
+          averageVariancePercentage: deviationByRole.length > 0 ? 
+            deviationByRole.reduce((sum, d) => sum + Math.abs(d.variance.costPercentage), 0) / deviationByRole.length : 0
+        }
+      });
+    } catch (error) {
+      console.error("Error generating deviation analysis:", error);
+      res.status(500).json({ message: "Failed to generate deviation analysis" });
+    }
+  });
+
+  // Endpoint para recomendaciones
+  app.get('/api/projects/:id/recommendations', async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getActiveProject(projectId);
+      
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const quotation = await storage.getQuotation(project.quotationId);
+      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
+      const projectEntries = await db.select()
+        .from(timeEntries)
+        .where(eq(timeEntries.projectId, projectId));
+
+      const totalActualCost = projectEntries.reduce((sum, entry) => 
+        sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
+      const totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+      const totalActualHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
+      const totalEstimatedHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+
+      const recommendations = [];
+
+      // Recomendación de control de costos
+      if (totalActualCost > totalEstimatedCost * 1.2) {
+        recommendations.push({
+          type: 'cost_control',
+          priority: 'high',
+          title: 'Control de Costos Urgente',
+          description: 'El proyecto excede el presupuesto estimado en más del 20%',
+          actions: [
+            'Revisar asignaciones de recursos',
+            'Optimizar procesos actuales',
+            'Considerar renegociar alcance con el cliente'
+          ],
+          impact: 'financial'
+        });
+      }
+
+      // Recomendación de eficiencia
+      if (totalActualHours > totalEstimatedHours * 1.1) {
+        recommendations.push({
+          type: 'efficiency',
+          priority: 'medium',
+          title: 'Mejora de Eficiencia',
+          description: 'Se están utilizando más horas de las estimadas',
+          actions: [
+            'Implementar metodologías ágiles',
+            'Automatizar tareas repetitivas',
+            'Proporcionar capacitación adicional al equipo'
+          ],
+          impact: 'productivity'
+        });
+      }
+
+      // Recomendación de rentabilidad
+      const markup = quotation ? (quotation.totalAmount / totalActualCost) : 0;
+      if (markup < 1.5) {
+        recommendations.push({
+          type: 'profitability',
+          priority: 'high',
+          title: 'Mejora de Rentabilidad',
+          description: 'El markup actual está por debajo del objetivo mínimo',
+          actions: [
+            'Reducir costos operativos',
+            'Optimizar tiempos de entrega',
+            'Evaluar ajustes en precios futuros'
+          ],
+          impact: 'profitability'
+        });
+      }
+
+      // Predicciones
+      const velocity = await calculateProjectVelocity(projectId);
+      const predictions = {
+        estimatedCompletionDate: velocity.estimatedCompletion?.toISOString() || null,
+        projectedFinalCost: velocity.projectedCost,
+        projectedFinalMarkup: velocity.projectedMarkup,
+        confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low'
+      };
+
+      res.json({
+        projectId,
+        projectName: project.name,
+        recommendations,
+        predictions,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      res.status(500).json({ message: "Failed to generate recommendations" });
+    }
+  });
+
   return httpServer;
 }
