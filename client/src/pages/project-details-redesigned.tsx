@@ -1685,12 +1685,12 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Total Registrado</span>
                     </div>
                     <Badge variant="secondary" className="bg-purple-100 text-purple-800 text-xs">
-                      {costSummary?.filteredHours || 0}h
+                      {(costSummary?.filteredHours || 0).toFixed(1)}h
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(1)}%
+                      {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(2)}%
                     </p>
                     <p className="text-xs text-gray-500">
                       de {costSummary?.targetHours || 0}h estimadas
