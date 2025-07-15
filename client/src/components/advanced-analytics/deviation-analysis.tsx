@@ -135,52 +135,82 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
       </CardHeader>
       <CardContent className="space-y-6">
         
-        {/* Resumen General */}
+        {/* Resumen General Mejorado */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">Diferencia vs Presupuesto</span>
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-blue-200 p-2 rounded-lg">
+                <DollarSign className="h-5 w-5 text-blue-700" />
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide mb-1">
+                  Diferencia vs Presupuesto
+                </p>
+                <p className="text-2xl font-bold text-blue-800">
+                  ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
+                </p>
+              </div>
             </div>
-            <p className="text-xl font-bold text-blue-600">
-              ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
-            </p>
-            <p className="text-xs text-blue-600">
+            <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full text-center">
               {deviationData.totalVariance.variance > 0 ? "Por encima del presupuesto" : "Por debajo del presupuesto"}
             </p>
           </div>
 
-          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-red-600" />
-              <span className="text-sm font-medium text-red-800">Exceden Presupuesto</span>
+          <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-red-200 p-2 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-red-700" />
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-red-600 font-semibold uppercase tracking-wide mb-1">
+                  Exceden Presupuesto
+                </p>
+                <p className="text-2xl font-bold text-red-800">
+                  {deviationData.summary.membersOverBudget}
+                </p>
+              </div>
             </div>
-            <p className="text-xl font-bold text-red-600">
-              {deviationData.summary.membersOverBudget}
+            <p className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full text-center">
+              miembros del equipo
             </p>
-            <p className="text-xs text-red-600">miembros del equipo</p>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingDown className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800">Bajo Presupuesto</span>
+          <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-green-200 p-2 rounded-lg">
+                <TrendingDown className="h-5 w-5 text-green-700" />
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">
+                  Bajo Presupuesto
+                </p>
+                <p className="text-2xl font-bold text-green-800">
+                  {deviationData.summary.membersUnderBudget}
+                </p>
+              </div>
             </div>
-            <p className="text-xl font-bold text-green-600">
-              {deviationData.summary.membersUnderBudget}
+            <p className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full text-center">
+              miembros del equipo
             </p>
-            <p className="text-xs text-green-600">miembros del equipo</p>
           </div>
 
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium text-purple-800">Total Miembros</span>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-purple-200 p-2 rounded-lg">
+                <Users className="h-5 w-5 text-purple-700" />
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide mb-1">
+                  Total Miembros
+                </p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {deviationData.deviationByRole.length}
+                </p>
+              </div>
             </div>
-            <p className="text-xl font-bold text-purple-600">
-              {deviationData.deviationByRole.length}
+            <p className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full text-center">
+              analizados
             </p>
-            <p className="text-xs text-purple-600">analizados</p>
           </div>
         </div>
 
@@ -226,14 +256,23 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
         {/* Desviaciones Críticas Detalladas */}
         {deviationData.majorDeviations && deviationData.majorDeviations.filter(d => d.severity === 'critical').length > 0 && (
           <Collapsible open={criticalOpen} onOpenChange={setCriticalOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <span className="font-semibold text-sm text-red-700">
-                  Desviaciones Críticas ({deviationData.majorDeviations.filter(d => d.severity === 'critical').length})
-                </span>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-xl border border-red-200 hover:from-red-100 hover:to-red-150 hover:shadow-md transition-all duration-200 group">
+              <div className="flex items-center gap-3">
+                <div className="bg-red-200 p-2 rounded-lg group-hover:bg-red-300 transition-colors">
+                  <AlertTriangle className="h-5 w-5 text-red-700" />
+                </div>
+                <div>
+                  <span className="font-semibold text-base text-red-800">
+                    Desviaciones Críticas
+                  </span>
+                  <p className="text-xs text-red-600">
+                    {deviationData.majorDeviations.filter(d => d.severity === 'critical').length} miembros requieren atención inmediata
+                  </p>
+                </div>
               </div>
-              {criticalOpen ? <ChevronDown className="h-4 w-4 text-red-600" /> : <ChevronRight className="h-4 w-4 text-red-600" />}
+              <div className="bg-red-200 p-2 rounded-lg group-hover:bg-red-300 transition-colors">
+                {criticalOpen ? <ChevronDown className="h-4 w-4 text-red-700" /> : <ChevronRight className="h-4 w-4 text-red-700" />}
+              </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               <div className="space-y-3">
@@ -285,14 +324,23 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
 
         {/* Análisis Detallado por Miembro */}
         <Collapsible open={teamAnalysisOpen} onOpenChange={setTeamAnalysisOpen}>
-          <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-gray-600" />
-              <span className="font-semibold text-sm text-gray-700">
-                Análisis por Miembro del Equipo ({deviationData.deviationByRole.length})
-              </span>
+          <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:from-gray-100 hover:to-gray-150 hover:shadow-md transition-all duration-200 group">
+            <div className="flex items-center gap-3">
+              <div className="bg-gray-200 p-2 rounded-lg group-hover:bg-gray-300 transition-colors">
+                <Users className="h-5 w-5 text-gray-700" />
+              </div>
+              <div>
+                <span className="font-semibold text-base text-gray-800">
+                  Análisis por Miembro del Equipo
+                </span>
+                <p className="text-xs text-gray-600">
+                  {deviationData.deviationByRole.length} miembros analizados con detalles de desviación
+                </p>
+              </div>
             </div>
-            {teamAnalysisOpen ? <ChevronDown className="h-4 w-4 text-gray-600" /> : <ChevronRight className="h-4 w-4 text-gray-600" />}
+            <div className="bg-gray-200 p-2 rounded-lg group-hover:bg-gray-300 transition-colors">
+              {teamAnalysisOpen ? <ChevronDown className="h-4 w-4 text-gray-700" /> : <ChevronRight className="h-4 w-4 text-gray-700" />}
+            </div>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <div className="space-y-3">
@@ -302,21 +350,30 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                 .map((deviation, index) => {
                 const badge = getVarianceBadge(deviation.deviationPercentage);
                 return (
-                  <div key={index} className="bg-gray-50 p-4 rounded-lg border">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-sm">
-                          {deviation.personnelName || `Personal #${deviation.personnelId}`}
-                        </p>
-                        {deviation.severity && (
-                          <p className="text-xs text-gray-500">
-                            Prioridad: {deviation.severity === 'critical' ? 'Crítica' : 
-                                      deviation.severity === 'high' ? 'Alta' : 
-                                      deviation.severity === 'medium' ? 'Media' : 'Baja'}
+                  <div key={index} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm ${
+                          deviation.severity === 'critical' ? 'bg-red-500' : 
+                          deviation.severity === 'high' ? 'bg-orange-500' : 
+                          deviation.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}>
+                          {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-base text-gray-800">
+                            {deviation.personnelName || `Personal #${deviation.personnelId}`}
                           </p>
-                        )}
+                          {deviation.severity && (
+                            <p className="text-xs text-gray-500">
+                              Prioridad: {deviation.severity === 'critical' ? 'Crítica' : 
+                                        deviation.severity === 'high' ? 'Alta' : 
+                                        deviation.severity === 'medium' ? 'Media' : 'Baja'}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      <Badge variant={badge.variant} className="px-3 py-1">{badge.label}</Badge>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4 text-xs">
