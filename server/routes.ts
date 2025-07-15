@@ -4492,8 +4492,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`🔍 Deviation analysis - Found ${projectTimeEntries.length} time entries after filtering`);
 
-      // Calcular desviaciones por miembro
-      const deviationByRole = teamMembers.map(member => {
+      // Si no hay registros de tiempo filtrados, devolver estructura vacía
+      if (projectTimeEntries.length === 0) {
+        console.log(`🔍 Deviation analysis - No time entries found for the filtered period, returning empty data`);
+        return res.json({
+          deviationByRole: [],
+          totalVariance: { variance: 0 },
+          summary: { membersOverBudget: 0, membersUnderBudget: 0 },
+          majorDeviations: [],
+          analysis: []
+        });
+      }
+
+      // Calcular desviaciones solo para miembros que tienen registros en el período filtrado
+      const membersWithTimeEntries = teamMembers.filter(member => 
+        projectTimeEntries.some(entry => entry.timeEntry.personnelId === member.personnelId)
+      );
+
+      console.log(`🔍 Deviation analysis - Found ${membersWithTimeEntries.length} team members with time entries in filtered period`);
+
+      const deviationByRole = membersWithTimeEntries.map(member => {
         const memberTimeEntries = projectTimeEntries.filter(entry => 
           entry.timeEntry.personnelId === member.personnelId
         );
@@ -4605,6 +4623,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const projectEntries = await db.select()
         .from(timeEntries)
         .where(and(...whereConditions));
+
+      console.log(`🔍 Recommendations - Found ${projectEntries.length} time entries after filtering`);
+
+      // Si no hay registros de tiempo filtrados, devolver estructura vacía
+      if (projectEntries.length === 0) {
+        console.log(`🔍 Recommendations - No time entries found for the filtered period, returning empty data`);
+        return res.json({
+          recommendations: [],
+          predictions: {
+            projectedFinalCost: 0,
+            projectedCompletionDate: null,
+            confidenceLevel: 'low'
+          },
+          generatedAt: new Date().toISOString()
+        });
+      }
 
       const totalActualCost = projectEntries.reduce((sum, entry) => 
         sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
