@@ -670,17 +670,18 @@ export default function ProjectDetailsRedesigned() {
     };
   }, [dateFilter]);
 
+  // Aplicar filtro temporal - disponible globalmente
+  const filteredTimeEntries = useMemo(() => {
+    if (!Array.isArray(timeEntries)) return [];
+    return filterTimeEntriesByDateRange(timeEntries);
+  }, [timeEntries, filterTimeEntriesByDateRange]);
+
   // Cálculos principales basados en objetivos de cotización aprobada
   const metrics = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return [];
 
     const projectData = project as any;
     const quotationData = projectData.quotation;
-
-
-
-    // APLICAR EL FILTRO TEMPORAL
-    const filteredTimeEntries = filterTimeEntriesByDateRange(timeEntries);
 
     // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA ASOCIADA AL PROYECTO
     if (!quotationData) {
@@ -824,28 +825,22 @@ export default function ProjectDetailsRedesigned() {
         bgColor: statusConfig.bg,
       }
     ];
-  }, [project, timeEntries, dateFilter, filterTimeEntriesByDateRange]);
+  }, [project, timeEntries, dateFilter, filteredTimeEntries]);
 
   const recentTimeEntries = useMemo(() => {
-    if (!Array.isArray(timeEntries)) return [];
+    if (!Array.isArray(filteredTimeEntries)) return [];
 
-    // Aplicar filtro temporal para mostrar solo entradas del período seleccionado
-    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-
-    return filteredEntries
+    return filteredTimeEntries
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
-  }, [timeEntries, filterTimeEntriesByDateRange, dateFilter]);
+  }, [filteredTimeEntries]);
 
   const teamStats = useMemo(() => {
-    if (!Array.isArray(timeEntries) || !Array.isArray(baseTeam)) return [];
-
-    // Aplicar filtro temporal para calcular estadísticas del período seleccionado
-    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+    if (!Array.isArray(filteredTimeEntries) || !Array.isArray(baseTeam)) return [];
 
     const memberStats = new Map();
 
-    filteredEntries.forEach((entry: TimeEntry) => {
+    filteredTimeEntries.forEach((entry: TimeEntry) => {
       if (!memberStats.has(entry.personnelId)) {
         memberStats.set(entry.personnelId, {
           id: entry.personnelId,
@@ -868,15 +863,14 @@ export default function ProjectDetailsRedesigned() {
     return Array.from(memberStats.values())
       .sort((a, b) => b.hours - a.hours)
       .slice(0, 5);
-  }, [timeEntries, baseTeam, filterTimeEntriesByDateRange, dateFilter]);
+  }, [filteredTimeEntries, baseTeam]);
 
   // Cálculo de resumen de costos usando objetivos de cotización
   const costSummary = useMemo(() => {
-    if (!project || !Array.isArray(timeEntries)) return null;
+    if (!project || !Array.isArray(filteredTimeEntries)) return null;
 
     const projectData = project as any;
     const quotationData = projectData.quotation;
-    const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
 
     // Obtener objetivos mensuales de la cotización asociada al proyecto
     if (!quotationData) {
@@ -905,10 +899,10 @@ export default function ProjectDetailsRedesigned() {
     const targetHours = monthlyEstimatedHours * targetMultiplier;
 
     // Calcular datos reales
-    const actualCost = filteredEntries.reduce((sum: number, entry: TimeEntry) => 
+    const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
 
-    const actualHours = filteredEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+    const actualHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
 
     const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
 
@@ -928,7 +922,7 @@ export default function ProjectDetailsRedesigned() {
       markup: markup,
       targetClientPrice: targetClientPrice
     };
-  }, [project, timeEntries, filterTimeEntriesByDateRange, dateFilter]);
+  }, [project, filteredTimeEntries, dateFilter]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
