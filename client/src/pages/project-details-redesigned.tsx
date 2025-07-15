@@ -1756,48 +1756,8 @@ export default function ProjectDetailsRedesigned() {
             </div>
 
             {/* SECCIÓN 2: Acciones Rápidas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Settings className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <span className="text-sm font-medium text-blue-700">Configurar Equipo</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setShowQuickRegister(true);
-                        toast({
-                          title: "Registro Semanal",
-                          description: "Configura las horas de trabajo para todo el equipo",
-                        });
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 h-8"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Configurar
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Registro semanal masivo para todo el equipo
-                  </p>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-blue-600">Próximo: </span>
-                    <span className="text-gray-500">
-                      {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES', { 
-                        weekday: 'long', 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex justify-center">
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow max-w-md">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -1829,32 +1789,32 @@ export default function ProjectDetailsRedesigned() {
               </Card>
             </div>
 
-            {/* SECCIÓN 3: Vista Inteligente del Equipo */}
-            <Card className="border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 to-white shadow-sm">
+            {/* SECCIÓN 3: Equipo del Proyecto - Vista de Registro */}
+            <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-white shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <Users className="h-4 w-4 text-indigo-600" />
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Users className="h-4 w-4 text-purple-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg font-semibold text-indigo-900">
+                      <CardTitle className="text-lg font-semibold text-purple-900">
                         Equipo del Proyecto - Vista de Registro
                       </CardTitle>
-                      <CardDescription className="text-sm text-indigo-700">
+                      <CardDescription className="text-sm text-purple-700">
                         Estado actual del equipo y facilidades de registro de tiempo
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-indigo-100 text-indigo-800 text-xs">
+                    <Badge variant="outline" className="bg-purple-100 text-purple-800 text-xs">
                       {teamStats?.filter(member => member.hours > 0).length || 0} activos
                     </Badge>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => setLocation(`/time-entries/project/${projectId}`)}
-                      className="border-indigo-200 hover:bg-indigo-50 h-8"
+                      className="border-purple-200 hover:bg-purple-50 h-8"
                     >
                       <BarChart3 className="h-3 w-3 mr-1" />
                       Analizar
@@ -1863,13 +1823,43 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <ProjectTeamSection 
-                  projectId={projectId!} 
-                  timeEntries={timeEntries}
-                  project={project}
-                  dateFilter={dateFilter}
-                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-                />
+                <div className="space-y-4">
+                  {teamStats && teamStats.length > 0 ? (
+                    teamStats.map((member, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-sm font-bold">
+                              {member.personnelName.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm text-purple-900">{member.personnelName}</div>
+                            <div className="text-xs text-purple-600">Operations Lead</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-sm text-purple-700">Registrado: {member.hours}h</div>
+                            <div className="text-xs text-purple-500">Activo</div>
+                          </div>
+                          <div className="w-32 bg-purple-100 rounded-full h-2">
+                            <div className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" style={{ width: `${Math.min((member.hours / 80) * 100, 100)}%` }}></div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-purple-900">${(member.cost || 0).toFixed(0)}</div>
+                            <div className="text-xs text-purple-600">Costo real</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-purple-500">
+                      <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No hay datos de equipo disponibles para {dateFilter.label}</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
