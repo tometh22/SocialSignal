@@ -46,7 +46,7 @@ import {
   monthlyInflation,
   systemConfig
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, asc, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
@@ -4502,7 +4502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const personnelIds = [...new Set(projectTimeEntries.map(entry => entry.personnelId))];
       const personnelData = personnelIds.length > 0 ? await db.select()
         .from(personnel)
-        .where(sql`${personnel.id} IN (${personnelIds.join(',')})`) : [];
+        .where(inArray(personnel.id, personnelIds)) : [];
       
       console.log(`🔍 Found ${personnelData.length} personnel records`);
       
