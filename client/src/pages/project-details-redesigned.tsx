@@ -1198,24 +1198,31 @@ export default function ProjectDetailsRedesigned() {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-3 w-full max-w-xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-4 w-full max-w-4xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
             >
               <Gauge className="h-4 w-4" />
               Resumen Ejecutivo
             </TabsTrigger>
             <TabsTrigger 
-              value="team" 
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+              value="team-analysis" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
-              <Users className="h-4 w-4" />
-              Gestión del Equipo
+              <BarChart3 className="h-4 w-4" />
+              Análisis de Equipo
+            </TabsTrigger>
+            <TabsTrigger 
+              value="time-management" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+            >
+              <Timer className="h-4 w-4" />
+              Registro de Tiempo
             </TabsTrigger>
             <TabsTrigger 
               value="details" 
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:shadow-sm"
             >
               <Calendar className="h-4 w-4" />
               Análisis Mensual
@@ -1456,26 +1463,19 @@ export default function ProjectDetailsRedesigned() {
 
           </TabsContent>
 
-          <TabsContent value="team" className="space-y-6">
-            {/* Gestión completa del equipo */}
+          <TabsContent value="team-analysis" className="space-y-6">
+            {/* Análisis operativo del equipo */}
             <div className="space-y-6">
-              {/* Panel principal del equipo */}
-              <Card>
+              {/* Métricas de Capacidad Operativa */}
+              <Card className="border-l-4 border-l-green-500">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-blue-600" />
-                      Equipo del Proyecto
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => setShowQuickRegister(true)}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Registrar Tiempo
-                    </Button>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-green-600" />
+                    Capacidad Operativa del Equipo
                   </CardTitle>
+                  <CardDescription>
+                    Análisis de rendimiento y utilización del equipo en el período {dateFilter.label}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ProjectTeamSection 
@@ -1488,55 +1488,44 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Acciones Rápidas del Equipo */}
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-green-600" />
-                      Acciones Rápidas
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      Gestión Operativa
-                    </Badge>
+              {/* Análisis de Desviaciones por Miembro */}
+              <Card className="border-l-4 border-l-red-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    Análisis de Desviaciones por Miembro
                   </CardTitle>
+                  <CardDescription>
+                    Desviaciones de presupuesto y tiempo para cada miembro del equipo en el período seleccionado
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Button
-                      variant="outline"
-                      className="h-16 flex items-center justify-center gap-3 hover:bg-green-50 hover:border-green-300"
-                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
-                    >
-                      <History className="h-5 w-5 text-green-600" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">Historial Completo</div>
-                        <div className="text-xs text-gray-500">Ver todos los registros</div>
-                      </div>
-                    </Button>
+                  <TeamDeviationAnalysis 
+                    projectId={projectId!} 
+                    dateFilter={{
+                      startDate: dateFilter.startDate.toISOString(),
+                      endDate: dateFilter.endDate.toISOString()
+                    }}
+                  />
+                </CardContent>
+              </Card>
 
+              {/* Reportes y Análisis */}
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    Reportes y Análisis
+                  </CardTitle>
+                  <CardDescription>
+                    Exportar datos del equipo y generar reportes operativos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
-                      className="h-16 flex items-center justify-center gap-3 hover:bg-purple-50 hover:border-purple-300"
-                      onClick={() => {
-                        // Abrir modal de registro de tiempo para configurar el equipo
-                        setShowQuickRegister(true);
-                        toast({
-                          title: "Registro de Tiempo",
-                          description: "Configura las horas de trabajo para el equipo del proyecto",
-                        });
-                      }}
-                    >
-                      <Settings className="h-5 w-5 text-purple-600" />
-                      <div className="text-left">
-                        <div className="font-medium text-sm">Configurar Equipo</div>
-                        <div className="text-xs text-gray-500">Registrar tiempo</div>
-                      </div>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      className="h-16 flex items-center justify-center gap-3 hover:bg-orange-50 hover:border-orange-300"
+                      className="h-16 flex items-center justify-center gap-3 hover:bg-blue-50 hover:border-blue-300"
                       onClick={() => {
                         try {
                           // Generar datos del reporte usando la información real del equipo
@@ -1588,14 +1577,14 @@ export default function ProjectDetailsRedesigned() {
                           const encodedUri = encodeURI(csvContent);
                           const link = document.createElement("a");
                           link.setAttribute("href", encodedUri);
-                          link.setAttribute("download", `reporte_proyecto_${projectId}_${new Date().toISOString().split('T')[0]}.csv`);
+                          link.setAttribute("download", `reporte_analisis_equipo_${projectId}_${new Date().toISOString().split('T')[0]}.csv`);
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
 
                           toast({
-                            title: "Reporte Generado",
-                            description: `Descargado reporte completo del proyecto con ${reportData.length} elementos`,
+                            title: "Reporte de Análisis Generado",
+                            description: `Descargado reporte de análisis del equipo con ${reportData.length} elementos`,
                           });
                         } catch (error) {
                           console.error('Error generando reporte:', error);
@@ -1607,34 +1596,148 @@ export default function ProjectDetailsRedesigned() {
                         }
                       }}
                     >
-                      <FileText className="h-5 w-5 text-orange-600" />
+                      <FileText className="h-5 w-5 text-blue-600" />
                       <div className="text-left">
-                        <div className="font-medium text-sm">Generar Reportes</div>
-                        <div className="text-xs text-gray-500">Análisis y exportar</div>
+                        <div className="font-medium text-sm">Reporte de Análisis</div>
+                        <div className="text-xs text-gray-500">Exportar análisis completo</div>
+                      </div>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      className="h-16 flex items-center justify-center gap-3 hover:bg-green-50 hover:border-green-300"
+                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
+                    >
+                      <History className="h-5 w-5 text-green-600" />
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Historial Completo</div>
+                        <div className="text-xs text-gray-500">Ver todos los registros</div>
+                      </div>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="time-management" className="space-y-6">
+            {/* Gestión y registro de tiempo */}
+            <div className="space-y-6">
+              {/* Panel de Registro de Tiempo */}
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-5 w-5 text-purple-600" />
+                      Registro de Tiempo del Equipo
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowQuickRegister(true)}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Registrar Tiempo
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    Gestión centralizada de registros de tiempo para el proyecto
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* Estadísticas de tiempo */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-4 w-4 text-purple-600" />
+                        <p className="text-sm font-medium text-purple-800">Total Registrado</p>
+                      </div>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {costSummary?.filteredHours || 0}h
+                      </p>
+                      <p className="text-xs text-purple-600">en el período seleccionado</p>
+                    </div>
+
+                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4 text-green-600" />
+                        <p className="text-sm font-medium text-green-800">Miembros Activos</p>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {teamStats?.length || 0}
+                      </p>
+                      <p className="text-xs text-green-600">con registros de tiempo</p>
+                    </div>
+
+                    <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity className="h-4 w-4 text-orange-600" />
+                        <p className="text-sm font-medium text-orange-800">Promedio Diario</p>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {teamStats && teamStats.length > 0 
+                          ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length / 30).toFixed(1)
+                          : '0.0'}h
+                      </p>
+                      <p className="text-xs text-orange-600">por miembro del equipo</p>
+                    </div>
+                  </div>
+
+                  {/* Acciones de gestión */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-purple-50 hover:border-purple-300"
+                      onClick={() => {
+                        setShowQuickRegister(true);
+                        toast({
+                          title: "Registro Semanal",
+                          description: "Configura las horas de trabajo para todo el equipo",
+                        });
+                      }}
+                    >
+                      <Settings className="h-6 w-6 text-purple-600" />
+                      <div className="text-center">
+                        <div className="font-medium text-sm">Configurar Equipo</div>
+                        <div className="text-xs text-gray-500">Registro semanal masivo</div>
+                      </div>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-orange-50 hover:border-orange-300"
+                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
+                    >
+                      <FileText className="h-6 w-6 text-orange-600" />
+                      <div className="text-center">
+                        <div className="font-medium text-sm">Gestionar Registros</div>
+                        <div className="text-xs text-gray-500">Editar, revisar, aprobar</div>
                       </div>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Análisis de Desviaciones por Miembro */}
-              <Card className="border-l-4 border-l-red-500">
+              {/* Vista del equipo para registro */}
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                    Análisis de Desviaciones por Miembro
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Equipo del Proyecto - Vista de Registro
                   </CardTitle>
                   <CardDescription>
-                    Desviaciones de presupuesto y tiempo para cada miembro del equipo en el período seleccionado
+                    Estado actual del equipo y facilidades de registro de tiempo
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <TeamDeviationAnalysis 
+                  <ProjectTeamSection 
                     projectId={projectId!} 
-                    dateFilter={{
-                      startDate: dateFilter.startDate.toISOString(),
-                      endDate: dateFilter.endDate.toISOString()
-                    }}
+                    timeEntries={timeEntries}
+                    project={project}
+                    dateFilter={dateFilter}
+                    filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
                   />
                 </CardContent>
               </Card>
