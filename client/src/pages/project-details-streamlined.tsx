@@ -621,17 +621,17 @@ export default function ProjectDetailsStreamlined() {
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-xs">
-                            {member.name.split(' ').map(n => n[0]).join('')}
+                            {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">{member.name}</p>
-                          <p className="text-xs text-slate-600">{member.role}</p>
+                          <p className="text-sm font-medium">{member.name || 'Usuario Desconocido'}</p>
+                          <p className="text-xs text-slate-600">{member.role || 'Sin rol'}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-bold">{member.hours.toFixed(1)}h</p>
-                        <p className="text-xs text-slate-600">{member.entries} registros</p>
+                        <p className="text-sm font-bold">{(member.hours || 0).toFixed(1)}h</p>
+                        <p className="text-xs text-slate-600">{member.entries || 0} registros</p>
                       </div>
                     </div>
                   ))}
@@ -680,11 +680,11 @@ export default function ProjectDetailsStreamlined() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className="text-xs">
-                              {entry.personnelName.split(' ').map(n => n[0]).join('')}
+                              {entry.personnelName ? entry.personnelName.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-sm font-medium">{entry.personnelName}</p>
+                            <p className="text-sm font-medium">{entry.personnelName || 'Usuario Desconocido'}</p>
                             <p className="text-xs text-slate-600">{format(new Date(entry.date), 'dd MMM yyyy', { locale: es })}</p>
                           </div>
                         </div>
