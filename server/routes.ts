@@ -4266,27 +4266,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
-      let timeEntriesQuery = db.select({
+      // Construir condiciones de filtro
+      const whereConditions = [eq(timeEntries.projectId, projectId)];
+      
+      if (startDate && endDate) {
+        whereConditions.push(
+          gte(timeEntries.date, startDate as string),
+          lte(timeEntries.date, endDate as string)
+        );
+      }
+
+      const projectTimeEntries3 = await db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
         .from(timeEntries)
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-        .where(eq(timeEntries.projectId, projectId))
+        .where(and(...whereConditions))
         .orderBy(asc(timeEntries.date));
-
-      if (startDate && endDate) {
-        timeEntriesQuery = timeEntriesQuery.where(
-          and(
-            eq(timeEntries.projectId, projectId),
-            gte(timeEntries.date, startDate as string),
-            lte(timeEntries.date, endDate as string)
-          )
-        );
-      }
-
-      const projectTimeEntries3 = await timeEntriesQuery;
 
       // Agrupar por período
       const groupedData = new Map();
@@ -4473,26 +4470,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotation = await storage.getQuotation(project.quotationId);
       const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
       
-      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
-      let timeEntriesQuery = db.select({
+      // Construir condiciones de filtro
+      const whereConditions = [eq(timeEntries.projectId, projectId)];
+      
+      if (startDate && endDate) {
+        whereConditions.push(
+          gte(timeEntries.date, startDate as string),
+          lte(timeEntries.date, endDate as string)
+        );
+      }
+
+      const projectTimeEntries = await db.select({
         timeEntry: timeEntries,
         personnel: personnel
       })
         .from(timeEntries)
         .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-        .where(eq(timeEntries.projectId, projectId));
-
-      if (startDate && endDate) {
-        timeEntriesQuery = timeEntriesQuery.where(
-          and(
-            eq(timeEntries.projectId, projectId),
-            gte(timeEntries.date, startDate as string),
-            lte(timeEntries.date, endDate as string)
-          )
-        );
-      }
-
-      const projectTimeEntries = await timeEntriesQuery;
+        .where(and(...whereConditions));
 
       // Calcular desviaciones por miembro
       const deviationByRole = teamMembers.map(member => {
@@ -4592,22 +4586,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotation = await storage.getQuotation(project.quotationId);
       const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
       
-      // Filtrar entradas de tiempo por rango de fechas si se proporcionan
-      let projectEntriesQuery = db.select()
-        .from(timeEntries)
-        .where(eq(timeEntries.projectId, projectId));
-
+      // Construir condiciones de filtro
+      const whereConditions = [eq(timeEntries.projectId, projectId)];
+      
       if (startDate && endDate) {
-        projectEntriesQuery = projectEntriesQuery.where(
-          and(
-            eq(timeEntries.projectId, projectId),
-            gte(timeEntries.date, startDate as string),
-            lte(timeEntries.date, endDate as string)
-          )
+        whereConditions.push(
+          gte(timeEntries.date, startDate as string),
+          lte(timeEntries.date, endDate as string)
         );
       }
 
-      const projectEntries = await projectEntriesQuery;
+      const projectEntries = await db.select()
+        .from(timeEntries)
+        .where(and(...whereConditions));
 
       const totalActualCost = projectEntries.reduce((sum, entry) => 
         sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
