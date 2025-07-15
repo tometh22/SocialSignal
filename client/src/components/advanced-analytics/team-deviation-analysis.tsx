@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface TeamDeviationAnalysisProps {
   projectId: number;
@@ -44,7 +45,12 @@ interface DeviationAnalysisData {
   }>;
 }
 
+type SortField = 'deviation' | 'cost' | 'hours';
+type SortDirection = 'asc' | 'desc';
+
 export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAnalysisProps) {
+  const [sortField, setSortField] = useState<SortField>('deviation');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const queryParams = dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
@@ -58,6 +64,44 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
     },
     enabled: !!projectId,
   });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc'); // Always start with desc (mayor a menor)
+    }
+  };
+
+  const getSortedData = () => {
+    if (!deviationData?.deviationByRole) return [];
+    
+    const data = [...deviationData.deviationByRole];
+    
+    return data.sort((a, b) => {
+      let valueA: number, valueB: number;
+      
+      switch (sortField) {
+        case 'deviation':
+          valueA = Math.abs(a.deviationPercentage);
+          valueB = Math.abs(b.deviationPercentage);
+          break;
+        case 'cost':
+          valueA = a.actualCost || 0;
+          valueB = b.actualCost || 0;
+          break;
+        case 'hours':
+          valueA = a.actualHours;
+          valueB = b.actualHours;
+          break;
+        default:
+          return 0;
+      }
+      
+      return sortDirection === 'desc' ? valueB - valueA : valueA - valueB;
+    });
+  };
 
   const getVarianceBadge = (percentage: number, actualHours: number) => {
     // Si no hay horas registradas, mostrar estado especial
@@ -152,8 +196,50 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
       {/* Tabla de Análisis Detallado */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">Análisis Detallado por Miembro</h3>
-          <p className="text-sm text-gray-600 mt-1">Ordenado por severidad de desviación</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">Análisis Detallado por Miembro</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Ordenado por {sortField === 'deviation' ? 'Criticidad' : sortField === 'cost' ? 'Costo' : 'Horas'} 
+                ({sortDirection === 'desc' ? 'Mayor a Menor' : 'Menor a Mayor'})
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant={sortField === 'deviation' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSort('deviation')}
+                className="flex items-center gap-1"
+              >
+                Criticidad
+                {sortField === 'deviation' && (
+                  sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                )}
+              </Button>
+              <Button
+                variant={sortField === 'cost' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSort('cost')}
+                className="flex items-center gap-1"
+              >
+                Costo
+                {sortField === 'cost' && (
+                  sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                )}
+              </Button>
+              <Button
+                variant={sortField === 'hours' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleSort('hours')}
+                className="flex items-center gap-1"
+              >
+                Horas
+                {sortField === 'hours' && (
+                  sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -168,8 +254,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {deviationData.deviationByRole
-                .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
+              {getSortedData()
                 .map((deviation, index) => {
                   const badge = getVarianceBadge(deviation.deviationPercentage, deviation.actualHours);
                   const progressPercentage = deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0;
