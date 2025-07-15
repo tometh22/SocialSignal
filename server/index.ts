@@ -8,13 +8,184 @@ import session from 'express-session';
 
 const app = express();
 
+// ENDPOINTS ANTES DE CUALQUIER MIDDLEWARE
+app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
+  console.log(`🎯 DEVIATION ANALYSIS - ID: ${req.params.id}, Query:`, req.query);
+  
+  try {
+    const projectId = parseInt(req.params.id);
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    
+    // Get project data
+    const project = await storage.getActiveProject(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Get quotation for budget data
+    const quotations = await storage.getQuotations();
+    const quotation = quotations.find(q => q.id === project.quotationId);
+    if (!quotation) {
+      console.log(`⚠️ No quotation found for project ${projectId}`);
+      return res.json({
+        deviationByRole: [],
+        totalVariance: { variance: 0 },
+        summary: { membersOverBudget: 0, membersUnderBudget: 0 },
+        majorDeviations: [],
+        analysis: []
+      });
+    }
+
+    // Get team members, time entries, and personnel data
+    const teamMembers = await storage.getQuotationTeamMembers(quotation.id);
+    const allTimeEntries = await storage.getTimeEntries();
+    const personnel = await storage.getPersonnel();
+    
+    // Filter time entries by project and date range
+    let filteredTimeEntries = allTimeEntries.filter(entry => entry.projectId === projectId);
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      filteredTimeEntries = filteredTimeEntries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= start && entryDate <= end;
+      });
+    }
+
+    console.log(`📊 Project: ${project.quotation.projectName}, Team: ${teamMembers.length}, Time entries: ${filteredTimeEntries.length}`);
+    if (filteredTimeEntries.length > 0) {
+      console.log(`📊 Sample time entry:`, filteredTimeEntries[0]);
+    }
+    if (personnel.length > 0) {
+      console.log(`📊 Sample personnel:`, personnel[0]);
+    }
+
+    if (filteredTimeEntries.length === 0) {
+      return res.json({
+        deviationByRole: [],
+        totalVariance: { variance: 0 },
+        summary: { membersOverBudget: 0, membersUnderBudget: 0 },
+        majorDeviations: [],
+        analysis: [],
+        debug: {
+          projectId,
+          startDate,
+          endDate,
+          message: 'No time entries found for this period',
+          timeEntriesTotal: allTimeEntries.filter(e => e.projectId === projectId).length
+        }
+      });
+    }
+
+    // Calculate deviations
+    const deviationByRole = [];
+    const majorDeviations = [];
+    let totalVariance = 0;
+    let membersOverBudget = 0;
+    let membersUnderBudget = 0;
+
+    // Create personnel map for hourly rates
+    const personnelMap = new Map(personnel.map(p => [p.id, p]));
+
+    for (const member of teamMembers) {
+      const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === member.personnelId);
+      const actualHours = memberTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+      
+      // Calculate actual cost: use entry.totalCost if available, otherwise calculate from personnel hourly rate
+      let actualCost = 0;
+      for (const entry of memberTimeEntries) {
+        if (entry.totalCost && entry.totalCost > 0) {
+          actualCost += entry.totalCost;
+        } else {
+          // Use historical hourly rate if available, otherwise current personnel hourly rate
+          const hourlyRate = entry.hourlyRateAtTime || personnelMap.get(entry.personnelId)?.hourlyRate || 0;
+          actualCost += entry.hours * hourlyRate;
+        }
+      }
+      
+      const budgetedHours = member.hours || 0;
+      const budgetedCost = member.cost || 0;
+      
+      const hourDeviation = actualHours - budgetedHours;
+      const costDeviation = actualCost - budgetedCost;
+      const deviationPercentage = budgetedCost > 0 ? (costDeviation / budgetedCost) * 100 : 0;
+      
+      // Only add valid cost deviations to total variance
+      if (!isNaN(costDeviation) && isFinite(costDeviation)) {
+        totalVariance += Math.abs(costDeviation);
+      }
+      
+      if (deviationPercentage > 5) {
+        membersOverBudget++;
+      } else if (deviationPercentage < -5) {
+        membersUnderBudget++;
+      }
+
+      const deviation = {
+        personnelId: member.personnelId,
+        budgetedHours,
+        actualHours,
+        budgetedCost,
+        actualCost,
+        hourDeviation,
+        costDeviation,
+        deviationPercentage
+      };
+
+      deviationByRole.push(deviation);
+
+      // Track major deviations
+      if (Math.abs(deviationPercentage) > 25 || Math.abs(costDeviation) > 500) {
+        majorDeviations.push({
+          ...deviation,
+          severity: Math.abs(deviationPercentage) > 50 ? 'critical' : 'high'
+        });
+      }
+    }
+
+    // Generate analysis
+    const analysis = [];
+    if (totalVariance > 1000) {
+      analysis.push({
+        type: 'budget_overrun',
+        message: `Project is ${totalVariance.toFixed(2)} USD over budget`,
+        severity: 'high'
+      });
+    }
+    
+    if (membersOverBudget > teamMembers.length * 0.3) {
+      analysis.push({
+        type: 'team_efficiency',
+        message: `${membersOverBudget} team members are significantly over budget`,
+        severity: 'medium'
+      });
+    }
+
+    const response = {
+      deviationByRole,
+      totalVariance: { variance: totalVariance },
+      summary: { membersOverBudget, membersUnderBudget },
+      majorDeviations,
+      analysis
+    };
+    
+    console.log(`🎯 Returning analysis: ${deviationByRole.length} members, variance: ${totalVariance.toFixed(2)}`);
+    res.json(response);
+  } catch (error) {
+    console.error("❌ Error in deviation analysis:", error);
+    res.status(500).json({ message: "Failed to analyze project deviations" });
+  }
+});
+
 // Request logging middleware for debugging (reduced noise)
 app.use((req, res, next) => {
   // Only log API requests and errors, not static files
   if (req.path.startsWith('/api') || req.method !== 'GET') {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    if (req.path.startsWith('/api')) {
-      console.log('Session ID:', req.session?.userId || 'undefined');
+    // Solo acceder a session después de que esté inicializada
+    if (req.path.startsWith('/api') && req.session) {
+      console.log('Session ID:', req.session.userId || 'undefined');
     }
   }
   next();
@@ -62,36 +233,7 @@ app.get("/api/test-project/:id/diagnosis", (req, res) => {
   });
 });
 
-// ENDPOINT TEMPORAL PARA DEVIATION ANALYSIS (MOVED FROM ROUTES.TS)
-app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
-  console.log(`🎯🎯🎯 DEVIATION ANALYSIS WORKING - ID: ${req.params.id}, Query:`, req.query);
-  
-  try {
-    const projectId = parseInt(req.params.id);
-    const { startDate, endDate } = req.query;
-    
-    // Return empty state for now to test basic functionality
-    const response = {
-      deviationByRole: [],
-      totalVariance: { variance: 0 },
-      summary: { membersOverBudget: 0, membersUnderBudget: 0 },
-      majorDeviations: [],
-      analysis: [],
-      debug: {
-        projectId,
-        startDate,
-        endDate,
-        message: 'Endpoint working from index.ts - showing empty state for filtered data'
-      }
-    };
-    
-    console.log(`🎯 Returning response:`, response);
-    res.json(response);
-  } catch (error) {
-    console.error("Error in deviation analysis:", error);
-    res.status(500).json({ message: "Failed to analyze project deviations" });
-  }
-});
+
 
 // Ruta pública para contador de proyectos (sin autenticación)
 app.get("/api/active-projects/count", async (req, res) => {
