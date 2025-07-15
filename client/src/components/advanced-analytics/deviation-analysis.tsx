@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign, ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 interface DeviationAnalysisProps {
   projectId: number;
@@ -42,6 +44,9 @@ interface DeviationAnalysisData {
 }
 
 export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisProps) {
+  const [criticalOpen, setCriticalOpen] = useState(true);
+  const [teamAnalysisOpen, setTeamAnalysisOpen] = useState(false);
+  
   const queryParams = dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
@@ -219,63 +224,82 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
         )}
 
         {/* Desviaciones Críticas Detalladas */}
-        {deviationData.majorDeviations && deviationData.majorDeviations.length > 0 && (
-          <div>
-            <h4 className="font-semibold text-sm mb-3 text-gray-700">Desviaciones Críticas Identificadas</h4>
-            <div className="space-y-3">
-              {deviationData.majorDeviations
-                .filter(deviation => deviation.severity === 'critical')
-                .map((deviation, index) => (
-                  <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-sm text-red-800">
-                          {deviation.personnelName || `Personal #${deviation.personnelId}`}
-                        </p>
-                        <p className="text-xs text-red-600">
-                          Desviación crítica: +{deviation.deviationPercentage?.toFixed(1)}%
-                        </p>
-                      </div>
-                      <Badge variant="destructive">CRÍTICO</Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <p className="text-gray-600 mb-1">Horas</p>
-                        <div className="flex justify-between">
-                          <span>Presup: {deviation.budgetedHours}h</span>
-                          <span>Real: {deviation.actualHours}h</span>
+        {deviationData.majorDeviations && deviationData.majorDeviations.filter(d => d.severity === 'critical').length > 0 && (
+          <Collapsible open={criticalOpen} onOpenChange={setCriticalOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <span className="font-semibold text-sm text-red-700">
+                  Desviaciones Críticas ({deviationData.majorDeviations.filter(d => d.severity === 'critical').length})
+                </span>
+              </div>
+              {criticalOpen ? <ChevronDown className="h-4 w-4 text-red-600" /> : <ChevronRight className="h-4 w-4 text-red-600" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <div className="space-y-3">
+                {deviationData.majorDeviations
+                  .filter(deviation => deviation.severity === 'critical')
+                  .map((deviation, index) => (
+                    <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium text-sm text-red-800">
+                            {deviation.personnelName || `Personal #${deviation.personnelId}`}
+                          </p>
+                          <p className="text-xs text-red-600">
+                            Desviación crítica: +{deviation.deviationPercentage?.toFixed(1)}%
+                          </p>
                         </div>
-                        <p className="text-red-600 font-medium mt-1">
-                          Exceso: +{deviation.hourDeviation?.toFixed(1)}h
-                        </p>
+                        <Badge variant="destructive">CRÍTICO</Badge>
                       </div>
                       
-                      <div>
-                        <p className="text-gray-600 mb-1">Costo</p>
-                        <div className="flex justify-between">
-                          <span>Presup: ${deviation.budgetedCost?.toLocaleString()}</span>
-                          <span>Real: ${deviation.actualCost?.toLocaleString()}</span>
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <p className="text-gray-600 mb-1">Horas</p>
+                          <div className="flex justify-between">
+                            <span>Presup: {deviation.budgetedHours}h</span>
+                            <span>Real: {deviation.actualHours}h</span>
+                          </div>
+                          <p className="text-red-600 font-medium mt-1">
+                            Exceso: +{deviation.hourDeviation?.toFixed(1)}h
+                          </p>
                         </div>
-                        <p className="text-red-600 font-medium mt-1">
-                          Sobrecosto: ${Math.abs(deviation.costDeviation || 0).toLocaleString()}
-                        </p>
+                        
+                        <div>
+                          <p className="text-gray-600 mb-1">Costo</p>
+                          <div className="flex justify-between">
+                            <span>Presup: ${deviation.budgetedCost?.toLocaleString()}</span>
+                            <span>Real: ${deviation.actualCost?.toLocaleString()}</span>
+                          </div>
+                          <p className="text-red-600 font-medium mt-1">
+                            Sobrecosto: ${Math.abs(deviation.costDeviation || 0).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-            </div>
-          </div>
+                  ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Análisis Detallado por Miembro */}
-        <div>
-          <h4 className="font-semibold text-sm mb-3 text-gray-700">Análisis por Miembro del Equipo</h4>
-          <div className="space-y-3">
-            {deviationData.deviationByRole
-              .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
-              .slice(0, 8)
-              .map((deviation, index) => {
+        <Collapsible open={teamAnalysisOpen} onOpenChange={setTeamAnalysisOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-gray-600" />
+              <span className="font-semibold text-sm text-gray-700">
+                Análisis por Miembro del Equipo ({deviationData.deviationByRole.length})
+              </span>
+            </div>
+            {teamAnalysisOpen ? <ChevronDown className="h-4 w-4 text-gray-600" /> : <ChevronRight className="h-4 w-4 text-gray-600" />}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <div className="space-y-3">
+              {deviationData.deviationByRole
+                .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
+                .slice(0, 8)
+                .map((deviation, index) => {
                 const badge = getVarianceBadge(deviation.deviationPercentage);
                 return (
                   <div key={index} className="bg-gray-50 p-4 rounded-lg border">
@@ -325,8 +349,9 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   </div>
                 );
               })}
-          </div>
-        </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
       </CardContent>
     </Card>
