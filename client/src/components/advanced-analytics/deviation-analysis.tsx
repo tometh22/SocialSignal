@@ -137,80 +137,88 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
         
         {/* Resumen General Mejorado */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="bg-blue-200 p-2 rounded-lg">
                 <DollarSign className="h-5 w-5 text-blue-700" />
               </div>
-              <div className="text-right">
+              <div className="text-right flex-1 ml-3">
                 <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide mb-1">
                   Diferencia vs Presupuesto
                 </p>
-                <p className="text-2xl font-bold text-blue-800">
+                <p className="text-xl font-bold text-blue-800">
                   ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
                 </p>
               </div>
             </div>
-            <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full text-center">
-              {deviationData.totalVariance.variance > 0 ? "Por encima del presupuesto" : "Por debajo del presupuesto"}
-            </p>
+            <div className="mt-auto">
+              <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full text-center">
+                {deviationData.totalVariance.variance > 0 ? "Por encima del presupuesto" : "Por debajo del presupuesto"}
+              </p>
+            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
+          <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="bg-red-200 p-2 rounded-lg">
                 <TrendingUp className="h-5 w-5 text-red-700" />
               </div>
-              <div className="text-right">
+              <div className="text-right flex-1 ml-3">
                 <p className="text-xs text-red-600 font-semibold uppercase tracking-wide mb-1">
                   Exceden Presupuesto
                 </p>
-                <p className="text-2xl font-bold text-red-800">
+                <p className="text-xl font-bold text-red-800">
                   {deviationData.summary.membersOverBudget}
                 </p>
               </div>
             </div>
-            <p className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full text-center">
-              miembros del equipo
-            </p>
+            <div className="mt-auto">
+              <p className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full text-center">
+                miembros del equipo
+              </p>
+            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="bg-green-200 p-2 rounded-lg">
                 <TrendingDown className="h-5 w-5 text-green-700" />
               </div>
-              <div className="text-right">
+              <div className="text-right flex-1 ml-3">
                 <p className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">
                   Bajo Presupuesto
                 </p>
-                <p className="text-2xl font-bold text-green-800">
+                <p className="text-xl font-bold text-green-800">
                   {deviationData.summary.membersUnderBudget}
                 </p>
               </div>
             </div>
-            <p className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full text-center">
-              miembros del equipo
-            </p>
+            <div className="mt-auto">
+              <p className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full text-center">
+                miembros del equipo
+              </p>
+            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between mb-3">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="bg-purple-200 p-2 rounded-lg">
                 <Users className="h-5 w-5 text-purple-700" />
               </div>
-              <div className="text-right">
+              <div className="text-right flex-1 ml-3">
                 <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide mb-1">
                   Total Miembros
                 </p>
-                <p className="text-2xl font-bold text-purple-800">
+                <p className="text-xl font-bold text-purple-800">
                   {deviationData.deviationByRole.length}
                 </p>
               </div>
             </div>
-            <p className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full text-center">
-              analizados
-            </p>
+            <div className="mt-auto">
+              <p className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full text-center">
+                analizados
+              </p>
+            </div>
           </div>
         </div>
 
