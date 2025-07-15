@@ -1177,9 +1177,9 @@ export default function ProjectDetailsRedesigned() {
         </div>
       </div>
 
-      {/* Registro rápido de tiempo */}
-      {showQuickRegister && (
-        <div className="px-6 py-4 bg-white border-b border-gray-200">
+      {/* Dialog de Registro Rápido de Tiempo */}
+      <Dialog open={showQuickRegister} onOpenChange={setShowQuickRegister}>
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
           <WeeklyTimeRegister
             projectId={Number(projectId)}
             onSuccess={() => {
@@ -1192,8 +1192,8 @@ export default function ProjectDetailsRedesigned() {
             }}
             onCancel={() => setShowQuickRegister(false)}
           />
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
@@ -2216,13 +2216,7 @@ export default function ProjectDetailsRedesigned() {
         </DialogContent>
       </Dialog>
 
-      {/* QuickTimeRegister */}
-      {showQuickRegister && (
-        <QuickTimeRegister
-          projectId={projectId!}
-          onClose={() => setShowQuickRegister(false)}
-        />
-      )}
+
     </div>
   );
 } 
