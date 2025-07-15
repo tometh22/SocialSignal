@@ -1466,27 +1466,56 @@ export default function ProjectDetailsRedesigned() {
           <TabsContent value="team-analysis" className="space-y-6">
             {/* Análisis operativo del equipo */}
             <div className="space-y-6">
-              {/* Métricas de Capacidad Operativa */}
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-green-600" />
-                    Capacidad Operativa del Equipo
-                  </CardTitle>
-                  <CardDescription>
-                    Análisis de rendimiento y utilización del equipo en el período {dateFilter.label}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ProjectTeamSection 
-                    projectId={projectId!} 
-                    timeEntries={timeEntries}
-                    project={project}
-                    dateFilter={dateFilter}
-                    filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-                  />
-                </CardContent>
-              </Card>
+              {/* Métricas de Rendimiento del Equipo */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-800">Miembros Activos</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {teamStats?.length || 0}
+                  </p>
+                  <p className="text-xs text-blue-600">en el período</p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-800">Horas Trabajadas</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">
+                    {costSummary?.filteredHours || 0}h
+                  </p>
+                  <p className="text-xs text-green-600">total acumulado</p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-purple-600" />
+                    <p className="text-sm font-medium text-purple-800">Eficiencia</p>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {costSummary?.targetHours && costSummary?.filteredHours 
+                      ? ((costSummary.filteredHours / costSummary.targetHours) * 100).toFixed(0)
+                      : '0'}%
+                  </p>
+                  <p className="text-xs text-purple-600">vs. objetivo</p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="h-4 w-4 text-orange-600" />
+                    <p className="text-sm font-medium text-orange-800">Promedio/Miembro</p>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {teamStats && teamStats.length > 0 
+                      ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length).toFixed(1)
+                      : '0.0'}h
+                  </p>
+                  <p className="text-xs text-orange-600">por persona</p>
+                </div>
+              </div>
 
               {/* Análisis de Desviaciones por Miembro */}
               <Card className="border-l-4 border-l-red-500">
