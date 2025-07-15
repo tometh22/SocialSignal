@@ -237,31 +237,49 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
           <div>
             <h4 className="font-semibold text-sm mb-3 text-gray-700">Análisis Automático del Sistema</h4>
             <div className="space-y-2">
-              {deviationData.analysis.map((item, index) => (
-                <div key={index} className={`p-3 rounded-lg border ${
-                  item.severity === 'high' ? 'bg-red-50 border-red-200' : 
-                  item.severity === 'medium' ? 'bg-yellow-50 border-yellow-200' :
-                  'bg-green-50 border-green-200'
+              {deviationData.analysis
+                .sort((a, b) => {
+                  const severityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+                  return severityOrder[b.severity] - severityOrder[a.severity];
+                })
+                .map((item, index) => (
+                <div key={index} className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                  item.severity === 'high' ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300 shadow-md' : 
+                  item.severity === 'medium' ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300' :
+                  'bg-gradient-to-r from-green-50 to-green-100 border-green-300'
                 }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`font-medium text-sm ${
-                      item.severity === 'high' ? 'text-red-800' : 
-                      item.severity === 'medium' ? 'text-yellow-800' : 'text-green-800'
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                      item.severity === 'high' ? 'bg-red-600' : 
+                      item.severity === 'medium' ? 'bg-yellow-600' : 'bg-green-600'
                     }`}>
-                      {item.type === 'budget_overrun' ? 'Sobrecosto del Proyecto' : 
-                       item.type === 'team_efficiency' ? 'Eficiencia del Equipo' : 
-                       item.type === 'critical_deviations' ? 'Desviaciones Críticas' :
-                       item.type === 'efficiency_opportunity' ? 'Oportunidad de Eficiencia' :
-                       item.type === 'high_variance' ? 'Alta Variabilidad' :
-                       item.type === 'scope_change' ? 'Cambio de Alcance' : item.type}
-                    </span>
-                    <Badge variant={item.severity === 'high' ? 'destructive' : 'secondary'}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <span className={`font-semibold text-sm ${
+                        item.severity === 'high' ? 'text-red-800' : 
+                        item.severity === 'medium' ? 'text-yellow-800' : 'text-green-800'
+                      }`}>
+                        {item.type === 'budget_overrun' ? 'Sobrecosto del Proyecto' : 
+                         item.type === 'team_efficiency' ? 'Eficiencia del Equipo' : 
+                         item.type === 'critical_deviations' ? 'Desviaciones Críticas' :
+                         item.type === 'efficiency_opportunity' ? 'Oportunidad de Eficiencia' :
+                         item.type === 'high_variance' ? 'Alta Variabilidad' :
+                         item.type === 'scope_change' ? 'Cambio de Alcance' : item.type}
+                      </span>
+                    </div>
+                    <Badge variant={item.severity === 'high' ? 'destructive' : item.severity === 'medium' ? 'outline' : 'secondary'} 
+                           className={`text-xs px-2 py-1 ${
+                             item.severity === 'high' ? 'bg-red-600 text-white border-red-700' : 
+                             item.severity === 'medium' ? 'bg-yellow-500 text-white border-yellow-600' : 
+                             'bg-green-500 text-white border-green-600'
+                           }`}>
                       {item.severity === 'high' ? 'Alto' : item.severity === 'medium' ? 'Medio' : 'Bajo'}
                     </Badge>
                   </div>
-                  <p className={`text-xs ${
-                    item.severity === 'high' ? 'text-red-600' : 
-                    item.severity === 'medium' ? 'text-yellow-600' : 'text-green-600'
+                  <p className={`text-xs leading-relaxed ${
+                    item.severity === 'high' ? 'text-red-700' : 
+                    item.severity === 'medium' ? 'text-yellow-700' : 'text-green-700'
                   }`}>
                     {item.message}
                   </p>
@@ -298,43 +316,36 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   .filter(deviation => deviation.severity === 'critical')
                   .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
                   .map((deviation, index) => (
-                    <div key={index} className="bg-white border border-red-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="flex-shrink-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                    <div key={index} className="bg-white border border-red-200 rounded-lg p-2.5 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <div className="flex-shrink-0 w-7 h-7 bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
                           {index + 1}
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 text-sm truncate">
                             {deviation.personnelName || `Personal #${deviation.personnelId}`}
                           </h4>
                           <p className="text-xs text-red-600 font-medium">
-                            Desviación crítica: +{deviation.deviationPercentage?.toFixed(1)}%
+                            +{deviation.deviationPercentage?.toFixed(1)}% desviación
                           </p>
                         </div>
-                        <Badge variant="destructive" className="text-xs px-2 py-1">CRÍTICO</Badge>
+                        <Badge variant="destructive" className="text-xs px-1.5 py-0.5">CRÍTICO</Badge>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-2 rounded">
-                        <div className="space-y-1">
-                          <p className="text-gray-700 font-medium">Horas</p>
-                          <div className="flex justify-between text-gray-600">
-                            <span>Presup: {deviation.budgetedHours}h</span>
-                            <span>Real: {deviation.actualHours}h</span>
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-1.5 rounded">
+                        <div>
+                          <p className="text-gray-700 font-medium mb-0.5">Horas</p>
+                          <div className="flex justify-between text-gray-600 text-xs">
+                            <span>{deviation.budgetedHours}h</span>
+                            <span className="text-red-600 font-medium">+{deviation.hourDeviation?.toFixed(1)}h</span>
                           </div>
-                          <p className="text-red-600 font-semibold">
-                            Exceso: +{deviation.hourDeviation?.toFixed(1)}h
-                          </p>
                         </div>
-                        
-                        <div className="space-y-1">
-                          <p className="text-gray-700 font-medium">Costo</p>
-                          <div className="flex justify-between text-gray-600">
-                            <span>Presup: ${deviation.budgetedCost?.toLocaleString()}</span>
-                            <span>Real: ${deviation.actualCost?.toLocaleString()}</span>
+                        <div>
+                          <p className="text-gray-700 font-medium mb-0.5">Costo</p>
+                          <div className="flex justify-between text-gray-600 text-xs">
+                            <span>${deviation.budgetedCost?.toLocaleString()}</span>
+                            <span className="text-red-600 font-medium">+${Math.abs(deviation.costDeviation || 0).toLocaleString()}</span>
                           </div>
-                          <p className="text-red-600 font-semibold">
-                            Sobrecosto: ${Math.abs(deviation.costDeviation || 0).toLocaleString()}
-                          </p>
                         </div>
                       </div>
                     </div>
