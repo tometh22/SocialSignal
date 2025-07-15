@@ -298,38 +298,41 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                   .filter(deviation => deviation.severity === 'critical')
                   .sort((a, b) => Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage))
                   .map((deviation, index) => (
-                    <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium text-sm text-red-800">
+                    <div key={index} className="bg-white border border-red-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 text-sm">
                             {deviation.personnelName || `Personal #${deviation.personnelId}`}
-                          </p>
-                          <p className="text-xs text-red-600">
+                          </h4>
+                          <p className="text-xs text-red-600 font-medium">
                             Desviación crítica: +{deviation.deviationPercentage?.toFixed(1)}%
                           </p>
                         </div>
-                        <Badge variant="destructive">CRÍTICO</Badge>
+                        <Badge variant="destructive" className="text-xs px-2 py-1">CRÍTICO</Badge>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 text-xs">
-                        <div>
-                          <p className="text-gray-600 mb-1">Horas</p>
-                          <div className="flex justify-between">
+                      <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-2 rounded">
+                        <div className="space-y-1">
+                          <p className="text-gray-700 font-medium">Horas</p>
+                          <div className="flex justify-between text-gray-600">
                             <span>Presup: {deviation.budgetedHours}h</span>
                             <span>Real: {deviation.actualHours}h</span>
                           </div>
-                          <p className="text-red-600 font-medium mt-1">
+                          <p className="text-red-600 font-semibold">
                             Exceso: +{deviation.hourDeviation?.toFixed(1)}h
                           </p>
                         </div>
                         
-                        <div>
-                          <p className="text-gray-600 mb-1">Costo</p>
-                          <div className="flex justify-between">
+                        <div className="space-y-1">
+                          <p className="text-gray-700 font-medium">Costo</p>
+                          <div className="flex justify-between text-gray-600">
                             <span>Presup: ${deviation.budgetedCost?.toLocaleString()}</span>
                             <span>Real: ${deviation.actualCost?.toLocaleString()}</span>
                           </div>
-                          <p className="text-red-600 font-medium mt-1">
+                          <p className="text-red-600 font-semibold">
                             Sobrecosto: ${Math.abs(deviation.costDeviation || 0).toLocaleString()}
                           </p>
                         </div>
@@ -369,36 +372,37 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                 .map((deviation, index) => {
                 const badge = getVarianceBadge(deviation.deviationPercentage);
                 return (
-                  <div key={index} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm ${
-                          deviation.severity === 'critical' ? 'bg-red-500' : 
-                          deviation.severity === 'high' ? 'bg-orange-500' : 
-                          deviation.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                        }`}>
-                          {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-shrink-0 w-6 h-6 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                            {index + 1}
+                          </div>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs ${
+                            deviation.severity === 'critical' ? 'bg-red-500' : 
+                            deviation.severity === 'high' ? 'bg-orange-500' : 
+                            deviation.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}>
+                            {(deviation.personnelName || `P${deviation.personnelId}`).split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
                         </div>
                         <div>
-                          <p className="font-semibold text-base text-gray-800">
+                          <p className="font-semibold text-sm text-gray-800">
                             {deviation.personnelName || `Personal #${deviation.personnelId}`}
                           </p>
-                          {deviation.severity && (
-                            <p className="text-xs text-gray-500">
-                              Prioridad: {deviation.severity === 'critical' ? 'Crítica' : 
-                                        deviation.severity === 'high' ? 'Alta' : 
-                                        deviation.severity === 'medium' ? 'Media' : 'Baja'}
-                            </p>
-                          )}
+                          <p className="text-xs text-gray-500">
+                            Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
+                          </p>
                         </div>
                       </div>
-                      <Badge variant={badge.variant} className={`px-3 py-1 ${badge.className}`}>{badge.label}</Badge>
+                      <Badge variant={badge.variant} className={`px-2 py-1 text-xs ${badge.className}`}>{badge.label}</Badge>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <p className="text-gray-600 mb-1">Horas</p>
-                        <div className="flex justify-between">
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-2 rounded">
+                      <div className="space-y-1">
+                        <p className="text-gray-700 font-medium">Horas</p>
+                        <div className="flex justify-between text-gray-600">
                           <span>Presup: {deviation.budgetedHours}h</span>
                           <span>Real: {deviation.actualHours}h</span>
                         </div>
@@ -406,18 +410,18 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                           value={Math.min(100, deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0)} 
                           className="h-1 mt-1"
                         />
-                        <p className={`text-xs font-medium mt-1 ${getVarianceColor((deviation.hourDeviation / Math.max(deviation.budgetedHours, 1)) * 100)}`}>
+                        <p className={`text-xs font-semibold ${getVarianceColor((deviation.hourDeviation / Math.max(deviation.budgetedHours, 1)) * 100)}`}>
                           Diferencia: {deviation.hourDeviation > 0 ? '+' : ''}{deviation.hourDeviation.toFixed(1)}h
                         </p>
                       </div>
                       
-                      <div>
-                        <p className="text-gray-600 mb-1">Costo</p>
-                        <div className="flex justify-between">
+                      <div className="space-y-1">
+                        <p className="text-gray-700 font-medium">Costo</p>
+                        <div className="flex justify-between text-gray-600">
                           <span>Presup: ${deviation.budgetedCost.toLocaleString()}</span>
                           <span>Real: ${deviation.actualCost?.toLocaleString() || '0'}</span>
                         </div>
-                        <p className={`text-xs font-medium mt-1 ${getVarianceColor(deviation.deviationPercentage)}`}>
+                        <p className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
                           Desviación: {deviation.deviationPercentage > 0 ? '+' : ''}{deviation.deviationPercentage?.toFixed(1) || '0'}%
                         </p>
                       </div>
