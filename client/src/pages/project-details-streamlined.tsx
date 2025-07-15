@@ -484,7 +484,11 @@ export default function ProjectDetailsStreamlined() {
                     <div className="flex justify-between text-xs font-bold pt-1 border-t border-green-200">
                       <span className="text-green-600">Margen:</span>
                       <span className="text-green-700">
-                        ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
+                        ${(() => {
+                          const price = typeof costSummary?.targetClientPrice === 'number' ? costSummary.targetClientPrice : 0;
+                          const cost = typeof costSummary?.totalCost === 'number' ? costSummary.totalCost : 0;
+                          return (price - cost).toLocaleString();
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -536,7 +540,7 @@ export default function ProjectDetailsStreamlined() {
                           <span>Avance General</span>
                           <span className="font-bold">
                             {(() => {
-                              if (!costSummary || !costSummary.targetHours) return "0.0%";
+                              if (!costSummary || typeof costSummary.targetHours !== 'number' || typeof costSummary.filteredHours !== 'number') return "0.0%";
                               const progressPercentage = Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
                               return `${progressPercentage.toFixed(1)}%`;
                             })()}
@@ -544,7 +548,7 @@ export default function ProjectDetailsStreamlined() {
                         </div>
                         <Progress 
                           value={(() => {
-                            if (!costSummary || !costSummary.targetHours) return 0;
+                            if (!costSummary || typeof costSummary.targetHours !== 'number' || typeof costSummary.filteredHours !== 'number') return 0;
                             return Math.min(100, (costSummary.filteredHours / costSummary.targetHours) * 100);
                           })()} 
                           className="h-2"
@@ -622,7 +626,7 @@ export default function ProjectDetailsStreamlined() {
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-xs">
-                            {member.name ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                            {(typeof member.name === 'string' && member.name.length > 0) ? member.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -687,7 +691,13 @@ export default function ProjectDetailsStreamlined() {
                           <div>
                             <p className="text-sm font-medium">{entry.personnelName || 'Usuario Desconocido'}</p>
                             <p className="text-xs text-slate-600">
-                              {entry.date ? format(new Date(entry.date), 'dd MMM yyyy', { locale: es }) : 'Sin fecha'}
+                              {(() => {
+                                try {
+                                  return entry.date ? format(new Date(entry.date), 'dd MMM yyyy', { locale: es }) : 'Sin fecha';
+                                } catch (error) {
+                                  return 'Fecha inválida';
+                                }
+                              })()}
                             </p>
                           </div>
                         </div>
