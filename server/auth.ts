@@ -90,31 +90,29 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
-    let userId = req.session.userId;
-
-    // Debug detallado de cookies y sesión
     console.log('🔍 Auth middleware - Headers:', req.headers.cookie);
     console.log('🔍 Auth middleware - Session ID:', req.sessionID);
     console.log('🔍 Auth middleware - Session data:', req.session);
 
     // SOLUCIÓN TEMPORAL: Si no hay sesión, pero hay Authorization header, usar eso
-    if (!userId && req.headers.authorization) {
+    if (!req.session?.userId && req.headers.authorization) {
       const token = req.headers.authorization.replace('Bearer ', '');
       console.log('🔍 Auth middleware - Checking Authorization header:', token);
 
       // Simple validación de token temporal (solo números = user ID)
       if (/^\d+$/.test(token)) {
-        userId = parseInt(token);
-        console.log('✅ Auth middleware - Using Authorization header user ID:', userId);
+        req.session.userId = parseInt(token);
+        console.log('✅ Auth middleware - Using Authorization header user ID:', req.session.userId);
       }
     }
 
-    if (!userId) {
+    if (!req.session?.userId) {
+      console.log('🔒 User not authenticated - No session or userId');
       return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
-      const user = await storage.getUser(userId);
+      const user = await storage.getUser(req.session.userId);
 
       if (!user) {
         req.session.destroy(() => {});
@@ -230,7 +228,7 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   app.post("/api/logout", (req, res) => {
     console.log('🚪 Logout request received');
-    
+
     req.session.destroy((err) => {
       if (err) {
         console.error("Error al cerrar sesión:", err);
@@ -238,7 +236,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       }
 
       console.log('✅ Session destroyed successfully');
-      
+
       // Limpiar la cookie de sesión
       res.clearCookie('sessionId', {
         path: '/',
@@ -246,7 +244,7 @@ export function setupAuth(app: Express, storage: IStorage) {
         secure: false,
         sameSite: false
       });
-      
+
       // También limpiar cualquier otra cookie relacionada con sesión
       res.clearCookie('connect.sid', {
         path: '/',

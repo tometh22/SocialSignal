@@ -37,7 +37,10 @@ export default function AuthPage() {
     console.log('🔍 AuthPage useEffect:', { user: !!user, loading });
     if (user && !loading) {
       console.log('✅ User authenticated, redirecting to dashboard');
-      setLocation('/');
+      // Añadir un pequeño delay para evitar bucles
+      setTimeout(() => {
+        setLocation('/');
+      }, 100);
     }
   }, [user, loading, setLocation]);
 

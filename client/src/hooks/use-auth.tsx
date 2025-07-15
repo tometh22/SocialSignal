@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: async (): Promise<UserType | null> => {
       try {
         console.log('🔍 Fetching current user...');
-        
+
         const response = await fetch("/api/current-user", {
           credentials: 'include',
           method: 'GET',
@@ -105,15 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
-      
+
       // Establecer inmediatamente los datos del usuario en el cache
       queryClient.setQueryData(["/api/current-user"], userData);
-      
+
       // Invalidar para forzar una nueva consulta
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
-      
+
       console.log('🚀 Login successful, user data set in cache');
-      
+
       toast({
         title: "Inicio de sesión exitoso",
         description: `Bienvenido ${userData.firstName}`,
@@ -180,14 +180,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       console.log('🚪 Logout successful, clearing user data...');
-      
+
       // Limpiar datos locales específicos
       localStorage.removeItem('tempUserId');
-      
+
       // Limpiar datos del cache de queries
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear();
-      
+
       toast({
         title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente",
