@@ -116,10 +116,26 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
 
   const getVarianceBadge = (percentage: number) => {
     const absPercentage = Math.abs(percentage);
-    if (absPercentage < 20) return { variant: "default" as const, label: "Normal" };
-    if (absPercentage < 50) return { variant: "secondary" as const, label: "Atención" };
-    if (absPercentage < 100) return { variant: "outline" as const, label: "Alto" };
-    return { variant: "destructive" as const, label: "Crítico" };
+    if (absPercentage < 20) return { 
+      variant: "default" as const, 
+      label: "Normal",
+      className: "bg-blue-500 text-white border-blue-600 hover:bg-blue-600"
+    };
+    if (absPercentage < 50) return { 
+      variant: "secondary" as const, 
+      label: "Atención",
+      className: "bg-yellow-500 text-white border-yellow-600 hover:bg-yellow-600"
+    };
+    if (absPercentage < 100) return { 
+      variant: "outline" as const, 
+      label: "Alto",
+      className: "bg-orange-500 text-white border-orange-600 hover:bg-orange-600"
+    };
+    return { 
+      variant: "destructive" as const, 
+      label: "Crítico",
+      className: "bg-red-500 text-white border-red-600 hover:bg-red-600"
+    };
   };
 
   return (
@@ -375,7 +391,7 @@ export function DeviationAnalysis({ projectId, dateFilter }: DeviationAnalysisPr
                           )}
                         </div>
                       </div>
-                      <Badge variant={badge.variant} className="px-3 py-1">{badge.label}</Badge>
+                      <Badge variant={badge.variant} className={`px-3 py-1 ${badge.className}`}>{badge.label}</Badge>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4 text-xs">
