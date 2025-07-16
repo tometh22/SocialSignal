@@ -2269,13 +2269,40 @@ export default function ProjectDetailsRedesigned() {
                         personnelId: member.personnelId
                       });
                       
-                      // Calcular eficiencia: trabajar menos horas que las estimadas es más eficiente
+                      // === CÁLCULO AVANZADO DE EFICIENCIA ===
                       let eficiencia = 0;
+                      let detalleEficiencia = '';
+                      
                       if (horasTrabajadas > 0 && horasEstimadas > 0) {
-                        // Si trabajó menos horas = más eficiente
-                        // Si trabajó igual = 100% eficiente
-                        // Si trabajó más = menos eficiente
-                        eficiencia = (horasEstimadas / horasTrabajadas) * 100;
+                        // 1. Eficiencia de Tiempo (60% del peso total)
+                        const eficienciaTiempo = Math.min((horasEstimadas / horasTrabajadas) * 100, 200);
+                        
+                        // 2. Factor de Consistencia (25% del peso)
+                        // Basado en la distribución del trabajo a lo largo del tiempo
+                        const diasUnicos = new Set(memberEntries.map(entry => entry.date.split('T')[0])).size;
+                        const consistencia = Math.min(diasUnicos * 15, 100); // Más días = más consistente
+                        
+                        // 3. Factor de Costo-Eficiencia (15% del peso)
+                        const costoReal = horasTrabajadas * tarifa;
+                        const costoEstimado = horasEstimadas * tarifa;
+                        const eficienciaCosto = costoEstimado > 0 ? Math.min((costoEstimado / costoReal) * 100, 150) : 100;
+                        
+                        // === FÓRMULA COMPUESTA ===
+                        eficiencia = (
+                          eficienciaTiempo * 0.60 +    // 60% tiempo
+                          consistencia * 0.25 +        // 25% consistencia
+                          eficienciaCosto * 0.15       // 15% costo
+                        );
+                        
+                        // Crear descripción detallada
+                        if (eficienciaTiempo >= 120) {
+                          detalleEficiencia = `Trabajó ${(100 - (horasTrabajadas / horasEstimadas * 100)).toFixed(0)}% menos horas que las estimadas`;
+                        } else if (eficienciaTiempo >= 100) {
+                          detalleEficiencia = `Trabajó exactamente las horas estimadas`;
+                        } else {
+                          detalleEficiencia = `Trabajó ${((horasTrabajadas / horasEstimadas * 100) - 100).toFixed(0)}% más horas que las estimadas`;
+                        }
+                        
                         eficiencia = Math.max(0, Math.min(200, eficiencia));
                       }
 
@@ -2286,7 +2313,9 @@ export default function ProjectDetailsRedesigned() {
                         horasTrabajadas,
                         tarifa,
                         eficiencia,
+                        detalleEficiencia,
                         registros: memberEntries.length,
+                        diasTrabajados: memberEntries.length > 0 ? new Set(memberEntries.map(entry => entry.date.split('T')[0])).size : 0,
                         tieneActividad: horasTrabajadas > 0
                       };
                     });
@@ -2333,26 +2362,25 @@ export default function ProjectDetailsRedesigned() {
 
                         {/* Top 5 compacto */}
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-800 mb-2">
-                            🏆 Top 5 Performers
-                          </h4>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-gray-800">
+                              🏆 Top 5 Performers
+                            </h4>
+                            <div className="text-xs text-gray-500">
+                              Eficiencia multifactor
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 mb-3 p-2 bg-gray-50 rounded">
+                            <strong>Metodología:</strong> Tiempo (60%) + Consistencia (25%) + Costo-efectividad (15%)
+                          </div>
                           <div className="space-y-2">
                             {top5.map((persona, index) => {
                               const esExcelente = persona.eficiencia >= 100;
                               const esBueno = persona.eficiencia >= 80;
                               const color = esExcelente ? 'green' : esBueno ? 'blue' : 'amber';
                               
-                              // Explicación de la eficiencia
-                              let explicacion = '';
-                              if (persona.eficiencia >= 100) {
-                                explicacion = 'Trabajó menos horas que las estimadas';
-                              } else if (persona.eficiencia >= 80) {
-                                explicacion = 'Cerca de las horas estimadas';
-                              } else if (persona.eficiencia > 0) {
-                                explicacion = 'Trabajó más horas que las estimadas';
-                              } else {
-                                explicacion = 'Sin datos suficientes';
-                              }
+                              // Usar la explicación detallada calculada
+                              const explicacion = persona.detalleEficiencia || 'Sin datos suficientes';
                               
                               return (
                                 <div key={persona.id} className={`p-3 rounded-lg border ${
@@ -2376,7 +2404,10 @@ export default function ProjectDetailsRedesigned() {
                                           Trabajó {persona.horasTrabajadas.toFixed(1)}h de {persona.horasEstimadas}h estimadas
                                         </div>
                                         <div className="text-xs text-gray-500">
-                                          {explicacion} • ${persona.tarifa}/h • {persona.registros} reg
+                                          {explicacion} • ${persona.tarifa}/h
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                          {persona.diasTrabajados} días • {persona.registros} registros
                                         </div>
                                       </div>
                                     </div>
