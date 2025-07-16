@@ -297,6 +297,25 @@ export function setupAuth(app: Express, storage: IStorage) {
   app.get("/api/current-user", async (req, res) => {
     console.log(`🔍 Current user check. Session ID: ${req.session.userId}`);
 
+    // RECUPERACIÓN DE SESIÓN: Si no hay sesión pero existe cookie persistente
+    if (!req.session?.userId && req.cookies && req.cookies['epical.persistent.sid']) {
+      const persistentUserId = parseInt(req.cookies['epical.persistent.sid']);
+      console.log('🔍 Current user - Found persistent cookie, User ID:', persistentUserId);
+      
+      if (!isNaN(persistentUserId) && persistentUserId > 0) {
+        // Verificar que el usuario existe antes de restaurar la sesión
+        try {
+          const user = await storage.getUser(persistentUserId);
+          if (user) {
+            req.session.userId = persistentUserId;
+            console.log('✅ Current user - Session restored from persistent cookie for user:', user.email);
+          }
+        } catch (error) {
+          console.log('❌ Current user - Error verifying persistent cookie user:', error);
+        }
+      }
+    }
+
     if (!req.session.userId) {
       console.log(`❌ No session found`);
       return res.status(401).json({ message: "No autenticado" });
