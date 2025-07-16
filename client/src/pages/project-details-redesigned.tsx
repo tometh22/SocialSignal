@@ -442,12 +442,12 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso - ultra compacto */}
-                  <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm border border-white ${
+                  {/* Badge de progreso - mínimo */}
+                  <div className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-semibold shadow-sm border border-white leading-none ${
                     progressPercent >= 100 ? 'bg-green-500 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
                     'bg-blue-500 text-white'
-                  }`}>
+                  }`} style={{ fontSize: '9px', lineHeight: '1' }}>
                     {progressPercent}
                   </div>
                 </div>
