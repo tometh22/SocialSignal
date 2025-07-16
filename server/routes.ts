@@ -3623,16 +3623,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (project && project.quotationId) {
           const quotationTeam = await storage.getQuotationTeamMembers(project.quotationId);
           
+          console.log(`🔍 ANTES DEL MAPEO - Datos de cotización:`, quotationTeam.slice(0, 2));
+          
           // Convertir formato de cotización a formato de equipo base
-          baseTeam = quotationTeam.map(member => ({
-            id: member.id,
-            projectId: projectId,
-            personnelId: member.personnelId,
-            roleId: member.roleId,
-            hours: member.hours,
-            rate: member.rate,
-            cost: member.cost
-          }));
+          baseTeam = quotationTeam.map(member => {
+            console.log(`🔄 MAPEANDO MIEMBRO:`, { id: member.id, hours: member.hours, rate: member.rate });
+            
+            return {
+              id: member.id,
+              projectId: projectId,
+              personnelId: member.personnelId,
+              roleId: member.roleId,
+              hours: member.hours,
+              rate: member.rate,
+              cost: member.cost,
+              estimatedHours: member.hours,
+              hourlyRate: member.rate
+            };
+          });
+          
+          console.log(`🔍 DESPUÉS DEL MAPEO - Equipo base:`, baseTeam.slice(0, 2));
         }
       }
       
@@ -3652,6 +3662,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hours: member.hours,
             rate: member.rate,
             cost: member.cost,
+            estimatedHours: member.estimatedHours,
+            hourlyRate: member.hourlyRate,
             personnelId: member.personnelId
           });
           
@@ -3663,6 +3675,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: m.personnel?.name,
         hours: m.hours,
         rate: m.rate,
+        estimatedHours: m.estimatedHours,
+        hourlyRate: m.hourlyRate,
         personnelId: m.personnelId
       })));
 

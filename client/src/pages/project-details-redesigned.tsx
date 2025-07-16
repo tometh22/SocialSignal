@@ -2256,13 +2256,15 @@ export default function ProjectDetailsRedesigned() {
                       );
 
                       const horasTrabajadas = memberEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-                      const horasEstimadas = member.hours || 0; // Usar horas totales del proyecto
-                      const tarifa = member.rate || 0;
+                      const horasEstimadas = member.estimatedHours || 0; // Usar horas estimadas del equipo
+                      const tarifa = member.hourlyRate || 0;
                       
                       console.log(`💡 ${member.personnel?.name || member.personnelId}: ${horasTrabajadas}h trabajadas, ${horasEstimadas}h estimadas, tarifa: $${tarifa}`);
                       console.log(`🔍 Raw member data:`, { 
                         hours: member.hours, 
-                        rate: member.rate, 
+                        rate: member.rate,
+                        estimatedHours: member.estimatedHours, 
+                        hourlyRate: member.hourlyRate, 
                         personnel: member.personnel?.name,
                         personnelId: member.personnelId
                       });
