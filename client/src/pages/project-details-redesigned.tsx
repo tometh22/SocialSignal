@@ -2423,19 +2423,19 @@ export default function ProjectDetailsRedesigned() {
                                 <span className="text-sm text-amber-800">Aceleración</span>
                                 <span className="font-bold text-green-600">
                                   {(() => {
-                                    const weeks = filteredEntries ? Object.entries(filteredEntries.reduce((acc: any, entry: TimeEntry) => {
+                                    const weeks = allEntries.length > 0 ? Object.entries(allEntries.reduce((acc: any, entry: TimeEntry) => {
                                       const date = new Date(entry.date);
                                       const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
                                       const weekKey = weekStart.toISOString().split('T')[0];
                                       if (!acc[weekKey]) acc[weekKey] = 0;
-                                      acc[weekKey] += entry.cost || (entry.hours * 12);
+                                      acc[weekKey] += (entry.hours || 0) * (entry.hourlyRate || 15);
                                       return acc;
                                     }, {})).slice(-2) : [];
                                     
                                     if (weeks.length < 2) return 'Estable';
                                     const [, prevWeekCost] = weeks[0];
                                     const [, currentWeekCost] = weeks[1];
-                                    const growth = ((currentWeekCost as number) - (prevWeekCost as number)) / (prevWeekCost as number) * 100;
+                                    const growth = prevWeekCost > 0 ? ((currentWeekCost as number) - (prevWeekCost as number)) / (prevWeekCost as number) * 100 : 0;
                                     
                                     return growth > 10 ? 'Acelerando' : growth < -10 ? 'Desacelerando' : 'Estable';
                                   })()}
