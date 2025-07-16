@@ -36,7 +36,9 @@ import {
   Filter,
   CalendarDays,
   ChevronDown,
-  History
+  History,
+  Download,
+  FileSpreadsheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -440,8 +442,8 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso */}
-                  <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                  {/* Badge de progreso - mejorado positioning */}
+                  <div className={`absolute -top-2 -right-2 min-w-[28px] h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white ${
                     progressPercent >= 100 ? 'bg-green-500 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
                     'bg-blue-500 text-white'
@@ -1783,8 +1785,8 @@ export default function ProjectDetailsRedesigned() {
             </div>
 
             {/* SECCIÓN 2: Acciones Rápidas */}
-            <div className="flex justify-center">
-              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow max-w-md">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -1810,6 +1812,68 @@ export default function ProjectDetailsRedesigned() {
                     <span className="text-emerald-600">Registros: </span>
                     <span className="text-gray-500">
                       {filteredTimeEntries.length} en {dateFilter.label}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-blue-700">Registrar Tiempo</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setActiveModal('time-register')}
+                      className="border-blue-200 hover:bg-blue-50 h-8"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Agregar horas trabajadas por equipo
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-blue-600">Última entrada: </span>
+                    <span className="text-gray-500">
+                      {filteredTimeEntries.length > 0 ? 'Hoy' : 'Sin registros'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-amber-600 bg-gradient-to-br from-amber-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <Download className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <span className="text-sm font-medium text-amber-700">Exportar Datos</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExportTeamReport()}
+                      className="border-amber-200 hover:bg-amber-50 h-8"
+                    >
+                      <FileSpreadsheet className="h-3 w-3 mr-1" />
+                      CSV
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Descargar reporte del periodo actual
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-amber-600">Período: </span>
+                    <span className="text-gray-500">
+                      {dateFilter.label}
                     </span>
                   </div>
                 </CardContent>
