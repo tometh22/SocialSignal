@@ -784,12 +784,17 @@ export default function ProjectDetailsRedesigned() {
     return filterTimeEntriesByDateRange(timeEntries);
   }, [timeEntries, filterTimeEntriesByDateRange]);
 
+  // Obtener datos de la cotización - disponible globalmente
+  const quotationData = useMemo(() => {
+    if (!project) return null;
+    return (project as any).quotation;
+  }, [project]);
+
   // Cálculos principales basados en objetivos de cotización aprobada
   const metrics = useMemo(() => {
     if (!project || !Array.isArray(timeEntries)) return [];
 
     const projectData = project as any;
-    const quotationData = projectData.quotation;
 
     // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA ASOCIADA AL PROYECTO
     if (!quotationData) {
