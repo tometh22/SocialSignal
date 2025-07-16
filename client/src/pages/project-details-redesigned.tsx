@@ -2218,400 +2218,335 @@ export default function ProjectDetailsRedesigned() {
               </Card>
             </div>
 
-            {/* COMPONENTE 1: SEMÁFORO DE SALUD - MÁS CRÍTICO */}
-            <Card className="border-red-200 bg-gradient-to-br from-red-50 to-pink-50">
+            {/* 📊 RESUMEN EJECUTIVO - VISTA PRINCIPAL */}
+            <Card className="border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-red-600" />
-                  Semáforo de Salud del Proyecto
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                  <BarChart3 className="h-6 w-6 text-blue-600" />
+                  Resumen Ejecutivo
                 </CardTitle>
-                <CardDescription>
-                  Estado crítico y alertas inmediatas
+                <CardDescription className="text-slate-600">
+                  Vista general del estado del proyecto con métricas clave
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  {/* Semáforo Principal */}
-                  <div className="lg:col-span-1">
-                    <div className="p-4 bg-white rounded-lg border border-red-200">
-                      <h5 className="font-medium text-red-800 mb-3">Estado General</h5>
-                      <div className="flex flex-col items-center">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${(() => {
-                          const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                          const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                          if (budgetUsage > 0.9 || timeUsage > 0.9) return 'bg-red-500';
-                          if (budgetUsage > 0.75 || timeUsage > 0.75) return 'bg-yellow-500';
-                          return 'bg-green-500';
-                        })()}`}>
-                          <span className="text-2xl font-bold text-white">
-                            {(() => {
-                              const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                              const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                              if (budgetUsage > 0.9 || timeUsage > 0.9) return '🔴';
-                              if (budgetUsage > 0.75 || timeUsage > 0.75) return '🟡';
-                              return '🟢';
-                            })()}
-                          </span>
+                {/* Métricas principales en tarjetas grandes y claras */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  
+                  {/* 💰 PRESUPUESTO */}
+                  <div className={`p-6 rounded-xl border-2 ${(() => {
+                    const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                    if (usage > 0.85) return 'border-red-300 bg-red-50';
+                    if (usage > 0.70) return 'border-amber-300 bg-amber-50';
+                    return 'border-green-300 bg-green-50';
+                  })()}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <DollarSign className={`h-8 w-8 ${(() => {
+                        const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                        if (usage > 0.85) return 'text-red-600';
+                        if (usage > 0.70) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`} />
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">
+                          {((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0).toFixed(0)}%
                         </div>
-                        <p className="text-xs text-center mt-2">
-                          {(() => {
-                            const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                            const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                            if (budgetUsage > 0.9 || timeUsage > 0.9) return 'Crítico';
-                            if (budgetUsage > 0.75 || timeUsage > 0.75) return 'Atención';
-                            return 'Saludable';
-                          })()}
-                        </p>
+                        <div className="text-xs text-slate-500">del presupuesto</div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Alertas Críticas */}
-                  <div className="lg:col-span-3">
-                    <div className="p-4 bg-white rounded-lg border border-red-200">
-                      <h5 className="font-medium text-red-800 mb-3">Alertas Críticas</h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(() => {
-                          const alerts = [];
-                          
-                          if ((costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.8) {
-                            alerts.push({
-                              type: 'danger',
-                              title: 'Presupuesto Crítico',
-                              message: `Utilizado el ${((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(1)}% del presupuesto`,
-                              icon: <AlertTriangle className="h-4 w-4 text-red-500" />
-                            });
-                          }
-                          
-                          if ((costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.8) {
-                            alerts.push({
-                              type: 'warning',
-                              title: 'Tiempo Crítico',
-                              message: `${((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(1)}% del tiempo utilizado`,
-                              icon: <Clock className="h-4 w-4 text-amber-500" />
-                            });
-                          }
-                          
-                          if (teamStats && teamStats.filter((t: any) => t.hours > 0).length < 3) {
-                            alerts.push({
-                              type: 'info',
-                              title: 'Recursos Limitados',
-                              message: `Solo ${teamStats.filter((t: any) => t.hours > 0).length} miembros activos`,
-                              icon: <Users className="h-4 w-4 text-blue-500" />
-                            });
-                          }
-                          
-                          if (alerts.length === 0) {
-                            alerts.push({
-                              type: 'success',
-                              title: 'Proyecto Estable',
-                              message: 'Todos los indicadores dentro de parámetros normales',
-                              icon: <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            });
-                          }
-                          
-                          return alerts.map((alert, i) => (
-                            <div key={i} className={`p-3 rounded-lg border ${
-                              alert.type === 'danger' ? 'bg-red-50 border-red-200' :
-                              alert.type === 'warning' ? 'bg-amber-50 border-amber-200' :
-                              alert.type === 'info' ? 'bg-blue-50 border-blue-200' :
-                              'bg-green-50 border-green-200'
-                            }`}>
-                              <div className="flex items-center gap-2 mb-1">
-                                {alert.icon}
-                                <span className="text-sm font-medium">{alert.title}</span>
-                              </div>
-                              <p className="text-xs text-gray-600">{alert.message}</p>
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* COMPONENTE 2: ANÁLISIS FINANCIERO */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-white border-green-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                    Análisis Financiero
-                  </CardTitle>
-                  <CardDescription>
-                    Rentabilidad y rendimiento económico
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 bg-gray-50 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-green-800">Margen de Rentabilidad</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800">
-                        {(() => {
-                          const revenue = (costSummary?.targetClientPrice || 0);
-                          const cost = (costSummary?.totalCost || 0);
-                          const margin = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
-                          return `${margin.toFixed(1)}%`;
-                        })()}
-                      </Badge>
-                    </div>
+                    
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Precio Cliente:</span>
-                        <span className="font-medium">${(costSummary?.targetClientPrice || 0).toLocaleString()}</span>
+                        <span className="text-slate-600">Gastado:</span>
+                        <span className="font-semibold">${(costSummary?.totalCost || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span>Costo Real:</span>
-                        <span className="font-medium">${(costSummary?.totalCost || 0).toLocaleString()}</span>
+                        <span className="text-slate-600">Presupuesto:</span>
+                        <span className="font-semibold">${(costSummary?.budget || 0).toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between text-sm font-semibold">
-                        <span>Ganancia:</span>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span className="text-slate-600">Restante:</span>
+                        <span className={`${((costSummary?.budget || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${((costSummary?.budget || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4">
+                      <div className="w-full bg-slate-200 rounded-full h-3">
+                        <div 
+                          className={`h-3 rounded-full transition-all duration-300 ${(() => {
+                            const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                            if (usage > 0.85) return 'bg-red-500';
+                            if (usage > 0.70) return 'bg-amber-500';
+                            return 'bg-green-500';
+                          })()}`}
+                          style={{ 
+                            width: `${Math.min(100, ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0))}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <div className={`text-xs mt-2 font-medium ${(() => {
+                        const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                        if (usage > 0.85) return 'text-red-600';
+                        if (usage > 0.70) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`}>
+                        {(() => {
+                          const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                          if (usage > 0.85) return '⚠️ ATENCIÓN REQUERIDA';
+                          if (usage > 0.70) return '👀 MONITOREAR';
+                          return '✅ DENTRO DEL RANGO';
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ⏰ TIEMPO */}
+                  <div className={`p-6 rounded-xl border-2 ${(() => {
+                    const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                    if (usage > 0.85) return 'border-red-300 bg-red-50';
+                    if (usage > 0.70) return 'border-amber-300 bg-amber-50';
+                    return 'border-green-300 bg-green-50';
+                  })()}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <Clock className={`h-8 w-8 ${(() => {
+                        const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                        if (usage > 0.85) return 'text-red-600';
+                        if (usage > 0.70) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`} />
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">
+                          {((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0).toFixed(0)}%
+                        </div>
+                        <div className="text-xs text-slate-500">del tiempo</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Trabajadas:</span>
+                        <span className="font-semibold">{(costSummary?.filteredHours || 0).toFixed(0)}h</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Estimadas:</span>
+                        <span className="font-semibold">{(costSummary?.targetHours || 0).toFixed(0)}h</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span className="text-slate-600">Restantes:</span>
+                        <span className={`${((costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {Math.max(0, (costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0)).toFixed(0)}h
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4">
+                      <div className="w-full bg-slate-200 rounded-full h-3">
+                        <div 
+                          className={`h-3 rounded-full transition-all duration-300 ${(() => {
+                            const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                            if (usage > 0.85) return 'bg-red-500';
+                            if (usage > 0.70) return 'bg-amber-500';
+                            return 'bg-green-500';
+                          })()}`}
+                          style={{ 
+                            width: `${Math.min(100, ((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0))}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <div className={`text-xs mt-2 font-medium ${(() => {
+                        const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                        if (usage > 0.85) return 'text-red-600';
+                        if (usage > 0.70) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`}>
+                        {(() => {
+                          const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                          if (usage > 0.85) return '⚠️ TIEMPO CRÍTICO';
+                          if (usage > 0.70) return '👀 SUPERVISAR';
+                          return '✅ EN CRONOGRAMA';
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 💹 RENTABILIDAD */}
+                  <div className={`p-6 rounded-xl border-2 ${(() => {
+                    const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
+                    if (markup < 1.5) return 'border-red-300 bg-red-50';
+                    if (markup < 2.0) return 'border-amber-300 bg-amber-50';
+                    return 'border-green-300 bg-green-50';
+                  })()}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <TrendingUp className={`h-8 w-8 ${(() => {
+                        const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
+                        if (markup < 1.5) return 'text-red-600';
+                        if (markup < 2.0) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`} />
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-900">
+                          {((costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0).toFixed(1)}x
+                        </div>
+                        <div className="text-xs text-slate-500">markup</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Precio Cliente:</span>
+                        <span className="font-semibold">${(costSummary?.targetClientPrice || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Costo Real:</span>
+                        <span className="font-semibold">${(costSummary?.totalCost || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold">
+                        <span className="text-slate-600">Ganancia:</span>
                         <span className={`${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
                         </span>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-gray-50 rounded-lg border border-green-200">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {(() => {
-                            const investment = (costSummary?.totalCost || 0);
-                            const profit = (costSummary?.targetClientPrice || 0) - investment;
-                            const roi = investment > 0 ? (profit / investment) * 100 : 0;
-                            return `${roi.toFixed(1)}%`;
-                          })()}
-                        </div>
-                        <p className="text-xs text-green-700">ROI del Proyecto</p>
+                    
+                    <div className="mt-4">
+                      <div className={`text-xs font-medium ${(() => {
+                        const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
+                        if (markup < 1.5) return 'text-red-600';
+                        if (markup < 2.0) return 'text-amber-600';
+                        return 'text-green-600';
+                      })()}`}>
+                        {(() => {
+                          const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
+                          if (markup < 1.5) return '📉 RENTABILIDAD BAJA';
+                          if (markup < 2.0) return '📊 RENTABILIDAD MEDIA';
+                          return '📈 RENTABILIDAD ALTA';
+                        })()}
                       </div>
-                    </div>
-                    <div className="p-3 bg-gray-50 rounded-lg border border-green-200">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {(() => {
-                            const monthlyRevenue = (costSummary?.targetClientPrice || 0) / 12;
-                            const paybackMonths = monthlyRevenue > 0 ? Math.ceil((costSummary?.totalCost || 0) / monthlyRevenue) : 0;
-                            return `${paybackMonths}m`;
-                          })()}
-                        </div>
-                        <p className="text-xs text-green-700">Período de Recuperación</p>
+                      <div className="text-xs text-slate-500 mt-1">
+                        Margen: {(() => {
+                          const margin = (costSummary?.targetClientPrice || 0) > 0 ? 
+                            ((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)) / (costSummary?.targetClientPrice || 1) * 100 : 0;
+                          return `${margin.toFixed(1)}%`;
+                        })()}
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* COMPONENTE 3: INDICADORES DE RENDIMIENTO */}
-              <Card className="bg-white border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Indicadores de Rendimiento
-                  </CardTitle>
-                  <CardDescription>
-                    Métricas de desempeño del proyecto
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg border border-blue-200">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {(() => {
-                            const plannedCost = (costSummary?.budget || 0);
-                            const actualCost = (costSummary?.totalCost || 0);
-                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 0;
-                            return cpi.toFixed(2);
-                          })()}
-                        </div>
-                        <p className="text-xs text-blue-700">IPC (Índice de Rendimiento de Costos)</p>
-                        <p className="text-xs text-gray-500">
-                          {(() => {
-                            const plannedCost = (costSummary?.budget || 0);
-                            const actualCost = (costSummary?.totalCost || 0);
-                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 0;
-                            return cpi > 1 ? 'Bajo presupuesto' : cpi < 1 ? 'Sobre presupuesto' : 'En presupuesto';
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-blue-200">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {(() => {
-                            const plannedHours = (costSummary?.targetHours || 0);
-                            const actualHours = (costSummary?.filteredHours || 0);
-                            const spi = plannedHours > 0 ? (actualHours / plannedHours) : 0;
-                            return spi.toFixed(2);
-                          })()}
-                        </div>
-                        <p className="text-xs text-blue-700">IPC (Índice de Rendimiento de Cronograma)</p>
-                        <p className="text-xs text-gray-500">
-                          {(() => {
-                            const plannedHours = (costSummary?.targetHours || 0);
-                            const actualHours = (costSummary?.filteredHours || 0);
-                            const spi = plannedHours > 0 ? (actualHours / plannedHours) : 0;
-                            return spi > 1 ? 'Adelantado' : spi < 1 ? 'Atrasado' : 'En cronograma';
-                          })()}
+                {/* Alertas importantes al final */}
+                {((costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.85 || 
+                  (costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.85) && (
+                  <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-amber-800 mb-1">Atención Requerida</h4>
+                        <p className="text-sm text-amber-700">
+                          {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.85 && 
+                           "El proyecto está cerca del límite presupuestario. "}
+                          {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.85 && 
+                           "Las horas trabajadas están cerca del límite estimado. "}
+                          Se recomienda revisar el avance y ajustar la planificación si es necesario.
                         </p>
                       </div>
                     </div>
                   </div>
-
-                  <div className="p-4 bg-gray-50 rounded-lg border border-blue-200">
-                    <h5 className="font-medium text-blue-800 mb-2">Velocidad del Equipo</h5>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Horas por Día:</span>
-                        <span className="font-medium">
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* 📈 Análisis de Eficiencia del Equipo */}
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                  <Users className="h-5 w-5 text-slate-600" />
+                  Análisis del Equipo
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Productividad y eficiencia del equipo de trabajo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Métricas de Productividad */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-slate-800">Métricas de Productividad</h4>
+                    
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-slate-600">Horas por día promedio</span>
+                        <span className="text-lg font-bold text-slate-900">
                           {(() => {
                             const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
                             const uniqueDays = new Set(filteredEntries?.map(e => e.date.split('T')[0])).size;
                             return uniqueDays > 0 ? ((costSummary?.filteredHours || 0) / uniqueDays).toFixed(1) : '0';
-                          })()}h/día
+                          })()}h
                         </span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Eficiencia Promedio:</span>
-                        <span className="font-medium">
-                          {teamStats && teamStats.length > 0 
-                            ? ((teamStats.reduce((sum: number, member: any) => sum + member.hours, 0) / teamStats.length) / 8 * 100).toFixed(0)
-                            : 0}%
-                        </span>
+                      <div className="text-xs text-slate-500">
+                        Basado en {new Set(filterTimeEntriesByDateRange(timeEntries)?.map(e => e.date.split('T')[0])).size} días de trabajo
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
-            {/* COMPONENTE 4: ANÁLISIS PREDICTIVO */}
-            <Card className="bg-white border-purple-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-purple-600" />
-                  Análisis Predictivo
-                </CardTitle>
-                <CardDescription>
-                  Proyecciones y estimaciones de finalización
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg border border-purple-200">
-                    <h5 className="font-medium text-purple-800 mb-2">Estimación de Finalización</h5>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-purple-600">
-                        ${(() => {
-                          const plannedCost = (costSummary?.budget || 0);
-                          const actualCost = (costSummary?.totalCost || 0);
-                          const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
-                          const eac = plannedCost / Math.max(cpi, 0.1);
-                          return eac.toFixed(0);
-                        })()}
-                      </div>
-                      <p className="text-xs text-purple-700">Costo Final Estimado</p>
-                      <div className="text-sm">
-                        <span className={`font-medium ${(() => {
-                          const plannedCost = (costSummary?.budget || 0);
-                          const actualCost = (costSummary?.totalCost || 0);
-                          const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
-                          const eac = plannedCost / Math.max(cpi, 0.1);
-                          const variance = eac - plannedCost;
-                          return variance > 0 ? 'text-red-600' : 'text-green-600';
-                        })()}`}>
-                          {(() => {
-                            const plannedCost = (costSummary?.budget || 0);
-                            const actualCost = (costSummary?.totalCost || 0);
-                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
-                            const eac = plannedCost / Math.max(cpi, 0.1);
-                            const variance = eac - plannedCost;
-                            return variance >= 0 ? '+' : '';
-                          })()}
-                          ${(() => {
-                            const plannedCost = (costSummary?.budget || 0);
-                            const actualCost = (costSummary?.totalCost || 0);
-                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
-                            const eac = plannedCost / Math.max(cpi, 0.1);
-                            const variance = eac - plannedCost;
-                            return Math.abs(variance).toFixed(0);
-                          })()} vs presupuesto
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-slate-600">Miembros activos</span>
+                        <span className="text-lg font-bold text-slate-900">
+                          {teamStats && teamStats.filter((member: any) => member.hours > 0).length || 0}
                         </span>
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        de {teamStats?.length || 0} miembros totales
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-purple-200">
-                    <h5 className="font-medium text-purple-800 mb-2">Pronóstico de Recursos</h5>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {(() => {
-                          const remainingHours = Math.max((costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0), 0);
-                          const workedHours = (costSummary?.filteredHours || 0);
-                          const avgHoursPerDay = workedHours > 0 ? workedHours / 30 : 8; // Estimación basada en 30 días
-                          const daysToComplete = avgHoursPerDay > 0 ? Math.ceil(remainingHours / avgHoursPerDay) : 0;
-                          return `${daysToComplete}d`;
-                        })()}
+                  {/* Estado del Progreso */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-slate-800">Estado del Progreso</h4>
+                    
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-slate-600">Progreso temporal</span>
+                        <span className="text-lg font-bold text-slate-900">
+                          {((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0).toFixed(0)}%
+                        </span>
                       </div>
-                      <p className="text-xs text-purple-700">Días para Completar</p>
-                      <div className="text-sm space-y-1">
-                        <div className="flex justify-between">
-                          <span>Horas Restantes:</span>
-                          <span className="font-medium">
-                            {Math.max((costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0), 0).toFixed(1)}h
-                          </span>
-                        </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min(100, ((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0))}%` 
+                          }}
+                        ></div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-purple-200">
-                    <h5 className="font-medium text-purple-800 mb-2">Análisis de Riesgos</h5>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {(() => {
-                          const overBudget = (costSummary?.totalCost || 0) > (quotationData?.baseCost || 0);
-                          const overTime = (costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0);
-                          const riskLevel = overBudget && overTime ? 'ALTO' : overBudget || overTime ? 'MEDIO' : 'BAJO';
-                          return riskLevel;
-                        })()}
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-slate-600">Progreso financiero</span>
+                        <span className="text-lg font-bold text-slate-900">
+                          {((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0).toFixed(0)}%
+                        </span>
                       </div>
-                      <p className="text-xs text-purple-700">Nivel de Riesgo</p>
-                      <div className="space-y-1">
-                        {(() => {
-                          const risks = [];
-                          if ((costSummary?.totalCost || 0) > (quotationData?.baseCost || 0) * 0.9) {
-                            risks.push('Presupuesto crítico');
-                          }
-                          if ((costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.9) {
-                            risks.push('Tiempo crítico');
-                          }
-                          if (teamStats && teamStats.filter((t: any) => t.hours > 0).length < 3) {
-                            risks.push('Recursos limitados');
-                          }
-                          return risks.length > 0 ? risks.map((risk, i) => (
-                            <div key={i} className="flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3 text-amber-500" />
-                              <span className="text-xs">{risk}</span>
-                            </div>
-                          )) : (
-                            <div className="flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3 text-green-500" />
-                              <span className="text-xs">Sin riesgos detectados</span>
-                            </div>
-                          );
-                        })()}
+                      <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0) > 0.85 ? 'bg-red-500' :
+                            ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0) > 0.70 ? 'bg-amber-500' : 'bg-green-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(100, ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0))}%` 
+                          }}
+                        ></div>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
           </TabsContent>
 
         </Tabs>
