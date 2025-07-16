@@ -2220,15 +2220,16 @@ export default function ProjectDetailsRedesigned() {
                       baseTeam: baseTeam?.length,
                       filteredTimeEntries: filteredTimeEntries?.length,
                       dateFilter: dateFilter.label,
-                      sampleTimeEntry: filteredTimeEntries?.[0]
+                      sampleTimeEntry: filteredTimeEntries?.[0],
+                      sampleBaseTeamMember: baseTeam?.[0]
                     });
 
                     // Calcular eficiencia real basada en el equipo base y registros de tiempo
                     const teamEfficiency = baseTeam?.map((member: any) => {
                       // Obtener horas trabajadas por este miembro en el período filtrado
-                      // Nota: base de datos usa personnel_id, no personnelId
+                      // Verificar tanto personnel_id como personnelId para compatibilidad
                       const memberTimeEntries = filteredTimeEntries.filter((entry: any) => 
-                        entry.personnel_id === member.personnelId
+                        entry.personnel_id === member.personnelId || entry.personnelId === member.personnelId
                       );
                       
                       const workedHours = memberTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
@@ -2239,7 +2240,7 @@ export default function ProjectDetailsRedesigned() {
                       const efficiency = estimatedHours > 0 ? Math.min(1.5, estimatedHours / Math.max(workedHours, 0.1)) : 1;
                       const costPerHour = hourlyRate;
 
-                      console.log(`🔍 ${member.personnel?.name}: ${workedHours}h trabajadas vs ${estimatedHours}h estimadas = ${(efficiency * 100).toFixed(1)}% eficiencia`);
+                      console.log(`🔍 ${member.personnel?.name || `Miembro ${member.personnelId}`}: ${workedHours}h trabajadas (${memberTimeEntries.length} entradas) vs ${estimatedHours}h estimadas = ${(efficiency * 100).toFixed(1)}% eficiencia`);
 
                       return {
                         name: member.personnel?.name || `Miembro ${member.personnelId}`,
@@ -2248,7 +2249,8 @@ export default function ProjectDetailsRedesigned() {
                         workedHours: workedHours,
                         estimatedHours: estimatedHours,
                         hasWorked: workedHours > 0,
-                        isOutlier: efficiency < 0.75 // Underperformers < 75% eficiencia
+                        isOutlier: efficiency < 0.75, // Underperformers < 75% eficiencia
+                        timeEntriesCount: memberTimeEntries.length
                       };
                     })?.filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
                       ?.sort((a, b) => b.efficiency - a.efficiency) || [];
@@ -2311,7 +2313,7 @@ export default function ProjectDetailsRedesigned() {
                                   <div>
                                     <span className="text-sm font-medium text-gray-700">{member.name}</span>
                                     <div className="text-xs text-gray-500 mt-1">
-                                      {member.workedHours.toFixed(1)}h trabajadas de {member.estimatedHours}h estimadas
+                                      {member.workedHours.toFixed(1)}h trabajadas de {member.estimatedHours}h estimadas ({member.timeEntriesCount || 0} registros)
                                     </div>
                                   </div>
                                   <div className="text-right">
