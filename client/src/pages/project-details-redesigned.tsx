@@ -2055,8 +2055,8 @@ export default function ProjectDetailsRedesigned() {
                       dateFilter: dateFilter
                     });
 
-                    // Si no hay datos suficientes, mostrar estado informativo
-                    if (!costSummary || !quotationData || !filteredTimeEntries || filteredTimeEntries.length === 0) {
+                    // Si no hay datos básicos, mostrar estado informativo
+                    if (!costSummary || !quotationData) {
                       return (
                         <div className="text-center p-8">
                           <div className="inline-flex items-center justify-center w-20 h-20 mb-4 bg-gray-100 rounded-full">
@@ -2072,7 +2072,6 @@ export default function ProjectDetailsRedesigned() {
                           <p className="text-xs text-gray-500 mt-2">
                             {!quotationData ? 'Sin cotización asociada' :
                              !costSummary ? 'Sin datos de costo' :
-                             !filteredTimeEntries || filteredTimeEntries.length === 0 ? 'Sin registros de tiempo en el período' : 
                              'Datos insuficientes'}
                           </p>
                         </div>
@@ -2083,8 +2082,15 @@ export default function ProjectDetailsRedesigned() {
                     const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
                     const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
                     const teamEfficiency = teamStats && teamStats.length > 0 
-                      ? (teamStats.reduce((sum: number, member: any) => sum + Math.min(1, (member.estimatedHours || 0) / Math.max(1, member.hours || 1)), 0) / teamStats.length) * 25
-                      : 20;
+                      ? (teamStats.reduce((sum: number, member: any) => {
+                          // Solo contar miembros que tienen horas trabajadas
+                          if (member.hours > 0) {
+                            const efficiency = Math.min(1, (member.estimatedHours || 0) / member.hours);
+                            return sum + efficiency;
+                          }
+                          return sum;
+                        }, 0) / Math.max(1, teamStats.filter(m => m.hours > 0).length)) * 25
+                      : 15;
                     const profitabilityHealth = (() => {
                       const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
                         ? quotationData.totalAmount / (costSummary.totalCost || 1) 
@@ -2211,17 +2217,69 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   {(() => {
+                    console.log('🔍 DEBUG - Eficiencia por Miembro:', {
+                      teamStats: teamStats,
+                      teamStatsLength: teamStats?.length,
+                      baseTeam: baseTeam?.length,
+                      filteredTimeEntries: filteredTimeEntries?.length,
+                      dateFilter: dateFilter
+                    });
+
                     // Análisis de eficiencia por miembro
                     const teamEfficiency = teamStats?.map((member: any) => {
                       const efficiency = member.estimatedHours > 0 ? member.estimatedHours / Math.max(member.hours, 1) : 1;
                       const costPerHour = member.hours > 0 ? member.cost / member.hours : 0;
                       return {
-                        name: member.personnel?.name || member.personnelName || 'Sin nombre',
+                        name: member.personnel?.name || member.personnelName || `Miembro ${member.personnelId}`,
                         efficiency: efficiency,
                         costPerHour: costPerHour,
+                        hours: member.hours,
+                        estimatedHours: member.estimatedHours,
                         isOutlier: efficiency < 0.75 // Underperformers < 75% eficiencia
                       };
                     }).sort((a, b) => b.efficiency - a.efficiency) || [];
+
+                    // Si no hay teamStats pero sí hay baseTeam, usar datos base
+                    if (teamEfficiency.length === 0 && baseTeam && baseTeam.length > 0) {
+                      const baseEfficiency = baseTeam.map((member: any) => ({
+                        name: member.personnel?.name || `Miembro ${member.personnelId}`,
+                        efficiency: 1, // Sin datos, asumir 100%
+                        costPerHour: member.rate || 0,
+                        hours: 0,
+                        estimatedHours: member.hours || 0,
+                        isOutlier: false
+                      })).slice(0, 5);
+
+                      console.log('🔍 Usando datos base del equipo:', baseEfficiency);
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="text-center p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm text-amber-700">
+                              📊 Mostrando datos base del equipo (sin registros en período seleccionado)
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              Equipo Base
+                            </h4>
+                            <div className="space-y-2">
+                              {baseEfficiency.map((member, index) => (
+                                <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-emerald-200">
+                                  <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                                  <div className="text-right">
+                                    <div className="text-sm font-bold text-gray-600">{member.estimatedHours}h est.</div>
+                                    <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     // Si no hay datos, mostrar mensaje informativo
                     if (teamEfficiency.length === 0) {
