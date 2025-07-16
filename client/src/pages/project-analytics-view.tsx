@@ -266,10 +266,33 @@ const ProjectAnalyticsView: React.FC = () => {
         const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
         const lastMonthFiltered = entries.filter(entry => {
           const entryDate = new Date(entry.date || entry.createdAt);
-          const matches = entryDate.getFullYear() === lastMonthYear && entryDate.getMonth() === lastMonth;
+          const entryYear = entryDate.getFullYear();
+          const entryMonth = entryDate.getMonth();
+          const matches = entryYear === lastMonthYear && entryMonth === lastMonth;
+          
+          console.log('🔍 Entry check:', {
+            entryId: entry.id,
+            entryDate: entryDate.toLocaleDateString('es-ES'),
+            entryYear,
+            entryMonth,
+            targetYear: lastMonthYear,
+            targetMonth: lastMonth,
+            matches
+          });
+          
           return matches;
         });
-        console.log('📅 Last month filtered:', lastMonthFiltered.length, { lastMonth, lastMonthYear });
+        console.log('📅 Last month filtered:', lastMonthFiltered.length, { 
+          lastMonth, 
+          lastMonthYear,
+          totalEntries: entries.length,
+          sampleFiltered: lastMonthFiltered.slice(0, 3).map(e => ({
+            id: e.id,
+            date: e.date,
+            hours: e.hours,
+            personnelId: e.personnelId
+          }))
+        });
         return lastMonthFiltered;
 
       case "current_quarter":

@@ -402,9 +402,14 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                              "Todo el proyecto"}
                   </span>
                   <span className="text-blue-600">
-                    {timeEntries.length} registros de tiempo • {personnel.length} miembros en el equipo
+                    {timeEntries.length} registros filtrados • {personnel.length} miembros en el equipo
                   </span>
                 </div>
+                {timeFilter === "last_month" && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    DEBUG: Buscando registros de junio 2025 (mes 5, año 2025)
+                  </div>
+                )}
               </div>
 
               {/* Lista de eficiencia del equipo */}
@@ -412,6 +417,19 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 <div className="text-sm font-medium text-gray-700 mb-3">
                   Equipo del Proyecto {timeEntries.length > 0 ? "" : "(Sin actividad en este período)"}
                 </div>
+                
+                {timeFilter === "last_month" && (
+                  <div className="text-xs bg-yellow-50 border border-yellow-200 rounded p-2 mb-3">
+                    <strong>DEBUG:</strong> Filtrando {timeEntries.length} registros para junio 2025
+                    {timeEntries.length > 0 && (
+                      <div className="mt-1">
+                        Muestra: {timeEntries.slice(0, 2).map(e => 
+                          `ID:${e.id} Fecha:${new Date(e.date || e.createdAt).toLocaleDateString('es-ES')} Horas:${e.hours} Personal:${e.personnelId}`
+                        ).join(' | ')}
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {personnel.length > 0 ? (
                   <div className="space-y-2">
@@ -430,6 +448,9 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       
                       const hasActivity = memberHours > 0;
                       const costGenerated = memberHours * member.hourlyRate;
+                      
+                      // Debug específico para miembros que deberían tener datos
+                      const memberEntriesInPeriod = timeEntries.filter(entry => entry.personnelId === member.id);
 
                       return (
                         <div 
@@ -446,6 +467,11 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                               <div className="font-medium text-sm">{member.name}</div>
                               <div className="text-xs text-muted-foreground">
                                 {memberRole?.name || 'Sin rol'} • ${member.hourlyRate.toFixed(1)}/h
+                                {timeFilter === "last_month" && (
+                                  <span className="ml-2 text-yellow-600">
+                                    (ID:{member.id}, Entradas:{memberEntriesInPeriod.length})
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
