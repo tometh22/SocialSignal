@@ -39,7 +39,10 @@ import {
   History,
   Download,
   FileSpreadsheet,
-  Shield
+  Shield,
+  Crown,
+  Lightbulb,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2015,102 +2018,260 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
 
           <TabsContent value="details" className="space-y-6">
-            {/* Análisis Mensual Avanzado */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Métricas Principales */}
-              <Card className="lg:col-span-2">
+            {/* ANÁLISIS ESTRATÉGICO - Nueva implementación completa */}
+            
+            {/* 1. SCORE DE SALUD DEL PROYECTO - Header principal */}
+            <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-purple-900">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Target className="h-6 w-6 text-purple-600" />
+                  </div>
+                  Análisis Estratégico - Score de Salud del Proyecto
+                </CardTitle>
+                <CardDescription className="text-purple-700">
+                  Evaluación integral del estado y proyecciones del proyecto basada en datos reales
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center mb-6">
+                  {(() => {
+                    // Cálculo del Score de Salud (0-100)
+                    const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
+                    const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
+                    const teamEfficiency = teamStats && teamStats.length > 0 
+                      ? (teamStats.reduce((sum: number, member: any) => sum + Math.min(1, (member.estimatedHours || 0) / Math.max(1, member.hours || 1)), 0) / teamStats.length) * 25
+                      : 20;
+                    const profitabilityHealth = (() => {
+                      const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
+                        ? quotationData.totalAmount / (costSummary.totalCost || 1) 
+                        : 0;
+                      if (markup >= 2.5) return 20;
+                      if (markup >= 1.8) return 15;
+                      if (markup >= 1.2) return 10;
+                      return 0;
+                    })();
+                    
+                    const totalScore = Math.round(budgetHealth + timeHealth + teamEfficiency + profitabilityHealth);
+                    const scoreColor = totalScore >= 80 ? 'text-green-600' : totalScore >= 60 ? 'text-yellow-600' : 'text-red-600';
+                    const scoreBg = totalScore >= 80 ? 'bg-green-50 border-green-200' : totalScore >= 60 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+                    
+                    return (
+                      <div className={`p-6 rounded-xl border-2 ${scoreBg} inline-block`}>
+                        <div className={`text-5xl font-bold ${scoreColor} mb-2`}>{totalScore}</div>
+                        <div className="text-lg font-semibold text-gray-700 mb-3">Score de Salud General</div>
+                        <div className="text-sm text-gray-600">
+                          {totalScore >= 80 ? '🟢 Proyecto en excelente estado' : 
+                           totalScore >= 60 ? '🟡 Proyecto requiere atención' : 
+                           '🔴 Proyecto en estado crítico'}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 2. PROYECCIÓN FINANCIERA - Fila principal */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-indigo-600" />
-                    Análisis Mensual Avanzado - {dateFilter.label}
+                  <CardTitle className="flex items-center gap-2 text-blue-900">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    Proyección Financiera
                   </CardTitle>
-                  <CardDescription>
-                    Tendencias y patrones de desempeño del proyecto
+                  <CardDescription className="text-blue-700">
+                    Análisis de burn rate y proyecciones de finalización
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(() => {
+                    // Cálculos de proyección financiera
+                    const today = new Date();
+                    const projectStartDate = project?.startDate ? new Date(project.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                    const monthsElapsed = Math.max(1, (today.getTime() - projectStartDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                    const monthlyBurnRate = (costSummary?.totalCost || 0) / monthsElapsed;
+                    const budgetRemaining = (costSummary?.budget || 0) - (costSummary?.totalCost || 0);
+                    const monthsRemaining = budgetRemaining > 0 ? budgetRemaining / Math.max(1, monthlyBurnRate) : 0;
+                    const projectedTotalCost = (costSummary?.totalCost || 0) > 0 && (costSummary?.filteredHours || 0) > 0 
+                      ? ((costSummary.totalCost / costSummary.filteredHours) * (costSummary.targetHours || 0))
+                      : (costSummary?.totalCost || 0);
+                    const budgetOverrun = projectedTotalCost - (costSummary?.budget || 0);
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white rounded-lg border border-blue-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-blue-800">Burn Rate Mensual</span>
+                            <span className="text-lg font-bold text-blue-900">${monthlyBurnRate.toLocaleString()}</span>
+                          </div>
+                          <div className="text-xs text-blue-600">
+                            Gasto promedio por mes transcurrido
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-white rounded-lg border border-blue-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-blue-800">Presupuesto Restante</span>
+                            <span className={`text-lg font-bold ${budgetRemaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              ${budgetRemaining.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-blue-600">
+                            Tiempo estimado restante: {monthsRemaining > 0 ? `${monthsRemaining.toFixed(1)} meses` : 'Presupuesto agotado'}
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-white rounded-lg border border-blue-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-blue-800">Costo Final Proyectado</span>
+                            <span className={`text-lg font-bold ${budgetOverrun > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              ${projectedTotalCost.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-blue-600">
+                            {budgetOverrun > 0 
+                              ? `Sobrecosto estimado: $${budgetOverrun.toLocaleString()}`
+                              : `Dentro del presupuesto`}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-900">
+                    <Users className="h-5 w-5 text-emerald-600" />
+                    Eficiencia por Miembro
+                  </CardTitle>
+                  <CardDescription className="text-emerald-700">
+                    Top performers vs underperformers del equipo
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-blue-600" />
-                          <p className="text-sm font-medium text-blue-800">Horas Totales</p>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(0)}%
-                        </Badge>
-                      </div>
-                      <p className="text-2xl font-bold text-blue-600 mb-1">
-                        {costSummary?.filteredHours || 0}h
-                      </p>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-500">de {costSummary?.targetHours || 0}h estimadas</span>
-                        <span className={`font-medium ${(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                          {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) ? '+' : ''}
-                          {((costSummary?.filteredHours || 0) - (costSummary?.targetHours || 0)).toFixed(1)}h
-                        </span>
-                      </div>
-                    </div>
+                  {(() => {
+                    // Análisis de eficiencia por miembro
+                    const teamEfficiency = teamStats?.map((member: any) => {
+                      const efficiency = member.estimatedHours > 0 ? member.estimatedHours / Math.max(member.hours, 1) : 1;
+                      const costPerHour = member.hours > 0 ? member.cost / member.hours : 0;
+                      return {
+                        name: member.personnelName || 'Sin nombre',
+                        efficiency: efficiency,
+                        costPerHour: costPerHour,
+                        isOutlier: efficiency < 0.75 // Underperformers < 75% eficiencia
+                      };
+                    }).sort((a, b) => b.efficiency - a.efficiency) || [];
 
-                    <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-green-600" />
-                          <p className="text-sm font-medium text-green-800">Costo vs Presupuesto</p>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(0)}%
-                        </Badge>
-                      </div>
-                      <p className="text-2xl font-bold text-green-600 mb-1">
-                        ${costSummary?.totalCost?.toLocaleString() || '0'}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-500">de ${costSummary?.budget?.toLocaleString() || '0'}</span>
-                        <span className={`font-medium ${(costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                          {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) ? '+' : ''}
-                          ${((costSummary?.totalCost || 0) - (costSummary?.budget || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                    const topPerformers = teamEfficiency.slice(0, 3);
+                    const underPerformers = teamEfficiency.filter(m => m.isOutlier).slice(0, 3);
 
-                  {/* Gráfico de Tendencias Simulado */}
-                  <div className="mb-6">
-                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-purple-600" />
-                      Tendencia de Horas por Semana
+                    return (
+                      <div className="space-y-4">
+                        {/* Top Performers */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
+                            <Crown className="h-4 w-4" />
+                            Top Performers
+                          </h4>
+                          <div className="space-y-2">
+                            {topPerformers.map((member, index) => (
+                              <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-emerald-200">
+                                <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                                <div className="text-right">
+                                  <div className="text-sm font-bold text-emerald-600">{(member.efficiency * 100).toFixed(0)}%</div>
+                                  <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Underperformers */}
+                        {underPerformers.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-1">
+                              <AlertTriangle className="h-4 w-4" />
+                              Requieren Atención
+                            </h4>
+                            <div className="space-y-2">
+                              {underPerformers.map((member, index) => (
+                                <div key={index} className="flex justify-between items-center p-2 bg-red-50 rounded border border-red-200">
+                                  <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                                  <div className="text-right">
+                                    <div className="text-sm font-bold text-red-600">{(member.efficiency * 100).toFixed(0)}%</div>
+                                    <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 3. ANÁLISIS DE TENDENCIAS - Gráfico grande */}
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-amber-900">
+                  <BarChart3 className="h-5 w-5 text-amber-600" />
+                  Análisis de Tendencias Temporales
+                </CardTitle>
+                <CardDescription className="text-amber-700">
+                  Patrones de gasto y productividad del proyecto
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Gráfico de tendencias semanales */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-amber-800">
+                      <Calendar className="h-4 w-4" />
+                      Gasto Semanal (Últimas 8 semanas)
                     </h4>
-                    <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+                    <div className="bg-white rounded-lg p-4 border border-amber-200">
                       <div className="flex items-end justify-between h-32 gap-2">
                         {(() => {
                           const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
                           if (!filteredEntries || filteredEntries.length === 0) {
-                            return Array(7).fill(0).map((_, i) => (
-                              <div key={i} className="bg-gray-200 rounded-t w-full h-4"></div>
+                            return Array(8).fill(0).map((_, i) => (
+                              <div key={i} className="bg-gray-200 rounded-t w-full h-4 flex flex-col items-center">
+                                <span className="text-xs text-gray-400 mt-1">$0</span>
+                              </div>
                             ));
                           }
 
-                          // Agrupar por semana
+                          // Agrupar por semana con costos
                           const weeklyData = filteredEntries.reduce((acc: any, entry: TimeEntry) => {
                             const date = new Date(entry.date);
                             const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
                             const weekKey = weekStart.toISOString().split('T')[0];
 
-                            if (!acc[weekKey]) acc[weekKey] = 0;
-                            acc[weekKey] += entry.hours;
+                            if (!acc[weekKey]) acc[weekKey] = { hours: 0, cost: 0 };
+                            acc[weekKey].hours += entry.hours;
+                            acc[weekKey].cost += entry.cost || (entry.hours * 12); // Estimación si no hay costo
                             return acc;
                           }, {});
 
-                          const weeks = Object.entries(weeklyData).slice(-7);
-                          const maxHours = Math.max(...weeks.map(([, hours]) => hours as number));
+                          const weeks = Object.entries(weeklyData).slice(-8);
+                          const maxCost = Math.max(...weeks.map(([, data]) => (data as any).cost));
 
-                          return weeks.map(([week, hours], i) => (
+                          return weeks.map(([week, data], i) => (
                             <div key={week} className="flex flex-col items-center gap-1 w-full">
                               <div 
-                                className="bg-gradient-to-t from-purple-500 to-purple-400 rounded-t w-full transition-all duration-300"
-                                style={{ height: `${(hours as number / maxHours) * 100}%` }}
-                              ></div>
+                                className="bg-gradient-to-t from-amber-500 to-amber-400 rounded-t w-full transition-all duration-300 relative group"
+                                style={{ height: `${((data as any).cost / maxCost) * 100}%` }}
+                              >
+                                <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                  ${((data as any).cost).toLocaleString()}
+                                </div>
+                              </div>
                               <span className="text-xs text-gray-500 transform rotate-45">
                                 {new Date(week).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
                               </span>
@@ -2120,430 +2281,182 @@ export default function ProjectDetailsRedesigned() {
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Panel de Análisis */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-orange-600" />
-                    Análisis de Rendimiento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Eficiencia del Equipo */}
-                  <div className="p-3 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="h-4 w-4 text-yellow-600" />
-                      <h5 className="font-semibold text-yellow-800">Eficiencia del Equipo</h5>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Promedio por persona</span>
-                        <span className="font-medium">
-                          {teamStats && teamStats.length > 0 
-                            ? (teamStats.reduce((sum: number, member: any) => sum + member.hours, 0) / teamStats.length).toFixed(1)
-                            : 0}h
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Miembros activos</span>
-                        <span className="font-medium">{teamStats?.length || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Días productivos</span>
-                        <span className="font-medium">
-                          {(() => {
-                            const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                            if (!filteredEntries) return 0;
-                            const validDates = filteredEntries
-                              .map((entry: TimeEntry) => new Date(entry.date).toDateString())
-                              .filter((dateString, index, array) => array.indexOf(dateString) === index);
-                            return validDates.length;
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Alertas y Recomendaciones */}
-                  <div className="space-y-2">
-                    <h5 className="font-semibold flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-orange-600" />
-                      Alertas
-                    </h5>
-
-                    {/* Alerta de presupuesto */}
-                    {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.8 && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
-                          <span className="text-sm font-medium text-red-800">Presupuesto Crítico</span>
-                        </div>
-                        <p className="text-xs text-red-600">
-                          Utilizado el {((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(1)}% del presupuesto
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Alerta de horas */}
-                    {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.9 && (
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Clock className="h-4 w-4 text-yellow-600" />
-                          <span className="text-sm font-medium text-yellow-800">Horas Elevadas</span>
-                        </div>
-                        <p className="text-xs text-yellow-600">
-                          Cerca del límite de horas estimadas
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Estado saludable */}
-                    {(costSummary?.totalCost || 0) <= (costSummary?.budget || 0) * 0.8 && 
-                     (costSummary?.filteredHours || 0) <= (costSummary?.targetHours || 0) * 0.9 && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium text-green-800">Proyecto Saludable</span>
-                        </div>
-                        <p className="text-xs text-green-600">
-                          Dentro de los parámetros normales
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* 📊 RESUMEN EJECUTIVO - VISTA PRINCIPAL */}
-            <Card className="border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-800">
-                  <BarChart3 className="h-6 w-6 text-blue-600" />
-                  Resumen Ejecutivo
-                </CardTitle>
-                <CardDescription className="text-slate-600">
-                  Vista general del estado del proyecto con métricas clave
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Métricas principales en tarjetas grandes y claras */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  
-                  {/* 💰 PRESUPUESTO */}
-                  <div className={`p-6 rounded-xl border-2 ${(() => {
-                    const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                    if (usage > 0.85) return 'border-red-300 bg-red-50';
-                    if (usage > 0.70) return 'border-amber-300 bg-amber-50';
-                    return 'border-green-300 bg-green-50';
-                  })()}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <DollarSign className={`h-8 w-8 ${(() => {
-                        const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                        if (usage > 0.85) return 'text-red-600';
-                        if (usage > 0.70) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`} />
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-slate-900">
-                          {((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0).toFixed(0)}%
-                        </div>
-                        <div className="text-xs text-slate-500">del presupuesto</div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Gastado:</span>
-                        <span className="font-semibold">${(costSummary?.totalCost || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Presupuesto:</span>
-                        <span className="font-semibold">${(costSummary?.budget || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span className="text-slate-600">Restante:</span>
-                        <span className={`${((costSummary?.budget || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${((costSummary?.budget || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4">
-                      <div className="w-full bg-slate-200 rounded-full h-3">
-                        <div 
-                          className={`h-3 rounded-full transition-all duration-300 ${(() => {
-                            const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                            if (usage > 0.85) return 'bg-red-500';
-                            if (usage > 0.70) return 'bg-amber-500';
-                            return 'bg-green-500';
-                          })()}`}
-                          style={{ 
-                            width: `${Math.min(100, ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0))}%` 
-                          }}
-                        ></div>
-                      </div>
-                      <div className={`text-xs mt-2 font-medium ${(() => {
-                        const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                        if (usage > 0.85) return 'text-red-600';
-                        if (usage > 0.70) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`}>
-                        {(() => {
-                          const usage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
-                          if (usage > 0.85) return '⚠️ ATENCIÓN REQUERIDA';
-                          if (usage > 0.70) return '👀 MONITOREAR';
-                          return '✅ DENTRO DEL RANGO';
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ⏰ TIEMPO */}
-                  <div className={`p-6 rounded-xl border-2 ${(() => {
-                    const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                    if (usage > 0.85) return 'border-red-300 bg-red-50';
-                    if (usage > 0.70) return 'border-amber-300 bg-amber-50';
-                    return 'border-green-300 bg-green-50';
-                  })()}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <Clock className={`h-8 w-8 ${(() => {
-                        const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                        if (usage > 0.85) return 'text-red-600';
-                        if (usage > 0.70) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`} />
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-slate-900">
-                          {((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0).toFixed(0)}%
-                        </div>
-                        <div className="text-xs text-slate-500">del tiempo</div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Trabajadas:</span>
-                        <span className="font-semibold">{(costSummary?.filteredHours || 0).toFixed(0)}h</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Estimadas:</span>
-                        <span className="font-semibold">{(costSummary?.targetHours || 0).toFixed(0)}h</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span className="text-slate-600">Restantes:</span>
-                        <span className={`${((costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {Math.max(0, (costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0)).toFixed(0)}h
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4">
-                      <div className="w-full bg-slate-200 rounded-full h-3">
-                        <div 
-                          className={`h-3 rounded-full transition-all duration-300 ${(() => {
-                            const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                            if (usage > 0.85) return 'bg-red-500';
-                            if (usage > 0.70) return 'bg-amber-500';
-                            return 'bg-green-500';
-                          })()}`}
-                          style={{ 
-                            width: `${Math.min(100, ((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0))}%` 
-                          }}
-                        ></div>
-                      </div>
-                      <div className={`text-xs mt-2 font-medium ${(() => {
-                        const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                        if (usage > 0.85) return 'text-red-600';
-                        if (usage > 0.70) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`}>
-                        {(() => {
-                          const usage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
-                          if (usage > 0.85) return '⚠️ TIEMPO CRÍTICO';
-                          if (usage > 0.70) return '👀 SUPERVISAR';
-                          return '✅ EN CRONOGRAMA';
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 💹 RENTABILIDAD */}
-                  <div className={`p-6 rounded-xl border-2 ${(() => {
-                    const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
-                    if (markup < 1.5) return 'border-red-300 bg-red-50';
-                    if (markup < 2.0) return 'border-amber-300 bg-amber-50';
-                    return 'border-green-300 bg-green-50';
-                  })()}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <TrendingUp className={`h-8 w-8 ${(() => {
-                        const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
-                        if (markup < 1.5) return 'text-red-600';
-                        if (markup < 2.0) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`} />
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-slate-900">
-                          {((costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0).toFixed(1)}x
-                        </div>
-                        <div className="text-xs text-slate-500">markup</div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Precio Cliente:</span>
-                        <span className="font-semibold">${(costSummary?.targetClientPrice || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Costo Real:</span>
-                        <span className="font-semibold">${(costSummary?.totalCost || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-bold">
-                        <span className="text-slate-600">Ganancia:</span>
-                        <span className={`${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4">
-                      <div className={`text-xs font-medium ${(() => {
-                        const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
-                        if (markup < 1.5) return 'text-red-600';
-                        if (markup < 2.0) return 'text-amber-600';
-                        return 'text-green-600';
-                      })()}`}>
-                        {(() => {
-                          const markup = (costSummary?.totalCost || 0) > 0 ? (costSummary?.targetClientPrice || 0) / (costSummary?.totalCost || 1) : 0;
-                          if (markup < 1.5) return '📉 RENTABILIDAD BAJA';
-                          if (markup < 2.0) return '📊 RENTABILIDAD MEDIA';
-                          return '📈 RENTABILIDAD ALTA';
-                        })()}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        Margen: {(() => {
-                          const margin = (costSummary?.targetClientPrice || 0) > 0 ? 
-                            ((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)) / (costSummary?.targetClientPrice || 1) * 100 : 0;
-                          return `${margin.toFixed(1)}%`;
-                        })()}
-                      </div>
+                  {/* Métricas de tendencias */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2 text-amber-800">
+                      <TrendingUp className="h-4 w-4" />
+                      Métricas Clave
+                    </h4>
+                    <div className="space-y-3">
+                      {(() => {
+                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
+                        const uniqueDays = filteredEntries ? new Set(filteredEntries.map((entry: TimeEntry) => 
+                          new Date(entry.date).toDateString())).size : 0;
+                        const avgDailyCost = uniqueDays > 0 ? (costSummary?.totalCost || 0) / uniqueDays : 0;
+                        const avgDailyHours = uniqueDays > 0 ? (costSummary?.filteredHours || 0) / uniqueDays : 0;
+                        
+                        return (
+                          <>
+                            <div className="p-3 bg-white rounded border border-amber-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-amber-800">Gasto promedio diario</span>
+                                <span className="font-bold text-amber-900">${avgDailyCost.toLocaleString()}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="p-3 bg-white rounded border border-amber-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-amber-800">Horas promedio diarias</span>
+                                <span className="font-bold text-amber-900">{avgDailyHours.toFixed(1)}h</span>
+                              </div>
+                            </div>
+                            
+                            <div className="p-3 bg-white rounded border border-amber-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-amber-800">Días activos</span>
+                                <span className="font-bold text-amber-900">{uniqueDays}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="p-3 bg-white rounded border border-amber-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-amber-800">Aceleración</span>
+                                <span className="font-bold text-green-600">
+                                  {(() => {
+                                    const weeks = filteredEntries ? Object.entries(filteredEntries.reduce((acc: any, entry: TimeEntry) => {
+                                      const date = new Date(entry.date);
+                                      const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
+                                      const weekKey = weekStart.toISOString().split('T')[0];
+                                      if (!acc[weekKey]) acc[weekKey] = 0;
+                                      acc[weekKey] += entry.cost || (entry.hours * 12);
+                                      return acc;
+                                    }, {})).slice(-2) : [];
+                                    
+                                    if (weeks.length < 2) return 'Estable';
+                                    const [, prevWeekCost] = weeks[0];
+                                    const [, currentWeekCost] = weeks[1];
+                                    const growth = ((currentWeekCost as number) - (prevWeekCost as number)) / (prevWeekCost as number) * 100;
+                                    
+                                    return growth > 10 ? 'Acelerando' : growth < -10 ? 'Desacelerando' : 'Estable';
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
-
-                {/* Alertas importantes al final */}
-                {((costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.85 || 
-                  (costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.85) && (
-                  <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                      <div>
-                        <h4 className="font-medium text-amber-800 mb-1">Atención Requerida</h4>
-                        <p className="text-sm text-amber-700">
-                          {(costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.85 && 
-                           "El proyecto está cerca del límite presupuestario. "}
-                          {(costSummary?.filteredHours || 0) > (costSummary?.targetHours || 0) * 0.85 && 
-                           "Las horas trabajadas están cerca del límite estimado. "}
-                          Se recomienda revisar el avance y ajustar la planificación si es necesario.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
-            
-            {/* 📈 Análisis de Eficiencia del Equipo */}
-            <Card className="bg-white border-slate-200">
+
+            {/* 4. RECOMENDACIONES AUTOMÁTICAS - Footer con alertas */}
+            <Card className="border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-800">
-                  <Users className="h-5 w-5 text-slate-600" />
-                  Análisis del Equipo
+                <CardTitle className="flex items-center gap-2 text-slate-900">
+                  <Lightbulb className="h-5 w-5 text-yellow-500" />
+                  Recomendaciones Estratégicas Automáticas
                 </CardTitle>
-                <CardDescription className="text-slate-600">
-                  Productividad y eficiencia del equipo de trabajo
+                <CardDescription className="text-slate-700">
+                  Acciones sugeridas basadas en el análisis de datos del proyecto
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Métricas de Productividad */}
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-slate-800">Métricas de Productividad</h4>
-                    
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-slate-600">Horas por día promedio</span>
-                        <span className="text-lg font-bold text-slate-900">
-                          {(() => {
-                            const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                            const uniqueDays = new Set(filteredEntries?.map(e => e.date.split('T')[0])).size;
-                            return uniqueDays > 0 ? ((costSummary?.filteredHours || 0) / uniqueDays).toFixed(1) : '0';
-                          })()}h
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Basado en {new Set(filterTimeEntriesByDateRange(timeEntries)?.map(e => e.date.split('T')[0])).size} días de trabajo
-                      </div>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {(() => {
+                    const recommendations = [];
+                    const burnRatePercentage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                    const timeUsagePercentage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                    const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 ? quotationData.totalAmount / (costSummary.totalCost || 1) : 0;
 
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-slate-600">Miembros activos</span>
-                        <span className="text-lg font-bold text-slate-900">
-                          {teamStats && teamStats.filter((member: any) => member.hours > 0).length || 0}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        de {teamStats?.length || 0} miembros totales
-                      </div>
-                    </div>
-                  </div>
+                    // Recomendación de presupuesto
+                    if (burnRatePercentage > 0.8) {
+                      recommendations.push({
+                        type: 'critical',
+                        icon: AlertTriangle,
+                        title: 'Revisar Alcance del Proyecto',
+                        description: 'Presupuesto al 80%+ utilizado. Considerar renegociación con cliente.',
+                        color: 'border-red-300 bg-red-50 text-red-800'
+                      });
+                    }
 
-                  {/* Estado del Progreso */}
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-slate-800">Estado del Progreso</h4>
-                    
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-slate-600">Progreso temporal</span>
-                        <span className="text-lg font-bold text-slate-900">
-                          {((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min(100, ((costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100 : 0))}%` 
-                          }}
-                        ></div>
-                      </div>
-                    </div>
+                    // Recomendación de tiempo
+                    if (timeUsagePercentage > 0.9) {
+                      recommendations.push({
+                        type: 'warning',
+                        icon: Clock,
+                        title: 'Optimizar Distribución de Tiempo',
+                        description: 'Horas cerca del límite. Revisar asignaciones y prioridades.',
+                        color: 'border-yellow-300 bg-yellow-50 text-yellow-800'
+                      });
+                    }
 
-                    <div className="p-4 bg-slate-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-slate-600">Progreso financiero</span>
-                        <span className="text-lg font-bold text-slate-900">
-                          {((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0) > 0.85 ? 'bg-red-500' :
-                            ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0) > 0.70 ? 'bg-amber-500' : 'bg-green-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, ((costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100 : 0))}%` 
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
+                    // Recomendación de rentabilidad
+                    if (markup < 1.5) {
+                      recommendations.push({
+                        type: 'warning',
+                        icon: TrendingDown,
+                        title: 'Mejorar Rentabilidad',
+                        description: 'Markup bajo. Evaluar eficiencias operativas y costos.',
+                        color: 'border-orange-300 bg-orange-50 text-orange-800'
+                      });
+                    }
+
+                    // Recomendación de equipo
+                    const underPerformers = teamStats?.filter((member: any) => {
+                      const efficiency = member.estimatedHours > 0 ? member.estimatedHours / Math.max(member.hours, 1) : 1;
+                      return efficiency < 0.7;
+                    }) || [];
+
+                    if (underPerformers.length > 0) {
+                      recommendations.push({
+                        type: 'info',
+                        icon: Users,
+                        title: 'Capacitación del Equipo',
+                        description: `${underPerformers.length} miembro(s) requieren apoyo adicional o redistribución.`,
+                        color: 'border-blue-300 bg-blue-50 text-blue-800'
+                      });
+                    }
+
+                    // Recomendación positiva si todo está bien
+                    if (burnRatePercentage <= 0.7 && timeUsagePercentage <= 0.8 && markup >= 1.8) {
+                      recommendations.push({
+                        type: 'success',
+                        icon: CheckCircle2,
+                        title: 'Proyecto en Óptimas Condiciones',
+                        description: 'Todos los indicadores están dentro de rangos saludables.',
+                        color: 'border-green-300 bg-green-50 text-green-800'
+                      });
+                    }
+
+                    // Si no hay datos suficientes
+                    if (recommendations.length === 0) {
+                      recommendations.push({
+                        type: 'info',
+                        icon: Info,
+                        title: 'Recopilar Más Datos',
+                        description: 'Registrar más tiempo para generar recomendaciones precisas.',
+                        color: 'border-gray-300 bg-gray-50 text-gray-800'
+                      });
+                    }
+
+                    return recommendations.map((rec, index) => {
+                      const IconComponent = rec.icon;
+                      return (
+                        <div key={index} className={`p-4 rounded-lg border-2 ${rec.color}`}>
+                          <div className="flex items-start gap-3">
+                            <IconComponent className="h-5 w-5 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-sm mb-1">{rec.title}</h4>
+                              <p className="text-xs leading-relaxed">{rec.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -2580,161 +2493,31 @@ export default function ProjectDetailsRedesigned() {
               onClick={confirmDelete}
               disabled={deleteTimeEntryMutation.isPending}
             >
-              {deleteTimeEntryMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Eliminando...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </>
-              )}
+              {deleteTimeEntryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-
-    </div>
-  );
-} 
-
-const QuickTimeRegister = ({ projectId, onClose }: { projectId: string, onClose: () => void }) => {
-  const [personnel, setPersonnel] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
-  const [selectedPersonnel, setSelectedPersonnel] = useState<number | null>(null);
-  const [selectedRole, setSelectedRole] = useState<number | null>(null);
-  const [hours, setHours] = useState<number>(8);
-  const [description, setDescription] = useState<string>("");
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    // Fetch personnel
-    fetch('/api/personnel')
-      .then(res => res.json())
-      .then(data => setPersonnel(data));
-
-    // Fetch roles
-    fetch('/api/roles')
-      .then(res => res.json())
-      .then(data => setRoles(data));
-  }, []);
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-
-    if (!selectedPersonnel || !selectedRole) {
-      toast({
-        title: "Error",
-        description: "Por favor, selecciona un miembro del equipo y un rol.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const data = {
-      projectId: projectId,
-      personnelId: selectedPersonnel,
-      roleId: selectedRole,
-      date: new Date().toISOString(),
-      hours: hours,
-      description: description
-    };
-
-    try {
-      const response = await fetch('/api/time-entries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Éxito",
-          description: "Registro de tiempo creado correctamente.",
-        });
-        queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-        onClose();
-      } else {
-        throw new Error('Failed to create time entry');
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el registro de tiempo",
-        variant: "destructive"
-      });
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-lg font-semibold mb-4">Registro Rápido de Tiempo</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="personnel" className="block text-sm font-medium text-gray-700">Miembro del Equipo</Label>
-            <Select onValueChange={(value) => setSelectedPersonnel(parseInt(value))} defaultValue={selectedPersonnel?.toString() || ""}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar miembro" />
-              </SelectTrigger>
-              <SelectContent>
-                {personnel.map((p) => (
-                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="role" className="block text-sm font-medium text-gray-700">Rol</Label>
-            <Select onValueChange={(value) => setSelectedRole(parseInt(value))} defaultValue={selectedRole?.toString() || ""}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((r) => (
-                  <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="hours" className="block text-sm font-medium text-gray-700">Horas</Label>
-            <Input
-              type="number"
-              id="hours"
-              value={hours}
-              onChange={(e) => setHours(parseInt(e.target.value))}
-              min="1"
-              max="24"
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div>
-            <Label htmlFor="description" className="block text-sm font-medium text-gray-700">Descripción</Label>
-            <Input
-              type="text"
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-            />
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-              Registrar
-            </Button>
-          </div>
-        </form>
-      </div>
+      {/* Diálogo de registro de tiempo rápido */}
+      <Dialog open={showQuickRegister} onOpenChange={setShowQuickRegister}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-blue-600" />
+              Registro de Tiempo - {project?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Registra tiempo para el equipo del proyecto de forma rápida y eficiente
+            </DialogDescription>
+          </DialogHeader>
+          <WeeklyTimeRegister 
+            projectId={projectId!} 
+            onClose={() => setShowQuickRegister(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
