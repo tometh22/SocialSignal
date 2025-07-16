@@ -593,8 +593,13 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
 }
 
 export default function ProjectDetailsRedesigned() {
-  const { id: projectId } = useParams();
-  const [, setLocation] = useLocation();
+  // Obtener projectId de la URL de manera más robusta
+  const [location, setLocation] = useLocation();
+  const projectId = location.split('/')[2]; // /active-projects/{id}
+  
+  // Debug: Verificar que el projectId se obtenga correctamente
+  console.log('🔍 Location debug:', { location, projectId, urlParts: location.split('/') });
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
