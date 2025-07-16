@@ -3642,13 +3642,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [personnelData] = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
           const [roleData] = await db.select().from(roles).where(eq(roles.id, member.roleId));
           
-          return {
+          const enrichedMember = {
             ...member,
             personnel: personnelData,
             role: roleData
           };
+          
+          console.log(`🚀 ENVIANDO AL FRONTEND - ${personnelData?.name}:`, {
+            hours: member.hours,
+            rate: member.rate,
+            cost: member.cost,
+            personnelId: member.personnelId
+          });
+          
+          return enrichedMember;
         })
       );
+
+      console.log(`📤 RESPUESTA COMPLETA AL FRONTEND:`, enrichedTeam.map(m => ({
+        name: m.personnel?.name,
+        hours: m.hours,
+        rate: m.rate,
+        personnelId: m.personnelId
+      })));
 
       res.json(enrichedTeam);
     } catch (error) {
