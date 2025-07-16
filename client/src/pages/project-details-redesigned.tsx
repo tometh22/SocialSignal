@@ -2220,42 +2220,32 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // COMPONENTE SIMPLE Y CLARO DE EFICIENCIA
-                    console.log('🚀 COMPONENTE EFICIENCIA SIMPLE - Datos:', {
+                    console.log('🚀 COMPONENTE EFICIENCIA COMPACTO - Datos:', {
                       baseTeam: baseTeam?.length || 0,
                       filteredTimeEntries: filteredTimeEntries?.length || 0,
-                      dateFilter: dateFilter.label
+                      dateFilter: dateFilter.label,
+                      sampleTeamMember: baseTeam?.[0]
                     });
 
                     if (!baseTeam || baseTeam.length === 0) {
                       return (
-                        <div className="text-center py-8">
-                          <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                            No hay equipo configurado
-                          </h3>
-                          <p className="text-gray-500 text-sm">
-                            Configure el equipo base del proyecto para ver el análisis
-                          </p>
+                        <div className="text-center py-6">
+                          <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm text-gray-600">No hay equipo configurado</p>
                         </div>
                       );
                     }
 
                     if (!filteredTimeEntries || filteredTimeEntries.length === 0) {
                       return (
-                        <div className="text-center py-8">
-                          <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                          <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                            Sin registros de tiempo
-                          </h3>
-                          <p className="text-gray-500 text-sm">
-                            No hay registros de tiempo para el período: {dateFilter.label}
-                          </p>
+                        <div className="text-center py-6">
+                          <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm text-gray-600">Sin registros para: {dateFilter.label}</p>
                         </div>
                       );
                     }
 
-                    // Crear lista simple de personas con sus datos
+                    // Procesar datos del equipo
                     const teamData = baseTeam.map((member: any) => {
                       const memberEntries = filteredTimeEntries.filter((entry: any) => 
                         entry.personnelId === member.personnelId
@@ -2265,117 +2255,85 @@ export default function ProjectDetailsRedesigned() {
                       const horasEstimadas = member.hours || 0;
                       const tarifa = member.rate || 0;
                       
-                      // Calcular eficiencia: solo si trabajó horas y tiene horas estimadas
+                      // Calcular eficiencia solo si tiene datos válidos
                       let eficiencia = 0;
                       if (horasTrabajadas > 0 && horasEstimadas > 0) {
-                        // Eficiencia = estar cerca de lo estimado es bueno
-                        // Si trabajó exactamente lo estimado = 100%
-                        // Si trabajó menos = mejor eficiencia
-                        // Si trabajó más = peor eficiencia
                         eficiencia = (horasEstimadas / horasTrabajadas) * 100;
-                        eficiencia = Math.max(0, Math.min(200, eficiencia)); // Limitar entre 0% y 200%
-                      }
-
-                      // Calcular progreso simple
-                      let progreso = 0;
-                      if (horasEstimadas > 0) {
-                        progreso = (horasTrabajadas / horasEstimadas) * 100;
-                      }
-
-                      // Determinar estado
-                      let estado = 'Sin actividad';
-                      let color = 'gray';
-                      
-                      if (horasTrabajadas > 0) {
-                        if (eficiencia >= 100) {
-                          estado = 'Excelente';
-                          color = 'green';
-                        } else if (eficiencia >= 80) {
-                          estado = 'Bueno';
-                          color = 'blue';
-                        } else if (eficiencia >= 60) {
-                          estado = 'Regular';
-                          color = 'amber';
-                        } else {
-                          estado = 'Necesita mejorar';
-                          color = 'red';
-                        }
+                        eficiencia = Math.max(0, Math.min(200, eficiencia));
                       }
 
                       return {
                         id: member.personnelId,
                         nombre: member.personnel?.name || `Usuario ${member.personnelId}`,
-                        horasEstimadas: horasEstimadas,
-                        horasTrabajadas: horasTrabajadas,
-                        tarifa: tarifa,
-                        eficiencia: eficiencia,
-                        progreso: progreso,
-                        estado: estado,
-                        color: color,
+                        horasEstimadas,
+                        horasTrabajadas,
+                        tarifa,
+                        eficiencia,
                         registros: memberEntries.length,
-                        costoTotal: horasTrabajadas * tarifa,
                         tieneActividad: horasTrabajadas > 0
                       };
                     });
 
-                    // Separar activos de inactivos y ordenar por eficiencia
-                    const activos = teamData
+                    // Top 5 con actividad
+                    const top5 = teamData
                       .filter(m => m.tieneActividad)
                       .sort((a, b) => b.eficiencia - a.eficiencia)
-                      .slice(0, 5); // Solo TOP 5
-                    
-                    const inactivos = teamData.filter(m => !m.tieneActividad);
+                      .slice(0, 5);
 
                     return (
-                      <div className="space-y-6">
-                        {/* Resumen del período */}
-                        <div className="bg-white rounded-lg border border-gray-200 p-4">
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                            Período: {dateFilter.label}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-4">
-                            {filteredTimeEntries.length} registros encontrados • {activos.length} personas activas
-                          </p>
-                          
-                          <div className="grid grid-cols-3 gap-4 text-center">
-                            <div className="bg-blue-50 rounded-lg p-3">
-                              <div className="text-xl font-bold text-blue-600">
+                      <div className="space-y-4">
+                        {/* Resumen compacto */}
+                        <div className="bg-white rounded-lg border p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-700">
+                              Período: {dateFilter.label}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {filteredTimeEntries.length} registros • {top5.length} activos
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                            <div className="bg-blue-50 rounded p-2">
+                              <div className="text-lg font-bold text-blue-600">
                                 {teamData.reduce((sum, m) => sum + m.horasTrabajadas, 0).toFixed(1)}
                               </div>
-                              <div className="text-sm text-blue-600">Horas trabajadas</div>
+                              <div className="text-xs text-blue-600">Trabajadas</div>
                             </div>
-                            <div className="bg-green-50 rounded-lg p-3">
-                              <div className="text-xl font-bold text-green-600">
+                            <div className="bg-green-50 rounded p-2">
+                              <div className="text-lg font-bold text-green-600">
                                 {teamData.reduce((sum, m) => sum + m.horasEstimadas, 0).toFixed(1)}
                               </div>
-                              <div className="text-sm text-green-600">Horas estimadas</div>
+                              <div className="text-xs text-green-600">Estimadas</div>
                             </div>
-                            <div className="bg-purple-50 rounded-lg p-3">
-                              <div className="text-xl font-bold text-purple-600">
-                                ${teamData.reduce((sum, m) => sum + m.costoTotal, 0).toFixed(0)}
+                            <div className="bg-purple-50 rounded p-2">
+                              <div className="text-lg font-bold text-purple-600">
+                                ${teamData.reduce((sum, m) => sum + (m.horasTrabajadas * m.tarifa), 0).toFixed(0)}
                               </div>
-                              <div className="text-sm text-purple-600">Costo total</div>
+                              <div className="text-xs text-purple-600">Costo</div>
                             </div>
                           </div>
                         </div>
 
-                        {/* TOP 5 Performers más eficientes */}
-                        {activos.length > 0 && (
-                          <div>
-                            <h4 className="text-md font-semibold text-gray-800 mb-4">
-                              🏆 Top 5 Performers más eficientes
-                            </h4>
-                            <div className="space-y-3">
-                              {activos.map((persona, index) => (
-                                <div key={persona.id} className={`rounded-lg border-2 p-4 ${
-                                  persona.color === 'green' ? 'bg-green-50 border-green-200' :
-                                  persona.color === 'blue' ? 'bg-blue-50 border-blue-200' :
-                                  persona.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                                  'bg-red-50 border-red-200'
+                        {/* Top 5 compacto */}
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-800 mb-2">
+                            🏆 Top 5 Performers
+                          </h4>
+                          <div className="space-y-2">
+                            {top5.map((persona, index) => {
+                              const esExcelente = persona.eficiencia >= 100;
+                              const esBueno = persona.eficiencia >= 80;
+                              const color = esExcelente ? 'green' : esBueno ? 'blue' : 'amber';
+                              
+                              return (
+                                <div key={persona.id} className={`p-3 rounded-lg border ${
+                                  color === 'green' ? 'bg-green-50 border-green-200' :
+                                  color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                                  'bg-amber-50 border-amber-200'
                                 }`}>
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                                         index === 0 ? 'bg-yellow-100 text-yellow-700' :
                                         index === 1 ? 'bg-gray-100 text-gray-700' :
                                         index === 2 ? 'bg-orange-100 text-orange-700' :
@@ -2384,81 +2342,30 @@ export default function ProjectDetailsRedesigned() {
                                         {index + 1}
                                       </div>
                                       <div>
-                                        <h5 className="font-semibold text-gray-800 text-lg">{persona.nombre}</h5>
-                                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                                          <span>Trabajó: {persona.horasTrabajadas.toFixed(1)}h</span>
-                                          <span>Estimado: {persona.horasEstimadas}h</span>
-                                          <span>Tarifa: ${persona.tarifa}/h</span>
-                                          <span>Registros: {persona.registros}</span>
+                                        <div className="font-medium text-gray-800 text-sm">{persona.nombre}</div>
+                                        <div className="text-xs text-gray-600">
+                                          {persona.horasTrabajadas.toFixed(1)}h de {persona.horasEstimadas}h • ${persona.tarifa}/h • {persona.registros} reg
                                         </div>
                                       </div>
                                     </div>
                                     <div className="text-right">
-                                      <div className={`text-3xl font-bold ${
-                                        persona.color === 'green' ? 'text-green-600' :
-                                        persona.color === 'blue' ? 'text-blue-600' :
-                                        persona.color === 'amber' ? 'text-amber-600' :
-                                        'text-red-600'
+                                      <div className={`text-xl font-bold ${
+                                        color === 'green' ? 'text-green-600' :
+                                        color === 'blue' ? 'text-blue-600' :
+                                        'text-amber-600'
                                       }`}>
                                         {persona.eficiencia.toFixed(0)}%
                                       </div>
-                                      <div className="text-sm text-gray-500">{persona.estado}</div>
+                                      <div className="text-xs text-gray-500">
+                                        {esExcelente ? 'Excelente' : esBueno ? 'Bueno' : 'Regular'}
+                                      </div>
                                     </div>
-                                  </div>
-                                  
-                                  {/* Barra de progreso */}
-                                  <div className="mt-3">
-                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                      <span>Progreso de horas</span>
-                                      <span>{persona.progreso.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-3">
-                                      <div
-                                        className={`h-3 rounded-full transition-all duration-300 ${
-                                          persona.color === 'green' ? 'bg-green-500' :
-                                          persona.color === 'blue' ? 'bg-blue-500' :
-                                          persona.color === 'amber' ? 'bg-amber-500' :
-                                          'bg-red-500'
-                                        }`}
-                                        style={{ width: `${Math.min(100, persona.progreso)}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="mt-3 text-sm text-gray-600">
-                                    <strong>Costo total: ${persona.costoTotal.toFixed(0)}</strong>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
+                              );
+                            })}
                           </div>
-                        )}
-
-                        {/* Personas sin actividad */}
-                        {inactivos.length > 0 && (
-                          <div>
-                            <h4 className="text-md font-semibold text-gray-600 mb-4">
-                              Personas sin actividad ({inactivos.length})
-                            </h4>
-                            <div className="bg-gray-50 rounded-lg p-4">
-                              <div className="grid grid-cols-2 gap-3">
-                                {inactivos.map((persona) => (
-                                  <div key={persona.id} className="flex items-center gap-3 text-sm">
-                                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                                      <span className="text-xs font-medium text-gray-600">
-                                        {persona.nombre.charAt(0)}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <div className="font-medium text-gray-700">{persona.nombre}</div>
-                                      <div className="text-gray-500">{persona.horasEstimadas}h estimadas</div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })()}
