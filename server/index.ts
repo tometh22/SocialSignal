@@ -5,6 +5,7 @@ import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
 import cors from 'cors';
 import session from 'express-session';
+import cookieParser from 'cookie-parser';
 
 const app = express();
 
@@ -243,6 +244,7 @@ app.use((req, res, next) => {
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser()); // Parsing de cookies para persistent sessions
 
 // CORS configuration - Permitir todos los orígenes para debugging en Replit
 app.use(cors({

@@ -67,13 +67,13 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
-    resave: true, // Forzar guardado para asegurar persistencia
-    saveUninitialized: true, // Guardar sesiones inicializadas
-    rolling: true, // Renovar cookie en cada respuesta
+    resave: false, // Solo guardar cuando se modifica
+    saveUninitialized: false, // No guardar sesiones vacías
+    rolling: true, // Renovar cookie en cada respuesta para mantener activo
     cookie: {
       secure: false, // No HTTPS en desarrollo
-      maxAge: 1000 * 60 * 60 * 24, // 1 día para testing
-      sameSite: false, // Desactivar sameSite para máxima compatibilidad
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días para evitar logouts frecuentes
+      sameSite: 'lax' as const, // Mejorar compatibilidad
       httpOnly: false, // Permitir acceso desde JS para debugging
       path: '/',
     },
@@ -93,6 +93,25 @@ export function setupAuth(app: Express, storage: IStorage) {
     console.log('🔍 Auth middleware - Headers:', req.headers.cookie);
     console.log('🔍 Auth middleware - Session ID:', req.sessionID);
     console.log('🔍 Auth middleware - Session data:', req.session);
+
+    // RECUPERACIÓN DE SESIÓN: Si no hay sesión pero existe cookie persistente
+    if (!req.session?.userId && req.cookies && req.cookies['epical.persistent.sid']) {
+      const persistentUserId = parseInt(req.cookies['epical.persistent.sid']);
+      console.log('🔍 Auth middleware - Found persistent cookie, User ID:', persistentUserId);
+      
+      if (!isNaN(persistentUserId) && persistentUserId > 0) {
+        // Verificar que el usuario existe antes de restaurar la sesión
+        try {
+          const user = await storage.getUser(persistentUserId);
+          if (user) {
+            req.session.userId = persistentUserId;
+            console.log('✅ Auth middleware - Session restored from persistent cookie for user:', user.email);
+          }
+        } catch (error) {
+          console.log('❌ Auth middleware - Error verifying persistent cookie user:', error);
+        }
+      }
+    }
 
     // SOLUCIÓN TEMPORAL: Si no hay sesión, pero hay Authorization header, usar eso
     if (!req.session?.userId && req.headers.authorization) {
@@ -198,6 +217,15 @@ export function setupAuth(app: Express, storage: IStorage) {
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}`);
 
+      // Agregar cookie persistente para sobrevivir reinicios del servidor
+      res.cookie('epical.persistent.sid', user.id, {
+        httpOnly: false,
+        secure: false,
+        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días
+        sameSite: 'lax',
+        path: '/'
+      });
+
       // Guardar la sesión explícitamente antes de enviar la respuesta
       req.session.save((saveError) => {
         if (saveError) {
@@ -251,6 +279,14 @@ export function setupAuth(app: Express, storage: IStorage) {
         httpOnly: false,
         secure: false,
         sameSite: false
+      });
+
+      // Limpiar la cookie persistente también
+      res.clearCookie('epical.persistent.sid', {
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: 'lax'
       });
 
       console.log('🍪 Session cookies cleared');

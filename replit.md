@@ -103,6 +103,11 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 16, 2025: **PERSISTENT SESSION IMPLEMENTATION** - Implemented persistent sessions that survive server restarts and code changes using PostgreSQL session store with 30-day persistent cookies, eliminating automatic logout frustration
+- July 16, 2025: **SESSION CONFIGURATION OPTIMIZATION** - Extended session maxAge to 7 days, optimized session settings (resave: false, saveUninitialized: false) for better performance and persistence
+- July 16, 2025: **COOKIE-PARSER INTEGRATION** - Added cookie-parser middleware for proper persistent cookie handling and session recovery functionality
+- July 16, 2025: **TIME REGISTRATION UX ENHANCEMENT** - Removed hanging card, added informative tooltips showing exact hours worked vs estimated with color-coded progress badges and intelligent progress bars
+- July 16, 2025: **DECIMAL FORMATTING CONSISTENCY** - Fixed excessive decimal display issues (like 1171.50000000000002h) by applying consistent toFixed() formatting across all analytics components
 - July 15, 2025: **OPTIMISTIC ANIMATIONS RESTORED** - Restored smooth optimistic animations for time entry creation and deletion with proper visual feedback and automatic modal closure
 - July 15, 2025: **UX IMPROVEMENTS** - Modal now closes automatically after successful registration, reduced loader display time from 300ms to 100ms for better responsiveness
 - July 15, 2025: **VISUAL FEEDBACK ENHANCEMENT** - Added temporary loading states with spinner and blue background for pending records, slide-out animation for deletions
