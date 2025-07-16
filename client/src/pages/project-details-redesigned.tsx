@@ -999,29 +999,38 @@ export default function ProjectDetailsRedesigned() {
 
     const memberStats = new Map();
 
+    // Inicializar con datos del equipo base
+    baseTeam.forEach((member: any) => {
+      memberStats.set(member.personnelId, {
+        personnelId: member.personnelId,
+        personnelName: member.personnel?.name || `Miembro ${member.personnelId}`,
+        personnel: member.personnel,
+        estimatedHours: member.hours || 0,
+        hours: 0,
+        cost: 0,
+        entries: 0,
+        lastActivity: null
+      });
+    });
+
+    // Agregar datos reales de tiempo
     filteredTimeEntries.forEach((entry: TimeEntry) => {
-      if (!memberStats.has(entry.personnelId)) {
-        memberStats.set(entry.personnelId, {
-          id: entry.personnelId,
-          name: entry.personnelName,
-          hours: 0,
-          entries: 0,
-          lastActivity: entry.date
-        });
-      }
-
-      const stats = memberStats.get(entry.personnelId);
-      stats.hours += entry.hours;
-      stats.entries += 1;
-
-      if (new Date(entry.date) > new Date(stats.lastActivity)) {
+      if (memberStats.has(entry.personnelId)) {
+        const stats = memberStats.get(entry.personnelId);
+        stats.hours += entry.hours || 0;
+        stats.cost += (entry.hours || 0) * (entry.hourlyRate || 0);
+        stats.entries += 1;
         stats.lastActivity = entry.date;
+        // Actualizar nombre si viene del entry
+        if (entry.personnelName && !stats.personnelName.includes('Miembro')) {
+          stats.personnelName = entry.personnelName;
+        }
       }
     });
 
     return Array.from(memberStats.values())
-      .sort((a, b) => b.hours - a.hours)
-      .slice(0, 5);
+      .filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
+      .sort((a, b) => b.hours - a.hours);
   }, [filteredTimeEntries, baseTeam]);
 
   // Cálculo de resumen de costos usando objetivos de cotización
@@ -2302,8 +2311,15 @@ export default function ProjectDetailsRedesigned() {
                     <div className="bg-white rounded-lg p-4 border border-amber-200">
                       <div className="flex items-end justify-between h-32 gap-2">
                         {(() => {
-                          const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                          if (!filteredEntries || filteredEntries.length === 0) {
+                          // Usar timeEntries directamente para tendencias (no filtros temporales restrictivos)
+                          const allEntries = Array.isArray(timeEntries) ? timeEntries : [];
+                          console.log('🔍 Tendencias - Datos disponibles:', {
+                            totalEntries: allEntries.length,
+                            sampleEntry: allEntries[0],
+                            filteredEntries: filteredTimeEntries.length
+                          });
+
+                          if (allEntries.length === 0) {
                             return Array(8).fill(0).map((_, i) => (
                               <div key={i} className="bg-gray-200 rounded-t w-full h-4 flex flex-col items-center">
                                 <span className="text-xs text-gray-400 mt-1">$0</span>
@@ -2311,29 +2327,42 @@ export default function ProjectDetailsRedesigned() {
                             ));
                           }
 
-                          // Agrupar por semana con costos
-                          const weeklyData = filteredEntries.reduce((acc: any, entry: TimeEntry) => {
-                            const date = new Date(entry.date);
-                            const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
-                            const weekKey = weekStart.toISOString().split('T')[0];
+                          // Agrupar por semana con costos - últimas 8 semanas
+                          const today = new Date();
+                          const eightWeeksAgo = new Date(today.getTime() - (8 * 7 * 24 * 60 * 60 * 1000));
+                          
+                          const weeklyData = allEntries
+                            .filter((entry: TimeEntry) => new Date(entry.date) >= eightWeeksAgo)
+                            .reduce((acc: any, entry: TimeEntry) => {
+                              const date = new Date(entry.date);
+                              const weekStart = new Date(date.setDate(date.getDate() - date.getDay()));
+                              const weekKey = weekStart.toISOString().split('T')[0];
 
-                            if (!acc[weekKey]) acc[weekKey] = { hours: 0, cost: 0 };
-                            acc[weekKey].hours += entry.hours;
-                            acc[weekKey].cost += entry.cost || (entry.hours * 12); // Estimación si no hay costo
-                            return acc;
-                          }, {});
+                              if (!acc[weekKey]) acc[weekKey] = { hours: 0, cost: 0 };
+                              acc[weekKey].hours += entry.hours || 0;
+                              acc[weekKey].cost += (entry.hours || 0) * (entry.hourlyRate || 15); // Usar tarifa o estimación
+                              return acc;
+                            }, {});
 
                           const weeks = Object.entries(weeklyData).slice(-8);
-                          const maxCost = Math.max(...weeks.map(([, data]) => (data as any).cost));
+                          const maxCost = Math.max(...weeks.map(([, data]) => (data as any).cost), 1);
+
+                          if (weeks.length === 0) {
+                            return Array(8).fill(0).map((_, i) => (
+                              <div key={i} className="bg-gray-200 rounded-t w-full h-4 flex flex-col items-center">
+                                <span className="text-xs text-gray-400 mt-1">$0</span>
+                              </div>
+                            ));
+                          }
 
                           return weeks.map(([week, data], i) => (
                             <div key={week} className="flex flex-col items-center gap-1 w-full">
                               <div 
-                                className="bg-gradient-to-t from-amber-500 to-amber-400 rounded-t w-full transition-all duration-300 relative group"
-                                style={{ height: `${((data as any).cost / maxCost) * 100}%` }}
+                                className="bg-gradient-to-t from-amber-500 to-amber-400 rounded-t w-full transition-all duration-300 relative group min-h-[4px]"
+                                style={{ height: `${Math.max(4, ((data as any).cost / maxCost) * 100)}%` }}
                               >
                                 <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                  ${((data as any).cost).toLocaleString()}
+                                  ${((data as any).cost).toFixed(0)}
                                 </div>
                               </div>
                               <span className="text-xs text-gray-500 transform rotate-45">
@@ -2354,11 +2383,17 @@ export default function ProjectDetailsRedesigned() {
                     </h4>
                     <div className="space-y-3">
                       {(() => {
-                        const filteredEntries = filterTimeEntriesByDateRange(timeEntries);
-                        const uniqueDays = filteredEntries ? new Set(filteredEntries.map((entry: TimeEntry) => 
+                        // Usar todos los entries para métricas generales (no solo filtrados)
+                        const allEntries = Array.isArray(timeEntries) ? timeEntries : [];
+                        const uniqueDays = allEntries.length > 0 ? new Set(allEntries.map((entry: TimeEntry) => 
                           new Date(entry.date).toDateString())).size : 0;
-                        const avgDailyCost = uniqueDays > 0 ? (costSummary?.totalCost || 0) / uniqueDays : 0;
-                        const avgDailyHours = uniqueDays > 0 ? (costSummary?.filteredHours || 0) / uniqueDays : 0;
+                        
+                        const totalCost = allEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRate || 15)), 0);
+                        const totalHours = allEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                        
+                        const avgDailyCost = uniqueDays > 0 ? totalCost / uniqueDays : 0;
+                        const avgDailyHours = uniqueDays > 0 ? totalHours / uniqueDays : 0;
                         
                         return (
                           <>
