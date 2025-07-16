@@ -486,16 +486,16 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
           const cardStyle = getCardStyle();
 
           return (
-            <div key={member.id} className={`flex items-center justify-between p-4 ${cardStyle.bgGradient} rounded-lg border ${cardStyle.borderColor} hover:shadow-md transition-all duration-200`}>
-              <div className="flex items-center gap-4">
+            <div key={member.id} className={`flex items-center justify-between p-3 border-l-4 ${cardStyle.borderColor} bg-white/60 backdrop-blur-sm rounded-lg hover:bg-white/80 transition-all duration-200 border border-gray-100`}>
+              <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className={`w-12 h-12 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
-                    <span className="text-white text-sm font-bold">
+                  <div className={`w-10 h-10 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
+                    <span className="text-white text-xs font-bold">
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso - más grande y legible */}
-                  <div className={`absolute -top-1 -right-1 min-w-[24px] h-[24px] rounded-full flex items-center justify-center text-xs font-bold shadow-lg border-2 border-white ${
+                  {/* Badge de progreso - más discreto pero legible */}
+                  <div className={`absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] rounded-full flex items-center justify-center text-[10px] font-bold shadow-md border border-white ${
                     progressPercent >= 100 ? 'bg-green-600 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
                     progressPercent > 0 ? 'bg-blue-600 text-white' :
@@ -505,79 +505,75 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className={`font-semibold text-sm ${cardStyle.nameColor}`}>
+                  <div className={`font-medium text-sm ${cardStyle.nameColor}`}>
                     {member.personnel?.name || 'Miembro del Equipo'}
                   </div>
-                  <div className={`text-xs ${cardStyle.roleColor} font-medium`}>
+                  <div className={`text-xs ${cardStyle.roleColor} opacity-75`}>
                     {member.role?.name || 'Operations Lead'}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs ${cardStyle.textColor} font-medium`}>
-                      {workedHours.toFixed(1)}h / {estimatedHours}h
-                    </span>
-                    {workedHours === 0 ? (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-gray-400 text-gray-600">
-                        Sin actividad
-                      </Badge>
-                    ) : isOverBudget ? (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">
-                        +{(workedHours - estimatedHours).toFixed(1)}h excedido
-                      </Badge>
-                    ) : remainingHours > 0 ? (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700">
-                        {remainingHours.toFixed(1)}h restantes
-                      </Badge>
-                    ) : (
-                      <Badge variant="default" className="text-[10px] px-1.5 py-0.5 bg-green-600">
-                        Completado
-                      </Badge>
-                    )}
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-4">
-                {/* Barra de progreso con tooltip */}
+              <div className="flex items-center gap-3">
+                {/* Información de horas más compacta */}
+                <div className="text-center min-w-[60px]">
+                  <div className={`text-sm font-bold ${cardStyle.textColor}`}>
+                    {workedHours.toFixed(1)}h
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    de {estimatedHours}h
+                  </div>
+                </div>
+
+                {/* Barra de progreso más sutil */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="w-32 bg-gray-200 rounded-full h-3 cursor-pointer relative overflow-hidden">
+                    <div className="w-24 bg-gray-100 rounded-full h-2 cursor-pointer relative overflow-hidden">
                       <div 
-                        className={`h-3 rounded-full transition-all duration-300 ${
-                          isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                          progressPercent >= 80 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
-                          progressPercent > 0 ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                          'bg-gradient-to-r from-gray-400 to-gray-500'
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isOverBudget ? 'bg-red-500' :
+                          progressPercent >= 80 ? 'bg-yellow-500' :
+                          progressPercent > 0 ? 'bg-green-500' :
+                          'bg-gray-400'
                         }`}
                         style={{ width: `${Math.min(progressPercent, 100)}%` }}
                       />
-                      {/* Línea de 100% cuando se excede */}
-                      {isOverBudget && (
-                        <div className="absolute top-0 right-0 w-0.5 h-3 bg-white opacity-80" 
-                             style={{ right: `${Math.max(0, 100 - progressPercent)}%` }} />
-                      )}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="text-sm">
-                      <div className="font-medium">Progreso de Horas</div>
                       <div>Trabajadas: {workedHours.toFixed(1)}h</div>
                       <div>Estimadas: {estimatedHours}h</div>
                       <div>Progreso: {progressPercent}%</div>
-                      {isOverBudget ? (
-                        <div className="text-red-300">Excedido: +{(workedHours - estimatedHours).toFixed(1)}h</div>
-                      ) : (
-                        <div className="text-green-300">Restantes: {remainingHours.toFixed(1)}h</div>
-                      )}
                     </div>
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Información de costo con jerarquía visual */}
-                <div className="text-right min-w-[90px]">
-                  <div className={`text-sm font-bold ${cardStyle.nameColor}`}>
+                {/* Status badge más limpio */}
+                {workedHours === 0 ? (
+                  <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-gray-300 text-gray-600 bg-gray-50">
+                    Sin actividad
+                  </Badge>
+                ) : isOverBudget ? (
+                  <Badge variant="destructive" className="text-[10px] px-2 py-0.5 bg-red-100 text-red-700 border-red-200">
+                    Excedido
+                  </Badge>
+                ) : progressPercent >= 100 ? (
+                  <Badge className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 border-green-200">
+                    Completado
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                    En progreso
+                  </Badge>
+                )}
+
+                {/* Costo más discreto */}
+                <div className="text-right min-w-[70px]">
+                  <div className={`text-sm font-semibold ${cardStyle.nameColor}`}>
                     ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}
                   </div>
-                  <div className={`text-xs ${cardStyle.roleColor}`}>
+                  <div className="text-xs text-gray-500">
                     ${member.hourlyRate || 0}/h
                   </div>
                 </div>
@@ -1986,10 +1982,10 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div>
                       <CardTitle className="text-lg font-semibold text-purple-900">
-                        Equipo del Proyecto
+                        Registro de Tiempo por Miembro
                       </CardTitle>
                       <CardDescription className="text-sm text-purple-700">
-                        Progreso y estado actual de cada miembro del equipo
+                        Estado de registro de horas y progreso individual del equipo
                       </CardDescription>
                     </div>
                   </div>
@@ -1997,15 +1993,6 @@ export default function ProjectDetailsRedesigned() {
                     <Badge variant="outline" className="bg-purple-100 text-purple-800 text-xs">
                       {teamStats?.filter(member => member.hours > 0).length || 0} activos
                     </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
-                      className="border-purple-200 hover:bg-purple-50 h-8"
-                    >
-                      <BarChart3 className="h-3 w-3 mr-1" />
-                      Analizar
-                    </Button>
                   </div>
                 </div>
               </CardHeader>
