@@ -2217,125 +2217,140 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent>
                   {(() => {
                     console.log('🔍 DEBUG - Eficiencia por Miembro:', {
-                      teamStats: teamStats,
-                      teamStatsLength: teamStats?.length,
                       baseTeam: baseTeam?.length,
                       filteredTimeEntries: filteredTimeEntries?.length,
-                      dateFilter: dateFilter
+                      dateFilter: dateFilter.label,
+                      sampleTimeEntry: filteredTimeEntries?.[0]
                     });
 
-                    // Análisis de eficiencia por miembro
-                    const teamEfficiency = teamStats?.map((member: any) => {
-                      const efficiency = member.estimatedHours > 0 ? member.estimatedHours / Math.max(member.hours, 1) : 1;
-                      const costPerHour = member.hours > 0 ? member.cost / member.hours : 0;
+                    // Calcular eficiencia real basada en el equipo base y registros de tiempo
+                    const teamEfficiency = baseTeam?.map((member: any) => {
+                      // Obtener horas trabajadas por este miembro en el período filtrado
+                      const memberTimeEntries = filteredTimeEntries.filter((entry: any) => 
+                        entry.personnelId === member.personnelId
+                      );
+                      
+                      const workedHours = memberTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+                      const estimatedHours = member.hours || 0; // Horas estimadas de la cotización
+                      const hourlyRate = member.rate || 0;
+                      
+                      // Calcular eficiencia: si trabajó menos de lo estimado = más eficiente
+                      const efficiency = estimatedHours > 0 ? Math.min(1.5, estimatedHours / Math.max(workedHours, 0.1)) : 1;
+                      const costPerHour = hourlyRate;
+
+                      console.log(`🔍 ${member.personnel?.name}: ${workedHours}h trabajadas vs ${estimatedHours}h estimadas = ${(efficiency * 100).toFixed(1)}% eficiencia`);
+
                       return {
-                        name: member.personnel?.name || member.personnelName || `Miembro ${member.personnelId}`,
+                        name: member.personnel?.name || `Miembro ${member.personnelId}`,
                         efficiency: efficiency,
                         costPerHour: costPerHour,
-                        hours: member.hours,
-                        estimatedHours: member.estimatedHours,
+                        workedHours: workedHours,
+                        estimatedHours: estimatedHours,
+                        hasWorked: workedHours > 0,
                         isOutlier: efficiency < 0.75 // Underperformers < 75% eficiencia
                       };
-                    }).sort((a, b) => b.efficiency - a.efficiency) || [];
+                    })?.filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
+                      ?.sort((a, b) => b.efficiency - a.efficiency) || [];
 
-                    // Si no hay teamStats pero sí hay baseTeam, usar datos base
-                    if (teamEfficiency.length === 0 && baseTeam && baseTeam.length > 0) {
-                      const baseEfficiency = baseTeam.map((member: any) => ({
-                        name: member.personnel?.name || `Miembro ${member.personnelId}`,
-                        efficiency: 1, // Sin datos, asumir 100%
-                        costPerHour: member.rate || 0,
-                        hours: 0,
-                        estimatedHours: member.hours || 0,
-                        isOutlier: false
-                      })).slice(0, 5);
+                    console.log('🔍 Team efficiency calculada:', teamEfficiency.slice(0, 3));
 
-                      console.log('🔍 Usando datos base del equipo:', baseEfficiency);
-
+                    // Si no hay equipo base configurado
+                    if (!baseTeam || baseTeam.length === 0) {
                       return (
-                        <div className="space-y-4">
-                          <div className="text-center p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                            <p className="text-sm text-amber-700">
-                              📊 Mostrando datos base del equipo (sin registros en período seleccionado)
-                            </p>
+                        <div className="text-center p-6">
+                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
+                            <Users className="h-8 w-8 text-gray-400" />
                           </div>
-                          
-                          <div>
-                            <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              Equipo Base
-                            </h4>
-                            <div className="space-y-2">
-                              {baseEfficiency.map((member, index) => (
-                                <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-emerald-200">
-                                  <span className="text-sm font-medium text-gray-700">{member.name}</span>
-                                  <div className="text-right">
-                                    <div className="text-sm font-bold text-gray-600">{member.estimatedHours}h est.</div>
-                                    <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin equipo configurado</h4>
+                          <p className="text-xs text-gray-500">
+                            Configure el equipo base del proyecto para ver análisis de eficiencia
+                          </p>
                         </div>
                       );
                     }
 
-                    // Si no hay datos, mostrar mensaje informativo
+                    // Si no hay miembros con horas estimadas
                     if (teamEfficiency.length === 0) {
                       return (
                         <div className="text-center p-6">
                           <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
                             <Users className="h-8 w-8 text-gray-400" />
                           </div>
-                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin datos del equipo</h4>
+                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin datos de estimación</h4>
                           <p className="text-xs text-gray-500">
-                            No hay registros de tiempo en el período seleccionado
+                            Los miembros del equipo no tienen horas estimadas configuradas
                           </p>
                         </div>
                       );
                     }
 
-                    const topPerformers = teamEfficiency.slice(0, 3);
-                    const underPerformers = teamEfficiency.filter(m => m.isOutlier).slice(0, 3);
+                    const membersWithWork = teamEfficiency.filter(m => m.hasWorked);
+                    const membersWithoutWork = teamEfficiency.filter(m => !m.hasWorked);
+                    const topPerformers = membersWithWork.slice(0, 5);
 
                     return (
                       <div className="space-y-4">
-                        {/* Top Performers */}
-                        <div>
-                          <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
-                            <Crown className="h-4 w-4" />
-                            Top Performers
-                          </h4>
-                          <div className="space-y-2">
-                            {topPerformers.map((member, index) => (
-                              <div key={index} className="flex justify-between items-center p-2 bg-white rounded border border-emerald-200">
-                                <span className="text-sm font-medium text-gray-700">{member.name}</span>
-                                <div className="text-right">
-                                  <div className="text-sm font-bold text-emerald-600">{(member.efficiency * 100).toFixed(0)}%</div>
-                                  <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                        {/* Información del período */}
+                        <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-700">
+                            📊 Período: {dateFilter.label} • {filteredTimeEntries.length} registros de tiempo • {membersWithWork.length} miembros activos
+                          </p>
                         </div>
 
-                        {/* Underperformers */}
-                        {underPerformers.length > 0 && (
+                        {/* Miembros con trabajo realizado */}
+                        {topPerformers.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-1">
-                              <AlertTriangle className="h-4 w-4" />
-                              Requieren Atención
+                            <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
+                              <Crown className="h-4 w-4" />
+                              Miembros Activos (con tiempo registrado)
                             </h4>
                             <div className="space-y-2">
-                              {underPerformers.map((member, index) => (
-                                <div key={index} className="flex justify-between items-center p-2 bg-red-50 rounded border border-red-200">
-                                  <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                              {topPerformers.map((member, index) => (
+                                <div key={index} className="flex justify-between items-center p-3 bg-white rounded border border-emerald-200">
+                                  <div>
+                                    <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {member.workedHours.toFixed(1)}h trabajadas de {member.estimatedHours}h estimadas
+                                    </div>
+                                  </div>
                                   <div className="text-right">
-                                    <div className="text-sm font-bold text-red-600">{(member.efficiency * 100).toFixed(0)}%</div>
+                                    <div className={`text-sm font-bold ${
+                                      member.efficiency >= 1.2 ? 'text-emerald-600' : 
+                                      member.efficiency >= 1.0 ? 'text-blue-600' : 
+                                      member.efficiency >= 0.8 ? 'text-yellow-600' : 'text-red-600'
+                                    }`}>
+                                      {(member.efficiency * 100).toFixed(0)}% efic.
+                                    </div>
                                     <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
                                   </div>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Miembros sin trabajo registrado */}
+                        {membersWithoutWork.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              Miembros Sin Actividad ({membersWithoutWork.length})
+                            </h4>
+                            <div className="space-y-2">
+                              {membersWithoutWork.slice(0, 3).map((member, index) => (
+                                <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded border border-gray-200">
+                                  <span className="text-sm font-medium text-gray-600">{member.name}</span>
+                                  <div className="text-right">
+                                    <div className="text-sm text-gray-500">0h trabajadas</div>
+                                    <div className="text-xs text-gray-400">${member.costPerHour.toFixed(1)}/h</div>
+                                  </div>
+                                </div>
+                              ))}
+                              {membersWithoutWork.length > 3 && (
+                                <div className="text-xs text-gray-500 text-center py-1">
+                                  +{membersWithoutWork.length - 3} miembros más sin actividad
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
