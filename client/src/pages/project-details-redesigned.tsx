@@ -2237,28 +2237,28 @@ export default function ProjectDetailsRedesigned() {
                       <h5 className="font-medium text-red-800 mb-3">Estado General</h5>
                       <div className="flex flex-col items-center">
                         <div className={`w-16 h-16 rounded-full flex items-center justify-center ${(() => {
-                          const budgetHealth = (costSummary?.totalCost || 0) / (quotationData?.baseCost || 1);
-                          const timeHealth = (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1);
-                          if (budgetHealth > 1.2 || timeHealth > 1.2) return 'bg-red-500';
-                          if (budgetHealth > 1.0 || timeHealth > 1.0) return 'bg-yellow-500';
+                          const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                          const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                          if (budgetUsage > 0.9 || timeUsage > 0.9) return 'bg-red-500';
+                          if (budgetUsage > 0.75 || timeUsage > 0.75) return 'bg-yellow-500';
                           return 'bg-green-500';
                         })()}`}>
                           <span className="text-2xl font-bold text-white">
                             {(() => {
-                              const budgetHealth = (costSummary?.totalCost || 0) / (quotationData?.baseCost || 1);
-                              const timeHealth = (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1);
-                              if (budgetHealth > 1.2 || timeHealth > 1.2) return '🔴';
-                              if (budgetHealth > 1.0 || timeHealth > 1.0) return '🟡';
+                              const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                              const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                              if (budgetUsage > 0.9 || timeUsage > 0.9) return '🔴';
+                              if (budgetUsage > 0.75 || timeUsage > 0.75) return '🟡';
                               return '🟢';
                             })()}
                           </span>
                         </div>
                         <p className="text-xs text-center mt-2">
                           {(() => {
-                            const budgetHealth = (costSummary?.totalCost || 0) / (quotationData?.baseCost || 1);
-                            const timeHealth = (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1);
-                            if (budgetHealth > 1.2 || timeHealth > 1.2) return 'Crítico';
-                            if (budgetHealth > 1.0 || timeHealth > 1.0) return 'Atención';
+                            const budgetUsage = (costSummary?.budget || 0) > 0 ? (costSummary?.totalCost || 0) / (costSummary?.budget || 1) : 0;
+                            const timeUsage = (costSummary?.targetHours || 0) > 0 ? (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) : 0;
+                            if (budgetUsage > 0.9 || timeUsage > 0.9) return 'Crítico';
+                            if (budgetUsage > 0.75 || timeUsage > 0.75) return 'Atención';
                             return 'Saludable';
                           })()}
                         </p>
@@ -2274,11 +2274,11 @@ export default function ProjectDetailsRedesigned() {
                         {(() => {
                           const alerts = [];
                           
-                          if ((costSummary?.totalCost || 0) > (quotationData?.baseCost || 0) * 0.9) {
+                          if ((costSummary?.totalCost || 0) > (costSummary?.budget || 0) * 0.8) {
                             alerts.push({
                               type: 'danger',
                               title: 'Presupuesto Crítico',
-                              message: `Utilizado el ${((costSummary?.totalCost || 0) / (quotationData?.baseCost || 1) * 100).toFixed(1)}% del presupuesto`,
+                              message: `Utilizado el ${((costSummary?.totalCost || 0) / (costSummary?.budget || 1) * 100).toFixed(1)}% del presupuesto`,
                               icon: <AlertTriangle className="h-4 w-4 text-red-500" />
                             });
                           }
@@ -2350,7 +2350,9 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-green-800">Margen de Rentabilidad</span>
                       <Badge variant="outline" className="bg-green-100 text-green-800">
                         {(() => {
-                          const margin = ((quotationData?.totalAmount || 0) - (costSummary?.totalCost || 0)) / (quotationData?.totalAmount || 1) * 100;
+                          const revenue = (costSummary?.targetClientPrice || 0);
+                          const cost = (costSummary?.totalCost || 0);
+                          const margin = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
                           return `${margin.toFixed(1)}%`;
                         })()}
                       </Badge>
@@ -2358,16 +2360,16 @@ export default function ProjectDetailsRedesigned() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span>Precio Cliente:</span>
-                        <span className="font-medium">${quotationData?.totalAmount?.toLocaleString() || '0'}</span>
+                        <span className="font-medium">${(costSummary?.targetClientPrice || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Costo Real:</span>
-                        <span className="font-medium">${costSummary?.totalCost?.toLocaleString() || '0'}</span>
+                        <span className="font-medium">${(costSummary?.totalCost || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm font-semibold">
                         <span>Ganancia:</span>
-                        <span className={`${((quotationData?.totalAmount || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          ${((quotationData?.totalAmount || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
+                        <span className={`${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${((costSummary?.targetClientPrice || 0) - (costSummary?.totalCost || 0)).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -2378,7 +2380,9 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
                           {(() => {
-                            const roi = ((quotationData?.totalAmount || 0) - (costSummary?.totalCost || 0)) / (costSummary?.totalCost || 1) * 100;
+                            const investment = (costSummary?.totalCost || 0);
+                            const profit = (costSummary?.targetClientPrice || 0) - investment;
+                            const roi = investment > 0 ? (profit / investment) * 100 : 0;
                             return `${roi.toFixed(1)}%`;
                           })()}
                         </div>
@@ -2389,8 +2393,9 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
                           {(() => {
-                            const paybackDays = Math.ceil((costSummary?.totalCost || 0) / ((quotationData?.totalAmount || 0) / 30));
-                            return `${paybackDays}d`;
+                            const monthlyRevenue = (costSummary?.targetClientPrice || 0) / 12;
+                            const paybackMonths = monthlyRevenue > 0 ? Math.ceil((costSummary?.totalCost || 0) / monthlyRevenue) : 0;
+                            return `${paybackMonths}m`;
                           })()}
                         </div>
                         <p className="text-xs text-green-700">Período de Recuperación</p>
@@ -2417,14 +2422,18 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-600">
                           {(() => {
-                            const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
+                            const plannedCost = (costSummary?.budget || 0);
+                            const actualCost = (costSummary?.totalCost || 0);
+                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 0;
                             return cpi.toFixed(2);
                           })()}
                         </div>
                         <p className="text-xs text-blue-700">IPC (Índice de Rendimiento de Costos)</p>
                         <p className="text-xs text-gray-500">
                           {(() => {
-                            const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
+                            const plannedCost = (costSummary?.budget || 0);
+                            const actualCost = (costSummary?.totalCost || 0);
+                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 0;
                             return cpi > 1 ? 'Bajo presupuesto' : cpi < 1 ? 'Sobre presupuesto' : 'En presupuesto';
                           })()}
                         </p>
@@ -2434,14 +2443,18 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-600">
                           {(() => {
-                            const spi = (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1);
+                            const plannedHours = (costSummary?.targetHours || 0);
+                            const actualHours = (costSummary?.filteredHours || 0);
+                            const spi = plannedHours > 0 ? (actualHours / plannedHours) : 0;
                             return spi.toFixed(2);
                           })()}
                         </div>
                         <p className="text-xs text-blue-700">IPC (Índice de Rendimiento de Cronograma)</p>
                         <p className="text-xs text-gray-500">
                           {(() => {
-                            const spi = (costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1);
+                            const plannedHours = (costSummary?.targetHours || 0);
+                            const actualHours = (costSummary?.filteredHours || 0);
+                            const spi = plannedHours > 0 ? (actualHours / plannedHours) : 0;
                             return spi > 1 ? 'Adelantado' : spi < 1 ? 'Atrasado' : 'En cronograma';
                           })()}
                         </p>
@@ -2494,29 +2507,38 @@ export default function ProjectDetailsRedesigned() {
                     <div className="space-y-2">
                       <div className="text-2xl font-bold text-purple-600">
                         ${(() => {
-                          const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
-                          const eac = (quotationData?.totalAmount || 0) / Math.max(cpi, 0.1);
-                          return eac.toLocaleString();
+                          const plannedCost = (costSummary?.budget || 0);
+                          const actualCost = (costSummary?.totalCost || 0);
+                          const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
+                          const eac = plannedCost / Math.max(cpi, 0.1);
+                          return eac.toFixed(0);
                         })()}
                       </div>
                       <p className="text-xs text-purple-700">Costo Final Estimado</p>
                       <div className="text-sm">
                         <span className={`font-medium ${(() => {
-                          const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
-                          const eac = (quotationData?.totalAmount || 0) / Math.max(cpi, 0.1);
-                          return eac > (quotationData?.totalAmount || 0) ? 'text-red-600' : 'text-green-600';
+                          const plannedCost = (costSummary?.budget || 0);
+                          const actualCost = (costSummary?.totalCost || 0);
+                          const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
+                          const eac = plannedCost / Math.max(cpi, 0.1);
+                          const variance = eac - plannedCost;
+                          return variance > 0 ? 'text-red-600' : 'text-green-600';
                         })()}`}>
                           {(() => {
-                            const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
-                            const eac = (quotationData?.totalAmount || 0) / Math.max(cpi, 0.1);
-                            const variance = eac - (quotationData?.totalAmount || 0);
+                            const plannedCost = (costSummary?.budget || 0);
+                            const actualCost = (costSummary?.totalCost || 0);
+                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
+                            const eac = plannedCost / Math.max(cpi, 0.1);
+                            const variance = eac - plannedCost;
                             return variance >= 0 ? '+' : '';
                           })()}
                           ${(() => {
-                            const cpi = (quotationData?.baseCost || 0) / (costSummary?.totalCost || 1);
-                            const eac = (quotationData?.totalAmount || 0) / Math.max(cpi, 0.1);
-                            const variance = eac - (quotationData?.totalAmount || 0);
-                            return Math.abs(variance).toLocaleString();
+                            const plannedCost = (costSummary?.budget || 0);
+                            const actualCost = (costSummary?.totalCost || 0);
+                            const cpi = actualCost > 0 ? (plannedCost / actualCost) : 1;
+                            const eac = plannedCost / Math.max(cpi, 0.1);
+                            const variance = eac - plannedCost;
+                            return Math.abs(variance).toFixed(0);
                           })()} vs presupuesto
                         </span>
                       </div>
@@ -2529,7 +2551,8 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-2xl font-bold text-purple-600">
                         {(() => {
                           const remainingHours = Math.max((costSummary?.targetHours || 0) - (costSummary?.filteredHours || 0), 0);
-                          const avgHoursPerDay = teamStats && teamStats.length > 0 ? (costSummary?.filteredHours || 0) / Math.max(teamStats.length, 1) / 30 : 0;
+                          const workedHours = (costSummary?.filteredHours || 0);
+                          const avgHoursPerDay = workedHours > 0 ? workedHours / 30 : 8; // Estimación basada en 30 días
                           const daysToComplete = avgHoursPerDay > 0 ? Math.ceil(remainingHours / avgHoursPerDay) : 0;
                           return `${daysToComplete}d`;
                         })()}
