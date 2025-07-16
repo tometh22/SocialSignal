@@ -2249,6 +2249,8 @@ export default function ProjectDetailsRedesigned() {
 
                     // Procesar datos del equipo
                     const teamData = baseTeam.map((member: any) => {
+                      console.log(`🔍 Procesando miembro:`, member);
+                      
                       const memberEntries = filteredTimeEntries.filter((entry: any) => 
                         entry.personnelId === member.personnelId
                       );
@@ -2258,6 +2260,12 @@ export default function ProjectDetailsRedesigned() {
                       const tarifa = member.rate || 0;
                       
                       console.log(`💡 ${member.personnel?.name || member.personnelId}: ${horasTrabajadas}h trabajadas, ${horasEstimadas}h estimadas, tarifa: $${tarifa}`);
+                      console.log(`🔍 Raw member data:`, { 
+                        hours: member.hours, 
+                        rate: member.rate, 
+                        personnel: member.personnel?.name,
+                        personnelId: member.personnelId
+                      });
                       
                       // Calcular eficiencia: trabajar menos horas que las estimadas es más eficiente
                       let eficiencia = 0;
