@@ -2224,7 +2224,9 @@ export default function ProjectDetailsRedesigned() {
                       baseTeam: baseTeam?.length || 0,
                       filteredTimeEntries: filteredTimeEntries?.length || 0,
                       dateFilter: dateFilter.label,
-                      sampleTeamMember: baseTeam?.[0]
+                      sampleTeamMember: baseTeam?.[0],
+                      fullBaseTeam: baseTeam,
+                      sampleTimeEntry: filteredTimeEntries?.[0]
                     });
 
                     if (!baseTeam || baseTeam.length === 0) {
@@ -2252,12 +2254,17 @@ export default function ProjectDetailsRedesigned() {
                       );
 
                       const horasTrabajadas = memberEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-                      const horasEstimadas = member.hours || 0;
+                      const horasEstimadas = member.hours || 0; // Usar horas totales del proyecto
                       const tarifa = member.rate || 0;
                       
-                      // Calcular eficiencia solo si tiene datos válidos
+                      console.log(`💡 ${member.personnel?.name || member.personnelId}: ${horasTrabajadas}h trabajadas, ${horasEstimadas}h estimadas, tarifa: $${tarifa}`);
+                      
+                      // Calcular eficiencia: trabajar menos horas que las estimadas es más eficiente
                       let eficiencia = 0;
                       if (horasTrabajadas > 0 && horasEstimadas > 0) {
+                        // Si trabajó menos horas = más eficiente
+                        // Si trabajó igual = 100% eficiente
+                        // Si trabajó más = menos eficiente
                         eficiencia = (horasEstimadas / horasTrabajadas) * 100;
                         eficiencia = Math.max(0, Math.min(200, eficiencia));
                       }
@@ -2325,6 +2332,18 @@ export default function ProjectDetailsRedesigned() {
                               const esBueno = persona.eficiencia >= 80;
                               const color = esExcelente ? 'green' : esBueno ? 'blue' : 'amber';
                               
+                              // Explicación de la eficiencia
+                              let explicacion = '';
+                              if (persona.eficiencia >= 100) {
+                                explicacion = 'Trabajó menos horas que las estimadas';
+                              } else if (persona.eficiencia >= 80) {
+                                explicacion = 'Cerca de las horas estimadas';
+                              } else if (persona.eficiencia > 0) {
+                                explicacion = 'Trabajó más horas que las estimadas';
+                              } else {
+                                explicacion = 'Sin datos suficientes';
+                              }
+                              
                               return (
                                 <div key={persona.id} className={`p-3 rounded-lg border ${
                                   color === 'green' ? 'bg-green-50 border-green-200' :
@@ -2344,7 +2363,10 @@ export default function ProjectDetailsRedesigned() {
                                       <div>
                                         <div className="font-medium text-gray-800 text-sm">{persona.nombre}</div>
                                         <div className="text-xs text-gray-600">
-                                          {persona.horasTrabajadas.toFixed(1)}h de {persona.horasEstimadas}h • ${persona.tarifa}/h • {persona.registros} reg
+                                          Trabajó {persona.horasTrabajadas.toFixed(1)}h de {persona.horasEstimadas}h estimadas
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {explicacion} • ${persona.tarifa}/h • {persona.registros} reg
                                         </div>
                                       </div>
                                     </div>
