@@ -223,9 +223,7 @@ const CompactTimeForm: React.FC<{
       });
 
       // Cerrar el modal automáticamente después del éxito
-      setTimeout(() => {
-        onSuccess();
-      }, 200);
+      onSuccess();
     },
     onError: (error: any, variables, context) => {
       // En caso de error, remover el registro temporal
