@@ -2274,24 +2274,31 @@ export default function ProjectDetailsRedesigned() {
                       let detalleEficiencia = '';
                       
                       if (horasTrabajadas > 0 && horasEstimadas > 0) {
-                        // 1. Eficiencia de Tiempo (60% del peso total)
+                        // 1. Eficiencia de Tiempo (50% del peso total)
                         const eficienciaTiempo = Math.min((horasEstimadas / horasTrabajadas) * 100, 200);
                         
-                        // 2. Factor de Consistencia (25% del peso)
+                        // 2. Factor de Peso/Impacto en el Proyecto (25% del peso)
+                        // Miembros con más horas estimadas tienen mayor responsabilidad
+                        const totalHorasProyecto = baseTeam.reduce((sum, m) => sum + (m.estimatedHours || 0), 0);
+                        const pesoEnProyecto = totalHorasProyecto > 0 ? (horasEstimadas / totalHorasProyecto) * 100 : 0;
+                        const factorPeso = Math.min(pesoEnProyecto * 2 + 50, 100); // Escalar: más peso = más importante
+                        
+                        // 3. Factor de Consistencia (15% del peso)
                         // Basado en la distribución del trabajo a lo largo del tiempo
                         const diasUnicos = new Set(memberEntries.map(entry => entry.date.split('T')[0])).size;
                         const consistencia = Math.min(diasUnicos * 15, 100); // Más días = más consistente
                         
-                        // 3. Factor de Costo-Eficiencia (15% del peso)
+                        // 4. Factor de Costo-Eficiencia (10% del peso)
                         const costoReal = horasTrabajadas * tarifa;
                         const costoEstimado = horasEstimadas * tarifa;
                         const eficienciaCosto = costoEstimado > 0 ? Math.min((costoEstimado / costoReal) * 100, 150) : 100;
                         
                         // === FÓRMULA COMPUESTA ===
                         eficiencia = (
-                          eficienciaTiempo * 0.60 +    // 60% tiempo
-                          consistencia * 0.25 +        // 25% consistencia
-                          eficienciaCosto * 0.15       // 15% costo
+                          eficienciaTiempo * 0.50 +    // 50% tiempo
+                          factorPeso * 0.25 +          // 25% peso/impacto
+                          consistencia * 0.15 +        // 15% consistencia
+                          eficienciaCosto * 0.10       // 10% costo
                         );
                         
                         // Crear descripción detallada
@@ -2306,6 +2313,10 @@ export default function ProjectDetailsRedesigned() {
                         eficiencia = Math.max(0, Math.min(200, eficiencia));
                       }
 
+                      // Calcular peso en el proyecto para mostrar
+                      const totalHorasProyecto = baseTeam.reduce((sum, m) => sum + (m.estimatedHours || 0), 0);
+                      const pesoEnProyecto = totalHorasProyecto > 0 ? (horasEstimadas / totalHorasProyecto) * 100 : 0;
+
                       return {
                         id: member.personnelId,
                         nombre: member.personnel?.name || `Usuario ${member.personnelId}`,
@@ -2314,6 +2325,7 @@ export default function ProjectDetailsRedesigned() {
                         tarifa,
                         eficiencia,
                         detalleEficiencia,
+                        pesoEnProyecto,
                         registros: memberEntries.length,
                         diasTrabajados: memberEntries.length > 0 ? new Set(memberEntries.map(entry => entry.date.split('T')[0])).size : 0,
                         tieneActividad: horasTrabajadas > 0
@@ -2371,7 +2383,7 @@ export default function ProjectDetailsRedesigned() {
                             </div>
                           </div>
                           <div className="text-xs text-gray-600 mb-3 p-2 bg-gray-50 rounded">
-                            <strong>Metodología:</strong> Tiempo (60%) + Consistencia (25%) + Costo-efectividad (15%)
+                            <strong>Metodología:</strong> Tiempo (50%) + Peso en proyecto (25%) + Consistencia (15%) + Costo-efectividad (10%)
                           </div>
                           <div className="space-y-2">
                             {top5.map((persona, index) => {
@@ -2407,7 +2419,7 @@ export default function ProjectDetailsRedesigned() {
                                           {explicacion} • ${persona.tarifa}/h
                                         </div>
                                         <div className="text-xs text-gray-400">
-                                          {persona.diasTrabajados} días • {persona.registros} registros
+                                          {persona.pesoEnProyecto.toFixed(1)}% del proyecto • {persona.diasTrabajados} días • {persona.registros} reg
                                         </div>
                                       </div>
                                     </div>
