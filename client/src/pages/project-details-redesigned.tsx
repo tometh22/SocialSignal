@@ -2226,8 +2226,9 @@ export default function ProjectDetailsRedesigned() {
                     // Calcular eficiencia real basada en el equipo base y registros de tiempo
                     const teamEfficiency = baseTeam?.map((member: any) => {
                       // Obtener horas trabajadas por este miembro en el período filtrado
+                      // Nota: base de datos usa personnel_id, no personnelId
                       const memberTimeEntries = filteredTimeEntries.filter((entry: any) => 
-                        entry.personnelId === member.personnelId
+                        entry.personnel_id === member.personnelId
                       );
                       
                       const workedHours = memberTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
