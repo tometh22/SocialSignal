@@ -2221,7 +2221,9 @@ export default function ProjectDetailsRedesigned() {
                       filteredTimeEntries: filteredTimeEntries?.length,
                       dateFilter: dateFilter.label,
                       sampleTimeEntry: filteredTimeEntries?.[0],
-                      sampleBaseTeamMember: baseTeam?.[0]
+                      sampleBaseTeamMember: baseTeam?.[0],
+                      baseTeamComplete: baseTeam,
+                      filteredTimeEntriesComplete: filteredTimeEntries
                     });
 
                     // Calcular eficiencia real basada en el equipo base y registros de tiempo
@@ -2268,6 +2270,14 @@ export default function ProjectDetailsRedesigned() {
                           <p className="text-xs text-gray-500">
                             Configure el equipo base del proyecto para ver análisis de eficiencia
                           </p>
+                          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-left">
+                            <div className="font-semibold text-red-800 mb-1">Debug Info:</div>
+                            <div className="text-red-700">
+                              baseTeam: {baseTeam ? 'exists' : 'null'} (length: {baseTeam?.length || 0})<br/>
+                              filteredTimeEntries: {filteredTimeEntries ? 'exists' : 'null'} (length: {filteredTimeEntries?.length || 0})<br/>
+                              dateFilter: {dateFilter.label}
+                            </div>
+                          </div>
                         </div>
                       );
                     }
@@ -2283,6 +2293,16 @@ export default function ProjectDetailsRedesigned() {
                           <p className="text-xs text-gray-500">
                             Los miembros del equipo no tienen horas estimadas configuradas
                           </p>
+                          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-left">
+                            <div className="font-semibold text-yellow-800 mb-1">Debug Info:</div>
+                            <div className="text-yellow-700">
+                              baseTeam: {baseTeam?.length || 0} miembros<br/>
+                              teamEfficiency después del filtro: {teamEfficiency.length}<br/>
+                              filteredTimeEntries: {filteredTimeEntries?.length || 0} registros<br/>
+                              dateFilter: {dateFilter.label}<br/>
+                              Miembros con horas &gt; 0: {baseTeam?.filter(m => m.hours > 0).length || 0}
+                            </div>
+                          </div>
                         </div>
                       );
                     }
