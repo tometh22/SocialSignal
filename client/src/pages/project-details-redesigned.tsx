@@ -2220,245 +2220,208 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    // NUEVO COMPONENTE DE EFICIENCIA DESDE CERO
-                    console.log('🚀 NUEVO COMPONENTE DE EFICIENCIA - Datos de entrada:', {
+                    // COMPONENTE SIMPLE Y CLARO DE EFICIENCIA
+                    console.log('🚀 COMPONENTE EFICIENCIA SIMPLE - Datos:', {
                       baseTeam: baseTeam?.length || 0,
                       filteredTimeEntries: filteredTimeEntries?.length || 0,
-                      dateFilter: dateFilter.label,
-                      sampleBaseTeam: baseTeam?.[0],
-                      sampleTimeEntry: filteredTimeEntries?.[0]
+                      dateFilter: dateFilter.label
                     });
 
-                    // Validación básica de datos
                     if (!baseTeam || baseTeam.length === 0) {
                       return (
                         <div className="text-center py-8">
-                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                            <Users className="h-8 w-8 text-gray-400" />
-                          </div>
+                          <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                           <h3 className="text-lg font-semibold text-gray-700 mb-2">
                             No hay equipo configurado
                           </h3>
                           <p className="text-gray-500 text-sm">
-                            Configure el equipo base del proyecto para ver el análisis de eficiencia
+                            Configure el equipo base del proyecto para ver el análisis
                           </p>
                         </div>
                       );
                     }
 
-                    // Procesar datos del equipo con registros de tiempo
-                    const teamAnalysis = baseTeam.map((member: any) => {
-                      // Obtener registros de tiempo de este miembro
+                    if (!filteredTimeEntries || filteredTimeEntries.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                            Sin registros de tiempo
+                          </h3>
+                          <p className="text-gray-500 text-sm">
+                            No hay registros de tiempo para el período: {dateFilter.label}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // Crear lista simple de personas con sus datos
+                    const teamData = baseTeam.map((member: any) => {
                       const memberEntries = filteredTimeEntries.filter((entry: any) => 
                         entry.personnelId === member.personnelId
                       );
 
-                      const workedHours = memberEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-                      const estimatedHours = member.hours || 0;
-                      const rate = member.rate || 0;
+                      const horasTrabajadas = memberEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
+                      const horasEstimadas = member.hours || 0;
+                      const tarifa = member.rate || 0;
                       
-                      // Calcular eficiencia simple: horas estimadas / horas trabajadas
-                      let efficiency = 0;
-                      if (workedHours > 0 && estimatedHours > 0) {
-                        efficiency = (estimatedHours / workedHours) * 100;
-                        // Limitar a máximo 150% para evitar valores extremos
-                        efficiency = Math.min(efficiency, 150);
+                      // Calcular progreso simple
+                      let progreso = 0;
+                      if (horasEstimadas > 0) {
+                        progreso = (horasTrabajadas / horasEstimadas) * 100;
+                      }
+
+                      // Determinar estado
+                      let estado = 'Sin actividad';
+                      let color = 'gray';
+                      
+                      if (horasTrabajadas > 0) {
+                        if (progreso <= 100) {
+                          estado = 'En progreso';
+                          color = 'blue';
+                        } else if (progreso <= 120) {
+                          estado = 'Sobrepasado';
+                          color = 'amber';
+                        } else {
+                          estado = 'Muy sobrepasado';
+                          color = 'red';
+                        }
                       }
 
                       return {
                         id: member.personnelId,
-                        name: member.personnel?.name || `Usuario ${member.personnelId}`,
-                        estimatedHours,
-                        workedHours,
-                        rate,
-                        efficiency,
-                        entriesCount: memberEntries.length,
-                        totalCost: workedHours * rate,
-                        hasActivity: workedHours > 0
+                        nombre: member.personnel?.name || `Usuario ${member.personnelId}`,
+                        horasEstimadas: horasEstimadas,
+                        horasTrabajadas: horasTrabajadas,
+                        tarifa: tarifa,
+                        progreso: progreso,
+                        estado: estado,
+                        color: color,
+                        registros: memberEntries.length,
+                        costoTotal: horasTrabajadas * tarifa,
+                        tieneActividad: horasTrabajadas > 0
                       };
                     });
 
-                    // Ordenar por eficiencia (de mayor a menor)
-                    const sortedTeam = teamAnalysis.sort((a, b) => b.efficiency - a.efficiency);
-
-                    // Obtener solo miembros con actividad
-                    const activeMembers = sortedTeam.filter(member => member.hasActivity);
-
-                    console.log('🔍 Análisis del equipo procesado:', {
-                      totalMembers: teamAnalysis.length,
-                      activeMembers: activeMembers.length,
-                      topPerformer: activeMembers[0]?.name,
-                      topEfficiency: activeMembers[0]?.efficiency
-                    });
+                    // Separar activos de inactivos
+                    const activos = teamData.filter(m => m.tieneActividad);
+                    const inactivos = teamData.filter(m => !m.tieneActividad);
 
                     return (
                       <div className="space-y-6">
                         {/* Resumen del período */}
-                        <div className="bg-white rounded-lg border-2 border-emerald-200 p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-800">
-                                Período: {dateFilter.label}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                {filteredTimeEntries.length} registros de tiempo encontrados
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-emerald-600">
-                                {activeMembers.length}
-                              </div>
-                              <p className="text-xs text-gray-500">Miembros activos</p>
-                            </div>
-                          </div>
+                        <div className="bg-white rounded-lg border border-gray-200 p-4">
+                          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                            Período: {dateFilter.label}
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-4">
+                            {filteredTimeEntries.length} registros encontrados • {activos.length} personas activas
+                          </p>
                           
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="bg-gray-50 rounded-lg p-3 text-center">
-                              <div className="text-lg font-bold text-gray-700">
-                                {teamAnalysis.reduce((sum, m) => sum + m.workedHours, 0).toFixed(1)}h
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                            <div className="bg-blue-50 rounded-lg p-3">
+                              <div className="text-xl font-bold text-blue-600">
+                                {teamData.reduce((sum, m) => sum + m.horasTrabajadas, 0).toFixed(1)}
                               </div>
-                              <div className="text-xs text-gray-500">Horas trabajadas</div>
+                              <div className="text-sm text-blue-600">Horas trabajadas</div>
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-3 text-center">
-                              <div className="text-lg font-bold text-gray-700">
-                                {teamAnalysis.reduce((sum, m) => sum + m.estimatedHours, 0).toFixed(1)}h
+                            <div className="bg-green-50 rounded-lg p-3">
+                              <div className="text-xl font-bold text-green-600">
+                                {teamData.reduce((sum, m) => sum + m.horasEstimadas, 0).toFixed(1)}
                               </div>
-                              <div className="text-xs text-gray-500">Horas estimadas</div>
+                              <div className="text-sm text-green-600">Horas estimadas</div>
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-3 text-center">
-                              <div className="text-lg font-bold text-gray-700">
-                                ${teamAnalysis.reduce((sum, m) => sum + m.totalCost, 0).toFixed(0)}
+                            <div className="bg-purple-50 rounded-lg p-3">
+                              <div className="text-xl font-bold text-purple-600">
+                                ${teamData.reduce((sum, m) => sum + m.costoTotal, 0).toFixed(0)}
                               </div>
-                              <div className="text-xs text-gray-500">Costo total</div>
+                              <div className="text-sm text-purple-600">Costo total</div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Lista de miembros activos */}
-                        {activeMembers.length > 0 ? (
-                          <div className="space-y-3">
-                            <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                              Miembros con actividad (ordenados por eficiencia)
+                        {/* Personas activas */}
+                        {activos.length > 0 && (
+                          <div>
+                            <h4 className="text-md font-semibold text-gray-800 mb-4">
+                              Personas con actividad ({activos.length})
                             </h4>
-                            {activeMembers.map((member, index) => {
-                              const isHighEfficient = member.efficiency >= 100;
-                              const isModerateEfficient = member.efficiency >= 80 && member.efficiency < 100;
-                              const needsAttention = member.efficiency < 80;
-
-                              return (
-                                <div
-                                  key={member.id}
-                                  className={`p-4 rounded-lg border-2 ${
-                                    isHighEfficient 
-                                      ? 'bg-green-50 border-green-200' 
-                                      : isModerateEfficient 
-                                      ? 'bg-blue-50 border-blue-200'
-                                      : 'bg-amber-50 border-amber-200'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                                        isHighEfficient 
-                                          ? 'bg-green-100 text-green-700' 
-                                          : isModerateEfficient 
-                                          ? 'bg-blue-100 text-blue-700'
-                                          : 'bg-amber-100 text-amber-700'
-                                      }`}>
-                                        {index + 1}
-                                      </div>
-                                      
-                                      <div>
-                                        <h5 className="font-semibold text-gray-800">{member.name}</h5>
-                                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                                          <span>
-                                            {member.workedHours.toFixed(1)}h de {member.estimatedHours}h
-                                          </span>
-                                          <span>
-                                            ${member.rate}/h
-                                          </span>
-                                          <span>
-                                            {member.entriesCount} registros
-                                          </span>
-                                        </div>
+                            <div className="space-y-3">
+                              {activos.map((persona) => (
+                                <div key={persona.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                      <h5 className="font-semibold text-gray-800 text-lg">{persona.nombre}</h5>
+                                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                                        <span>Trabajó: {persona.horasTrabajadas.toFixed(1)} horas</span>
+                                        <span>Estimado: {persona.horasEstimadas} horas</span>
+                                        <span>Tarifa: ${persona.tarifa}/h</span>
+                                        <span>Registros: {persona.registros}</span>
                                       </div>
                                     </div>
-
                                     <div className="text-right">
                                       <div className={`text-2xl font-bold ${
-                                        isHighEfficient 
-                                          ? 'text-green-600' 
-                                          : isModerateEfficient 
-                                          ? 'text-blue-600'
-                                          : 'text-amber-600'
+                                        persona.color === 'blue' ? 'text-blue-600' :
+                                        persona.color === 'amber' ? 'text-amber-600' :
+                                        persona.color === 'red' ? 'text-red-600' :
+                                        'text-gray-600'
                                       }`}>
-                                        {member.efficiency.toFixed(0)}%
+                                        {persona.progreso.toFixed(0)}%
                                       </div>
-                                      <div className="text-xs text-gray-500">
-                                        {isHighEfficient ? 'Excelente' : isModerateEfficient ? 'Bueno' : 'Necesita atención'}
-                                      </div>
+                                      <div className="text-sm text-gray-500">{persona.estado}</div>
                                     </div>
                                   </div>
-
+                                  
                                   {/* Barra de progreso */}
                                   <div className="mt-3">
-                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                      <span>Progreso de horas</span>
+                                      <span>{persona.progreso.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-3">
                                       <div
-                                        className={`h-2 rounded-full transition-all duration-300 ${
-                                          isHighEfficient 
-                                            ? 'bg-green-500' 
-                                            : isModerateEfficient 
-                                            ? 'bg-blue-500'
-                                            : 'bg-amber-500'
+                                        className={`h-3 rounded-full transition-all duration-300 ${
+                                          persona.color === 'blue' ? 'bg-blue-500' :
+                                          persona.color === 'amber' ? 'bg-amber-500' :
+                                          persona.color === 'red' ? 'bg-red-500' :
+                                          'bg-gray-400'
                                         }`}
-                                        style={{ 
-                                          width: `${Math.min(100, (member.workedHours / member.estimatedHours) * 100)}%` 
-                                        }}
+                                        style={{ width: `${Math.min(100, persona.progreso)}%` }}
                                       />
                                     </div>
-                                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                      <span>Progreso</span>
-                                      <span>{((member.workedHours / member.estimatedHours) * 100).toFixed(0)}%</span>
-                                    </div>
+                                  </div>
+                                  
+                                  <div className="mt-3 text-sm text-gray-600">
+                                    <strong>Costo total: ${persona.costoTotal.toFixed(0)}</strong>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 bg-gray-50 rounded-lg">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
-                              <Clock className="h-8 w-8 text-gray-400" />
+                              ))}
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                              Sin actividad en este período
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              No se encontraron registros de tiempo para el período seleccionado
-                            </p>
                           </div>
                         )}
 
-                        {/* Mostrar miembros sin actividad */}
-                        {activeMembers.length < teamAnalysis.length && (
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-gray-600 mb-3">
-                              Miembros sin actividad ({teamAnalysis.length - activeMembers.length})
+                        {/* Personas sin actividad */}
+                        {inactivos.length > 0 && (
+                          <div>
+                            <h4 className="text-md font-semibold text-gray-600 mb-4">
+                              Personas sin actividad ({inactivos.length})
                             </h4>
-                            <div className="grid grid-cols-2 gap-2">
-                              {teamAnalysis
-                                .filter(member => !member.hasActivity)
-                                .map((member) => (
-                                  <div key={member.id} className="flex items-center gap-2 text-sm text-gray-500">
-                                    <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                                      <span className="text-xs">
-                                        {member.name.charAt(0)}
+                            <div className="bg-gray-50 rounded-lg p-4">
+                              <div className="grid grid-cols-2 gap-3">
+                                {inactivos.map((persona) => (
+                                  <div key={persona.id} className="flex items-center gap-3 text-sm">
+                                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                      <span className="text-xs font-medium text-gray-600">
+                                        {persona.nombre.charAt(0)}
                                       </span>
                                     </div>
-                                    <span>{member.name}</span>
-                                    <span className="text-xs">({member.estimatedHours}h est.)</span>
+                                    <div>
+                                      <div className="font-medium text-gray-700">{persona.nombre}</div>
+                                      <div className="text-gray-500">{persona.horasEstimadas}h estimadas</div>
+                                    </div>
                                   </div>
                                 ))}
+                              </div>
                             </div>
                           </div>
                         )}
