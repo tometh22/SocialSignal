@@ -2238,6 +2238,8 @@ export default function ProjectDetailsRedesigned() {
                       const estimatedHours = member.hours || 0; // Horas estimadas de la cotización
                       const hourlyRate = member.rate || 0;
                       
+                      console.log(`🔍 Processing member ${member.personnel?.name || member.personnelId}: estimatedHours=${estimatedHours}, workedHours=${workedHours}, rate=${hourlyRate}`);
+                      
                       // Calcular eficiencia: si trabajó menos de lo estimado = más eficiente
                       const efficiency = estimatedHours > 0 ? Math.min(1.5, estimatedHours / Math.max(workedHours, 0.1)) : 1;
                       const costPerHour = hourlyRate;
@@ -2254,7 +2256,10 @@ export default function ProjectDetailsRedesigned() {
                         isOutlier: efficiency < 0.75, // Underperformers < 75% eficiencia
                         timeEntriesCount: memberTimeEntries.length
                       };
-                    })?.filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
+                    })?.filter(member => {
+                      console.log(`🔍 Filtering member ${member.name}: estimatedHours=${member.estimatedHours}`);
+                      return member.estimatedHours > 0;
+                    }) // Solo miembros con horas estimadas
                       ?.sort((a, b) => b.efficiency - a.efficiency) || [];
 
                     console.log('🔍 Team efficiency calculada:', teamEfficiency.slice(0, 3));
