@@ -685,11 +685,15 @@ export default function ProjectDetailsRedesigned() {
 
   // Estado del filtro temporal - configurado por defecto para mostrar datos reales de junio 2025
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
+    // Configurar por defecto para mostrar junio 2025 como "mes pasado" 
+    const currentDate = new Date();
+    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     return {
       type: 'month',
-      startDate: new Date(2025, 5, 1), // Junio 2025 (mes 5, base 0)
-      endDate: new Date(2025, 5, 30),
-      label: "Mes pasado (junio 2025)"
+      startDate: startOfMonth(lastMonth),
+      endDate: endOfMonth(lastMonth),
+      label: `Mes pasado (${monthName})`
     };
   });
 
