@@ -357,7 +357,13 @@ const ProjectAnalyticsView: React.FC = () => {
       filter: timeFilter,
       originalCount: timeEntries.length,
       filteredCount: filtered.length,
-      totalHours: filtered.reduce((sum, entry) => sum + (entry.hours || 0), 0)
+      totalHours: filtered.reduce((sum, entry) => sum + (entry.hours || 0), 0),
+      sampleEntries: filtered.slice(0, 3).map(e => ({
+        id: e.id,
+        date: e.date,
+        hours: e.hours,
+        personnelId: e.personnelId
+      }))
     });
     return filtered;
   }, [timeEntries, timeFilter, getFilteredTimeEntries]);
@@ -462,23 +468,23 @@ const ProjectAnalyticsView: React.FC = () => {
       return acc;
     }, {} as Record<number, number>);
 
-    const result = Object.entries(personnelHours)
-      .map(([personnelId, hours]) => {
-        const person = personnel.find(p => p.id === parseInt(personnelId));
-        return {
-          id: parseInt(personnelId),
-          name: person ? `${person.name}` : 'Desconocido',
-          hours
-        };
-      })
-      .filter(item => item.hours > 0)
-      .sort((a, b) => b.hours - a.hours);
+    // Incluir a todo el personal del proyecto, incluso si no tienen horas registradas
+    const result = personnel.map(person => {
+      const hours = personnelHours[person.id] || 0;
+      return {
+        id: person.id,
+        name: person.name,
+        hours
+      };
+    }).sort((a, b) => b.hours - a.hours);
 
     console.log('👥 Personnel data calculated:', {
       filter: timeFilter,
       totalPersonnel: result.length,
+      activePersonnel: result.filter(p => p.hours > 0).length,
       totalHours: result.reduce((sum, p) => sum + p.hours, 0),
-      entriesUsed: dataToUse.length
+      entriesUsed: dataToUse.length,
+      personnelBreakdown: result.map(p => ({ name: p.name, hours: p.hours }))
     });
 
     return result;

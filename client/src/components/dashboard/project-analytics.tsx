@@ -380,6 +380,104 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             )}
           </div>
 
+          {/* Análisis de Eficiencia por Miembro */}
+          <Card className="shadow-sm">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Eficiencia por Miembro
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Top performers vs underperformers del equipo
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-blue-700">
+                    Período: {timeFilter === "current_month" ? "Este mes" : 
+                             timeFilter === "last_month" ? "Mes pasado (junio 2025)" :
+                             timeFilter === "current_quarter" ? "Este trimestre" :
+                             timeFilter === "last_quarter" ? "Trimestre pasado" :
+                             "Todo el proyecto"}
+                  </span>
+                  <span className="text-blue-600">
+                    {timeEntries.length} registros de tiempo • {personnel.length} miembros en el equipo
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista de eficiencia del equipo */}
+              <div className="space-y-3">
+                <div className="text-sm font-medium text-gray-700 mb-3">
+                  Equipo del Proyecto {timeEntries.length > 0 ? "" : "(Sin actividad en este período)"}
+                </div>
+                
+                {personnel.length > 0 ? (
+                  <div className="space-y-2">
+                    {personnel.map((member) => {
+                      // Calcular horas trabajadas por este miembro en el período actual
+                      const memberHours = timeEntries
+                        .filter(entry => entry.personnelId === member.id)
+                        .reduce((sum, entry) => sum + (entry.hours || 0), 0);
+                      
+                      // Obtener rol del miembro
+                      const memberRole = roles.find(role => role.id === member.roleId);
+                      
+                      // Calcular horas estimadas para este miembro (basado en timeByPersonnelData)
+                      const memberInTimeData = timeByPersonnelData.find(p => p.id === member.id);
+                      const estimatedHours = memberInTimeData ? memberInTimeData.hours : 0;
+                      
+                      const hasActivity = memberHours > 0;
+                      const costGenerated = memberHours * member.hourlyRate;
+
+                      return (
+                        <div 
+                          key={member.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            hasActivity ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
+                              {member.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm">{member.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {memberRole?.name || 'Sin rol'} • ${member.hourlyRate.toFixed(1)}/h
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-right">
+                            {hasActivity ? (
+                              <>
+                                <div className="font-medium text-sm">{formatNumber(memberHours, 1)}h trabajadas</div>
+                                <div className="text-xs text-muted-foreground">
+                                  ${formatNumber(costGenerated, 0)} generados
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-sm text-gray-500">Sin registros</div>
+                                <div className="text-xs text-gray-400">En este período</div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No hay personal asignado al proyecto
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="shadow-sm">
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -391,9 +489,35 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-              <div className="text-center py-12 text-muted-foreground text-sm">
-                Análisis mensual en desarrollo
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="bg-blue-50 p-3 rounded-lg text-center">
+                  <div className="text-lg font-bold text-blue-700">
+                    {formatNumber(timeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0), 1)}h
+                  </div>
+                  <div className="text-xs text-blue-600">Horas Trabajadas</div>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg text-center">
+                  <div className="text-lg font-bold text-green-700">
+                    {timeEntries.filter(entry => entry.personnelId).length}
+                  </div>
+                  <div className="text-xs text-green-600">Registros de Tiempo</div>
+                </div>
+                <div className="bg-purple-50 p-3 rounded-lg text-center">
+                  <div className="text-lg font-bold text-purple-700">
+                    {timeByPersonnelData.filter(p => p.hours > 0).length}
+                  </div>
+                  <div className="text-xs text-purple-600">Miembros Activos</div>
+                </div>
               </div>
+              
+              {timeEntries.length === 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <div className="text-sm text-yellow-800">
+                    <strong>Información:</strong> No hay registros de tiempo para el período seleccionado.
+                    {timeFilter !== "all" && " Prueba seleccionar 'Todo el proyecto' para ver la actividad completa."}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
