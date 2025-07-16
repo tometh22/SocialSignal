@@ -564,7 +564,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
-                    En progreso
+                    Parcial
                   </Badge>
                 )}
 
@@ -1973,24 +1973,24 @@ export default function ProjectDetailsRedesigned() {
             </div>
 
             {/* SECCIÓN 3: Equipo del Proyecto - Vista de Registro */}
-            <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-white shadow-sm">
+            <Card className="border-l-4 border-l-gray-400 bg-white shadow-sm">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Users className="h-4 w-4 text-purple-600" />
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Users className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg font-semibold text-purple-900">
+                      <CardTitle className="text-lg font-semibold text-gray-900">
                         Registro de Tiempo por Miembro
                       </CardTitle>
-                      <CardDescription className="text-sm text-purple-700">
+                      <CardDescription className="text-sm text-gray-700">
                         Estado de registro de horas y progreso individual del equipo
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-purple-100 text-purple-800 text-xs">
+                    <Badge variant="outline" className="bg-gray-100 text-gray-800 text-xs">
                       {teamStats?.filter(member => member.hours > 0).length || 0} activos
                     </Badge>
                   </div>

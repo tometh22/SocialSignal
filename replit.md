@@ -103,6 +103,7 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 16, 2025: **TIME REGISTRATION UI IMPROVEMENTS** - Changed registration component background from purple gradient to clean white design, replaced confusing "En progreso" badge with clearer "Parcial" for past time periods, improved visual hierarchy with neutral gray color scheme
 - July 16, 2025: **PERSISTENT SESSION IMPLEMENTATION** - Implemented persistent sessions that survive server restarts and code changes using PostgreSQL session store with 30-day persistent cookies, eliminating automatic logout frustration
 - July 16, 2025: **SESSION CONFIGURATION OPTIMIZATION** - Extended session maxAge to 7 days, optimized session settings (resave: false, saveUninitialized: false) for better performance and persistence
 - July 16, 2025: **COOKIE-PARSER INTEGRATION** - Added cookie-parser middleware for proper persistent cookie handling and session recovery functionality
