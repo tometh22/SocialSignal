@@ -442,13 +442,13 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso - mejorado positioning */}
-                  <div className={`absolute -top-2 -right-2 min-w-[28px] h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white ${
+                  {/* Badge de progreso - tamaño compacto */}
+                  <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white ${
                     progressPercent >= 100 ? 'bg-green-500 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
                     'bg-blue-500 text-white'
                   }`}>
-                    {progressPercent}%
+                    {progressPercent}
                   </div>
                 </div>
                 <div className="flex-1">
@@ -1793,7 +1793,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="p-2 bg-emerald-100 rounded-lg">
                         <History className="h-4 w-4 text-emerald-600" />
                       </div>
-                      <span className="text-sm font-medium text-emerald-700">Gestionar Registros</span>
+                      <span className="text-sm font-medium text-emerald-700">Historial Completo</span>
                     </div>
                     <Button
                       size="sm"
@@ -1806,7 +1806,7 @@ export default function ProjectDetailsRedesigned() {
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    Editar, revisar y aprobar registros existentes
+                    Ver, editar y administrar todos los registros de tiempo
                   </p>
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-emerald-600">Registros: </span>
@@ -1829,7 +1829,7 @@ export default function ProjectDetailsRedesigned() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setActiveModal('time-register')}
+                      onClick={() => setShowQuickRegister(true)}
                       className="border-blue-200 hover:bg-blue-50 h-8"
                     >
                       <Plus className="h-3 w-3 mr-1" />
@@ -1860,7 +1860,27 @@ export default function ProjectDetailsRedesigned() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleExportTeamReport()}
+                      onClick={() => {
+                        const teamData = teamStats?.map(member => ({
+                          Nombre: member.personnel?.name || 'Sin nombre',
+                          Horas: member.hours?.toFixed(2) || '0.00',
+                          Costo: `$${member.cost?.toFixed(2) || '0.00'}`,
+                          Progreso: `${Math.round((member.hours / (member.estimatedHours || 1)) * 100)}%`
+                        })) || [];
+                        
+                        const csvContent = [
+                          Object.keys(teamData[0] || {}).join(','),
+                          ...teamData.map(row => Object.values(row).join(','))
+                        ].join('\n');
+                        
+                        const blob = new Blob([csvContent], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `equipo-proyecto-${projectId}-${dateFilter.label}.csv`;
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                      }}
                       className="border-amber-200 hover:bg-amber-50 h-8"
                     >
                       <FileSpreadsheet className="h-3 w-3 mr-1" />
