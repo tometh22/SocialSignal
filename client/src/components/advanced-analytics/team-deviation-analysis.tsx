@@ -354,8 +354,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                       <td className="px-6 py-4 text-center">
                         <div className="space-y-1">
                           <div className="text-sm text-gray-900">
-                            <span className="font-medium">{deviation.actualHours}h</span>
-                            <span className="text-gray-500"> / {deviation.budgetedHours}h</span>
+                            <span className="font-medium">{(deviation.actualHours || 0).toFixed(1)}h</span>
+                            <span className="text-gray-500"> / {(deviation.budgetedHours || 0).toFixed(1)}h</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
@@ -366,7 +366,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                               style={{ width: `${Math.min(100, progressPercentage)}%` }}
                             />
                           </div>
-                          <div className="text-xs text-gray-500">{progressPercentage.toFixed(1)}% progreso</div>
+                          <div className="text-xs text-gray-500">{progressPercentage.toFixed(0)}% progreso</div>
                         </div>
                       </td>
 
@@ -374,10 +374,10 @@ export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAn
                       <td className="px-6 py-4 text-center">
                         <div className="space-y-1">
                           <div className="text-sm font-medium text-gray-900">
-                            ${deviation.actualCost?.toLocaleString() || '0'}
+                            ${(deviation.actualCost || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Presup: ${deviation.budgetedCost.toLocaleString()}
+                            Presup: ${(deviation.budgetedCost || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                           </div>
                           <div className={`text-xs font-semibold ${getVarianceColor(deviation.deviationPercentage)}`}>
                             {deviation.deviationPercentage > 0 ? '+' : ''}{(deviation.deviationPercentage || 0).toFixed(1)}%
