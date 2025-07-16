@@ -1910,10 +1910,10 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div>
                       <CardTitle className="text-lg font-semibold text-purple-900">
-                        Equipo del Proyecto - Vista de Registro
+                        Equipo del Proyecto
                       </CardTitle>
                       <CardDescription className="text-sm text-purple-700">
-                        Estado actual del equipo y facilidades de registro de tiempo
+                        Progreso y estado actual de cada miembro del equipo
                       </CardDescription>
                     </div>
                   </div>
@@ -1933,14 +1933,119 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <ProjectTeamSection 
-                  projectId={projectId!} 
-                  timeEntries={timeEntries}
-                  project={project}
-                  dateFilter={dateFilter}
-                  filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-                />
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {teamStats && teamStats.length > 0 ? (
+                    <div className="grid gap-4">
+                      {/* Header de la tabla */}
+                      <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 border-b border-purple-100">
+                        <div className="col-span-3">Miembro</div>
+                        <div className="col-span-3">Progreso</div>
+                        <div className="col-span-2 text-center">Horas</div>
+                        <div className="col-span-2 text-center">Estado</div>
+                        <div className="col-span-2 text-right">Costo</div>
+                      </div>
+                      
+                      {/* Filas de datos */}
+                      {teamStats.map((member, index) => {
+                        const workedHours = member.hours || 0;
+                        const estimatedHours = member.estimatedHours || 1;
+                        const progressPercent = Math.round((workedHours / estimatedHours) * 100);
+                        const remainingHours = Math.max(0, estimatedHours - workedHours);
+                        const isOverBudget = workedHours > estimatedHours;
+
+                        return (
+                          <div 
+                            key={`${member.personnelId}-${index}`}
+                            className="grid grid-cols-12 gap-4 items-center py-3 px-4 bg-white rounded-lg border border-gray-100 hover:border-purple-200 hover:shadow-sm transition-all"
+                          >
+                            {/* Miembro */}
+                            <div className="col-span-3 flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                                <span className="text-white text-sm font-bold">
+                                  {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
+                                </span>
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900 text-sm">{member.personnel?.name || 'Miembro del equipo'}</div>
+                                <div className="text-xs text-gray-500">Operations Lead</div>
+                              </div>
+                            </div>
+                            
+                            {/* Progreso */}
+                            <div className="col-span-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                                  <div 
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                      isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                                      progressPercent >= 80 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                                      'bg-gradient-to-r from-purple-500 to-purple-600'
+                                    }`}
+                                    style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                                  />
+                                </div>
+                                <span className={`text-xs font-medium min-w-[35px] ${
+                                  isOverBudget ? 'text-red-600' :
+                                  progressPercent >= 80 ? 'text-yellow-600' :
+                                  'text-purple-600'
+                                }`}>
+                                  {progressPercent}%
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Horas */}
+                            <div className="col-span-2 text-center">
+                              <div className="text-sm font-medium text-gray-900">
+                                {workedHours.toFixed(1)}h / {estimatedHours}h
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {isOverBudget ? 
+                                  `+${(workedHours - estimatedHours).toFixed(1)}h excedido` :
+                                  `${remainingHours.toFixed(1)}h restantes`
+                                }
+                              </div>
+                            </div>
+                            
+                            {/* Estado */}
+                            <div className="col-span-2 text-center">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${
+                                  isOverBudget ? 'bg-red-50 text-red-700 border-red-200' :
+                                  progressPercent >= 80 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                  progressPercent > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                  'bg-gray-50 text-gray-500 border-gray-200'
+                                }`}
+                              >
+                                {isOverBudget ? 'Excedido' :
+                                 progressPercent >= 80 ? 'Por completar' :
+                                 progressPercent > 0 ? 'En progreso' :
+                                 'Sin iniciar'}
+                              </Badge>
+                            </div>
+                            
+                            {/* Costo */}
+                            <div className="col-span-2 text-right">
+                              <div className="text-sm font-bold text-gray-900">
+                                ${(member.cost || 0).toFixed(0)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                ${member.hourlyRate?.toFixed(0) || '0'}/h
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No hay miembros del equipo asignados</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
