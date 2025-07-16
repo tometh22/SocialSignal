@@ -425,42 +425,112 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        {baseTeam.map((member: any) => {
+      <div className="space-y-3">
+        {baseTeam.map((member: any, index: number) => {
           const workedHours = getTimeWorkedByMember(member.personnelId);
           const estimatedHours = member.estimatedHours || 0;
           const progressPercent = getProgressPercentage(workedHours, estimatedHours);
           const remainingHours = Math.max(0, estimatedHours - workedHours);
           const isOverBudget = workedHours > estimatedHours;
+          
+          // Definir colores y estilos basados en el estado del miembro
+          const getCardStyle = () => {
+            if (workedHours === 0) {
+              return {
+                bgGradient: "bg-gradient-to-r from-gray-50 to-gray-100",
+                borderColor: "border-gray-300",
+                textColor: "text-gray-600",
+                avatarBg: "bg-gradient-to-br from-gray-400 to-gray-500",
+                nameColor: "text-gray-700",
+                roleColor: "text-gray-500"
+              };
+            } else if (isOverBudget) {
+              return {
+                bgGradient: "bg-gradient-to-r from-red-50 to-red-100",
+                borderColor: "border-red-300",
+                textColor: "text-red-700",
+                avatarBg: "bg-gradient-to-br from-red-500 to-red-600",
+                nameColor: "text-red-900",
+                roleColor: "text-red-600"
+              };
+            } else if (progressPercent >= 80) {
+              return {
+                bgGradient: "bg-gradient-to-r from-yellow-50 to-orange-100",
+                borderColor: "border-yellow-300",
+                textColor: "text-yellow-700",
+                avatarBg: "bg-gradient-to-br from-yellow-500 to-orange-500",
+                nameColor: "text-yellow-900",
+                roleColor: "text-yellow-700"
+              };
+            } else if (progressPercent > 0) {
+              return {
+                bgGradient: "bg-gradient-to-r from-green-50 to-emerald-100",
+                borderColor: "border-green-300",
+                textColor: "text-green-700",
+                avatarBg: "bg-gradient-to-br from-green-500 to-emerald-600",
+                nameColor: "text-green-900",
+                roleColor: "text-green-700"
+              };
+            } else {
+              return {
+                bgGradient: "bg-gradient-to-r from-blue-50 to-blue-100",
+                borderColor: "border-blue-300",
+                textColor: "text-blue-700",
+                avatarBg: "bg-gradient-to-br from-blue-500 to-blue-600",
+                nameColor: "text-blue-900",
+                roleColor: "text-blue-700"
+              };
+            }
+          };
+
+          const cardStyle = getCardStyle();
 
           return (
-            <div key={member.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200 hover:shadow-md transition-all duration-200">
+            <div key={member.id} className={`flex items-center justify-between p-4 ${cardStyle.bgGradient} rounded-lg border ${cardStyle.borderColor} hover:shadow-md transition-all duration-200`}>
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                  <div className={`w-12 h-12 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
                     <span className="text-white text-sm font-bold">
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso - mínimo */}
-                  <div className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-semibold shadow-sm border border-white leading-none ${
-                    progressPercent >= 100 ? 'bg-green-500 text-white' : 
+                  {/* Badge de progreso - más grande y legible */}
+                  <div className={`absolute -top-1 -right-1 min-w-[24px] h-[24px] rounded-full flex items-center justify-center text-xs font-bold shadow-lg border-2 border-white ${
+                    progressPercent >= 100 ? 'bg-green-600 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
-                    'bg-blue-500 text-white'
-                  }`} style={{ fontSize: '9px', lineHeight: '1' }}>
+                    progressPercent > 0 ? 'bg-blue-600 text-white' :
+                    'bg-gray-400 text-white'
+                  }`}>
                     {progressPercent}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-sm text-purple-900">{member.personnel?.name || 'Miembro del Equipo'}</div>
-                  <div className="text-xs text-purple-600">{member.role?.name || 'Operations Lead'}</div>
-                  <div className="text-xs text-purple-500 mt-1">
-                    {workedHours.toFixed(1)}h de {estimatedHours}h estimadas
-                    {remainingHours > 0 && (
-                      <span className="text-gray-500"> • {remainingHours.toFixed(1)}h restantes</span>
-                    )}
-                    {isOverBudget && (
-                      <span className="text-red-600 font-medium"> • +{(workedHours - estimatedHours).toFixed(1)}h excedido</span>
+                  <div className={`font-semibold text-sm ${cardStyle.nameColor}`}>
+                    {member.personnel?.name || 'Miembro del Equipo'}
+                  </div>
+                  <div className={`text-xs ${cardStyle.roleColor} font-medium`}>
+                    {member.role?.name || 'Operations Lead'}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs ${cardStyle.textColor} font-medium`}>
+                      {workedHours.toFixed(1)}h / {estimatedHours}h
+                    </span>
+                    {workedHours === 0 ? (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-gray-400 text-gray-600">
+                        Sin actividad
+                      </Badge>
+                    ) : isOverBudget ? (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">
+                        +{(workedHours - estimatedHours).toFixed(1)}h excedido
+                      </Badge>
+                    ) : remainingHours > 0 ? (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700">
+                        {remainingHours.toFixed(1)}h restantes
+                      </Badge>
+                    ) : (
+                      <Badge variant="default" className="text-[10px] px-1.5 py-0.5 bg-green-600">
+                        Completado
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -470,18 +540,19 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                 {/* Barra de progreso con tooltip */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="w-32 bg-purple-100 rounded-full h-3 cursor-pointer relative">
+                    <div className="w-32 bg-gray-200 rounded-full h-3 cursor-pointer relative overflow-hidden">
                       <div 
                         className={`h-3 rounded-full transition-all duration-300 ${
                           isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
                           progressPercent >= 80 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
-                          'bg-gradient-to-r from-purple-500 to-purple-600'
+                          progressPercent > 0 ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                          'bg-gradient-to-r from-gray-400 to-gray-500'
                         }`}
                         style={{ width: `${Math.min(progressPercent, 100)}%` }}
                       />
                       {/* Línea de 100% cuando se excede */}
                       {isOverBudget && (
-                        <div className="absolute top-0 right-0 w-0.5 h-3 bg-gray-400 opacity-60" 
+                        <div className="absolute top-0 right-0 w-0.5 h-3 bg-white opacity-80" 
                              style={{ right: `${Math.max(0, 100 - progressPercent)}%` }} />
                       )}
                     </div>
@@ -501,12 +572,12 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Información de costo */}
-                <div className="text-right min-w-[80px]">
-                  <div className="text-sm font-medium text-purple-900">
+                {/* Información de costo con jerarquía visual */}
+                <div className="text-right min-w-[90px]">
+                  <div className={`text-sm font-bold ${cardStyle.nameColor}`}>
                     ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}
                   </div>
-                  <div className="text-xs text-purple-600">
+                  <div className={`text-xs ${cardStyle.roleColor}`}>
                     ${member.hourlyRate || 0}/h
                   </div>
                 </div>
