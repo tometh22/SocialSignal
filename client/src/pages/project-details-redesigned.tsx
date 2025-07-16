@@ -2265,6 +2265,17 @@ export default function ProjectDetailsRedesigned() {
                       const horasEstimadas = member.hours || 0;
                       const tarifa = member.rate || 0;
                       
+                      // Calcular eficiencia: solo si trabajó horas y tiene horas estimadas
+                      let eficiencia = 0;
+                      if (horasTrabajadas > 0 && horasEstimadas > 0) {
+                        // Eficiencia = estar cerca de lo estimado es bueno
+                        // Si trabajó exactamente lo estimado = 100%
+                        // Si trabajó menos = mejor eficiencia
+                        // Si trabajó más = peor eficiencia
+                        eficiencia = (horasEstimadas / horasTrabajadas) * 100;
+                        eficiencia = Math.max(0, Math.min(200, eficiencia)); // Limitar entre 0% y 200%
+                      }
+
                       // Calcular progreso simple
                       let progreso = 0;
                       if (horasEstimadas > 0) {
@@ -2276,14 +2287,17 @@ export default function ProjectDetailsRedesigned() {
                       let color = 'gray';
                       
                       if (horasTrabajadas > 0) {
-                        if (progreso <= 100) {
-                          estado = 'En progreso';
+                        if (eficiencia >= 100) {
+                          estado = 'Excelente';
+                          color = 'green';
+                        } else if (eficiencia >= 80) {
+                          estado = 'Bueno';
                           color = 'blue';
-                        } else if (progreso <= 120) {
-                          estado = 'Sobrepasado';
+                        } else if (eficiencia >= 60) {
+                          estado = 'Regular';
                           color = 'amber';
                         } else {
-                          estado = 'Muy sobrepasado';
+                          estado = 'Necesita mejorar';
                           color = 'red';
                         }
                       }
@@ -2294,6 +2308,7 @@ export default function ProjectDetailsRedesigned() {
                         horasEstimadas: horasEstimadas,
                         horasTrabajadas: horasTrabajadas,
                         tarifa: tarifa,
+                        eficiencia: eficiencia,
                         progreso: progreso,
                         estado: estado,
                         color: color,
@@ -2303,8 +2318,12 @@ export default function ProjectDetailsRedesigned() {
                       };
                     });
 
-                    // Separar activos de inactivos
-                    const activos = teamData.filter(m => m.tieneActividad);
+                    // Separar activos de inactivos y ordenar por eficiencia
+                    const activos = teamData
+                      .filter(m => m.tieneActividad)
+                      .sort((a, b) => b.eficiencia - a.eficiencia)
+                      .slice(0, 5); // Solo TOP 5
+                    
                     const inactivos = teamData.filter(m => !m.tieneActividad);
 
                     return (
@@ -2340,33 +2359,48 @@ export default function ProjectDetailsRedesigned() {
                           </div>
                         </div>
 
-                        {/* Personas activas */}
+                        {/* TOP 5 Performers más eficientes */}
                         {activos.length > 0 && (
                           <div>
                             <h4 className="text-md font-semibold text-gray-800 mb-4">
-                              Personas con actividad ({activos.length})
+                              🏆 Top 5 Performers más eficientes
                             </h4>
                             <div className="space-y-3">
-                              {activos.map((persona) => (
-                                <div key={persona.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                              {activos.map((persona, index) => (
+                                <div key={persona.id} className={`rounded-lg border-2 p-4 ${
+                                  persona.color === 'green' ? 'bg-green-50 border-green-200' :
+                                  persona.color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                                  persona.color === 'amber' ? 'bg-amber-50 border-amber-200' :
+                                  'bg-red-50 border-red-200'
+                                }`}>
                                   <div className="flex items-center justify-between mb-3">
-                                    <div>
-                                      <h5 className="font-semibold text-gray-800 text-lg">{persona.nombre}</h5>
-                                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                                        <span>Trabajó: {persona.horasTrabajadas.toFixed(1)} horas</span>
-                                        <span>Estimado: {persona.horasEstimadas} horas</span>
-                                        <span>Tarifa: ${persona.tarifa}/h</span>
-                                        <span>Registros: {persona.registros}</span>
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                        index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                        index === 1 ? 'bg-gray-100 text-gray-700' :
+                                        index === 2 ? 'bg-orange-100 text-orange-700' :
+                                        'bg-blue-100 text-blue-700'
+                                      }`}>
+                                        {index + 1}
+                                      </div>
+                                      <div>
+                                        <h5 className="font-semibold text-gray-800 text-lg">{persona.nombre}</h5>
+                                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                                          <span>Trabajó: {persona.horasTrabajadas.toFixed(1)}h</span>
+                                          <span>Estimado: {persona.horasEstimadas}h</span>
+                                          <span>Tarifa: ${persona.tarifa}/h</span>
+                                          <span>Registros: {persona.registros}</span>
+                                        </div>
                                       </div>
                                     </div>
                                     <div className="text-right">
-                                      <div className={`text-2xl font-bold ${
+                                      <div className={`text-3xl font-bold ${
+                                        persona.color === 'green' ? 'text-green-600' :
                                         persona.color === 'blue' ? 'text-blue-600' :
                                         persona.color === 'amber' ? 'text-amber-600' :
-                                        persona.color === 'red' ? 'text-red-600' :
-                                        'text-gray-600'
+                                        'text-red-600'
                                       }`}>
-                                        {persona.progreso.toFixed(0)}%
+                                        {persona.eficiencia.toFixed(0)}%
                                       </div>
                                       <div className="text-sm text-gray-500">{persona.estado}</div>
                                     </div>
@@ -2381,10 +2415,10 @@ export default function ProjectDetailsRedesigned() {
                                     <div className="w-full bg-gray-200 rounded-full h-3">
                                       <div
                                         className={`h-3 rounded-full transition-all duration-300 ${
+                                          persona.color === 'green' ? 'bg-green-500' :
                                           persona.color === 'blue' ? 'bg-blue-500' :
                                           persona.color === 'amber' ? 'bg-amber-500' :
-                                          persona.color === 'red' ? 'bg-red-500' :
-                                          'bg-gray-400'
+                                          'bg-red-500'
                                         }`}
                                         style={{ width: `${Math.min(100, persona.progreso)}%` }}
                                       />
