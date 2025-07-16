@@ -683,14 +683,13 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
 
-  // Estado del filtro temporal - configurado por defecto para mostrar el mes actual
+  // Estado del filtro temporal - configurado por defecto para mostrar datos reales de junio 2025
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
-    const now = new Date();
     return {
       type: 'month',
-      startDate: startOfMonth(now),
-      endDate: endOfMonth(now),
-      label: "Este mes"
+      startDate: new Date(2025, 5, 1), // Junio 2025 (mes 5, base 0)
+      endDate: new Date(2025, 5, 30),
+      label: "Mes pasado (junio 2025)"
     };
   });
 
