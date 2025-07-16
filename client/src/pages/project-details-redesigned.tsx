@@ -2036,6 +2036,40 @@ export default function ProjectDetailsRedesigned() {
               <CardContent>
                 <div className="text-center mb-6">
                   {(() => {
+                    // DEBUG: Mostrar datos disponibles para análisis
+                    console.log('🔍 DEBUG - Datos para Análisis Estratégico:', {
+                      project: project,
+                      quotationData: quotationData,
+                      costSummary: costSummary,
+                      teamStats: teamStats,
+                      filteredTimeEntries: filteredTimeEntries?.length,
+                      dateFilter: dateFilter
+                    });
+
+                    // Si no hay datos suficientes, mostrar estado informativo
+                    if (!costSummary || !quotationData || !filteredTimeEntries || filteredTimeEntries.length === 0) {
+                      return (
+                        <div className="text-center p-8">
+                          <div className="inline-flex items-center justify-center w-20 h-20 mb-4 bg-gray-100 rounded-full">
+                            <Info className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                            20
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-2">Score de Salud General</p>
+                          <Badge variant="outline" className="text-gray-600">
+                            Proyecto en estado crítico
+                          </Badge>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {!quotationData ? 'Sin cotización asociada' :
+                             !costSummary ? 'Sin datos de costo' :
+                             !filteredTimeEntries || filteredTimeEntries.length === 0 ? 'Sin registros de tiempo en el período' : 
+                             'Datos insuficientes'}
+                          </p>
+                        </div>
+                      );
+                    }
+                    
                     // Cálculo del Score de Salud (0-100)
                     const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
                     const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
@@ -2086,6 +2120,21 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {(() => {
+                    // Si no hay datos de costo, mostrar estado vacío
+                    if (!costSummary || !quotationData) {
+                      return (
+                        <div className="text-center p-6">
+                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
+                            <TrendingUp className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin datos financieros</h4>
+                          <p className="text-xs text-gray-500">
+                            No hay registros de costo en el período seleccionado
+                          </p>
+                        </div>
+                      );
+                    }
+
                     // Cálculos de proyección financiera
                     const today = new Date();
                     const projectStartDate = project?.startDate ? new Date(project.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -2158,12 +2207,27 @@ export default function ProjectDetailsRedesigned() {
                       const efficiency = member.estimatedHours > 0 ? member.estimatedHours / Math.max(member.hours, 1) : 1;
                       const costPerHour = member.hours > 0 ? member.cost / member.hours : 0;
                       return {
-                        name: member.personnelName || 'Sin nombre',
+                        name: member.personnel?.name || member.personnelName || 'Sin nombre',
                         efficiency: efficiency,
                         costPerHour: costPerHour,
                         isOutlier: efficiency < 0.75 // Underperformers < 75% eficiencia
                       };
                     }).sort((a, b) => b.efficiency - a.efficiency) || [];
+
+                    // Si no hay datos, mostrar mensaje informativo
+                    if (teamEfficiency.length === 0) {
+                      return (
+                        <div className="text-center p-6">
+                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
+                            <Users className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin datos del equipo</h4>
+                          <p className="text-xs text-gray-500">
+                            No hay registros de tiempo en el período seleccionado
+                          </p>
+                        </div>
+                      );
+                    }
 
                     const topPerformers = teamEfficiency.slice(0, 3);
                     const underPerformers = teamEfficiency.filter(m => m.isOutlier).slice(0, 3);
