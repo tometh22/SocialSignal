@@ -442,8 +442,8 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                       {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
                     </span>
                   </div>
-                  {/* Badge de progreso - tamaño compacto */}
-                  <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm border-2 border-white ${
+                  {/* Badge de progreso - ultra compacto */}
+                  <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm border border-white ${
                     progressPercent >= 100 ? 'bg-green-500 text-white' : 
                     progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
                     'bg-blue-500 text-white'
@@ -470,7 +470,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
                 {/* Barra de progreso con tooltip */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="w-32 bg-purple-100 rounded-full h-3 cursor-help relative">
+                    <div className="w-32 bg-purple-100 rounded-full h-3 cursor-pointer relative">
                       <div 
                         className={`h-3 rounded-full transition-all duration-300 ${
                           isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
