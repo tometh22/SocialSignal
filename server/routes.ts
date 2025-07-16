@@ -3612,7 +3612,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID" });
       }
 
-      const baseTeam = await storage.getProjectBaseTeam(projectId);
+      let baseTeam = await storage.getProjectBaseTeam(projectId);
+      
+      // Si no hay equipo base configurado, usar el equipo de la cotización como fallback
+      if (baseTeam.length === 0) {
+        console.log(`🔄 No base team found for project ${projectId}, using quotation team as fallback`);
+        
+        // Obtener la cotización del proyecto
+        const [project] = await db.select().from(activeProjects).where(eq(activeProjects.id, projectId));
+        if (project && project.quotationId) {
+          const quotationTeam = await storage.getQuotationTeamMembers(project.quotationId);
+          
+          // Convertir formato de cotización a formato de equipo base
+          baseTeam = quotationTeam.map(member => ({
+            id: member.id,
+            projectId: projectId,
+            personnelId: member.personnelId,
+            roleId: member.roleId,
+            hours: member.hours,
+            rate: member.rate,
+            cost: member.cost
+          }));
+        }
+      }
       
       // Enriquecer con información de personal y roles
       const enrichedTeam = await Promise.all(

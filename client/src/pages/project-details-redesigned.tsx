@@ -2216,170 +2216,308 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    console.log('🔍 DEBUG - Eficiencia por Miembro:', {
-                      baseTeam: baseTeam?.length,
-                      filteredTimeEntries: filteredTimeEntries?.length,
-                      dateFilter: dateFilter.label,
-                      sampleTimeEntry: filteredTimeEntries?.[0],
-                      sampleBaseTeamMember: baseTeam?.[0],
-                      baseTeamComplete: baseTeam,
-                      filteredTimeEntriesComplete: filteredTimeEntries
-                    });
-
                     // Calcular eficiencia real basada en el equipo base y registros de tiempo
                     const teamEfficiency = baseTeam?.map((member: any) => {
                       // Obtener horas trabajadas por este miembro en el período filtrado
-                      // Verificar tanto personnel_id como personnelId para compatibilidad
                       const memberTimeEntries = filteredTimeEntries.filter((entry: any) => 
-                        entry.personnel_id === member.personnelId || entry.personnelId === member.personnelId
+                        entry.personnelId === member.personnelId
                       );
                       
                       const workedHours = memberTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
                       const estimatedHours = member.hours || 0; // Horas estimadas de la cotización
                       const hourlyRate = member.rate || 0;
                       
-                      console.log(`🔍 Processing member ${member.personnel?.name || member.personnelId}: estimatedHours=${estimatedHours}, workedHours=${workedHours}, rate=${hourlyRate}`);
-                      
                       // Calcular eficiencia: si trabajó menos de lo estimado = más eficiente
                       const efficiency = estimatedHours > 0 ? Math.min(1.5, estimatedHours / Math.max(workedHours, 0.1)) : 1;
-                      const costPerHour = hourlyRate;
-
-                      console.log(`🔍 ${member.personnel?.name || `Miembro ${member.personnelId}`}: ${workedHours}h trabajadas (${memberTimeEntries.length} entradas) vs ${estimatedHours}h estimadas = ${(efficiency * 100).toFixed(1)}% eficiencia`);
 
                       return {
                         name: member.personnel?.name || `Miembro ${member.personnelId}`,
                         efficiency: efficiency,
-                        costPerHour: costPerHour,
+                        costPerHour: hourlyRate,
                         workedHours: workedHours,
                         estimatedHours: estimatedHours,
                         hasWorked: workedHours > 0,
-                        isOutlier: efficiency < 0.75, // Underperformers < 75% eficiencia
+                        isOutlier: efficiency < 0.75,
                         timeEntriesCount: memberTimeEntries.length
                       };
-                    })?.filter(member => {
-                      console.log(`🔍 Filtering member ${member.name}: estimatedHours=${member.estimatedHours}`);
-                      return member.estimatedHours > 0;
-                    }) // Solo miembros con horas estimadas
+                    })?.filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
                       ?.sort((a, b) => b.efficiency - a.efficiency) || [];
 
-                    console.log('🔍 Team efficiency calculada:', teamEfficiency.slice(0, 3));
-
-                    // Si no hay equipo base configurado
+                    // Si no hay equipo base configurado, mostrar el análisis usando los datos disponibles
                     if (!baseTeam || baseTeam.length === 0) {
                       return (
-                        <div className="text-center p-6">
-                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
-                            <Users className="h-8 w-8 text-gray-400" />
+                        <div className="text-center p-8">
+                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-emerald-100 rounded-full">
+                            <Users className="h-8 w-8 text-emerald-600" />
                           </div>
-                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin equipo configurado</h4>
-                          <p className="text-xs text-gray-500">
-                            Configure el equipo base del proyecto para ver análisis de eficiencia
+                          <h4 className="text-lg font-semibold text-gray-700 mb-2">Configuración de Equipo Pendiente</h4>
+                          <p className="text-sm text-gray-500 mb-4">
+                            Para ver análisis de eficiencia detallado, configure el equipo base del proyecto
                           </p>
-                          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-left">
-                            <div className="font-semibold text-red-800 mb-1">Debug Info:</div>
-                            <div className="text-red-700">
-                              baseTeam: {baseTeam ? 'exists' : 'null'} (length: {baseTeam?.length || 0})<br/>
-                              filteredTimeEntries: {filteredTimeEntries ? 'exists' : 'null'} (length: {filteredTimeEntries?.length || 0})<br/>
-                              dateFilter: {dateFilter.label}
-                            </div>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Configurar Equipo
+                          </Button>
                         </div>
                       );
                     }
 
-                    // Si no hay miembros con horas estimadas
+                    // Si hay equipo pero no hay datos de eficiencia después del filtro, aún mostrar el equipo
                     if (teamEfficiency.length === 0) {
+                      // Crear datos de eficiencia básicos sin filtrar para mostrar el equipo
+                      const basicTeamData = baseTeam?.map((member: any) => ({
+                        name: member.personnel?.name || `Miembro ${member.personnelId}`,
+                        estimatedHours: member.hours || 0,
+                        workedHours: 0,
+                        efficiency: 1,
+                        costPerHour: member.rate || 0,
+                        hasWorked: false,
+                        timeEntriesCount: 0
+                      })) || [];
+
                       return (
-                        <div className="text-center p-6">
-                          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-gray-100 rounded-full">
-                            <Users className="h-8 w-8 text-gray-400" />
+                        <div className="space-y-4">
+                          {/* Header con información del período */}
+                          <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm font-medium text-blue-800 mb-1">
+                              📊 Período: {dateFilter.label}
+                            </p>
+                            <p className="text-xs text-blue-600">
+                              {filteredTimeEntries.length} registros de tiempo • {baseTeam.length} miembros en el equipo
+                            </p>
                           </div>
-                          <h4 className="text-sm font-semibold text-gray-600 mb-1">Sin datos de estimación</h4>
-                          <p className="text-xs text-gray-500">
-                            Los miembros del equipo no tienen horas estimadas configuradas
-                          </p>
-                          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-left">
-                            <div className="font-semibold text-yellow-800 mb-1">Debug Info:</div>
-                            <div className="text-yellow-700">
-                              baseTeam: {baseTeam?.length || 0} miembros<br/>
-                              teamEfficiency después del filtro: {teamEfficiency.length}<br/>
-                              filteredTimeEntries: {filteredTimeEntries?.length || 0} registros<br/>
-                              dateFilter: {dateFilter.label}<br/>
-                              Miembros con horas &gt; 0: {baseTeam?.filter(m => m.hours > 0).length || 0}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
 
-                    const membersWithWork = teamEfficiency.filter(m => m.hasWorked);
-                    const membersWithoutWork = teamEfficiency.filter(m => !m.hasWorked);
-                    const topPerformers = membersWithWork.slice(0, 5);
-
-                    return (
-                      <div className="space-y-4">
-                        {/* Información del período */}
-                        <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm text-blue-700">
-                            📊 Período: {dateFilter.label} • {filteredTimeEntries.length} registros de tiempo • {membersWithWork.length} miembros activos
-                          </p>
-                        </div>
-
-                        {/* Miembros con trabajo realizado */}
-                        {topPerformers.length > 0 && (
+                          {/* Lista del equipo sin actividad */}
                           <div>
-                            <h4 className="text-sm font-semibold text-emerald-800 mb-2 flex items-center gap-1">
-                              <Crown className="h-4 w-4" />
-                              Miembros Activos (con tiempo registrado)
-                            </h4>
-                            <div className="space-y-2">
-                              {topPerformers.map((member, index) => (
-                                <div key={index} className="flex justify-between items-center p-3 bg-white rounded border border-emerald-200">
-                                  <div>
-                                    <span className="text-sm font-medium text-gray-700">{member.name}</span>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {member.workedHours.toFixed(1)}h trabajadas de {member.estimatedHours}h estimadas ({member.timeEntriesCount || 0} registros)
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className={`text-sm font-bold ${
-                                      member.efficiency >= 1.2 ? 'text-emerald-600' : 
-                                      member.efficiency >= 1.0 ? 'text-blue-600' : 
-                                      member.efficiency >= 0.8 ? 'text-yellow-600' : 'text-red-600'
-                                    }`}>
-                                      {(member.efficiency * 100).toFixed(0)}% efic.
-                                    </div>
-                                    <div className="text-xs text-gray-500">${member.costPerHour.toFixed(1)}/h</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Miembros sin trabajo registrado */}
-                        {membersWithoutWork.length > 0 && (
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                            <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
                               <Users className="h-4 w-4" />
-                              Miembros Sin Actividad ({membersWithoutWork.length})
+                              Equipo del Proyecto (Sin actividad en este período)
                             </h4>
-                            <div className="space-y-2">
-                              {membersWithoutWork.slice(0, 3).map((member, index) => (
-                                <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded border border-gray-200">
-                                  <span className="text-sm font-medium text-gray-600">{member.name}</span>
+                            <div className="grid grid-cols-1 gap-2">
+                              {basicTeamData.slice(0, 8).map((member, index) => (
+                                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                      <span className="text-xs font-medium text-gray-600">
+                                        {member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                                      <div className="text-xs text-gray-500">
+                                        {member.estimatedHours}h estimadas • ${member.costPerHour.toFixed(1)}/h
+                                      </div>
+                                    </div>
+                                  </div>
                                   <div className="text-right">
-                                    <div className="text-sm text-gray-500">0h trabajadas</div>
-                                    <div className="text-xs text-gray-400">${member.costPerHour.toFixed(1)}/h</div>
+                                    <div className="text-sm text-gray-500">Sin registros</div>
+                                    <div className="text-xs text-gray-400">En este período</div>
                                   </div>
                                 </div>
                               ))}
-                              {membersWithoutWork.length > 3 && (
-                                <div className="text-xs text-gray-500 text-center py-1">
-                                  +{membersWithoutWork.length - 3} miembros más sin actividad
+                              {basicTeamData.length > 8 && (
+                                <div className="text-center p-2">
+                                  <span className="text-xs text-gray-500">
+                                    Y {basicTeamData.length - 8} miembros más...
+                                  </span>
                                 </div>
                               )}
                             </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Mostrar solo los top 5 performers con diseño mejorado
+                    const topPerformers = teamEfficiency.slice(0, 5);
+                    const averageEfficiency = teamEfficiency.length > 0 ? 
+                      teamEfficiency.reduce((sum, m) => sum + m.efficiency, 0) / teamEfficiency.length : 0;
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Header con métricas clave */}
+                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-200 rounded-xl p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                <Zap className="h-5 w-5 text-emerald-600" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-bold text-gray-800">Análisis de Rendimiento</h3>
+                                <p className="text-sm text-gray-600">Top 5 performers del equipo</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-emerald-600">
+                                {(averageEfficiency * 100).toFixed(1)}%
+                              </div>
+                              <p className="text-xs text-gray-500">Eficiencia promedio</p>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 text-center">
+                              <div className="text-lg font-bold text-gray-700">{teamEfficiency.length}</div>
+                              <div className="text-xs text-gray-500">Miembros activos</div>
+                            </div>
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 text-center">
+                              <div className="text-lg font-bold text-green-600">
+                                {teamEfficiency.filter(m => m.efficiency >= 1).length}
+                              </div>
+                              <div className="text-xs text-gray-500">Sobre expectativas</div>
+                            </div>
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 text-center">
+                              <div className="text-lg font-bold text-blue-600">
+                                {teamEfficiency.filter(m => m.hasWorked).length}
+                              </div>
+                              <div className="text-xs text-gray-500">Con registros</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Top 5 Performers con diseño elegante */}
+                        <div className="space-y-3">
+                          {topPerformers.map((member, index) => {
+                            const isTopPerformer = member.efficiency >= 1.2;
+                            const isGoodPerformer = member.efficiency >= 1 && member.efficiency < 1.2;
+                            const needsAttention = member.efficiency < 0.8;
+                            
+                            return (
+                              <div
+                                key={index}
+                                className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 hover:shadow-lg ${
+                                  isTopPerformer 
+                                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-300' 
+                                    : isGoodPerformer
+                                    ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 hover:border-blue-300'
+                                    : needsAttention
+                                    ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 hover:border-amber-300'
+                                    : 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                {/* Ranking badge */}
+                                <div className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                  index === 1 ? 'bg-gray-100 text-gray-700' :
+                                  index === 2 ? 'bg-orange-100 text-orange-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {index + 1}
+                                </div>
+
+                                {/* Badge de estado */}
+                                {index === 0 && (
+                                  <div className="absolute top-3 left-3">
+                                    <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium">
+                                      <Crown className="h-3 w-3" />
+                                      MVP
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <div className="flex items-center justify-between p-6">
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold ${
+                                      isTopPerformer ? 'bg-green-100 text-green-700' :
+                                      isGoodPerformer ? 'bg-blue-100 text-blue-700' :
+                                      needsAttention ? 'bg-amber-100 text-amber-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {member.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                      <h4 className="text-base font-semibold text-gray-800">{member.name}</h4>
+                                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          {member.workedHours.toFixed(1)}h / {member.estimatedHours}h
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <DollarSign className="h-3 w-3" />
+                                          ${member.costPerHour.toFixed(1)}/h
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Barra de progreso */}
+                                      <div className="w-48 mt-2">
+                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                          <span>Progreso</span>
+                                          <span>{((member.workedHours / member.estimatedHours) * 100).toFixed(0)}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                          <div
+                                            className={`h-2 rounded-full transition-all duration-500 ${
+                                              isTopPerformer ? 'bg-green-500' :
+                                              isGoodPerformer ? 'bg-blue-500' :
+                                              needsAttention ? 'bg-amber-500' :
+                                              'bg-gray-400'
+                                            }`}
+                                            style={{ width: `${Math.min(100, (member.workedHours / member.estimatedHours) * 100)}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right space-y-2">
+                                    <div className={`text-3xl font-bold ${
+                                      isTopPerformer ? 'text-green-600' :
+                                      isGoodPerformer ? 'text-blue-600' :
+                                      needsAttention ? 'text-amber-600' :
+                                      'text-gray-600'
+                                    }`}>
+                                      {(member.efficiency * 100).toFixed(0)}%
+                                    </div>
+                                    <div className="flex items-center gap-1 text-sm">
+                                      {isTopPerformer ? (
+                                        <>
+                                          <TrendingUp className="h-4 w-4 text-green-500" />
+                                          <span className="text-green-600 font-medium">Excelente</span>
+                                        </>
+                                      ) : isGoodPerformer ? (
+                                        <>
+                                          <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                                          <span className="text-blue-600 font-medium">Bueno</span>
+                                        </>
+                                      ) : needsAttention ? (
+                                        <>
+                                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                          <span className="text-amber-600 font-medium">Atención</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Activity className="h-4 w-4 text-gray-500" />
+                                          <span className="text-gray-600 font-medium">Regular</span>
+                                        </>
+                                      )}
+                                    </div>
+                                    
+                                    {member.timeEntriesCount > 0 && (
+                                      <div className="text-xs text-gray-500">
+                                        {member.timeEntriesCount} registros
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Footer con insights */}
+                        {teamEfficiency.length > 5 && (
+                          <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-700 font-medium">
+                              Mostrando los 5 mejores performers de {teamEfficiency.length} miembros totales
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">
+                              Eficiencia promedio del equipo completo: {(averageEfficiency * 100).toFixed(1)}%
+                            </p>
                           </div>
                         )}
                       </div>
