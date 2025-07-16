@@ -43,6 +43,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -421,43 +422,97 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
   }
 
   return (
-    <div className="space-y-4">
-      {baseTeam.map((member: any) => {
-        const workedHours = getTimeWorkedByMember(member.personnelId);
-        const progressPercent = getProgressPercentage(workedHours, member.estimatedHours || 0);
+    <TooltipProvider>
+      <div className="space-y-4">
+        {baseTeam.map((member: any) => {
+          const workedHours = getTimeWorkedByMember(member.personnelId);
+          const estimatedHours = member.estimatedHours || 0;
+          const progressPercent = getProgressPercentage(workedHours, estimatedHours);
+          const remainingHours = Math.max(0, estimatedHours - workedHours);
+          const isOverBudget = workedHours > estimatedHours;
 
-        return (
-          <div key={member.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-bold">
-                  {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
-                </span>
+          return (
+            <div key={member.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white rounded-lg border border-purple-200 hover:shadow-md transition-all duration-200">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-11 h-11 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                    <span className="text-white text-sm font-bold">
+                      {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
+                    </span>
+                  </div>
+                  {/* Badge de progreso */}
+                  <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                    progressPercent >= 100 ? 'bg-green-500 text-white' : 
+                    progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
+                    'bg-blue-500 text-white'
+                  }`}>
+                    {progressPercent}%
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-sm text-purple-900">{member.personnel?.name || 'Miembro del Equipo'}</div>
+                  <div className="text-xs text-purple-600">{member.role?.name || 'Operations Lead'}</div>
+                  <div className="text-xs text-purple-500 mt-1">
+                    {workedHours.toFixed(1)}h de {estimatedHours}h estimadas
+                    {remainingHours > 0 && (
+                      <span className="text-gray-500"> • {remainingHours.toFixed(1)}h restantes</span>
+                    )}
+                    {isOverBudget && (
+                      <span className="text-red-600 font-medium"> • +{(workedHours - estimatedHours).toFixed(1)}h excedido</span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="font-medium text-sm text-purple-900">{member.personnel?.name || 'Miembro del Equipo'}</div>
-                <div className="text-xs text-purple-600">{member.role?.name || 'Operations Lead'}</div>
+              
+              <div className="flex items-center gap-4">
+                {/* Barra de progreso con tooltip */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-32 bg-purple-100 rounded-full h-3 cursor-help relative">
+                      <div 
+                        className={`h-3 rounded-full transition-all duration-300 ${
+                          isOverBudget ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                          progressPercent >= 80 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+                          'bg-gradient-to-r from-purple-500 to-purple-600'
+                        }`}
+                        style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                      />
+                      {/* Línea de 100% cuando se excede */}
+                      {isOverBudget && (
+                        <div className="absolute top-0 right-0 w-0.5 h-3 bg-gray-400 opacity-60" 
+                             style={{ right: `${Math.max(0, 100 - progressPercent)}%` }} />
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-sm">
+                      <div className="font-medium">Progreso de Horas</div>
+                      <div>Trabajadas: {workedHours.toFixed(1)}h</div>
+                      <div>Estimadas: {estimatedHours}h</div>
+                      <div>Progreso: {progressPercent}%</div>
+                      {isOverBudget ? (
+                        <div className="text-red-300">Excedido: +{(workedHours - estimatedHours).toFixed(1)}h</div>
+                      ) : (
+                        <div className="text-green-300">Restantes: {remainingHours.toFixed(1)}h</div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Información de costo */}
+                <div className="text-right min-w-[80px]">
+                  <div className="text-sm font-medium text-purple-900">
+                    ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    ${member.hourlyRate || 0}/h
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-sm text-purple-700">Registrado: {workedHours.toFixed(1)}h</div>
-                <div className="text-xs text-purple-500">Activo</div>
-              </div>
-              <div className="w-32 bg-purple-100 rounded-full h-2">
-                <div 
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" 
-                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                ></div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium text-purple-900">${(workedHours * (member.hourlyRate || 0)).toFixed(0)}</div>
-                <div className="text-xs text-purple-600">Costo real</div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       <div className="pt-3 border-t space-y-2">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -531,7 +586,7 @@ function ProjectTeamSection({ projectId, timeEntries, project, dateFilter, filte
           </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
