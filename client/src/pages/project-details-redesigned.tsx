@@ -729,8 +729,8 @@ export default function ProjectDetailsRedesigned() {
     enabled: !!(project as any)?.clientId,
   });
 
-  // Debug: Log client data to verify logoUrl is present
-  console.log('Client data:', client);
+  // Debug: Log complete data to verify it's working
+  console.log('🔍 COMPLETE DATA:', completeData);
 
   const { data: timeEntries = [] } = useQuery({
     queryKey: [`/api/time-entries/project/${projectId}`],
@@ -817,198 +817,93 @@ export default function ProjectDetailsRedesigned() {
     return (project as any).quotation;
   }, [project]);
 
-  // Cálculos principales basados en objetivos de cotización aprobada
-  const metrics = useMemo(() => {
-    if (!project || !Array.isArray(timeEntries)) return [];
-
-    const projectData = project as any;
-
-    // OBTENER OBJETIVOS DE LA COTIZACIÓN APROBADA ASOCIADA AL PROYECTO
-    if (!quotationData) {
-      console.warn('⚠️ No hay cotización asociada al proyecto:', projectData.id);
-      return [];
-    }
-
-    const monthlyClientPrice = quotationData.totalAmount; // Precio mensual al cliente
-    const monthlyBaseCost = quotationData.baseCost; // Costo base mensual estimado
-    const monthlyMarkup = quotationData.markupAmount || 0; // Markup mensual
-
-    // Obtener horas estimadas desde la cotización (calculadas desde los miembros del equipo)
-    const monthlyEstimatedHours = quotationData.estimatedHours || 0;
-
-
-
-    // IMPLEMENTAR LÓGICA DIFERENCIADA SEGÚN TIPO DE PROYECTO
-    // Fuente de verdad: quotationData.projectType determina si es 'always-on' o 'one-shot'
-    const isAlwaysOnProject = quotationData.projectType === 'always-on';
-
-    console.log('🎯 TIPO DE PROYECTO DETECTADO:', {
-      projectType: quotationData.projectType,
-      isAlwaysOn: isAlwaysOnProject,
-      filtroActual: dateFilter.label,
-      factorMultiplicador: isAlwaysOnProject ? 'Variable según período' : 'Siempre 1 (valor total)'
-    });
-
-    const getTargetMultiplier = () => {
-      // Para proyectos One-Shot, siempre usar el valor total (multiplicador = 1)
-      if (!isAlwaysOnProject) {
-        return 1;
-      }
-
-      // Para proyectos Always-On, calcular multiplicador según período seleccionado
-      const daysDiff = Math.ceil((dateFilter.endDate.getTime() - dateFilter.startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const daysInMonth = 30;
-
-      if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
-        return 3; // Trimestre = 3 meses
-      } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
-        return 6; // Semestre = 6 meses
-      } else if (dateFilter.label.includes('año') || dateFilter.label.includes('12 meses')) {
-        return 12; // Año = 12 meses
-      } else if (dateFilter.label.includes('mes') || daysDiff >= 25) {
-        return 1; // Mes completo
-      } else {
-        return daysDiff / daysInMonth; // Proporción de mes
-      }
-    };
-
-    const targetMultiplier = getTargetMultiplier();
-
-    // Aplicar multiplicador solo para proyectos Always-On
-    const targetClientPrice = monthlyClientPrice * targetMultiplier;
-    const targetBaseCost = monthlyBaseCost * targetMultiplier;
-    const targetHours = monthlyEstimatedHours * targetMultiplier;
-
-    // CALCULAR DATOS REALES DEL PERÍODO FILTRADO
-    const actualHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-    const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
-      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
-
-    // SI NO HAY DATOS REALES EN EL PERÍODO, MOSTRAR ESTADO VACÍO
-    const hasDataInPeriod = filteredTimeEntries.length > 0;
+  // Usar datos del hook centralizado como fuente de verdad
+  const costSummary = useMemo(() => {
+    if (!completeData) return null;
     
-    if (!hasDataInPeriod) {
-      return [
-        {
-          label: "Markup",
-          value: "0.0x",
-          subtitle: "Sin datos en el período",
-          icon: Percent,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
-          change: 0
-        },
-        {
-          label: "Progreso",
-          value: "0%",
-          subtitle: "Sin actividad registrada",
-          icon: Target,
-          color: "text-gray-600", 
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
-          change: 0
-        },
-        {
-          label: "Presupuesto",
-          value: "$0",
-          subtitle: "Sin costos registrados",
-          icon: DollarSign,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
-          change: 0
-        },
-        {
-          label: "Estado",
-          value: "Crítico",
-          subtitle: "Sin actividad en el período",
-          icon: AlertTriangle,
-          color: "text-red-700",
-          bgColor: "bg-gradient-to-br from-red-50 to-red-100",
-        }
-      ];
-    }
+    const {
+      quotation,
+      actuals,
+      metrics: calculatedMetrics
+    } = completeData;
 
-    // CALCULAR EFICIENCIAS Y DESVIACIONES
-    const costEfficiency = targetBaseCost > 0 ? ((targetBaseCost - actualCost) / targetBaseCost) * 100 : 0;
-    const hourEfficiency = targetHours > 0 ? ((targetHours - actualHours) / targetHours) * 100 : 0;
-    const budgetUtilization = targetBaseCost > 0 ? (actualCost / targetBaseCost) * 100 : 0;
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'active': return { color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' };
-        case 'paused': return { color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-200' };
-        case 'completed': return { color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' };
-        default: return { color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200' };
-      }
+    return {
+      // Métricas principales
+      markup: calculatedMetrics.markup,
+      filteredHours: actuals.totalWorkedHours,
+      targetHours: quotation.estimatedHours,
+      totalCost: actuals.totalWorkedCost,
+      targetBudget: quotation.baseCost,
+      totalEntries: actuals.totalEntries,
+      
+      // Porcentajes calculados
+      hoursProgress: (actuals.totalWorkedHours / quotation.estimatedHours) * 100,
+      budgetUtilization: (actuals.totalWorkedCost / quotation.baseCost) * 100,
+      
+      // Datos adicionales
+      clientPrice: quotation.totalAmount,
+      efficiency: calculatedMetrics.efficiency
     };
+  }, [completeData]);
 
-    const statusConfig = getStatusColor(projectData.status);
+  // Obtener estadísticas del equipo desde completeData
+  const teamStats = useMemo(() => {
+    if (!completeData?.quotation?.team) return [];
+    
+    return completeData.quotation.team.map(member => ({
+      name: member.personnelName,
+      hours: member.hours || 0,
+      estimatedHours: member.hours || 0,
+      entries: 0, // Será calculado por el componente
+      personnelId: member.personnelId
+    }));
+  }, [completeData]);
+
+  // Métricas para mostrar en el header usando completeData
+  const metrics = useMemo(() => {
+    if (!costSummary) return [];
 
     return [
       {
-        label: "Presupuesto vs Objetivo",
-        value: `$${actualCost.toLocaleString()}`,
-        subtitle: `Objetivo: $${targetBaseCost.toLocaleString()} | ${costEfficiency >= 0 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(costEfficiency).toFixed(1)}%`,
-        icon: DollarSign,
-        color: costEfficiency >= 0 ? "text-green-700" : "text-red-700",
-        bgColor: costEfficiency >= 0 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100",
-        change: costEfficiency
+        label: "Markup",
+        value: `${costSummary.markup.toFixed(1)}x`,
+        subtitle: `${costSummary.clientPrice.toLocaleString()} / ${costSummary.totalCost.toLocaleString()}`,
+        icon: Percent,
+        color: costSummary.markup >= 2.5 ? "text-green-700" : costSummary.markup >= 1.8 ? "text-blue-700" : "text-red-700",
+        bgColor: costSummary.markup >= 2.5 ? "bg-gradient-to-br from-green-50 to-green-100" : costSummary.markup >= 1.8 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-red-50 to-red-100",
+        change: 0
       },
       {
-        label: `Horas vs Objetivo`,
-        value: `${actualHours.toFixed(1)}h`,
-        subtitle: `Objetivo: ${targetHours.toFixed(1)}h | ${hourEfficiency >= 0 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(hourEfficiency).toFixed(1)}%`,
-        icon: Clock,
-        color: hourEfficiency >= 0 ? "text-green-700" : "text-orange-700",
-        bgColor: hourEfficiency >= 0 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-orange-50 to-orange-100",
-        change: hourEfficiency
-      },
-      {
-        label: "Progreso del Período",
-        value: (() => {
-          // Calcular progreso basado en horas completadas vs objetivo del período
-          if (targetHours === 0) return "0.0%";
-          const progressPercentage = Math.min(100, (actualHours / targetHours) * 100);
-          return `${progressPercentage.toFixed(1)}%`;
-        })(),
-        subtitle: (() => {
-          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
-          if (progressPercentage >= 100) return "Objetivo completado";
-          if (progressPercentage >= 80) return "Cerca del objetivo";
-          if (progressPercentage >= 50) return "Progreso moderado";
-          if (progressPercentage > 0) return "Progreso inicial";
-          return "Sin progreso registrado";
-        })(),
+        label: "Progreso",
+        value: `${costSummary.hoursProgress.toFixed(1)}%`,
+        subtitle: `${costSummary.filteredHours.toFixed(1)}h / ${costSummary.targetHours}h`,
         icon: Target,
-        color: (() => {
-          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
-          if (progressPercentage >= 100) return "text-green-700";
-          if (progressPercentage >= 80) return "text-blue-700";
-          if (progressPercentage >= 50) return "text-yellow-700";
-          if (progressPercentage > 0) return "text-orange-700";
-          return "text-gray-700";
-        })(),
-        bgColor: (() => {
-          const progressPercentage = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
-          if (progressPercentage >= 100) return "bg-gradient-to-br from-green-50 to-green-100";
-          if (progressPercentage >= 80) return "bg-gradient-to-br from-blue-50 to-blue-100";
-          if (progressPercentage >= 50) return "bg-gradient-to-br from-yellow-50 to-yellow-100";
-          if (progressPercentage > 0) return "bg-gradient-to-br from-orange-50 to-orange-100";
-          return "bg-gradient-to-br from-gray-50 to-gray-100";
-        })(),
-        change: targetHours > 0 ? ((actualHours / targetHours) * 100) - 100 : 0
+        color: costSummary.hoursProgress >= 100 ? "text-green-700" : costSummary.hoursProgress >= 75 ? "text-blue-700" : "text-orange-700",
+        bgColor: costSummary.hoursProgress >= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : costSummary.hoursProgress >= 75 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-orange-50 to-orange-100",
+        change: 0
       },
       {
-        label: "Estado",
-        value: projectData.status === 'active' ? 'Activo' : 
-               projectData.status === 'paused' ? 'Pausado' : 
-               projectData.status === 'completed' ? 'Completado' : 'Desconocido',
-        subtitle: projectData.completionStatus || "Sin actualizar",
-        icon: projectData.status === 'active' ? Play : projectData.status === 'paused' ? Pause : CheckCircle2,
-        color: statusConfig.color,
-        bgColor: statusConfig.bg,
+        label: "Presupuesto",
+        value: `${costSummary.budgetUtilization.toFixed(1)}%`,
+        subtitle: `$${costSummary.totalCost.toLocaleString()} usado`,
+        icon: DollarSign,
+        color: costSummary.budgetUtilization <= 100 ? "text-green-700" : "text-red-700",
+        bgColor: costSummary.budgetUtilization <= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100",
+        change: 0
+      },
+      {
+        label: "Registros",
+        value: `${costSummary.totalEntries}`,
+        subtitle: `entradas de tiempo`,
+        icon: Clock,
+        color: "text-purple-700",
+        bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
+        change: 0
       }
     ];
-  }, [project, timeEntries, dateFilter, filteredTimeEntries]);
+  }, [costSummary]);
+
+
 
   const recentTimeEntries = useMemo(() => {
     if (!Array.isArray(filteredTimeEntries)) return [];
@@ -1017,84 +912,6 @@ export default function ProjectDetailsRedesigned() {
       .sort((a: TimeEntry, b: TimeEntry) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
   }, [filteredTimeEntries]);
-
-  const teamStats = useMemo(() => {
-    if (!Array.isArray(filteredTimeEntries) || !Array.isArray(baseTeam)) return [];
-
-    const memberStats = new Map();
-
-    // Inicializar con datos del equipo base
-    baseTeam.forEach((member: any) => {
-      memberStats.set(member.personnelId, {
-        personnelId: member.personnelId,
-        personnelName: member.personnel?.name || `Miembro ${member.personnelId}`,
-        personnel: member.personnel,
-        estimatedHours: member.hours || 0,
-        hours: 0,
-        cost: 0,
-        entries: 0,
-        lastActivity: null
-      });
-    });
-
-    // Agregar datos reales de tiempo
-    filteredTimeEntries.forEach((entry: TimeEntry) => {
-      if (memberStats.has(entry.personnelId)) {
-        const stats = memberStats.get(entry.personnelId);
-        stats.hours += entry.hours || 0;
-        stats.cost += (entry.hours || 0) * (entry.hourlyRate || 0);
-        stats.entries += 1;
-        stats.lastActivity = entry.date;
-        // Actualizar nombre si viene del entry
-        if (entry.personnelName && !stats.personnelName.includes('Miembro')) {
-          stats.personnelName = entry.personnelName;
-        }
-      }
-    });
-
-    return Array.from(memberStats.values())
-      .filter(member => member.estimatedHours > 0) // Solo miembros con horas estimadas
-      .sort((a, b) => b.hours - a.hours);
-  }, [filteredTimeEntries, baseTeam]);
-
-  // SINGLE SOURCE OF TRUTH: usar completeData para todas las métricas
-  const costSummary = useMemo(() => {
-    if (!completeData || !Array.isArray(filteredTimeEntries)) return null;
-
-    console.log('🔍 SINGLE SOURCE OF TRUTH - costSummary:', {
-      estimatedHours: completeData.quotation.estimatedHours,
-      totalWorkedHours: completeData.actuals.totalWorkedHours,
-      totalWorkedCost: completeData.actuals.totalWorkedCost,
-      baseCost: completeData.quotation.baseCost,
-      totalAmount: completeData.quotation.totalAmount,
-      metrics: completeData.metrics
-    });
-
-    // Usar datos directamente de completeData
-    const actualHours = completeData.actuals.totalWorkedHours;
-    const actualCost = completeData.actuals.totalWorkedCost;
-    const targetHours = completeData.quotation.estimatedHours;
-    const targetBudget = completeData.quotation.baseCost;
-    const targetClientPrice = completeData.quotation.totalAmount;
-    
-    // Calcular métricas usando la fuente única
-    const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
-    const markup = actualCost > 0 ? targetClientPrice / actualCost : 0;
-    const hoursProgress = targetHours > 0 ? Math.min(100, (actualHours / targetHours) * 100) : 0;
-
-    return {
-      totalCost: actualCost,
-      budget: targetBudget,
-      budgetUtilization,
-      savings: targetBudget - actualCost,
-      filteredHours: actualHours,
-      targetHours,
-      targetMultiplier: 1, // Simplificado para single source
-      markup: markup,
-      targetClientPrice: targetClientPrice,
-      hoursProgress: hoursProgress
-    };
-  }, [completeData, filteredTimeEntries]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
