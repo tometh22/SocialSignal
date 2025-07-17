@@ -2081,8 +2081,8 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Score de Salud</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                                   <div className="font-bold mb-2">Score de Salud del Proyecto (Indicador General):</div>
                                   <div className="space-y-1 text-xs mb-3">
                                     <div>• Verde (Excelente): ≥80 puntos</div>
@@ -2165,8 +2165,8 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Proyección Financiera</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                                   <div className="font-bold mb-2">Proyección Financiera:</div>
                                   <div className="space-y-1 text-xs mb-3">
                                     <div>• Verde: ≤80% del presupuesto cotizado</div>
@@ -2253,8 +2253,8 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Eficiencia Equipo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                                   <div className="font-bold mb-2">Eficiencia del Equipo:</div>
                                   <div className="space-y-1 text-xs mb-3">
                                     <div>• Verde: ≥80% de eficiencia</div>
@@ -2287,7 +2287,7 @@ export default function ProjectDetailsRedesigned() {
                             isWarning ? 'text-yellow-600' :
                             isGood ? 'text-green-600' :
                             'text-gray-600'
-                          }`}>vs estimado</p>
+                          }`}>vs {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0) || '0'}h cotizadas</p>
                         </div>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                           isCritical ? 'bg-red-200/50' :
@@ -2336,8 +2336,8 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Burn Rate</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                                   <div className="font-bold mb-2">Burn Rate (Velocidad de Gasto):</div>
                                   <div className="space-y-1 text-xs mb-3">
                                     <div>• Verde: ≤80% del presupuesto mensual estimado</div>
@@ -2417,8 +2417,8 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Progreso Tiempo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                                   <div className="font-bold mb-2">Progreso de Tiempo:</div>
                                   <div className="space-y-1 text-xs mb-3">
                                     <div>• Verde: ≤75% del tiempo cotizado</div>
@@ -2483,8 +2483,8 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
                         <div className="group relative">
                           <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-50">
-                            <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-80 shadow-xl">
+                          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                            <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
                               <div className="font-bold mb-2">Score de Calidad (Indicador Específico):</div>
                               <div className="space-y-1 text-xs mb-3">
                                 <div>• Excelente: ≥90 puntos</div>
