@@ -103,7 +103,7 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
-- July 17, 2025: **COMPREHENSIVE TOOLTIPS IMPLEMENTATION** - Added informative tooltips to all 6 KPI cards explaining calculation logic and color criteria (Score de Salud, Proyección Financiera, Eficiencia Equipo, Burn Rate, Progreso Tiempo, Score Calidad) plus enhanced tooltips for heat map and top performers sections
+- July 17, 2025: **COMPREHENSIVE TOOLTIPS IMPLEMENTATION** - Added informative tooltips to all 6 KPI cards explaining calculation logic and color criteria (Score de Salud, Proyección Financiera, Eficiencia Equipo, Burn Rate, Progreso Tiempo, Score Calidad) plus enhanced tooltips for heat map and top performers sections with real-time data visualization showing exact comparison values
 - July 17, 2025: **HEAT MAP VISUALIZATION ENHANCEMENT** - Replaced initials with full names (truncated at 12 characters) in heat map grid and improved tooltip explanations for color coding system using real data from time entries
 - July 17, 2025: **MONTHLY ANALYSIS DASHBOARD REFINEMENT** - Enhanced world-class monthly analysis tab with comprehensive explanations of all metrics: strategic color system (red=critical, yellow=attention, green=good, white=neutral) with detailed calculation formulas
 - July 16, 2025: **TIME REGISTRATION UI IMPROVEMENTS** - Changed registration component background from purple gradient to clean white design, replaced confusing "En progreso" badge with clearer "Parcial" for past time periods, improved visual hierarchy with neutral gray color scheme

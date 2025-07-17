@@ -2089,8 +2089,13 @@ export default function ProjectDetailsRedesigned() {
                                     <div>• Amarillo (Atención): 50-79 puntos</div>
                                     <div>• Rojo (Crítico): &lt;50 puntos</div>
                                   </div>
-                                  <div className="mt-1 text-gray-300 text-xs">
-                                    Combina presupuesto, tiempo y calidad
+                                  <div className="mt-2 border-t border-gray-600 pt-1">
+                                    <div className="text-gray-300 text-xs">
+                                      <div><strong>Datos actuales:</strong></div>
+                                      <div>Costo real: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
+                                      <div>Presupuesto: ${(costSummary?.budget || 0).toFixed(0)}</div>
+                                      <div>Horas: {(costSummary?.filteredHours || 0).toFixed(1)}h / {(costSummary?.targetHours || 0).toFixed(1)}h</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2165,8 +2170,13 @@ export default function ProjectDetailsRedesigned() {
                                     <div>• Amarillo: 80-100% del presupuesto</div>
                                     <div>• Rojo: &gt;100% del presupuesto</div>
                                   </div>
-                                  <div className="mt-1 text-gray-300 text-xs">
-                                    Extrapola gastos actuales al final del proyecto
+                                  <div className="mt-2 border-t border-gray-600 pt-1">
+                                    <div className="text-gray-300 text-xs">
+                                      <div><strong>Comparación:</strong></div>
+                                      <div>Gasto actual: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
+                                      <div>Proyección final: ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)}</div>
+                                      <div>Presupuesto total: ${(costSummary?.budget || 0).toFixed(0)}</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2245,8 +2255,13 @@ export default function ProjectDetailsRedesigned() {
                                     <div>• Amarillo: 60-79% de eficiencia</div>
                                     <div>• Rojo: &lt;60% de eficiencia</div>
                                   </div>
-                                  <div className="mt-1 text-gray-300 text-xs">
-                                    Horas trabajadas vs horas estimadas del equipo
+                                  <div className="mt-2 border-t border-gray-600 pt-1">
+                                    <div className="text-gray-300 text-xs">
+                                      <div><strong>Datos del equipo:</strong></div>
+                                      <div>Horas trabajadas: {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(1) || '0.0'}h</div>
+                                      <div>Horas estimadas: {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(1) || '0.0'}h</div>
+                                      <div>Miembros activos: {teamStats?.filter(member => member.hours > 0).length || 0}</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2320,8 +2335,13 @@ export default function ProjectDetailsRedesigned() {
                                     <div>• Amarillo: 80-120% del presupuesto mensual</div>
                                     <div>• Rojo: &gt;120% del presupuesto mensual</div>
                                   </div>
-                                  <div className="mt-1 text-gray-300 text-xs">
-                                    Costo total ÷ meses transcurridos del proyecto
+                                  <div className="mt-2 border-t border-gray-600 pt-1">
+                                    <div className="text-gray-300 text-xs">
+                                      <div><strong>Cálculo actual:</strong></div>
+                                      <div>Costo total: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
+                                      <div>Meses transcurridos: {Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30)).toFixed(1)}</div>
+                                      <div>Presupuesto mensual: ${((costSummary?.budget || 0) / 12).toFixed(0)}</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2393,8 +2413,13 @@ export default function ProjectDetailsRedesigned() {
                                     <div>• Amarillo: 75-100% del tiempo estimado</div>
                                     <div>• Rojo: &gt;100% (retraso)</div>
                                   </div>
-                                  <div className="mt-1 text-gray-300 text-xs">
-                                    Horas trabajadas vs horas presupuestadas
+                                  <div className="mt-2 border-t border-gray-600 pt-1">
+                                    <div className="text-gray-300 text-xs">
+                                      <div><strong>Datos de tiempo:</strong></div>
+                                      <div>Horas trabajadas: {(costSummary?.filteredHours || 0).toFixed(1)}h</div>
+                                      <div>Horas presupuestadas: {(costSummary?.targetHours || 0).toFixed(1)}h</div>
+                                      <div>Progreso: {(((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1)) * 100).toFixed(1)}%</div>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -2452,8 +2477,13 @@ export default function ProjectDetailsRedesigned() {
                                 <div>• Regular: 50-69 puntos</div>
                                 <div>• Crítico: &lt;50 puntos</div>
                               </div>
-                              <div className="mt-1 text-gray-300 text-xs">
-                                Basado en feedback y métricas de entregables
+                              <div className="mt-2 border-t border-gray-600 pt-1">
+                                <div className="text-gray-300 text-xs">
+                                  <div><strong>Basado en:</strong></div>
+                                  <div>• Feedback de cliente</div>
+                                  <div>• Métricas de entregables</div>
+                                  <div>• Evaluaciones internas</div>
+                                </div>
                               </div>
                             </div>
                           </div>
