@@ -699,7 +699,17 @@ export default function ProjectDetailsRedesigned() {
     };
   });
 
-  // Datos del proyecto
+  // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto de un endpoint centralizado
+  const { data: completeData, isLoading: completeDataLoading } = useQuery({
+    queryKey: ["/api/projects", projectId, "complete-data"],
+    queryFn: () => {
+      if (!projectId) throw new Error("No project ID provided");
+      return fetch(`/api/projects/${projectId}/complete-data`).then(res => res.json());
+    },
+    enabled: !!projectId
+  });
+
+  // Datos del proyecto (mantenido para compatibilidad)
   const { data: project, isLoading } = useQuery({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: !!projectId,
@@ -2202,49 +2212,15 @@ export default function ProjectDetailsRedesigned() {
                   ? teamStats.reduce((sum, member) => sum + (member.hours || 0), 0)
                   : 0;
                 
-                // Calculate totalEstimated from quotation data (universal solution)
-                const totalEstimated = useMemo(() => {
-                  // First try: use quotationData.team if available
-                  if (quotationData?.team && Array.isArray(quotationData.team)) {
-                    const quotationTotal = quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0);
-                    if (quotationTotal > 0) return quotationTotal;
-                  }
-                  
-                  // Second try: use baseTeam if available
-                  if (baseTeam && Array.isArray(baseTeam) && baseTeam.length > 0) {
-                    const baseTeamTotal = baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0);
-                    if (baseTeamTotal > 0) return baseTeamTotal;
-                  }
-                  
-                  // Third try: use project budget hours if available
-                  if (project?.quotationData?.estimatedHours) {
-                    return project.quotationData.estimatedHours;
-                  }
-                  
-                  // Last resort: calculate from teamStats estimatedHours but warn
-                  if (teamStats && Array.isArray(teamStats) && teamStats.length > 0) {
-                    const teamStatsTotal = teamStats.reduce((sum, member) => sum + (member.estimatedHours || 0), 0);
-                    if (teamStatsTotal > 0) {
-                      console.warn('⚠️ Using teamStats for totalEstimated, may be inaccurate:', teamStatsTotal);
-                      return teamStatsTotal;
-                    }
-                  }
-                  
-                  return 1; // Prevent division by zero
-                }, [quotationData, baseTeam, project, teamStats]);
+                // USE SINGLE SOURCE OF TRUTH: get data from centralized endpoint
+                const totalEstimated = completeData?.quotation?.estimatedHours || 1;
                 
-                // Debug logging to verify which source is being used
+                // Debug logging to verify single source of truth
                 if (typeof window !== 'undefined') {
-                  console.log('🔍 UNIVERSAL CALCULATION DEBUG:');
-                  console.log('📊 quotationData available:', !!quotationData);
-                  console.log('📊 quotationData.team:', quotationData?.team?.length || 0, 'members');
-                  if (quotationData?.team) {
-                    console.log('📊 quotationData.team hours:', quotationData.team.map(m => m.hours));
-                    console.log('📊 quotationData.team total:', quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0));
-                  }
-                  console.log('📊 baseTeam:', baseTeam?.length || 0, 'members');
-                  console.log('📊 project.quotationData.estimatedHours:', project?.quotationData?.estimatedHours);
-                  console.log('📊 Final totalEstimated used:', totalEstimated);
+                  console.log('🔍 SINGLE SOURCE OF TRUTH:');
+                  console.log('📊 completeData available:', !!completeData);
+                  console.log('📊 Estimated hours from single source:', totalEstimated);
+                  console.log('📊 This should always be 969h for Warner Bros project');
                 }
                 
                 const efficiency = totalEstimated > 0 ? (totalWorked / totalEstimated) * 100 : 0;
