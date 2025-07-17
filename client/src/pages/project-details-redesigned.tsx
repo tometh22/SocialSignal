@@ -2198,10 +2198,15 @@ export default function ProjectDetailsRedesigned() {
 
               {/* Team Efficiency - Strategic Colors */}
               {(() => {
-                const efficiency = teamStats && teamStats.length > 0 
-                  ? (teamStats.reduce((sum, member) => sum + (member.hours || 0), 0) / 
-                     Math.max(1, teamStats.reduce((sum, member) => sum + (member.estimatedHours || 0), 0))) * 100
+                // Use baseTeam for accurate estimation hours from quotation (969h) instead of teamStats
+                const totalWorked = teamStats && teamStats.length > 0 
+                  ? teamStats.reduce((sum, member) => sum + (member.hours || 0), 0)
                   : 0;
+                const totalEstimated = baseTeam && baseTeam.length > 0 
+                  ? baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0)
+                  : 1;
+                
+                const efficiency = totalEstimated > 0 ? (totalWorked / totalEstimated) * 100 : 0;
                 const isCritical = efficiency < 60;
                 const isWarning = efficiency >= 60 && efficiency < 80;
                 const isGood = efficiency >= 80;
@@ -2229,7 +2234,7 @@ export default function ProjectDetailsRedesigned() {
                                 <div className="font-bold">Eficiencia del Equipo</div>
                                 <div>Verde ≥80% | Amarillo 60-79% | Rojo &lt;60%</div>
                                 <div className="mt-1 text-gray-300">
-                                  {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(0)}h trabajadas de {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0)}h cotizadas
+                                  {totalWorked.toFixed(0)}h trabajadas de {totalEstimated.toFixed(0)}h cotizadas
                                 </div>
                               </div>
                             </div>
