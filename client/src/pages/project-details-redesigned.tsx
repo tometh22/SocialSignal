@@ -70,6 +70,7 @@ import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
+import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 
 interface ProjectMetric {
   label: string;
@@ -699,15 +700,23 @@ export default function ProjectDetailsRedesigned() {
     };
   });
 
-  // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto de un endpoint centralizado
-  const { data: completeData, isLoading: completeDataLoading } = useQuery({
-    queryKey: ["/api/projects", projectId, "complete-data"],
-    queryFn: () => {
-      if (!projectId) throw new Error("No project ID provided");
-      return fetch(`/api/projects/${projectId}/complete-data`).then(res => res.json());
-    },
-    enabled: !!projectId
-  });
+  // Mapear el filtro temporal al formato que espera el hook
+  const getTimeFilterForHook = (filter: DateFilter) => {
+    if (filter.label.includes('Mes pasado')) return 'last_month';
+    if (filter.label.includes('Este mes')) return 'current_month';
+    if (filter.label.includes('Trimestre pasado')) return 'last_quarter';
+    if (filter.label.includes('Este trimestre')) return 'current_quarter';
+    if (filter.label.includes('Semestre pasado')) return 'last_semester';
+    if (filter.label.includes('Este semestre')) return 'current_semester';
+    if (filter.label.includes('Año')) return 'current_year';
+    return 'all';
+  };
+
+  // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
+  const { data: completeData, isLoading: completeDataLoading } = useCompleteProjectData(
+    projectId ? parseInt(projectId) : 0, 
+    getTimeFilterForHook(dateFilter)
+  );
 
   // Datos del proyecto (mantenido para compatibilidad)
   const { data: project, isLoading } = useQuery({

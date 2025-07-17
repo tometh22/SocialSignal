@@ -103,6 +103,7 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 17, 2025: **CRITICAL TEMPORAL FILTERING SYSTEM UNIFIED** - Implemented single source of truth with `useCompleteProjectData` hook that supports temporal filtering across all project tabs, fixed inconsistent data sources where different tabs were using separate endpoints, now all metrics are calculated from the same filtered dataset ensuring consistency between dashboard, team analysis, and monthly analytics
 - July 17, 2025: **COMPREHENSIVE TOOLTIPS REDESIGN** - Redesigned all 6 KPI tooltips with compact format (left-positioned, w-48, clear text) explaining calculation logic and color criteria, fixed positioning issues to prevent cutoff, clarified "vs estimado" text to show specific values like "219h trabajadas de 969h cotizadas", clear distinction between Score de Salud (general project health) vs Score de Calidad (deliverable quality), all with real-time data from quotation comparisons
 - July 17, 2025: **HEAT MAP VISUALIZATION ENHANCEMENT** - Replaced initials with full names (truncated at 12 characters) in heat map grid and improved tooltip explanations for color coding system using real data from time entries
 - July 17, 2025: **MONTHLY ANALYSIS DASHBOARD REFINEMENT** - Enhanced world-class monthly analysis tab with comprehensive explanations of all metrics: strategic color system (red=critical, yellow=attention, green=good, white=neutral) with detailed calculation formulas
