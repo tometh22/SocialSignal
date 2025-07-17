@@ -2072,12 +2072,30 @@ export default function ProjectDetailsRedesigned() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-xs font-medium mb-1 ${
-                            isCritical ? 'text-red-700' :
-                            isWarning ? 'text-yellow-700' :
-                            isGood ? 'text-green-700' :
-                            'text-gray-700'
-                          }`}>Score de Salud</p>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-xs font-medium mb-1 ${
+                              isCritical ? 'text-red-700' :
+                              isWarning ? 'text-yellow-700' :
+                              isGood ? 'text-green-700' :
+                              'text-gray-700'
+                            }`}>Score de Salud</p>
+                            <div className="group relative">
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                                  <div className="font-bold mb-1">Score de Salud del Proyecto:</div>
+                                  <div className="space-y-1 text-xs">
+                                    <div>• Verde (Excelente): ≥80 puntos</div>
+                                    <div>• Amarillo (Atención): 50-79 puntos</div>
+                                    <div>• Rojo (Crítico): &lt;50 puntos</div>
+                                  </div>
+                                  <div className="mt-1 text-gray-300 text-xs">
+                                    Combina presupuesto, tiempo y calidad
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <p className={`text-2xl font-bold ${
                             isCritical ? 'text-red-800' :
                             isWarning ? 'text-yellow-800' :
@@ -2130,12 +2148,30 @@ export default function ProjectDetailsRedesigned() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-xs font-medium mb-1 ${
-                            isOverBudget ? 'text-red-700' :
-                            isWarning ? 'text-yellow-700' :
-                            isGood ? 'text-green-700' :
-                            'text-gray-700'
-                          }`}>Proyección Financiera</p>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-xs font-medium mb-1 ${
+                              isOverBudget ? 'text-red-700' :
+                              isWarning ? 'text-yellow-700' :
+                              isGood ? 'text-green-700' :
+                              'text-gray-700'
+                            }`}>Proyección Financiera</p>
+                            <div className="group relative">
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                                  <div className="font-bold mb-1">Proyección Financiera:</div>
+                                  <div className="space-y-1 text-xs">
+                                    <div>• Verde: ≤80% del presupuesto</div>
+                                    <div>• Amarillo: 80-100% del presupuesto</div>
+                                    <div>• Rojo: &gt;100% del presupuesto</div>
+                                  </div>
+                                  <div className="mt-1 text-gray-300 text-xs">
+                                    Extrapola gastos actuales al final del proyecto
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <p className={`text-lg font-bold ${
                             isOverBudget ? 'text-red-800' :
                             isWarning ? 'text-yellow-800' :
@@ -2192,12 +2228,30 @@ export default function ProjectDetailsRedesigned() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-xs font-medium mb-1 ${
-                            isCritical ? 'text-red-700' :
-                            isWarning ? 'text-yellow-700' :
-                            isGood ? 'text-green-700' :
-                            'text-gray-700'
-                          }`}>Eficiencia Equipo</p>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-xs font-medium mb-1 ${
+                              isCritical ? 'text-red-700' :
+                              isWarning ? 'text-yellow-700' :
+                              isGood ? 'text-green-700' :
+                              'text-gray-700'
+                            }`}>Eficiencia Equipo</p>
+                            <div className="group relative">
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                                  <div className="font-bold mb-1">Eficiencia del Equipo:</div>
+                                  <div className="space-y-1 text-xs">
+                                    <div>• Verde: ≥80% de eficiencia</div>
+                                    <div>• Amarillo: 60-79% de eficiencia</div>
+                                    <div>• Rojo: &lt;60% de eficiencia</div>
+                                  </div>
+                                  <div className="mt-1 text-gray-300 text-xs">
+                                    Horas trabajadas vs horas estimadas del equipo
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <p className={`text-2xl font-bold ${
                             isCritical ? 'text-red-800' :
                             isWarning ? 'text-yellow-800' :
@@ -2249,12 +2303,30 @@ export default function ProjectDetailsRedesigned() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-xs font-medium mb-1 ${
-                            isCritical ? 'text-red-700' :
-                            isWarning ? 'text-yellow-700' :
-                            isGood ? 'text-green-700' :
-                            'text-gray-700'
-                          }`}>Burn Rate</p>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-xs font-medium mb-1 ${
+                              isCritical ? 'text-red-700' :
+                              isWarning ? 'text-yellow-700' :
+                              isGood ? 'text-green-700' :
+                              'text-gray-700'
+                            }`}>Burn Rate</p>
+                            <div className="group relative">
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                                  <div className="font-bold mb-1">Burn Rate (Velocidad de Gasto):</div>
+                                  <div className="space-y-1 text-xs">
+                                    <div>• Verde: ≤80% del presupuesto mensual</div>
+                                    <div>• Amarillo: 80-120% del presupuesto mensual</div>
+                                    <div>• Rojo: &gt;120% del presupuesto mensual</div>
+                                  </div>
+                                  <div className="mt-1 text-gray-300 text-xs">
+                                    Costo total ÷ meses transcurridos del proyecto
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <p className={`text-2xl font-bold ${
                             isCritical ? 'text-red-800' :
                             isWarning ? 'text-yellow-800' :
@@ -2304,12 +2376,30 @@ export default function ProjectDetailsRedesigned() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className={`text-xs font-medium mb-1 ${
-                            isCritical ? 'text-red-700' :
-                            isWarning ? 'text-yellow-700' :
-                            isGood ? 'text-green-700' :
-                            'text-gray-700'
-                          }`}>Progreso Tiempo</p>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-xs font-medium mb-1 ${
+                              isCritical ? 'text-red-700' :
+                              isWarning ? 'text-yellow-700' :
+                              isGood ? 'text-green-700' :
+                              'text-gray-700'
+                            }`}>Progreso Tiempo</p>
+                            <div className="group relative">
+                              <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                                <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                                  <div className="font-bold mb-1">Progreso de Tiempo:</div>
+                                  <div className="space-y-1 text-xs">
+                                    <div>• Verde: ≤75% del tiempo estimado</div>
+                                    <div>• Amarillo: 75-100% del tiempo estimado</div>
+                                    <div>• Rojo: &gt;100% (retraso)</div>
+                                  </div>
+                                  <div className="mt-1 text-gray-300 text-xs">
+                                    Horas trabajadas vs horas presupuestadas
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                           <p className={`text-2xl font-bold ${
                             isCritical ? 'text-red-800' :
                             isWarning ? 'text-yellow-800' :
@@ -2349,7 +2439,26 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
+                        <div className="group relative">
+                          <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                            <div className="bg-black text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap max-w-xs">
+                              <div className="font-bold mb-1">Score de Calidad:</div>
+                              <div className="space-y-1 text-xs">
+                                <div>• Excelente: ≥90 puntos</div>
+                                <div>• Bueno: 70-89 puntos</div>
+                                <div>• Regular: 50-69 puntos</div>
+                                <div>• Crítico: &lt;50 puntos</div>
+                              </div>
+                              <div className="mt-1 text-gray-300 text-xs">
+                                Basado en feedback y métricas de entregables
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <p className="text-2xl font-bold text-gray-800">92</p>
                       <p className="text-xs text-gray-600 mt-1">Excelente</p>
                     </div>
