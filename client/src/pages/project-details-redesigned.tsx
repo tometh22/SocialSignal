@@ -2081,25 +2081,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Score de Salud</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                                  <div className="font-bold mb-2">Score de Salud del Proyecto (Indicador General):</div>
-                                  <div className="space-y-1 text-xs mb-3">
-                                    <div>• Verde (Excelente): ≥80 puntos</div>
-                                    <div>• Amarillo (Atención): 50-79 puntos</div>
-                                    <div>• Rojo (Crítico): &lt;50 puntos</div>
-                                  </div>
-                                  <div className="text-gray-300 text-xs mb-3">
-                                    <strong>Diferencia clave:</strong> Combina métricas financieras y operativas del proyecto completo.
-                                  </div>
-                                  <div className="border-t border-gray-600 pt-2">
-                                    <div className="text-gray-300 text-xs">
-                                      <div><strong>Valores vs cotización estimada:</strong></div>
-                                      <div>Costo real: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
-                                      <div>Presupuesto cotizado: ${(costSummary?.budget || 0).toFixed(0)}</div>
-                                      <div>Horas: {(costSummary?.filteredHours || 0).toFixed(1)}h / {(costSummary?.targetHours || 0).toFixed(1)}h estimadas</div>
-                                    </div>
-                                  </div>
+                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                                <div className="font-bold">Score de Salud General</div>
+                                <div>Verde ≥80pts | Amarillo 50-79pts | Rojo &lt;50pts</div>
+                                <div className="mt-1 text-gray-300">
+                                  ${(costSummary?.totalCost || 0).toFixed(0)} gastado / ${(costSummary?.budget || 0).toFixed(0)} presupuestado
                                 </div>
                               </div>
                             </div>
@@ -2165,25 +2151,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Proyección Financiera</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                                  <div className="font-bold mb-2">Proyección Financiera:</div>
-                                  <div className="space-y-1 text-xs mb-3">
-                                    <div>• Verde: ≤80% del presupuesto cotizado</div>
-                                    <div>• Amarillo: 80-100% del presupuesto cotizado</div>
-                                    <div>• Rojo: &gt;100% del presupuesto cotizado</div>
-                                  </div>
-                                  <div className="text-gray-300 text-xs mb-3">
-                                    Extrapola gastos actuales al final del proyecto basado en tendencia.
-                                  </div>
-                                  <div className="border-t border-gray-600 pt-2">
-                                    <div className="text-gray-300 text-xs">
-                                      <div><strong>Comparación vs presupuesto de cotización:</strong></div>
-                                      <div>Gasto actual: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
-                                      <div>Proyección final: ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)}</div>
-                                      <div>Presupuesto cotizado: ${(costSummary?.budget || 0).toFixed(0)}</div>
-                                    </div>
-                                  </div>
+                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                                <div className="font-bold">Proyección Financiera</div>
+                                <div>Verde ≤80% | Amarillo 80-100% | Rojo &gt;100%</div>
+                                <div className="mt-1 text-gray-300">
+                                  Proyección: ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)} / ${(costSummary?.budget || 0).toFixed(0)} presupuesto
                                 </div>
                               </div>
                             </div>
@@ -2253,25 +2225,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Eficiencia Equipo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                                  <div className="font-bold mb-2">Eficiencia del Equipo:</div>
-                                  <div className="space-y-1 text-xs mb-3">
-                                    <div>• Verde: ≥80% de eficiencia</div>
-                                    <div>• Amarillo: 60-79% de eficiencia</div>
-                                    <div>• Rojo: &lt;60% de eficiencia</div>
-                                  </div>
-                                  <div className="text-gray-300 text-xs mb-3">
-                                    Promedio de eficiencia del equipo completo.
-                                  </div>
-                                  <div className="border-t border-gray-600 pt-2">
-                                    <div className="text-gray-300 text-xs">
-                                      <div><strong>Datos vs horas estimadas en cotización:</strong></div>
-                                      <div>Horas trabajadas: {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(1) || '0.0'}h</div>
-                                      <div>Horas cotizadas: {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(1) || '0.0'}h</div>
-                                      <div>Miembros activos: {teamStats?.filter(member => member.hours > 0).length || 0}</div>
-                                    </div>
-                                  </div>
+                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                                <div className="font-bold">Eficiencia del Equipo</div>
+                                <div>Verde ≥80% | Amarillo 60-79% | Rojo &lt;60%</div>
+                                <div className="mt-1 text-gray-300">
+                                  {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(0)}h trabajadas / {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0)}h cotizadas
                                 </div>
                               </div>
                             </div>
@@ -2287,7 +2245,7 @@ export default function ProjectDetailsRedesigned() {
                             isWarning ? 'text-yellow-600' :
                             isGood ? 'text-green-600' :
                             'text-gray-600'
-                          }`}>vs {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0) || '0'}h cotizadas</p>
+                          }`}>de {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0) || '0'}h cotizadas</p>
                         </div>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                           isCritical ? 'bg-red-200/50' :
@@ -2336,25 +2294,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Burn Rate</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                                  <div className="font-bold mb-2">Burn Rate (Velocidad de Gasto):</div>
-                                  <div className="space-y-1 text-xs mb-3">
-                                    <div>• Verde: ≤80% del presupuesto mensual estimado</div>
-                                    <div>• Amarillo: 80-120% del presupuesto mensual estimado</div>
-                                    <div>• Rojo: &gt;120% del presupuesto mensual estimado</div>
-                                  </div>
-                                  <div className="text-gray-300 text-xs mb-3">
-                                    Velocidad de gasto actual vs ritmo planificado en cotización.
-                                  </div>
-                                  <div className="border-t border-gray-600 pt-2">
-                                    <div className="text-gray-300 text-xs">
-                                      <div><strong>Cálculo vs presupuesto cotizado:</strong></div>
-                                      <div>Costo total: ${(costSummary?.totalCost || 0).toFixed(0)}</div>
-                                      <div>Meses transcurridos: {Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30)).toFixed(1)}</div>
-                                      <div>Presupuesto mensual cotizado: ${((costSummary?.budget || 0) / 12).toFixed(0)}</div>
-                                    </div>
-                                  </div>
+                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                                <div className="font-bold">Burn Rate</div>
+                                <div>Verde ≤80% | Amarillo 80-120% | Rojo &gt;120%</div>
+                                <div className="mt-1 text-gray-300">
+                                  ${((costSummary?.totalCost || 0) / Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30))).toFixed(0)}/mes vs ${((costSummary?.budget || 0) / 12).toFixed(0)}/mes planificado
                                 </div>
                               </div>
                             </div>
@@ -2417,25 +2361,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Progreso Tiempo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                                <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                                  <div className="font-bold mb-2">Progreso de Tiempo:</div>
-                                  <div className="space-y-1 text-xs mb-3">
-                                    <div>• Verde: ≤75% del tiempo cotizado</div>
-                                    <div>• Amarillo: 75-100% del tiempo cotizado</div>
-                                    <div>• Rojo: &gt;100% (excede cotización)</div>
-                                  </div>
-                                  <div className="text-gray-300 text-xs mb-3">
-                                    Consumo de horas vs tiempo presupuestado en cotización.
-                                  </div>
-                                  <div className="border-t border-gray-600 pt-2">
-                                    <div className="text-gray-300 text-xs">
-                                      <div><strong>Datos vs cotización:</strong></div>
-                                      <div>Horas trabajadas: {(costSummary?.filteredHours || 0).toFixed(1)}h</div>
-                                      <div>Horas cotizadas: {(costSummary?.targetHours || 0).toFixed(1)}h</div>
-                                      <div>Progreso: {(((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1)) * 100).toFixed(1)}%</div>
-                                    </div>
-                                  </div>
+                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                                <div className="font-bold">Progreso de Tiempo</div>
+                                <div>Verde ≤75% | Amarillo 75-100% | Rojo &gt;100%</div>
+                                <div className="mt-1 text-gray-300">
+                                  {(costSummary?.filteredHours || 0).toFixed(0)}h trabajadas / {(costSummary?.targetHours || 0).toFixed(0)}h cotizadas
                                 </div>
                               </div>
                             </div>
@@ -2483,27 +2413,11 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
                         <div className="group relative">
                           <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
-                            <div className="bg-black text-white text-xs rounded-lg py-3 px-4 w-72 shadow-xl border border-gray-600">
-                              <div className="font-bold mb-2">Score de Calidad (Indicador Específico):</div>
-                              <div className="space-y-1 text-xs mb-3">
-                                <div>• Excelente: ≥90 puntos</div>
-                                <div>• Bueno: 70-89 puntos</div>
-                                <div>• Regular: 50-69 puntos</div>
-                                <div>• Crítico: &lt;50 puntos</div>
-                              </div>
-                              <div className="text-gray-300 text-xs mb-3">
-                                <strong>Diferencia clave:</strong> Mide específicamente la calidad de los entregables y trabajo producido.
-                              </div>
-                              <div className="border-t border-gray-600 pt-2">
-                                <div className="text-gray-300 text-xs">
-                                  <div><strong>Basado en:</strong></div>
-                                  <div>• Feedback directo del cliente</div>
-                                  <div>• Métricas de entregables completados</div>
-                                  <div>• Evaluaciones internas de calidad</div>
-                                  <div>• Cumplimiento de estándares</div>
-                                </div>
-                              </div>
+                          <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                            <div className="font-bold">Score de Calidad</div>
+                            <div>Excelente ≥90pts | Bueno 70-89pts | Regular 50-69pts</div>
+                            <div className="mt-1 text-gray-300">
+                              Basado en feedback de cliente y entregables
                             </div>
                           </div>
                         </div>
