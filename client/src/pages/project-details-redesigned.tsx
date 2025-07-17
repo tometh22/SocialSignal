@@ -718,6 +718,12 @@ export default function ProjectDetailsRedesigned() {
     getTimeFilterForHook(dateFilter)
   );
 
+  // DEBUG: Verificar qué datos está recibiendo el frontend
+  console.log('🔍 DEBUG - Complete Data:', completeData);
+  console.log('🔍 DEBUG - Loading:', completeDataLoading);
+  console.log('🔍 DEBUG - Metrics:', completeData?.metrics);
+  console.log('🔍 DEBUG - Markup:', completeData?.metrics?.markup);
+
 
 
   // Datos del proyecto (mantenido para compatibilidad)
