@@ -81,8 +81,8 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
   
-  // Single source of truth for project data
-  const { data: completeData, isLoading: isCompleteDataLoading } = useCompleteProjectData(project?.id);
+  // Single source of truth for project data with temporal filtering
+  const { data: completeData, isLoading: isCompleteDataLoading } = useCompleteProjectData(project?.id, timeFilter);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { 

@@ -40,11 +40,12 @@ interface CompleteProjectData {
   };
 }
 
-export const useCompleteProjectData = (projectId: number) => {
+export const useCompleteProjectData = (projectId: number, timeFilter: string = 'all') => {
   return useQuery<CompleteProjectData>({
-    queryKey: ['projects', projectId, 'complete-data'],
+    queryKey: ['projects', projectId, 'complete-data', timeFilter],
     queryFn: async () => {
-      const response = await apiRequest(`/api/projects/${projectId}/complete-data`);
+      const url = `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
+      const response = await apiRequest(url);
       if (!response.ok) {
         throw new Error('Failed to fetch complete project data');
       }

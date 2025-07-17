@@ -95,15 +95,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO
+  // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    console.log(`🔥🔥🔥 COMPLETE DATA ENDPOINT HIT - ID: ${id}`);
+    const timeFilter = req.query.timeFilter as string || 'all';
+    console.log(`🔥🔥🔥 COMPLETE DATA ENDPOINT HIT - ID: ${id}, Filter: ${timeFilter}`);
     
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
-      console.log(`📊 Getting complete data for project ${id} - SINGLE SOURCE OF TRUTH`);
+      console.log(`📊 Getting complete data for project ${id} with filter: ${timeFilter}`);
       
       // 1. Obtener datos base del proyecto
       const project = await storage.getActiveProject(id);
@@ -125,18 +126,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📊 Total estimated hours from quotation:`, estimatedHours);
       }
 
-      // 3. Obtener tiempo trabajado real
-      const timeEntries = await storage.getTimeEntriesByProject(id);
+      // 3. Función para aplicar filtros temporales
+      const getDateRangeForFilter = (filter: string) => {
+        const now = new Date();
+        let startDate: Date;
+        let endDate: Date = now;
+
+        switch (filter) {
+          case 'current_month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            break;
+          case 'last_month':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+            break;
+          case 'current_quarter':
+            const currentQuarter = Math.floor(now.getMonth() / 3);
+            startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+            endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+            break;
+          case 'last_quarter':
+            const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+            const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+            startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
+            endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
+            break;
+          case 'current_semester':
+            const currentSemester = Math.floor(now.getMonth() / 6);
+            startDate = new Date(now.getFullYear(), currentSemester * 6, 1);
+            endDate = new Date(now.getFullYear(), (currentSemester + 1) * 6, 0);
+            break;
+          case 'last_semester':
+            const lastSemester = Math.floor(now.getMonth() / 6) - 1;
+            const semesterYear = lastSemester < 0 ? now.getFullYear() - 1 : now.getFullYear();
+            const adjustedSemester = lastSemester < 0 ? 1 : lastSemester;
+            startDate = new Date(semesterYear, adjustedSemester * 6, 1);
+            endDate = new Date(semesterYear, (adjustedSemester + 1) * 6, 0);
+            break;
+          case 'current_year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            endDate = new Date(now.getFullYear(), 11, 31);
+            break;
+          default:
+            return null; // Sin filtro
+        }
+
+        console.log(`📅 Date range for filter ${filter}:`, startDate.toISOString(), 'to', endDate.toISOString());
+        return { startDate, endDate };
+      };
+
+      // 4. Obtener tiempo trabajado real con filtros
+      let timeEntries = await storage.getTimeEntriesByProject(id);
+      
+      // Aplicar filtro temporal si está especificado
+      const dateRange = getDateRangeForFilter(timeFilter);
+      if (dateRange) {
+        timeEntries = timeEntries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+        });
+        console.log(`📊 Filtered time entries for project ${id}:`, timeEntries.length, 'entries (from', dateRange.startDate.toISOString(), 'to', dateRange.endDate.toISOString(), ')');
+      }
+
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
       const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.cost || 0), 0);
       
       console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
       console.log(`📊 Total worked hours:`, totalWorkedHours);
 
-      // 4. Calcular métricas consolidadas (ÚNICA FUENTE)
-      const efficiency = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
-      const markup = totalWorkedCost > 0 ? totalAmount / totalWorkedCost : 0;
-      const budgetUtilization = baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0;
+      // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
+      let adjustedEstimatedHours = estimatedHours;
+      let adjustedBaseCost = baseCost;
+      let adjustedTotalAmount = totalAmount;
+      
+      // Para proyectos Always-On, calcular estimaciones proporcionales al período
+      if (project.quotation?.projectType === 'always-on' && dateRange && timeFilter !== 'all') {
+        const monthsInFilter = getMonthsInFilter(timeFilter);
+        if (monthsInFilter > 0) {
+          // Las cotizaciones Always-On son anuales, dividimos por 12 y multiplicamos por el período
+          adjustedEstimatedHours = (estimatedHours / 12) * monthsInFilter;
+          adjustedBaseCost = (baseCost / 12) * monthsInFilter;
+          adjustedTotalAmount = (totalAmount / 12) * monthsInFilter;
+          
+          console.log(`📊 Always-On project adjustment for ${monthsInFilter} months:`, {
+            original: estimatedHours,
+            adjusted: adjustedEstimatedHours
+          });
+        }
+      }
+
+      // Función auxiliar para calcular meses en filtro
+      function getMonthsInFilter(filter: string): number {
+        switch (filter) {
+          case 'current_month':
+          case 'last_month':
+            return 1;
+          case 'current_quarter':
+          case 'last_quarter':
+            return 3;
+          case 'current_semester':
+          case 'last_semester':
+            return 6;
+          case 'current_year':
+            return 12;
+          default:
+            return 0;
+        }
+      }
+
+      // 6. Calcular métricas consolidadas (ÚNICA FUENTE)
+      const efficiency = adjustedEstimatedHours > 0 ? (totalWorkedHours / adjustedEstimatedHours) * 100 : 0;
+      const markup = totalWorkedCost > 0 ? adjustedTotalAmount / totalWorkedCost : 0;
+      const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
 
       // 5. Crear el objeto consolidado (FUENTE ÚNICA DE VERDAD)
       const completeData = {
@@ -155,9 +258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quotation: {
           id: project.quotation?.id,
           projectName: project.quotation?.projectName,
-          baseCost,
-          totalAmount,
-          estimatedHours, // ESTA ES LA FUENTE ÚNICA
+          baseCost: adjustedBaseCost,
+          totalAmount: adjustedTotalAmount,
+          estimatedHours: adjustedEstimatedHours, // AJUSTADA SEGÚN FILTRO TEMPORAL
           team: quotationTeam.map(member => ({
             id: member.id,
             personnelId: member.personnelId,
@@ -180,15 +283,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           efficiency: Math.round(efficiency * 100) / 100,
           markup: Math.round(markup * 100) / 100,
           budgetUtilization: Math.round(budgetUtilization * 100) / 100,
-          hoursDeviation: Math.round((totalWorkedHours - estimatedHours) * 100) / 100,
-          costDeviation: Math.round((totalWorkedCost - baseCost) * 100) / 100
+          hoursDeviation: Math.round((totalWorkedHours - adjustedEstimatedHours) * 100) / 100,
+          costDeviation: Math.round((totalWorkedCost - adjustedBaseCost) * 100) / 100
         }
       };
 
       console.log(`📊 Complete data prepared for project ${id}:`, {
         estimatedHours: completeData.quotation.estimatedHours,
         workedHours: completeData.actuals.totalWorkedHours,
-        efficiency: completeData.metrics.efficiency
+        efficiency: completeData.metrics.efficiency,
+        timeFilter: timeFilter,
+        isAlwaysOn: project.quotation?.projectType === 'always-on'
       });
 
       res.json(completeData);
