@@ -81,11 +81,75 @@ const ProjectDetailsUnified: React.FC = () => {
     return 'all';
   };
 
-  // SINGLE SOURCE OF TRUTH: usar hook centralizado
-  const { data: completeData, isLoading: completeDataLoading } = useCompleteProjectData(
-    projectId ? parseInt(projectId) : 0,
-    getTimeFilterForHook(dateFilter)
-  );
+  // Obtener datos directamente sin el hook problemático
+  const { data: quotation } = useQuery({
+    queryKey: [`/api/quotations/${(project as any)?.quotationId}`],
+    enabled: !!(project as any)?.quotationId,
+  });
+
+  const { data: quotationTeam = [] } = useQuery({
+    queryKey: [`/api/quotations/${(project as any)?.quotationId}/team`],
+    enabled: !!(project as any)?.quotationId,
+  });
+
+  const { data: timeEntries = [] } = useQuery({
+    queryKey: [`/api/time-entries/project/${projectId}`],
+    enabled: !!projectId,
+  });
+
+  // Filtrar entradas de tiempo por fecha
+  const filteredTimeEntries = useMemo(() => {
+    return timeEntries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
+    });
+  }, [timeEntries, dateFilter]);
+
+  // Crear datos simulados para completeData
+  const completeData = useMemo(() => {
+    if (!quotation || !quotationTeam.length) return null;
+
+    const totalWorkedHours = filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const totalWorkedCost = filteredTimeEntries.reduce((sum, entry) => sum + entry.cost, 0);
+    const estimatedHours = quotationTeam.reduce((sum, member) => sum + member.hours, 0);
+    const baseCost = quotation.baseCost || 0;
+    const totalAmount = quotation.totalAmount || 0;
+    
+    const markup = totalWorkedCost > 0 ? totalAmount / totalWorkedCost : 0;
+    const efficiency = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
+    
+    return {
+      quotation: {
+        id: quotation.id,
+        projectName: quotation.projectName,
+        baseCost,
+        totalAmount,
+        estimatedHours,
+        team: quotationTeam.map(member => ({
+          id: member.id,
+          personnelId: member.personnelId,
+          personnelName: member.personnelName,
+          hours: member.hours,
+          rate: member.rate,
+          cost: member.cost
+        }))
+      },
+      actuals: {
+        totalWorkedHours,
+        totalWorkedCost,
+        totalEntries: filteredTimeEntries.length
+      },
+      metrics: {
+        markup,
+        efficiency,
+        budgetUtilization: baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0,
+        hoursDeviation: estimatedHours > 0 ? ((totalWorkedHours - estimatedHours) / estimatedHours) * 100 : 0,
+        costDeviation: baseCost > 0 ? ((totalWorkedCost - baseCost) / baseCost) * 100 : 0
+      }
+    };
+  }, [quotation, quotationTeam, filteredTimeEntries]);
+
+  const completeDataLoading = false;
 
   // Datos del proyecto (para información básica)
   const { data: project, isLoading } = useQuery({
@@ -244,7 +308,7 @@ const ProjectDetailsUnified: React.FC = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {(project as any)?.name || 'Proyecto'}
+                {completeData?.quotation?.projectName || (project as any)?.subprojectName || 'Proyecto'}
               </h1>
               <p className="text-gray-600">{client?.name || 'Cliente'}</p>
             </div>
