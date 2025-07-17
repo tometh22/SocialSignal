@@ -817,6 +817,12 @@ export default function ProjectDetailsRedesigned() {
     return filterTimeEntriesByDateRange(timeEntries);
   }, [timeEntries, filterTimeEntriesByDateRange]);
 
+  // Obtener datos de la cotización - disponible globalmente
+  const quotationData = useMemo(() => {
+    if (!project) return null;
+    return (project as any).quotation;
+  }, [project]);
+
   // DEBUG TEMPORAL: Ver qué datos hay disponibles
   console.log('🔍 CARDS DEBUG - filteredTimeEntries:', filteredTimeEntries?.length || 0, 'entries');
   console.log('🔍 CARDS DEBUG - quotationData:', quotationData?.totalAmount || 0, 'precio');
@@ -827,12 +833,6 @@ export default function ProjectDetailsRedesigned() {
       sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
     console.log('🔍 CARDS DEBUG - Total horas:', totalHours, 'Total costo:', totalCost);
   }
-
-  // Obtener datos de la cotización - disponible globalmente
-  const quotationData = useMemo(() => {
-    if (!project) return null;
-    return (project as any).quotation;
-  }, [project]);
 
   // Cálculos principales basados en objetivos de cotización aprobada
   const metrics = useMemo(() => {
