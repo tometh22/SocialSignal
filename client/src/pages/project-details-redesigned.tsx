@@ -1351,14 +1351,14 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
-                      const markup = costSummary?.markup || 0;
+                      const markup = completeData?.markup || 0;
                       if (markup >= 2.5) return 'default';
                       if (markup >= 1.8) return 'secondary';
                       if (markup >= 1.2) return 'destructive';
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const markup = costSummary?.markup || 0;
+                        const markup = completeData?.markup || 0;
                         if (markup >= 2.5) return 'Excelente';
                         if (markup >= 1.8) return 'Bueno';
                         if (markup >= 1.2) return 'Aceptable';
@@ -1368,7 +1368,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      {costSummary?.markup ? `${costSummary.markup.toFixed(1)}x` : '0.0x'}
+                      {completeData?.markup ? `${completeData.markup.toFixed(1)}x` : '0.0x'}
                     </p>
                     <p className="text-xs text-gray-500">
                       Rentabilidad del proyecto
@@ -1389,15 +1389,15 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {costSummary?.filteredHours || 0}h / {costSummary?.targetHours || 0}h
+                        {completeData?.workedHours?.toFixed(1) || 0}h / {completeData?.estimatedHours || 0}h
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(costSummary?.hoursProgress || 0).toFixed(1)}%
+                      {(completeData?.efficiency || 0).toFixed(1)}%
                     </p>
-                    <Progress value={costSummary?.hoursProgress || 0} className="h-2" />
+                    <Progress value={completeData?.efficiency || 0} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
@@ -1414,16 +1414,22 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        ${costSummary?.totalCost?.toLocaleString() || 0}
+                        ${completeData?.totalCost?.toLocaleString() || 0}
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(costSummary?.budgetUtilization || 0).toFixed(1)}%
+                      {(() => {
+                        if (!completeData?.budget || !completeData?.totalCost) return '0.0';
+                        return ((completeData.totalCost / completeData.budget) * 100).toFixed(1);
+                      })()}%
                     </p>
                     <Progress 
-                      value={costSummary?.budgetUtilization || 0} 
+                      value={(() => {
+                        if (!completeData?.budget || !completeData?.totalCost) return 0;
+                        return (completeData.totalCost / completeData.budget) * 100;
+                      })()} 
                       className="h-2"
                     />
                   </div>
@@ -1441,29 +1447,28 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      const budgetUtil = costSummary?.budgetUtilization || 0;
-                      const markup = costSummary?.markup || 0;
-                      if (budgetUtil > 90 || markup < 1.2) return 'destructive';
-                      if (budgetUtil > 75 || markup < 1.8) return 'secondary';
-                      return 'default';
+                      const efficiency = completeData?.efficiency || 0;
+                      if (efficiency >= 90) return 'default';
+                      if (efficiency >= 70) return 'secondary';
+                      return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const budgetUtil = costSummary?.budgetUtilization || 0;
-                        const markup = costSummary?.markup || 0;
-                        if (budgetUtil > 90 || markup < 1.2) return 'Crítico';
-                        if (budgetUtil > 75 || markup < 1.8) return 'Atención';
-                        return 'Saludable';
+                        const efficiency = completeData?.efficiency || 0;
+                        if (efficiency >= 90) return 'Excelente';
+                        if (efficiency >= 70) return 'Bueno';
+                        if (efficiency >= 50) return 'Regular';
+                        return 'Crítico';
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        const budgetUtil = costSummary?.budgetUtilization || 0;
-                        const markup = costSummary?.markup || 0;
-                        if (budgetUtil > 90 || markup < 1.2) return 'Crítico';
-                        if (budgetUtil > 75 || markup < 1.8) return 'Atención';
-                        return 'Saludable';
+                        const efficiency = completeData?.efficiency || 0;
+                        if (efficiency >= 90) return 'Excelente';
+                        if (efficiency >= 70) return 'Bueno';
+                        if (efficiency >= 50) return 'Regular';
+                        return 'Crítico';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">Evaluación integral</p>
