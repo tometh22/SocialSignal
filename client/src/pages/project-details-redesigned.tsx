@@ -2445,8 +2445,8 @@ export default function ProjectDetailsRedesigned() {
                                 style={{ opacity: intensity / 100 }}
                                 title={`${name}: ${workedHours.toFixed(1)}h trabajadas / ${estimatedHours.toFixed(1)}h estimadas`}
                               >
-                                <div className="text-white text-xs font-bold text-center">
-                                  {name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                <div className="text-white text-xs font-bold text-center leading-tight">
+                                  {name.length > 12 ? name.substring(0, 12) + '...' : name}
                                 </div>
                                 <div className="text-white text-xs text-center mt-1">
                                   {workedHours.toFixed(1)}h
