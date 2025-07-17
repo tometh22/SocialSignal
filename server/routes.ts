@@ -593,11 +593,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
+    console.log('🔍 Getting quotation with ID:', req.params.id, 'parsed:', id);
+    
+    if (isNaN(id)) {
+      console.error('❌ Invalid quotation ID:', req.params.id);
+      return res.status(400).json({ message: "Invalid quotation ID" });
+    }
 
     const quotation = await storage.getQuotation(id);
-    if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+    if (!quotation) {
+      console.error('❌ Quotation not found for ID:', id);
+      return res.status(404).json({ message: "Quotation not found" });
+    }
 
+    console.log('✅ Quotation found:', quotation.id, quotation.projectName);
     res.json(quotation);
   });
 

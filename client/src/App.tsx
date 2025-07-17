@@ -118,7 +118,7 @@ function AppRoutes() {
                   
                   {/* Legacy Redirects for Quotations */}
                   <ProtectedRoute path="/manage-quotes" component={() => <Redirect to="/quotations" />} />
-                  <ProtectedRoute path="/quotation/:id" component={() => <Redirect to="/quotations/:id" />} />
+                  <ProtectedRoute path="/quotation/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/quotations/${params.id}`} />} />
                   
                   {/* Project Management */}
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
