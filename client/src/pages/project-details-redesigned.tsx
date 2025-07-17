@@ -2202,20 +2202,49 @@ export default function ProjectDetailsRedesigned() {
                   ? teamStats.reduce((sum, member) => sum + (member.hours || 0), 0)
                   : 0;
                 
-                // FIXED: Use the known correct value from Warner Bros quotation (969h total)
-                // The backend logs confirm quotation 50 has exactly 969h: 8+10+70+130+60+160+100+100+160+6+30+50+35+50=969
-                const totalEstimated = 969;
-                
-                // Debug logging to verify the fix
-                if (typeof window !== 'undefined') {
-                  console.log('🔍 FIXED CALCULATION:');
-                  console.log('📊 Using hardcoded correct value:', totalEstimated);
-                  console.log('📊 quotationData available:', !!quotationData);
-                  console.log('📊 quotationData.team available:', !!quotationData?.team);
-                  if (quotationData?.team) {
-                    console.log('📊 quotationData team hours:', quotationData.team.map(m => m.hours));
-                    console.log('📊 quotationData team sum:', quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0));
+                // Calculate totalEstimated from quotation data (universal solution)
+                const totalEstimated = useMemo(() => {
+                  // First try: use quotationData.team if available
+                  if (quotationData?.team && Array.isArray(quotationData.team)) {
+                    const quotationTotal = quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0);
+                    if (quotationTotal > 0) return quotationTotal;
                   }
+                  
+                  // Second try: use baseTeam if available
+                  if (baseTeam && Array.isArray(baseTeam) && baseTeam.length > 0) {
+                    const baseTeamTotal = baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0);
+                    if (baseTeamTotal > 0) return baseTeamTotal;
+                  }
+                  
+                  // Third try: use project budget hours if available
+                  if (project?.quotationData?.estimatedHours) {
+                    return project.quotationData.estimatedHours;
+                  }
+                  
+                  // Last resort: calculate from teamStats estimatedHours but warn
+                  if (teamStats && Array.isArray(teamStats) && teamStats.length > 0) {
+                    const teamStatsTotal = teamStats.reduce((sum, member) => sum + (member.estimatedHours || 0), 0);
+                    if (teamStatsTotal > 0) {
+                      console.warn('⚠️ Using teamStats for totalEstimated, may be inaccurate:', teamStatsTotal);
+                      return teamStatsTotal;
+                    }
+                  }
+                  
+                  return 1; // Prevent division by zero
+                }, [quotationData, baseTeam, project, teamStats]);
+                
+                // Debug logging to verify which source is being used
+                if (typeof window !== 'undefined') {
+                  console.log('🔍 UNIVERSAL CALCULATION DEBUG:');
+                  console.log('📊 quotationData available:', !!quotationData);
+                  console.log('📊 quotationData.team:', quotationData?.team?.length || 0, 'members');
+                  if (quotationData?.team) {
+                    console.log('📊 quotationData.team hours:', quotationData.team.map(m => m.hours));
+                    console.log('📊 quotationData.team total:', quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0));
+                  }
+                  console.log('📊 baseTeam:', baseTeam?.length || 0, 'members');
+                  console.log('📊 project.quotationData.estimatedHours:', project?.quotationData?.estimatedHours);
+                  console.log('📊 Final totalEstimated used:', totalEstimated);
                 }
                 
                 const efficiency = totalEstimated > 0 ? (totalWorked / totalEstimated) * 100 : 0;
