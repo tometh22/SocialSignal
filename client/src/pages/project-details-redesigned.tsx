@@ -2033,161 +2033,328 @@ export default function ProjectDetailsRedesigned() {
 
           {/* WORLD-CLASS MONTHLY ANALYSIS TAB */}
           <TabsContent value="details" className="space-y-6">
-            {/* Enhanced KPI Header Cards */}
+            {/* Strategic Color-Coded KPI Header Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              {/* Health Score */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-emerald-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-emerald-700 mb-1">Score de Salud</p>
-                      <p className="text-2xl font-bold text-emerald-800">
-                        {(() => {
-                          const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
-                          const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
-                          const teamEfficiency = teamStats && teamStats.length > 0 
-                            ? (teamStats.reduce((sum: number, member: any) => {
-                                if (member.hours > 0) {
-                                  const efficiency = Math.min(1, (member.estimatedHours || 0) / member.hours);
-                                  return sum + efficiency;
-                                }
-                                return sum;
-                              }, 0) / Math.max(1, teamStats.filter(m => m.hours > 0).length)) * 25
-                            : 15;
-                          const profitabilityHealth = (() => {
-                            const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
-                              ? quotationData.totalAmount / (costSummary.totalCost || 1) 
-                              : 0;
-                            if (markup >= 2.5) return 20;
-                            if (markup >= 1.8) return 15;
-                            if (markup >= 1.2) return 10;
-                            return 0;
-                          })();
-                          return Math.round(budgetHealth + timeHealth + teamEfficiency + profitabilityHealth);
-                        })()}
-                      </p>
-                      <p className="text-xs text-emerald-600 mt-1">
-                        {(() => {
-                          const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
-                          const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
-                          const teamEfficiency = teamStats && teamStats.length > 0 
-                            ? (teamStats.reduce((sum: number, member: any) => {
-                                if (member.hours > 0) {
-                                  const efficiency = Math.min(1, (member.estimatedHours || 0) / member.hours);
-                                  return sum + efficiency;
-                                }
-                                return sum;
-                              }, 0) / Math.max(1, teamStats.filter(m => m.hours > 0).length)) * 25
-                            : 15;
-                          const profitabilityHealth = (() => {
-                            const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
-                              ? quotationData.totalAmount / (costSummary.totalCost || 1) 
-                              : 0;
-                            if (markup >= 2.5) return 20;
-                            if (markup >= 1.8) return 15;
-                            if (markup >= 1.2) return 10;
-                            return 0;
-                          })();
-                          const score = Math.round(budgetHealth + timeHealth + teamEfficiency + profitabilityHealth);
-                          return score >= 80 ? 'Excelente' : score >= 60 ? 'Bueno' : 'Crítico';
-                        })()}
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-emerald-200/50 flex items-center justify-center">
-                      <Gauge className="h-6 w-6 text-emerald-700" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Health Score - Strategic Colors */}
+              {(() => {
+                const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
+                const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
+                const teamEfficiency = teamStats && teamStats.length > 0 
+                  ? (teamStats.reduce((sum: number, member: any) => {
+                      if (member.hours > 0) {
+                        const efficiency = Math.min(1, (member.estimatedHours || 0) / member.hours);
+                        return sum + efficiency;
+                      }
+                      return sum;
+                    }, 0) / Math.max(1, teamStats.filter(m => m.hours > 0).length)) * 25
+                  : 15;
+                const profitabilityHealth = (() => {
+                  const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
+                    ? quotationData.totalAmount / (costSummary.totalCost || 1) 
+                    : 0;
+                  if (markup >= 2.5) return 20;
+                  if (markup >= 1.8) return 15;
+                  if (markup >= 1.2) return 10;
+                  return 0;
+                })();
+                const score = Math.round(budgetHealth + timeHealth + teamEfficiency + profitabilityHealth);
+                const isGood = score >= 80;
+                const isWarning = score >= 60 && score < 80;
+                const isCritical = score < 60;
+                
+                return (
+                  <Card className={`relative overflow-hidden border-0 shadow-lg ${
+                    isCritical ? 'bg-gradient-to-br from-red-50 to-red-100' :
+                    isWarning ? 'bg-gradient-to-br from-yellow-50 to-yellow-100' :
+                    isGood ? 'bg-gradient-to-br from-green-50 to-green-100' :
+                    'bg-white'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Score de Salud</p>
+                          <p className={`text-2xl font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>{score}</p>
+                          <p className={`text-xs mt-1 ${
+                            isCritical ? 'text-red-600' :
+                            isWarning ? 'text-yellow-600' :
+                            isGood ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>
+                            {score >= 80 ? 'Excelente' : score >= 60 ? 'Bueno' : 'Crítico'}
+                          </p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isCritical ? 'bg-red-200/50' :
+                          isWarning ? 'bg-yellow-200/50' :
+                          isGood ? 'bg-green-200/50' :
+                          'bg-gray-200/50'
+                        }`}>
+                          <Gauge className={`h-6 w-6 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
-              {/* Financial Projection */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-blue-700 mb-1">Proyección Financiera</p>
-                      <p className="text-lg font-bold text-blue-800">Muy Buena</p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)} proyectado
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-blue-200/50 flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-blue-700" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Financial Projection - Strategic Colors */}
+              {(() => {
+                const projectedCost = (costSummary?.totalCost || 0) * 1.15;
+                const budget = costSummary?.budget || 0;
+                const isOverBudget = projectedCost > budget;
+                const isWarning = projectedCost > budget * 0.9;
+                const isGood = projectedCost <= budget * 0.8;
+                
+                return (
+                  <Card className={`relative overflow-hidden border-0 shadow-lg ${
+                    isOverBudget ? 'bg-gradient-to-br from-red-50 to-red-100' :
+                    isWarning ? 'bg-gradient-to-br from-yellow-50 to-yellow-100' :
+                    isGood ? 'bg-gradient-to-br from-green-50 to-green-100' :
+                    'bg-white'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${
+                            isOverBudget ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Proyección Financiera</p>
+                          <p className={`text-lg font-bold ${
+                            isOverBudget ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>
+                            {isOverBudget ? 'Riesgo' : isWarning ? 'Atención' : 'Muy Buena'}
+                          </p>
+                          <p className={`text-xs mt-1 ${
+                            isOverBudget ? 'text-red-600' :
+                            isWarning ? 'text-yellow-600' :
+                            isGood ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>
+                            ${projectedCost.toFixed(0)} proyectado
+                          </p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isOverBudget ? 'bg-red-200/50' :
+                          isWarning ? 'bg-yellow-200/50' :
+                          isGood ? 'bg-green-200/50' :
+                          'bg-gray-200/50'
+                        }`}>
+                          <TrendingUp className={`h-6 w-6 ${
+                            isOverBudget ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
-              {/* Team Efficiency */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-purple-700 mb-1">Eficiencia Equipo</p>
-                      <p className="text-2xl font-bold text-purple-800">
-                        {teamStats && teamStats.length > 0 
-                          ? Math.round((teamStats.reduce((sum, member) => sum + (member.hours || 0), 0) / 
-                              teamStats.reduce((sum, member) => sum + (member.estimatedHours || 0), 0)) * 100) || 0
-                          : 0}%
-                      </p>
-                      <p className="text-xs text-purple-600 mt-1">vs estimado</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-purple-200/50 flex items-center justify-center">
-                      <Users className="h-6 w-6 text-purple-700" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Team Efficiency - Strategic Colors */}
+              {(() => {
+                const efficiency = teamStats && teamStats.length > 0 
+                  ? (teamStats.reduce((sum, member) => sum + (member.hours || 0), 0) / 
+                     Math.max(1, teamStats.reduce((sum, member) => sum + (member.estimatedHours || 0), 0))) * 100
+                  : 0;
+                const isCritical = efficiency < 60;
+                const isWarning = efficiency >= 60 && efficiency < 80;
+                const isGood = efficiency >= 80;
+                
+                return (
+                  <Card className={`relative overflow-hidden border-0 shadow-lg ${
+                    isCritical ? 'bg-gradient-to-br from-red-50 to-red-100' :
+                    isWarning ? 'bg-gradient-to-br from-yellow-50 to-yellow-100' :
+                    isGood ? 'bg-gradient-to-br from-green-50 to-green-100' :
+                    'bg-white'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Eficiencia Equipo</p>
+                          <p className={`text-2xl font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>{Math.round(efficiency)}%</p>
+                          <p className={`text-xs mt-1 ${
+                            isCritical ? 'text-red-600' :
+                            isWarning ? 'text-yellow-600' :
+                            isGood ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>vs estimado</p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isCritical ? 'bg-red-200/50' :
+                          isWarning ? 'bg-yellow-200/50' :
+                          isGood ? 'bg-green-200/50' :
+                          'bg-gray-200/50'
+                        }`}>
+                          <Users className={`h-6 w-6 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
-              {/* Burn Rate */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-orange-700 mb-1">Burn Rate</p>
-                      <p className="text-2xl font-bold text-orange-800">
-                        ${((costSummary?.totalCost || 0) / Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30))).toFixed(0)}
-                      </p>
-                      <p className="text-xs text-orange-600 mt-1">por mes</p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-orange-200/50 flex items-center justify-center">
-                      <Flame className="h-6 w-6 text-orange-700" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Burn Rate - Strategic Colors */}
+              {(() => {
+                const monthsElapsed = Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
+                const burnRate = (costSummary?.totalCost || 0) / monthsElapsed;
+                const monthlyBudget = (costSummary?.budget || 0) / 12; // Asumiendo proyecto anual
+                const isCritical = burnRate > monthlyBudget * 1.2;
+                const isWarning = burnRate > monthlyBudget;
+                const isGood = burnRate <= monthlyBudget * 0.8;
+                
+                return (
+                  <Card className={`relative overflow-hidden border-0 shadow-lg ${
+                    isCritical ? 'bg-gradient-to-br from-red-50 to-red-100' :
+                    isWarning ? 'bg-gradient-to-br from-yellow-50 to-yellow-100' :
+                    isGood ? 'bg-gradient-to-br from-green-50 to-green-100' :
+                    'bg-white'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Burn Rate</p>
+                          <p className={`text-2xl font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>${burnRate.toFixed(0)}</p>
+                          <p className={`text-xs mt-1 ${
+                            isCritical ? 'text-red-600' :
+                            isWarning ? 'text-yellow-600' :
+                            isGood ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>por mes</p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isCritical ? 'bg-red-200/50' :
+                          isWarning ? 'bg-yellow-200/50' :
+                          isGood ? 'bg-green-200/50' :
+                          'bg-gray-200/50'
+                        }`}>
+                          <Flame className={`h-6 w-6 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
-              {/* Time Progress */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-medium text-green-700 mb-1">Progreso Tiempo</p>
-                      <p className="text-2xl font-bold text-green-800">
-                        {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(0)}%
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        {costSummary?.filteredHours?.toFixed(1) || 0}h / {costSummary?.targetHours?.toFixed(1) || 0}h
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-green-200/50 flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-green-700" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Time Progress - Strategic Colors */}
+              {(() => {
+                const progress = ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1)) * 100;
+                const isCritical = progress > 100;
+                const isWarning = progress > 85;
+                const isGood = progress <= 75;
+                
+                return (
+                  <Card className={`relative overflow-hidden border-0 shadow-lg ${
+                    isCritical ? 'bg-gradient-to-br from-red-50 to-red-100' :
+                    isWarning ? 'bg-gradient-to-br from-yellow-50 to-yellow-100' :
+                    isGood ? 'bg-gradient-to-br from-green-50 to-green-100' :
+                    'bg-white'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className={`text-xs font-medium mb-1 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Progreso Tiempo</p>
+                          <p className={`text-2xl font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>{progress.toFixed(0)}%</p>
+                          <p className={`text-xs mt-1 ${
+                            isCritical ? 'text-red-600' :
+                            isWarning ? 'text-yellow-600' :
+                            isGood ? 'text-green-600' :
+                            'text-gray-600'
+                          }`}>
+                            {costSummary?.filteredHours?.toFixed(1) || 0}h / {costSummary?.targetHours?.toFixed(1) || 0}h
+                          </p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          isCritical ? 'bg-red-200/50' :
+                          isWarning ? 'bg-yellow-200/50' :
+                          isGood ? 'bg-green-200/50' :
+                          'bg-gray-200/50'
+                        }`}>
+                          <Clock className={`h-6 w-6 ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
-              {/* Quality Score */}
-              <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-indigo-100">
+              {/* Quality Score - Always Good (White) */}
+              <Card className="relative overflow-hidden border-0 shadow-lg bg-white">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs font-medium text-indigo-700 mb-1">Score Calidad</p>
-                      <p className="text-2xl font-bold text-indigo-800">92</p>
-                      <p className="text-xs text-indigo-600 mt-1">Excelente</p>
+                      <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
+                      <p className="text-2xl font-bold text-gray-800">92</p>
+                      <p className="text-xs text-gray-600 mt-1">Excelente</p>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-indigo-200/50 flex items-center justify-center">
-                      <Star className="h-6 w-6 text-indigo-700" />
+                    <div className="w-12 h-12 rounded-full bg-gray-200/50 flex items-center justify-center">
+                      <Star className="h-6 w-6 text-gray-700" />
                     </div>
                   </div>
                 </CardContent>
@@ -2195,8 +2362,8 @@ export default function ProjectDetailsRedesigned() {
             </div>
 
             {/* Advanced Team Performance Analysis */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Team Performance Heat Map */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Team Performance Heat Map - Fixed Data Source */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
@@ -2207,41 +2374,185 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-3">
-                    {teamStats?.slice(0, 8).map((member, index) => {
-                      const efficiency = member.estimatedHours > 0 ? (member.estimatedHours / Math.max(member.hours || 1, 1)) : 0;
-                      const performanceLevel = efficiency >= 0.9 ? 'excellent' : efficiency >= 0.7 ? 'good' : efficiency >= 0.5 ? 'average' : 'needs-attention';
-                      const colors = {
-                        excellent: 'bg-green-500',
-                        good: 'bg-blue-500', 
-                        average: 'bg-yellow-500',
-                        'needs-attention': 'bg-red-500'
-                      };
+                    {(() => {
+                      // Use baseTeam data which should have the real team member information
+                      const teamMembers = baseTeam || teamStats || [];
+                      console.log('🔍 Team data for heat map:', { baseTeam, teamStats, teamMembers });
                       
-                      return (
-                        <div key={member.personnelId} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center font-semibold text-gray-700 text-sm">
-                              {member.name?.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                            </div>
-                            <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${colors[performanceLevel]} rounded-full border-2 border-white`}></div>
+                      if (!teamMembers || teamMembers.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-gray-500">
+                            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No hay datos del equipo disponibles</p>
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-medium text-gray-900">{member.name}</span>
-                              <Badge variant={performanceLevel === 'excellent' ? 'default' : performanceLevel === 'good' ? 'secondary' : 'destructive'} className="text-xs">
-                                {efficiency >= 0.9 ? 'Excelente' : efficiency >= 0.7 ? 'Bueno' : efficiency >= 0.5 ? 'Regular' : 'Crítico'}
-                              </Badge>
+                        );
+                      }
+                      
+                      return teamMembers.slice(0, 8).map((member: any, index: number) => {
+                        const workedHours = member.hours || 0;
+                        const estimatedHours = member.estimatedHours || 1;
+                        const efficiency = estimatedHours > 0 ? (estimatedHours / Math.max(workedHours, 0.1)) : 0;
+                        
+                        // Strategic color coding
+                        const isCritical = efficiency < 0.7 || workedHours > estimatedHours * 1.3;
+                        const isWarning = efficiency < 0.9 || workedHours > estimatedHours * 1.1;
+                        const isGood = efficiency >= 0.9 && workedHours <= estimatedHours * 1.1;
+                        
+                        const colorClasses = {
+                          bg: isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : isGood ? 'bg-green-500' : 'bg-gray-500',
+                          border: isCritical ? 'border-red-200' : isWarning ? 'border-yellow-200' : isGood ? 'border-green-200' : 'border-gray-200'
+                        };
+                        
+                        return (
+                          <div key={member.personnelId || index} className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors border ${colorClasses.border}`}>
+                            <div className="relative">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center font-semibold text-gray-700 text-sm">
+                                {member.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2) || 'NN'}
+                              </div>
+                              <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${colorClasses.bg} rounded-full border-2 border-white`}></div>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm text-gray-600">{(member.hours || 0).toFixed(1)}h trabajadas</span>
-                              <span className="text-sm text-gray-500">•</span>
-                              <span className="text-sm text-gray-600">{(efficiency * 100).toFixed(0)}% eficiencia</span>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-medium text-gray-900">{member.name || 'Miembro sin nombre'}</span>
+                                <Badge 
+                                  variant={isCritical ? 'destructive' : isWarning ? 'secondary' : isGood ? 'default' : 'outline'} 
+                                  className="text-xs"
+                                >
+                                  {isCritical ? 'Crítico' : isWarning ? 'Atención' : isGood ? 'Excelente' : 'Regular'}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-600">{workedHours.toFixed(1)}h trabajadas</span>
+                                <span className="text-sm text-gray-500">•</span>
+                                <span className="text-sm text-gray-600">{estimatedHours.toFixed(1)}h estimadas</span>
+                              </div>
+                              <Progress 
+                                value={Math.min(100, (workedHours / Math.max(estimatedHours, 1)) * 100)} 
+                                className="h-2 mt-2" 
+                              />
                             </div>
-                            <Progress value={efficiency * 100} className="h-2 mt-2" />
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* TOP PERFORMERS - New Section */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Crown className="h-5 w-5 text-blue-600" />
+                    Top Performers
+                  </CardTitle>
+                  <CardDescription>Basado en eficiencia, peso del proyecto y uso de horas</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {(() => {
+                      // Calculate top performers based on efficiency + project weight + hour usage
+                      const teamMembers = baseTeam || teamStats || [];
+                      
+                      if (!teamMembers || teamMembers.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-gray-500">
+                            <Crown className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No hay datos suficientes para calcular top performers</p>
+                          </div>
+                        );
+                      }
+                      
+                      const performersWithScore = teamMembers.map((member: any) => {
+                        const workedHours = member.hours || 0;
+                        const estimatedHours = member.estimatedHours || 1;
+                        const hourlyRate = member.hourlyRate || 10;
+                        
+                        // Efficiency score (0-40 points)
+                        const efficiency = estimatedHours > 0 ? Math.min(1, estimatedHours / Math.max(workedHours, 0.1)) : 0;
+                        const efficiencyScore = efficiency * 40;
+                        
+                        // Project weight score (0-30 points) - based on estimated hours in project
+                        const maxEstimatedInProject = Math.max(...teamMembers.map((m: any) => m.estimatedHours || 0));
+                        const projectWeightScore = maxEstimatedInProject > 0 ? (estimatedHours / maxEstimatedInProject) * 30 : 0;
+                        
+                        // Hour usage score (0-30 points) - penalize over-usage, reward optimal usage
+                        const usageRatio = workedHours / Math.max(estimatedHours, 1);
+                        const hourUsageScore = usageRatio <= 1 ? 30 : Math.max(0, 30 - ((usageRatio - 1) * 20));
+                        
+                        const totalScore = efficiencyScore + projectWeightScore + hourUsageScore;
+                        
+                        return {
+                          ...member,
+                          totalScore,
+                          efficiencyScore,
+                          projectWeightScore,
+                          hourUsageScore,
+                          efficiency,
+                          usageRatio
+                        };
+                      });
+                      
+                      // Sort by total score and take top 5
+                      const topPerformers = performersWithScore
+                        .sort((a, b) => b.totalScore - a.totalScore)
+                        .slice(0, 5);
+                      
+                      return topPerformers.map((performer, index) => {
+                        const isTopPerformer = index === 0;
+                        const scoreColor = performer.totalScore >= 80 ? 'text-green-600' : 
+                                          performer.totalScore >= 60 ? 'text-blue-600' : 
+                                          'text-gray-600';
+                        
+                        return (
+                          <div key={performer.personnelId || index} className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                            isTopPerformer ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-gray-50'
+                          }`}>
+                            <div className="relative">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${
+                                isTopPerformer ? 'bg-gradient-to-br from-yellow-200 to-yellow-300 text-yellow-800' :
+                                'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-700'
+                              }`}>
+                                #{index + 1}
+                              </div>
+                              {isTopPerformer && (
+                                <div className="absolute -top-2 -right-2">
+                                  <Crown className="h-6 w-6 text-yellow-600" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-bold text-gray-900">{performer.name}</span>
+                                <span className={`text-lg font-bold ${scoreColor}`}>
+                                  {performer.totalScore.toFixed(0)} pts
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-xs">
+                                <div className="text-center">
+                                  <p className="font-medium text-gray-700">Eficiencia</p>
+                                  <p className={`font-bold ${performer.efficiency >= 0.9 ? 'text-green-600' : performer.efficiency >= 0.7 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                    {(performer.efficiency * 100).toFixed(0)}%
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-medium text-gray-700">Peso Proyecto</p>
+                                  <p className="font-bold text-blue-600">
+                                    {performer.estimatedHours}h
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-medium text-gray-700">Uso Horas</p>
+                                  <p className={`font-bold ${performer.usageRatio <= 1 ? 'text-green-600' : performer.usageRatio <= 1.2 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                    {(performer.usageRatio * 100).toFixed(0)}%
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </CardContent>
               </Card>
@@ -2256,49 +2567,160 @@ export default function ProjectDetailsRedesigned() {
                   <CardDescription>Métricas financieras y proyecciones</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  {/* Markup Analysis */}
-                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-purple-700">Markup Actual</span>
-                      <span className="text-lg font-bold text-purple-800">
-                        {quotationData?.totalAmount && costSummary?.totalCost 
-                          ? (quotationData.totalAmount / costSummary.totalCost).toFixed(2) + 'x'
-                          : '2.72x'
-                        }
-                      </span>
-                    </div>
-                    <Progress value={75} className="h-2" />
-                    <p className="text-xs text-purple-600 mt-1">Target: 2.5x • Estado: Excelente</p>
-                  </div>
+                  {/* Markup Analysis - Strategic Colors */}
+                  {(() => {
+                    const markup = quotationData?.totalAmount && costSummary?.totalCost 
+                      ? quotationData.totalAmount / costSummary.totalCost 
+                      : 2.72;
+                    const isCritical = markup < 1.2;
+                    const isWarning = markup >= 1.2 && markup < 1.8;
+                    const isGood = markup >= 1.8;
+                    
+                    return (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        isCritical ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' :
+                        isWarning ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300' :
+                        isGood ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-300' :
+                        'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-sm font-medium ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Markup Actual</span>
+                          <span className={`text-lg font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>
+                            {markup.toFixed(2)}x
+                          </span>
+                        </div>
+                        <Progress value={Math.min(100, (markup / 2.5) * 100)} className="h-2" />
+                        <p className={`text-xs mt-1 ${
+                          isCritical ? 'text-red-600' :
+                          isWarning ? 'text-yellow-600' :
+                          isGood ? 'text-green-600' :
+                          'text-gray-600'
+                        }`}>
+                          Target: 2.5x • Estado: {
+                            isCritical ? 'Crítico' :
+                            isWarning ? 'Atención' :
+                            isGood ? 'Excelente' :
+                            'Regular'
+                          }
+                        </p>
+                      </div>
+                    );
+                  })()}
 
-                  {/* Budget Utilization */}
-                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-green-700">Utilización Presupuesto</span>
-                      <span className="text-lg font-bold text-green-800">
-                        {costSummary?.budget && costSummary?.totalCost 
-                          ? ((costSummary.totalCost / costSummary.budget) * 100).toFixed(0) + '%'
-                          : '63%'
-                        }
-                      </span>
-                    </div>
-                    <Progress value={63} className="h-2" />
-                    <p className="text-xs text-green-600 mt-1">Restante: ${costSummary?.budget && costSummary?.totalCost ? (costSummary.budget - costSummary.totalCost).toFixed(0) : '4,200'}</p>
-                  </div>
+                  {/* Budget Utilization - Strategic Colors */}
+                  {(() => {
+                    const budgetUsage = costSummary?.budget && costSummary?.totalCost 
+                      ? (costSummary.totalCost / costSummary.budget) * 100
+                      : 63;
+                    const isCritical = budgetUsage > 90;
+                    const isWarning = budgetUsage > 75;
+                    const isGood = budgetUsage <= 75;
+                    
+                    return (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        isCritical ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' :
+                        isWarning ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300' :
+                        isGood ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-300' :
+                        'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-sm font-medium ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Utilización Presupuesto</span>
+                          <span className={`text-lg font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>
+                            {budgetUsage.toFixed(0)}%
+                          </span>
+                        </div>
+                        <Progress value={budgetUsage} className="h-2" />
+                        <p className={`text-xs mt-1 ${
+                          isCritical ? 'text-red-600' :
+                          isWarning ? 'text-yellow-600' :
+                          isGood ? 'text-green-600' :
+                          'text-gray-600'
+                        }`}>
+                          Restante: ${costSummary?.budget && costSummary?.totalCost 
+                            ? (costSummary.budget - costSummary.totalCost).toFixed(0) 
+                            : '4,200'
+                          } • {
+                            isCritical ? 'Riesgo sobrecosto' :
+                            isWarning ? 'Cerca del límite' :
+                            isGood ? 'Dentro del rango' :
+                            'Sin datos'
+                          }
+                        </p>
+                      </div>
+                    );
+                  })()}
 
-                  {/* Revenue Forecast */}
-                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-orange-700">Proyección Ingresos</span>
-                      <span className="text-lg font-bold text-orange-800">
-                        ${quotationData?.totalAmount?.toFixed(0) || '18,500'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-orange-600">
-                      <TrendingUp className="h-3 w-3" />
-                      <span>+15% vs objetivo inicial</span>
-                    </div>
-                  </div>
+                  {/* Revenue Forecast - Strategic Colors */}
+                  {(() => {
+                    const targetRevenue = quotationData?.totalAmount || 18500;
+                    const projectedRevenue = (costSummary?.totalCost || 0) * 1.15;
+                    const revenueVariation = targetRevenue > 0 ? ((projectedRevenue - targetRevenue) / targetRevenue) * 100 : 15;
+                    const isCritical = revenueVariation < -10;
+                    const isWarning = revenueVariation < 0;
+                    const isGood = revenueVariation >= 0;
+                    
+                    return (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        isCritical ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300' :
+                        isWarning ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300' :
+                        isGood ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-300' :
+                        'bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-sm font-medium ${
+                            isCritical ? 'text-red-700' :
+                            isWarning ? 'text-yellow-700' :
+                            isGood ? 'text-green-700' :
+                            'text-gray-700'
+                          }`}>Proyección Ingresos</span>
+                          <span className={`text-lg font-bold ${
+                            isCritical ? 'text-red-800' :
+                            isWarning ? 'text-yellow-800' :
+                            isGood ? 'text-green-800' :
+                            'text-gray-800'
+                          }`}>
+                            ${targetRevenue.toFixed(0)}
+                          </span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-xs ${
+                          isCritical ? 'text-red-600' :
+                          isWarning ? 'text-yellow-600' :
+                          isGood ? 'text-green-600' :
+                          'text-gray-600'
+                        }`}>
+                          <TrendingUp className="h-3 w-3" />
+                          <span>
+                            {revenueVariation >= 0 ? '+' : ''}{revenueVariation.toFixed(0)}% vs objetivo inicial • {
+                              isCritical ? 'Por debajo objetivo' :
+                              isWarning ? 'Cerca del objetivo' :
+                              isGood ? 'Superando objetivo' :
+                              'Sin referencia'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
@@ -2385,7 +2807,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Risk Indicators */}
+              {/* Risk Indicators - Strategic Colors */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 border-b">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
@@ -2394,22 +2816,95 @@ export default function ProjectDetailsRedesigned() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Riesgo Presupuesto</span>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Bajo</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Riesgo Tiempo</span>
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Medio</Badge>
-                  </div>
+                  {/* Budget Risk - Strategic Colors */}
+                  {(() => {
+                    const budgetUsage = costSummary?.budget && costSummary?.totalCost 
+                      ? (costSummary.totalCost / costSummary.budget) * 100
+                      : 0;
+                    const isCritical = budgetUsage > 90;
+                    const isWarning = budgetUsage > 75;
+                    const isGood = budgetUsage <= 75;
+                    
+                    return (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Riesgo Presupuesto</span>
+                        <Badge className={`${
+                          isCritical ? 'bg-red-100 text-red-800' :
+                          isWarning ? 'bg-yellow-100 text-yellow-800' :
+                          isGood ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isCritical ? 'Alto' : isWarning ? 'Medio' : isGood ? 'Bajo' : 'Sin datos'}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Time Risk - Strategic Colors */}
+                  {(() => {
+                    const timeProgress = costSummary?.targetHours && costSummary?.filteredHours 
+                      ? (costSummary.filteredHours / costSummary.targetHours) * 100
+                      : 0;
+                    const isCritical = timeProgress > 100;
+                    const isWarning = timeProgress > 85;
+                    const isGood = timeProgress <= 85;
+                    
+                    return (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Riesgo Tiempo</span>
+                        <Badge className={`${
+                          isCritical ? 'bg-red-100 text-red-800' :
+                          isWarning ? 'bg-yellow-100 text-yellow-800' :
+                          isGood ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isCritical ? 'Alto' : isWarning ? 'Medio' : isGood ? 'Bajo' : 'Sin datos'}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Quality Risk - Always Good (White/Neutral) */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Riesgo Calidad</span>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Bajo</Badge>
+                    <Badge className="bg-green-100 text-green-800">Bajo</Badge>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Riesgo General</span>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">Controlado</Badge>
-                  </div>
+
+                  {/* General Risk - Based on Overall Analysis */}
+                  {(() => {
+                    const budgetUsage = costSummary?.budget && costSummary?.totalCost 
+                      ? (costSummary.totalCost / costSummary.budget) * 100
+                      : 0;
+                    const timeProgress = costSummary?.targetHours && costSummary?.filteredHours 
+                      ? (costSummary.filteredHours / costSummary.targetHours) * 100
+                      : 0;
+                    const markup = quotationData?.totalAmount && costSummary?.totalCost 
+                      ? quotationData.totalAmount / costSummary.totalCost 
+                      : 2.0;
+                    
+                    const budgetRisk = budgetUsage > 90;
+                    const timeRisk = timeProgress > 100;
+                    const markupRisk = markup < 1.2;
+                    
+                    const totalRisks = [budgetRisk, timeRisk, markupRisk].filter(Boolean).length;
+                    const isCritical = totalRisks >= 2;
+                    const isWarning = totalRisks === 1;
+                    const isGood = totalRisks === 0;
+                    
+                    return (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Riesgo General</span>
+                        <Badge className={`${
+                          isCritical ? 'bg-red-100 text-red-800' :
+                          isWarning ? 'bg-yellow-100 text-yellow-800' :
+                          isGood ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {isCritical ? 'Crítico' : isWarning ? 'Atención' : isGood ? 'Controlado' : 'Sin análisis'}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
