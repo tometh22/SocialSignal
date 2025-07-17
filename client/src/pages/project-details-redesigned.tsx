@@ -2250,7 +2250,7 @@ export default function ProjectDetailsRedesigned() {
                             isWarning ? 'text-yellow-600' :
                             isGood ? 'text-green-600' :
                             'text-gray-600'
-                          }`}>de {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0) || '0'}h cotizadas</p>
+                          }`}>de {totalEstimated.toFixed(0)}h cotizadas</p>
                         </div>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                           isCritical ? 'bg-red-200/50' :
