@@ -2068,7 +2068,27 @@ export default function ProjectDetailsRedesigned() {
                       </p>
                       <p className="text-xs text-emerald-600 mt-1">
                         {(() => {
-                          const score = Math.round(85 - (riskIndicators?.budgetRisk || 0) * 0.5);
+                          const budgetHealth = Math.max(0, (1 - ((costSummary?.totalCost || 0) / (costSummary?.budget || 1))) * 30);
+                          const timeHealth = Math.max(0, (1 - ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1))) * 25);
+                          const teamEfficiency = teamStats && teamStats.length > 0 
+                            ? (teamStats.reduce((sum: number, member: any) => {
+                                if (member.hours > 0) {
+                                  const efficiency = Math.min(1, (member.estimatedHours || 0) / member.hours);
+                                  return sum + efficiency;
+                                }
+                                return sum;
+                              }, 0) / Math.max(1, teamStats.filter(m => m.hours > 0).length)) * 25
+                            : 15;
+                          const profitabilityHealth = (() => {
+                            const markup = quotationData?.totalAmount && (costSummary?.totalCost || 0) > 0 
+                              ? quotationData.totalAmount / (costSummary.totalCost || 1) 
+                              : 0;
+                            if (markup >= 2.5) return 20;
+                            if (markup >= 1.8) return 15;
+                            if (markup >= 1.2) return 10;
+                            return 0;
+                          })();
+                          const score = Math.round(budgetHealth + timeHealth + teamEfficiency + profitabilityHealth);
                           return score >= 80 ? 'Excelente' : score >= 60 ? 'Bueno' : 'Crítico';
                         })()}
                       </p>
