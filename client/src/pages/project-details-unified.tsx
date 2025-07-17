@@ -98,9 +98,50 @@ const ProjectDetailsUnified: React.FC = () => {
     enabled: !!(project as any)?.clientId,
   });
 
+  // Debug: Log data to verify it's working
+  console.log('🔍 PROJECT DATA:', project);
+  console.log('🔍 COMPLETE DATA:', completeData);
+  console.log('🔍 PROJECT ID:', projectId);
+  console.log('🔍 LOADING STATES:', { isLoading, completeDataLoading });
+
   // Métricas principales calculadas desde completeData
   const metrics = useMemo(() => {
-    if (!completeData) return [];
+    if (!completeData) {
+      return [
+        {
+          label: "Markup",
+          value: "0.0x",
+          subtitle: "Cargando...",
+          icon: Percent,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
+        },
+        {
+          label: "Progreso",
+          value: "0%",
+          subtitle: "Cargando...",
+          icon: Target,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
+        },
+        {
+          label: "Presupuesto",
+          value: "0%",
+          subtitle: "Cargando...",
+          icon: DollarSign,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
+        },
+        {
+          label: "Registros",
+          value: "0",
+          subtitle: "Cargando...",
+          icon: Clock,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
+        }
+      ];
+    }
 
     const {
       quotation,
@@ -108,15 +149,15 @@ const ProjectDetailsUnified: React.FC = () => {
       metrics: calculatedMetrics
     } = completeData;
 
-    const markup = calculatedMetrics.markup;
-    const hoursProgress = quotation.estimatedHours > 0 ? (actuals.totalWorkedHours / quotation.estimatedHours) * 100 : 0;
-    const budgetUtilization = quotation.baseCost > 0 ? (actuals.totalWorkedCost / quotation.baseCost) * 100 : 0;
+    const markup = calculatedMetrics?.markup || 0;
+    const hoursProgress = quotation?.estimatedHours > 0 ? (actuals?.totalWorkedHours / quotation.estimatedHours) * 100 : 0;
+    const budgetUtilization = quotation?.baseCost > 0 ? (actuals?.totalWorkedCost / quotation.baseCost) * 100 : 0;
 
     return [
       {
         label: "Markup",
         value: `${markup.toFixed(1)}x`,
-        subtitle: `$${quotation.totalAmount.toLocaleString()} / $${actuals.totalWorkedCost.toLocaleString()}`,
+        subtitle: `$${(quotation?.totalAmount || 0).toLocaleString()} / $${(actuals?.totalWorkedCost || 0).toLocaleString()}`,
         icon: Percent,
         color: markup >= 2.5 ? "text-green-700" : markup >= 1.8 ? "text-blue-700" : "text-red-700",
         bgColor: markup >= 2.5 ? "bg-gradient-to-br from-green-50 to-green-100" : markup >= 1.8 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-red-50 to-red-100"
@@ -124,7 +165,7 @@ const ProjectDetailsUnified: React.FC = () => {
       {
         label: "Progreso",
         value: `${hoursProgress.toFixed(1)}%`,
-        subtitle: `${actuals.totalWorkedHours.toFixed(1)}h / ${quotation.estimatedHours}h`,
+        subtitle: `${(actuals?.totalWorkedHours || 0).toFixed(1)}h / ${quotation?.estimatedHours || 0}h`,
         icon: Target,
         color: hoursProgress >= 100 ? "text-green-700" : hoursProgress >= 75 ? "text-blue-700" : "text-orange-700",
         bgColor: hoursProgress >= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : hoursProgress >= 75 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-orange-50 to-orange-100"
@@ -132,14 +173,14 @@ const ProjectDetailsUnified: React.FC = () => {
       {
         label: "Presupuesto",
         value: `${budgetUtilization.toFixed(1)}%`,
-        subtitle: `$${actuals.totalWorkedCost.toLocaleString()} / $${quotation.baseCost.toLocaleString()}`,
+        subtitle: `$${(actuals?.totalWorkedCost || 0).toLocaleString()} / $${(quotation?.baseCost || 0).toLocaleString()}`,
         icon: DollarSign,
         color: budgetUtilization <= 100 ? "text-green-700" : "text-red-700",
         bgColor: budgetUtilization <= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100"
       },
       {
         label: "Registros",
-        value: `${actuals.totalEntries}`,
+        value: `${actuals?.totalEntries || 0}`,
         subtitle: `entradas de tiempo`,
         icon: Clock,
         color: "text-purple-700",
@@ -171,13 +212,16 @@ const ProjectDetailsUnified: React.FC = () => {
     );
   }
 
-  if (!project || !completeData) {
+  if (!projectId || (!isLoading && !completeDataLoading && !project && !completeData)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Proyecto no encontrado</h2>
           <p className="text-gray-600 mb-4">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
+          <p className="text-xs text-gray-500 mb-4">
+            Debug: projectId={projectId}, project={!!project}, completeData={!!completeData}
+          </p>
           <Button onClick={() => setLocation("/active-projects")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Proyectos
