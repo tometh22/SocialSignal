@@ -825,7 +825,10 @@ export default function ProjectDetailsRedesigned() {
 
   // DEBUG TEMPORAL: Ver qué datos hay disponibles
   console.log('🔍 CARDS DEBUG - filteredTimeEntries:', filteredTimeEntries?.length || 0, 'entries');
+  console.log('🔍 CARDS DEBUG - timeEntries raw:', timeEntries?.length || 0, 'entries');
   console.log('🔍 CARDS DEBUG - quotationData:', quotationData?.totalAmount || 0, 'precio');
+  console.log('🔍 CARDS DEBUG - dateFilter:', dateFilter);
+  console.log('🔍 CARDS DEBUG - project:', project ? 'loaded' : 'null');
   if (filteredTimeEntries && filteredTimeEntries.length > 0) {
     console.log('🔍 CARDS DEBUG - Primera entrada:', filteredTimeEntries[0]);
     const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
