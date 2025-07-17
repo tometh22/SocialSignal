@@ -95,6 +95,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO
+  app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    console.log(`🔥🔥🔥 COMPLETE DATA ENDPOINT HIT - ID: ${id}`);
+    
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      console.log(`📊 Getting complete data for project ${id} - SINGLE SOURCE OF TRUTH`);
+      
+      // 1. Obtener datos base del proyecto
+      const project = await storage.getActiveProject(id);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      // 2. Obtener datos de la cotización (FUENTE ÚNICA para horas estimadas)
+      let quotationTeam = [];
+      let estimatedHours = 0;
+      let baseCost = 0;
+      let totalAmount = 0;
+      
+      if (project.quotation) {
+        quotationTeam = await storage.getQuotationTeamMembers(project.quotation.id);
+        estimatedHours = quotationTeam.reduce((total, member) => total + (member.hours || 0), 0);
+        baseCost = project.quotation.baseCost || 0;
+        totalAmount = project.quotation.totalAmount || 0;
+        
+        console.log(`📊 Quotation team for project ${id}:`, quotationTeam.length, 'members');
+        console.log(`📊 Total estimated hours from quotation:`, estimatedHours);
+      }
+
+      // 3. Obtener tiempo trabajado real
+      const timeEntries = await storage.getTimeEntriesByProject(id);
+      const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
+      const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.cost || 0), 0);
+      
+      console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
+      console.log(`📊 Total worked hours:`, totalWorkedHours);
+
+      // 4. Calcular métricas consolidadas (ÚNICA FUENTE)
+      const efficiency = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
+      const markup = totalWorkedCost > 0 ? totalAmount / totalWorkedCost : 0;
+      const budgetUtilization = baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0;
+
+      // 5. Crear el objeto consolidado (FUENTE ÚNICA DE VERDAD)
+      const completeData = {
+        // Datos base del proyecto
+        project: {
+          id: project.id,
+          name: project.quotation?.projectName || '',
+          status: project.status,
+          startDate: project.startDate,
+          expectedEndDate: project.expectedEndDate,
+          clientId: project.clientId,
+          quotationId: project.quotationId
+        },
+        
+        // Datos de la cotización (FUENTE ÚNICA para estimaciones)
+        quotation: {
+          id: project.quotation?.id,
+          projectName: project.quotation?.projectName,
+          baseCost,
+          totalAmount,
+          estimatedHours, // ESTA ES LA FUENTE ÚNICA
+          team: quotationTeam.map(member => ({
+            id: member.id,
+            personnelId: member.personnelId,
+            personnelName: member.personnel?.name,
+            hours: member.hours,
+            rate: member.rate,
+            cost: member.cost
+          }))
+        },
+        
+        // Datos reales trabajados
+        actuals: {
+          totalWorkedHours,
+          totalWorkedCost,
+          totalEntries: timeEntries.length
+        },
+        
+        // Métricas calculadas (ÚNICA FUENTE)
+        metrics: {
+          efficiency: Math.round(efficiency * 100) / 100,
+          markup: Math.round(markup * 100) / 100,
+          budgetUtilization: Math.round(budgetUtilization * 100) / 100,
+          hoursDeviation: Math.round((totalWorkedHours - estimatedHours) * 100) / 100,
+          costDeviation: Math.round((totalWorkedCost - baseCost) * 100) / 100
+        }
+      };
+
+      console.log(`📊 Complete data prepared for project ${id}:`, {
+        estimatedHours: completeData.quotation.estimatedHours,
+        workedHours: completeData.actuals.totalWorkedHours,
+        efficiency: completeData.metrics.efficiency
+      });
+
+      res.json(completeData);
+    } catch (error) {
+      console.error("Error getting complete project data:", error);
+      res.status(500).json({ message: "Failed to get complete project data" });
+    }
+  });
+
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
@@ -1293,107 +1396,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== FUENTE ÚNICA DE VERDAD ====================
-  // Endpoint centralizado: todos los datos de un proyecto en un solo lugar
-  app.get("/api/projects/:id/complete-data", requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
-
-    try {
-      console.log(`📊 Getting complete data for project ${id} - SINGLE SOURCE OF TRUTH`);
-      
-      // 1. Obtener datos base del proyecto
-      const project = await storage.getActiveProject(id);
-      if (!project) return res.status(404).json({ message: "Project not found" });
-
-      // 2. Obtener datos de la cotización (FUENTE ÚNICA para horas estimadas)
-      let quotationTeam = [];
-      let estimatedHours = 0;
-      let baseCost = 0;
-      let totalAmount = 0;
-      
-      if (project.quotation) {
-        quotationTeam = await storage.getQuotationTeamMembers(project.quotation.id);
-        estimatedHours = quotationTeam.reduce((total, member) => total + (member.hours || 0), 0);
-        baseCost = project.quotation.baseCost || 0;
-        totalAmount = project.quotation.totalAmount || 0;
-        
-        console.log(`📊 Quotation team for project ${id}:`, quotationTeam.length, 'members');
-        console.log(`📊 Total estimated hours from quotation:`, estimatedHours);
-      }
-
-      // 3. Obtener tiempo trabajado real
-      const timeEntries = await storage.getTimeEntriesByProject(id);
-      const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-      const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.cost || 0), 0);
-      
-      console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
-      console.log(`📊 Total worked hours:`, totalWorkedHours);
-
-      // 4. Calcular métricas consolidadas (ÚNICA FUENTE)
-      const efficiency = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
-      const markup = totalWorkedCost > 0 ? totalAmount / totalWorkedCost : 0;
-      const budgetUtilization = baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0;
-
-      // 5. Crear el objeto consolidado (FUENTE ÚNICA DE VERDAD)
-      const completeData = {
-        // Datos base del proyecto
-        project: {
-          id: project.id,
-          name: project.quotation?.projectName || '',
-          status: project.status,
-          startDate: project.startDate,
-          expectedEndDate: project.expectedEndDate,
-          clientId: project.clientId,
-          quotationId: project.quotationId
-        },
-        
-        // Datos de la cotización (FUENTE ÚNICA para estimaciones)
-        quotation: {
-          id: project.quotation?.id,
-          projectName: project.quotation?.projectName,
-          baseCost,
-          totalAmount,
-          estimatedHours, // ESTA ES LA FUENTE ÚNICA
-          team: quotationTeam.map(member => ({
-            id: member.id,
-            personnelId: member.personnelId,
-            personnelName: member.personnel?.name,
-            hours: member.hours,
-            rate: member.rate,
-            cost: member.cost
-          }))
-        },
-        
-        // Datos reales trabajados
-        actuals: {
-          totalWorkedHours,
-          totalWorkedCost,
-          totalEntries: timeEntries.length
-        },
-        
-        // Métricas calculadas (ÚNICA FUENTE)
-        metrics: {
-          efficiency: Math.round(efficiency * 100) / 100,
-          markup: Math.round(markup * 100) / 100,
-          budgetUtilization: Math.round(budgetUtilization * 100) / 100,
-          hoursDeviation: Math.round((totalWorkedHours - estimatedHours) * 100) / 100,
-          costDeviation: Math.round((totalWorkedCost - baseCost) * 100) / 100
-        }
-      };
-
-      console.log(`📊 Complete data prepared for project ${id}:`, {
-        estimatedHours: completeData.quotation.estimatedHours,
-        workedHours: completeData.actuals.totalWorkedHours,
-        efficiency: completeData.metrics.efficiency
-      });
-
-      res.json(completeData);
-    } catch (error) {
-      console.error("Error getting complete project data:", error);
-      res.status(500).json({ message: "Failed to get complete project data" });
-    }
-  });
+  // ==================== ENDPOINT ELIMINADO - CONSOLIDADO ARRIBA ====================
+  // El endpoint /api/projects/:id/complete-data ya está implementado arriba con autenticación
 
   // Obtener un proyecto activo específico (mantenido para compatibilidad)
   app.get("/api/active-projects/:id", requireAuth, async (req, res) => {

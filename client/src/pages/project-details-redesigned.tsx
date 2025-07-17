@@ -1048,71 +1048,29 @@ export default function ProjectDetailsRedesigned() {
       .sort((a, b) => b.hours - a.hours);
   }, [filteredTimeEntries, baseTeam]);
 
-  // Cálculo de resumen de costos usando objetivos de cotización
+  // SINGLE SOURCE OF TRUTH: usar completeData para todas las métricas
   const costSummary = useMemo(() => {
-    if (!project || !Array.isArray(filteredTimeEntries)) return null;
+    if (!completeData || !Array.isArray(filteredTimeEntries)) return null;
 
-    const projectData = project as any;
-    const quotationData = projectData.quotation;
+    console.log('🔍 SINGLE SOURCE OF TRUTH - costSummary:', {
+      estimatedHours: completeData.quotation.estimatedHours,
+      totalWorkedHours: completeData.actuals.totalWorkedHours,
+      totalWorkedCost: completeData.actuals.totalWorkedCost,
+      baseCost: completeData.quotation.baseCost,
+      totalAmount: completeData.quotation.totalAmount,
+      metrics: completeData.metrics
+    });
 
-    // Obtener objetivos mensuales de la cotización asociada al proyecto
-    if (!quotationData) {
-      console.warn('⚠️ No hay cotización asociada al proyecto para costSummary:', projectData.id);
-      return null;
-    }
-
-    // SI NO HAY DATOS EN EL PERÍODO, RETORNAR VALORES EN CERO
-    const hasDataInPeriod = filteredTimeEntries.length > 0;
+    // Usar datos directamente de completeData
+    const actualHours = completeData.actuals.totalWorkedHours;
+    const actualCost = completeData.actuals.totalWorkedCost;
+    const targetHours = completeData.quotation.estimatedHours;
+    const targetBudget = completeData.quotation.baseCost;
+    const targetClientPrice = completeData.quotation.totalAmount;
     
-    if (!hasDataInPeriod) {
-      return {
-        totalCost: 0,
-        budget: 0,
-        budgetUtilization: 0,
-        savings: 0,
-        filteredHours: 0,
-        targetHours: 0,
-        targetMultiplier: 0,
-        markup: 0,
-        targetClientPrice: 0,
-        hoursProgress: 0
-      };
-    }
-
-    const monthlyBaseCost = quotationData.baseCost;
-    const monthlyEstimatedHours = quotationData.estimatedHours || 0;
-
-    // Calcular multiplicador según el período
-    const getTargetMultiplier = () => {
-      if (dateFilter.label.includes('trimestre') || dateFilter.label.includes('3 meses')) {
-        return 3;
-      } else if (dateFilter.label.includes('semestre') || dateFilter.label.includes('6 meses')) {
-        return 6;
-      } else if (dateFilter.label.includes('año') || dateFilter.label.includes('12 meses')) {
-        return 12;
-      } else {
-        return 1; // Por defecto, un mes
-      }
-    };
-
-    const targetMultiplier = getTargetMultiplier();
-    const targetBudget = monthlyBaseCost * targetMultiplier;
-    const targetHours = monthlyEstimatedHours * targetMultiplier;
-
-    // Calcular datos reales
-    const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
-      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 100)), 0);
-
-    const actualHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-
+    // Calcular métricas usando la fuente única
     const budgetUtilization = targetBudget > 0 ? (actualCost / targetBudget) * 100 : 0;
-
-    // Calcular markup usando precio de cotización vs costo real
-    const monthlyClientPrice = quotationData.totalAmount || 0;
-    const targetClientPrice = monthlyClientPrice * targetMultiplier;
     const markup = actualCost > 0 ? targetClientPrice / actualCost : 0;
-    
-    // Calcular progreso de horas
     const hoursProgress = targetHours > 0 ? Math.min(100, (actualHours / targetHours) * 100) : 0;
 
     return {
@@ -1122,12 +1080,12 @@ export default function ProjectDetailsRedesigned() {
       savings: targetBudget - actualCost,
       filteredHours: actualHours,
       targetHours,
-      targetMultiplier,
+      targetMultiplier: 1, // Simplificado para single source
       markup: markup,
       targetClientPrice: targetClientPrice,
       hoursProgress: hoursProgress
     };
-  }, [project, filteredTimeEntries, dateFilter]);
+  }, [completeData, filteredTimeEntries]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({

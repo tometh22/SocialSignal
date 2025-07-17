@@ -30,6 +30,8 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ProjectAnalyticsProps {
   project: any;
@@ -78,6 +80,9 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
   timeFilter
 }) => {
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Single source of truth for project data
+  const { data: completeData, isLoading: isCompleteDataLoading } = useCompleteProjectData(project?.id);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { 
@@ -362,125 +367,338 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 
         {/* Contenido: Análisis Mensual - World-Class Design */}
         <TabsContent value="monthly" className="mt-0 space-y-6">
-          {/* Enhanced KPI Header Cards */}
-          <div className="grid grid-cols-6 gap-4">
-            {/* Health Score */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-emerald-700 mb-1">Score de Salud</p>
-                    <p className="text-2xl font-bold text-emerald-800">
-                      {Math.round(85 - (riskIndicators?.budgetRisk || 0) * 0.5)}
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      {Math.round(85 - (riskIndicators?.budgetRisk || 0) * 0.5) >= 80 ? 'Excelente' : 
-                       Math.round(85 - (riskIndicators?.budgetRisk || 0) * 0.5) >= 60 ? 'Bueno' : 'Crítico'}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-emerald-200/50 flex items-center justify-center">
-                    <Gauge className="h-6 w-6 text-emerald-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {isCompleteDataLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <>
+              {/* Enhanced KPI Header Cards */}
+              <div className="grid grid-cols-6 gap-4">
+                {/* Health Score */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-emerald-700 mb-1">Score de Salud</p>
+                              <p className="text-2xl font-bold text-emerald-800">
+                                {completeData?.metrics?.efficiency ? Math.round(100 - Math.max(0, completeData.metrics.efficiency - 100)) : 85}
+                              </p>
+                              <p className="text-xs text-emerald-600 mt-1">
+                                {completeData?.metrics?.efficiency ? (
+                                  completeData.metrics.efficiency <= 100 ? 'Excelente' : 
+                                  completeData.metrics.efficiency <= 150 ? 'Bueno' : 'Crítico'
+                                ) : 'Calculando...'}
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-emerald-200/50 flex items-center justify-center">
+                              <Gauge className="h-6 w-6 text-emerald-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Score de Salud del Proyecto</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Indicador general del rendimiento del proyecto basado en desviaciones horarias
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Horas estimadas:</span>
+                            <span className="font-medium">{completeData?.quotation?.estimatedHours || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Horas trabajadas:</span>
+                            <span className="font-medium">{completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Eficiencia:</span>
+                            <span className="font-medium">{completeData?.metrics?.efficiency?.toFixed(1) || 0}%</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Verde: ≤100%, Amarillo: ≤150%, Rojo: &gt;150%
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            {/* Financial Projection */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-blue-700 mb-1">Proyección Financiera</p>
-                    <p className="text-lg font-bold text-blue-800">Muy Buena</p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Burn Rate: {formatCurrency((costSummary?.actualCost || 0) / Math.max(projectMetrics?.daysElapsed || 1, 1))}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-blue-200/50 flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-blue-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Financial Projection */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-blue-700 mb-1">Proyección Financiera</p>
+                              <p className="text-lg font-bold text-blue-800">
+                                {completeData?.metrics?.markup ? (
+                                  completeData.metrics.markup >= 2.5 ? 'Excelente' :
+                                  completeData.metrics.markup >= 1.8 ? 'Muy Buena' :
+                                  completeData.metrics.markup >= 1.2 ? 'Buena' : 'Crítica'
+                                ) : 'Calculando...'}
+                              </p>
+                              <p className="text-xs text-blue-600 mt-1">
+                                Markup: {completeData?.metrics?.markup?.toFixed(2) || 0}x
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-blue-200/50 flex items-center justify-center">
+                              <TrendingUp className="h-6 w-6 text-blue-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Proyección Financiera</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Análisis de rentabilidad basado en precio vs costo real
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Precio cotizado:</span>
+                            <span className="font-medium">${completeData?.quotation?.totalAmount?.toLocaleString() || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Costo real:</span>
+                            <span className="font-medium">${completeData?.actuals?.totalWorkedCost?.toLocaleString() || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Markup:</span>
+                            <span className="font-medium">{completeData?.metrics?.markup?.toFixed(2) || 0}x</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Verde: ≥2.5x, Azul: ≥1.8x, Amarillo: ≥1.2x, Rojo: &lt;1.2x
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            {/* Team Efficiency */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-purple-700 mb-1">Eficiencia del Equipo</p>
-                    <p className="text-2xl font-bold text-purple-800">
-                      {Math.round((projectMetrics?.actualHours || 0) / Math.max(personnel.length, 1))}%
-                    </p>
-                    <p className="text-xs text-purple-600 mt-1">
-                      {timeByPersonnelData.filter(p => p.hours > 0).length} activos
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-purple-200/50 flex items-center justify-center">
-                    <Users className="h-6 w-6 text-purple-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Team Efficiency */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-purple-700 mb-1">Eficiencia del Equipo</p>
+                              <p className="text-2xl font-bold text-purple-800">
+                                {completeData?.metrics?.efficiency?.toFixed(1) || 0}%
+                              </p>
+                              <p className="text-xs text-purple-600 mt-1">
+                                {completeData?.quotation?.team?.length || 0} miembros
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-purple-200/50 flex items-center justify-center">
+                              <Users className="h-6 w-6 text-purple-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Eficiencia del Equipo</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Porcentaje de horas trabajadas vs horas estimadas del equipo
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Horas estimadas:</span>
+                            <span className="font-medium">{completeData?.quotation?.estimatedHours || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Horas trabajadas:</span>
+                            <span className="font-medium">{completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Eficiencia:</span>
+                            <span className="font-medium">{completeData?.metrics?.efficiency?.toFixed(1) || 0}%</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          100% = perfecto, &gt;100% = sobrecosto, &lt;100% = subcosto
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            {/* Operational Indicators */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-orange-700 mb-1">Indicadores Operacionales</p>
-                    <p className="text-lg font-bold text-orange-800">
-                      {Math.round((projectMetrics?.actualHours || 0) / Math.max(projectMetrics?.daysElapsed || 1, 1) * 10) / 10}h/día
-                    </p>
-                    <p className="text-xs text-orange-600 mt-1">
-                      {timeEntries.length} registros
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-orange-200/50 flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-orange-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Operational Indicators */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-orange-700 mb-1">Indicadores Operacionales</p>
+                              <p className="text-lg font-bold text-orange-800">
+                                {completeData?.actuals?.totalEntries || 0}
+                              </p>
+                              <p className="text-xs text-orange-600 mt-1">
+                                registros activos
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-orange-200/50 flex items-center justify-center">
+                              <Clock className="h-6 w-6 text-orange-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Indicadores Operacionales</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Métricas operacionales del proyecto
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Registros totales:</span>
+                            <span className="font-medium">{completeData?.actuals?.totalEntries || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Desviación horas:</span>
+                            <span className="font-medium">{completeData?.metrics?.hoursDeviation?.toFixed(1) || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Desviación costo:</span>
+                            <span className="font-medium">${completeData?.metrics?.costDeviation?.toLocaleString() || 0}</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Valores positivos = sobrecosto, negativos = subcosto
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            {/* Active Days */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-teal-50 to-teal-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-teal-700 mb-1">Días Activos</p>
-                    <p className="text-2xl font-bold text-teal-800">
-                      {Math.min(timeEntries.length, projectMetrics?.daysElapsed || 0)}
-                    </p>
-                    <p className="text-xs text-teal-600 mt-1">
-                      de {projectMetrics?.daysTotal || 0} totales
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-teal-200/50 flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-teal-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Quality Score */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-teal-50 to-teal-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-teal-700 mb-1">Score de Calidad</p>
+                              <p className="text-2xl font-bold text-teal-800">
+                                {completeData?.metrics?.budgetUtilization ? Math.round(100 - Math.abs(completeData.metrics.budgetUtilization - 100)) : 90}
+                              </p>
+                              <p className="text-xs text-teal-600 mt-1">
+                                {completeData?.metrics?.budgetUtilization ? (
+                                  Math.abs(completeData.metrics.budgetUtilization - 100) <= 10 ? 'Excelente' :
+                                  Math.abs(completeData.metrics.budgetUtilization - 100) <= 25 ? 'Bueno' : 'Necesita mejora'
+                                ) : 'Evaluando...'}
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-teal-200/50 flex items-center justify-center">
+                              <Calendar className="h-6 w-6 text-teal-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Score de Calidad</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Evaluación de la calidad del entregable basada en utilización de presupuesto
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Presupuesto base:</span>
+                            <span className="font-medium">${completeData?.quotation?.baseCost?.toLocaleString() || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Costo trabajado:</span>
+                            <span className="font-medium">${completeData?.actuals?.totalWorkedCost?.toLocaleString() || 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Utilización:</span>
+                            <span className="font-medium">{completeData?.metrics?.budgetUtilization?.toFixed(1) || 0}%</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Diferencia respecto al presupuesto planificado
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            {/* Performance Registers */}
-            <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-pink-50 to-pink-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-pink-700 mb-1">Registros de Desempeño</p>
-                    <p className="text-2xl font-bold text-pink-800">{timeEntries.length}</p>
-                    <p className="text-xs text-pink-600 mt-1">Este período</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-pink-200/50 flex items-center justify-center">
-                    <BarChart4 className="h-6 w-6 text-pink-700" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                {/* Performance Registers */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-pink-50 to-pink-100 cursor-help">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-pink-700 mb-1">Progreso vs Estimado</p>
+                              <p className="text-2xl font-bold text-pink-800">
+                                {completeData?.quotation?.estimatedHours && completeData?.actuals?.totalWorkedHours 
+                                  ? `${Math.round((completeData.actuals.totalWorkedHours / completeData.quotation.estimatedHours) * 100)}%`
+                                  : '0%'}
+                              </p>
+                              <p className="text-xs text-pink-600 mt-1">
+                                {completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h de {completeData?.quotation?.estimatedHours || 0}h
+                              </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-pink-200/50 flex items-center justify-center">
+                              <BarChart4 className="h-6 w-6 text-pink-700" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="w-48 p-3">
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Progreso vs Estimado</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Comparación directa entre horas trabajadas y cotizadas
+                        </p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span>Horas cotizadas:</span>
+                            <span className="font-medium">{completeData?.quotation?.estimatedHours || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Horas trabajadas:</span>
+                            <span className="font-medium">{completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Progreso:</span>
+                            <span className="font-medium">{completeData?.metrics?.efficiency?.toFixed(1) || 0}%</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Verde: ≤100%, Amarillo: ≤150%, Rojo: &gt;150%
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </>
+          )}
+        </TabsContent>
 
-          {/* Enhanced Team Performance Analysis */}
+        {/* Enhanced Team Performance Analysis */}
+        <TabsContent value="performance" className="mt-0 space-y-6">
           <Card className="shadow-lg border-0 bg-gradient-to-br from-slate-50 to-slate-100">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
