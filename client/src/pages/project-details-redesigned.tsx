@@ -1351,14 +1351,14 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
-                      const markup = completeData?.markup || 0;
+                      const markup = completeData?.metrics?.markup || 0;
                       if (markup >= 2.5) return 'default';
                       if (markup >= 1.8) return 'secondary';
                       if (markup >= 1.2) return 'destructive';
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const markup = completeData?.markup || 0;
+                        const markup = completeData?.metrics?.markup || 0;
                         if (markup >= 2.5) return 'Excelente';
                         if (markup >= 1.8) return 'Bueno';
                         if (markup >= 1.2) return 'Aceptable';
@@ -1368,7 +1368,7 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      {completeData?.markup ? `${completeData.markup.toFixed(1)}x` : '0.0x'}
+                      {completeData?.metrics?.markup ? `${completeData.metrics.markup.toFixed(1)}x` : '0.0x'}
                     </p>
                     <p className="text-xs text-gray-500">
                       Rentabilidad del proyecto
@@ -1389,15 +1389,15 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {completeData?.workedHours?.toFixed(1) || 0}h / {completeData?.estimatedHours || 0}h
+                        {completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h / {completeData?.quotation?.estimatedHours || 0}h
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(completeData?.efficiency || 0).toFixed(1)}%
+                      {(completeData?.metrics?.efficiency || 0).toFixed(1)}%
                     </p>
-                    <Progress value={completeData?.efficiency || 0} className="h-2" />
+                    <Progress value={completeData?.metrics?.efficiency || 0} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
@@ -1414,22 +1414,16 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        ${completeData?.totalCost?.toLocaleString() || 0}
+                        ${completeData?.actuals?.totalWorkedCost?.toLocaleString() || 0}
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(() => {
-                        if (!completeData?.budget || !completeData?.totalCost) return '0.0';
-                        return ((completeData.totalCost / completeData.budget) * 100).toFixed(1);
-                      })()}%
+                      {(completeData?.metrics?.budgetUtilization || 0).toFixed(1)}%
                     </p>
                     <Progress 
-                      value={(() => {
-                        if (!completeData?.budget || !completeData?.totalCost) return 0;
-                        return (completeData.totalCost / completeData.budget) * 100;
-                      })()} 
+                      value={completeData?.metrics?.budgetUtilization || 0} 
                       className="h-2"
                     />
                   </div>
@@ -1447,13 +1441,13 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      const efficiency = completeData?.efficiency || 0;
+                      const efficiency = completeData?.metrics?.efficiency || 0;
                       if (efficiency >= 90) return 'default';
                       if (efficiency >= 70) return 'secondary';
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const efficiency = completeData?.efficiency || 0;
+                        const efficiency = completeData?.metrics?.efficiency || 0;
                         if (efficiency >= 90) return 'Excelente';
                         if (efficiency >= 70) return 'Bueno';
                         if (efficiency >= 50) return 'Regular';
@@ -1464,7 +1458,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        const efficiency = completeData?.efficiency || 0;
+                        const efficiency = completeData?.metrics?.efficiency || 0;
                         if (efficiency >= 90) return 'Excelente';
                         if (efficiency >= 70) return 'Bueno';
                         if (efficiency >= 50) return 'Regular';
