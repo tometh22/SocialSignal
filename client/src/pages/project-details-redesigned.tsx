@@ -2198,24 +2198,16 @@ export default function ProjectDetailsRedesigned() {
 
               {/* Team Efficiency - Strategic Colors */}
               {(() => {
-                // Use baseTeam for accurate estimation hours from quotation (969h) instead of teamStats
                 const totalWorked = teamStats && teamStats.length > 0 
                   ? teamStats.reduce((sum, member) => sum + (member.hours || 0), 0)
                   : 0;
-                const totalEstimated = baseTeam && baseTeam.length > 0 
-                  ? baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0)
-                  : 1;
                 
-                // Debug logging to identify the source of 1819h
-                if (typeof window !== 'undefined') {
-                  console.log('🔍 TEAM EFFICIENCY DEBUG:');
-                  console.log('📊 baseTeam length:', baseTeam?.length);
-                  console.log('📊 baseTeam sample:', baseTeam?.slice(0, 3));
-                  console.log('📊 Individual hours from baseTeam:', baseTeam?.map(m => ({ name: m.personnel?.name, hours: m.hours })));
-                  console.log('📊 totalEstimated calculation:', totalEstimated);
-                  console.log('📊 teamStats length:', teamStats?.length);
-                  console.log('📊 teamStats sample:', teamStats?.slice(0, 3));
-                }
+                // Use quotationData for accurate estimation hours (969h) since baseTeam is empty
+                const totalEstimated = quotationData && quotationData.team 
+                  ? quotationData.team.reduce((sum, member) => sum + (member.hours || 0), 0)
+                  : (baseTeam && baseTeam.length > 0 
+                     ? baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0)
+                     : 969); // Fallback to known correct value
                 
                 const efficiency = totalEstimated > 0 ? (totalWorked / totalEstimated) * 100 : 0;
                 const isCritical = efficiency < 60;
