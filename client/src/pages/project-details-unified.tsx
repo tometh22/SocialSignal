@@ -5,7 +5,6 @@ import { useLocation } from 'wouter';
 import { 
   ArrowLeft, 
   Users, 
-  Calendar, 
   Clock, 
   DollarSign, 
   TrendingUp, 
@@ -13,25 +12,14 @@ import {
   Percent,
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp
+  BarChart3,
+  Calendar
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
-
-// Tipos para el proyecto
-interface Project {
-  id: number;
-  name: string;
-  status: string;
-  clientId: number;
-  startDate: string;
-  expectedEndDate: string;
-}
 
 interface DateFilter {
   label: string;
@@ -40,7 +28,7 @@ interface DateFilter {
 }
 
 const ProjectDetailsUnified: React.FC = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { id: projectId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [dateFilter, setDateFilter] = useState<DateFilter>({
     label: 'Este mes',
@@ -72,16 +60,18 @@ const ProjectDetailsUnified: React.FC = () => {
     }
   ];
 
-  // Mapear filtro a formato del hook
-  const getTimeFilterForHook = (filter: DateFilter) => {
-    if (filter.label.includes('Mes pasado')) return 'last_month';
-    if (filter.label.includes('Este mes')) return 'current_month';
-    if (filter.label.includes('Este trimestre')) return 'current_quarter';
-    if (filter.label.includes('Este año')) return 'current_year';
-    return 'all';
-  };
+  // Datos del proyecto
+  const { data: project, isLoading } = useQuery({
+    queryKey: [`/api/active-projects/${projectId}`],
+    enabled: !!projectId,
+  });
 
-  // Obtener datos directamente sin el hook problemático
+  const { data: client } = useQuery({
+    queryKey: [`/api/clients/${(project as any)?.clientId}`],
+    enabled: !!(project as any)?.clientId,
+  });
+
+  // Obtener datos de la cotización
   const { data: quotation } = useQuery({
     queryKey: [`/api/quotations/${(project as any)?.quotationId}`],
     enabled: !!(project as any)?.quotationId,
@@ -99,15 +89,27 @@ const ProjectDetailsUnified: React.FC = () => {
 
   // Filtrar entradas de tiempo por fecha
   const filteredTimeEntries = useMemo(() => {
+    if (!timeEntries) return [];
     return timeEntries.filter(entry => {
       const entryDate = new Date(entry.date);
       return entryDate >= dateFilter.startDate && entryDate <= dateFilter.endDate;
     });
   }, [timeEntries, dateFilter]);
 
-  // Crear datos simulados para completeData
-  const completeData = useMemo(() => {
-    if (!quotation || !quotationTeam.length) return null;
+  // Calcular métricas
+  const metrics = useMemo(() => {
+    if (!quotation || !quotationTeam.length) {
+      return {
+        totalWorkedHours: 0,
+        totalWorkedCost: 0,
+        estimatedHours: 0,
+        baseCost: 0,
+        totalAmount: 0,
+        markup: 0,
+        hoursProgress: 0,
+        budgetUtilization: 0
+      };
+    }
 
     const totalWorkedHours = filteredTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
     const totalWorkedCost = filteredTimeEntries.reduce((sum, entry) => sum + entry.cost, 0);
@@ -116,214 +118,119 @@ const ProjectDetailsUnified: React.FC = () => {
     const totalAmount = quotation.totalAmount || 0;
     
     const markup = totalWorkedCost > 0 ? totalAmount / totalWorkedCost : 0;
-    const efficiency = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
-    
+    const hoursProgress = estimatedHours > 0 ? (totalWorkedHours / estimatedHours) * 100 : 0;
+    const budgetUtilization = baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0;
+
     return {
-      quotation: {
-        id: quotation.id,
-        projectName: quotation.projectName,
-        baseCost,
-        totalAmount,
-        estimatedHours,
-        team: quotationTeam.map(member => ({
-          id: member.id,
-          personnelId: member.personnelId,
-          personnelName: member.personnelName,
-          hours: member.hours,
-          rate: member.rate,
-          cost: member.cost
-        }))
-      },
-      actuals: {
-        totalWorkedHours,
-        totalWorkedCost,
-        totalEntries: filteredTimeEntries.length
-      },
-      metrics: {
-        markup,
-        efficiency,
-        budgetUtilization: baseCost > 0 ? (totalWorkedCost / baseCost) * 100 : 0,
-        hoursDeviation: estimatedHours > 0 ? ((totalWorkedHours - estimatedHours) / estimatedHours) * 100 : 0,
-        costDeviation: baseCost > 0 ? ((totalWorkedCost - baseCost) / baseCost) * 100 : 0
-      }
+      totalWorkedHours,
+      totalWorkedCost,
+      estimatedHours,
+      baseCost,
+      totalAmount,
+      markup,
+      hoursProgress,
+      budgetUtilization
     };
   }, [quotation, quotationTeam, filteredTimeEntries]);
 
-  const completeDataLoading = false;
-
-  // Datos del proyecto (para información básica)
-  const { data: project, isLoading } = useQuery({
-    queryKey: [`/api/active-projects/${projectId}`],
-    enabled: !!projectId,
-  });
-
-  const { data: client } = useQuery({
-    queryKey: [`/api/clients/${(project as any)?.clientId}`],
-    enabled: !!(project as any)?.clientId,
-  });
-
-  // Debug: Log data to verify it's working
-  console.log('🔍 PROJECT DATA:', project);
-  console.log('🔍 COMPLETE DATA:', completeData);
-  console.log('🔍 PROJECT ID:', projectId);
-  console.log('🔍 LOADING STATES:', { isLoading, completeDataLoading });
-
-  // Métricas principales calculadas desde completeData
-  const metrics = useMemo(() => {
-    if (!completeData) {
-      return [
-        {
-          label: "Markup",
-          value: "0.0x",
-          subtitle: "Cargando...",
-          icon: Percent,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
-        },
-        {
-          label: "Progreso",
-          value: "0%",
-          subtitle: "Cargando...",
-          icon: Target,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
-        },
-        {
-          label: "Presupuesto",
-          value: "0%",
-          subtitle: "Cargando...",
-          icon: DollarSign,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
-        },
-        {
-          label: "Registros",
-          value: "0",
-          subtitle: "Cargando...",
-          icon: Clock,
-          color: "text-gray-600",
-          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100"
-        }
-      ];
+  // Cartas de métricas principales
+  const kpiCards = [
+    {
+      label: "Markup",
+      value: `${metrics.markup.toFixed(1)}x`,
+      subtitle: `$${metrics.totalAmount.toLocaleString()} / $${metrics.totalWorkedCost.toLocaleString()}`,
+      icon: Percent,
+      color: metrics.markup >= 2.5 ? "text-green-700" : metrics.markup >= 1.8 ? "text-blue-700" : "text-red-700",
+      bgColor: metrics.markup >= 2.5 ? "bg-gradient-to-br from-green-50 to-green-100" : metrics.markup >= 1.8 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-red-50 to-red-100"
+    },
+    {
+      label: "Progreso",
+      value: `${metrics.hoursProgress.toFixed(1)}%`,
+      subtitle: `${metrics.totalWorkedHours.toFixed(1)}h / ${metrics.estimatedHours}h`,
+      icon: Target,
+      color: metrics.hoursProgress >= 100 ? "text-green-700" : metrics.hoursProgress >= 75 ? "text-blue-700" : "text-orange-700",
+      bgColor: metrics.hoursProgress >= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : metrics.hoursProgress >= 75 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-orange-50 to-orange-100"
+    },
+    {
+      label: "Presupuesto",
+      value: `${metrics.budgetUtilization.toFixed(1)}%`,
+      subtitle: `$${metrics.totalWorkedCost.toLocaleString()} / $${metrics.baseCost.toLocaleString()}`,
+      icon: DollarSign,
+      color: metrics.budgetUtilization <= 100 ? "text-green-700" : "text-red-700",
+      bgColor: metrics.budgetUtilization <= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100"
+    },
+    {
+      label: "Registros",
+      value: filteredTimeEntries.length.toString(),
+      subtitle: "Entradas de tiempo",
+      icon: Clock,
+      color: "text-blue-700",
+      bgColor: "bg-gradient-to-br from-blue-50 to-blue-100"
     }
+  ];
 
-    const {
-      quotation,
-      actuals,
-      metrics: calculatedMetrics
-    } = completeData;
-
-    const markup = calculatedMetrics?.markup || 0;
-    const hoursProgress = quotation?.estimatedHours > 0 ? (actuals?.totalWorkedHours / quotation.estimatedHours) * 100 : 0;
-    const budgetUtilization = quotation?.baseCost > 0 ? (actuals?.totalWorkedCost / quotation.baseCost) * 100 : 0;
-
-    return [
-      {
-        label: "Markup",
-        value: `${markup.toFixed(1)}x`,
-        subtitle: `$${(quotation?.totalAmount || 0).toLocaleString()} / $${(actuals?.totalWorkedCost || 0).toLocaleString()}`,
-        icon: Percent,
-        color: markup >= 2.5 ? "text-green-700" : markup >= 1.8 ? "text-blue-700" : "text-red-700",
-        bgColor: markup >= 2.5 ? "bg-gradient-to-br from-green-50 to-green-100" : markup >= 1.8 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-red-50 to-red-100"
-      },
-      {
-        label: "Progreso",
-        value: `${hoursProgress.toFixed(1)}%`,
-        subtitle: `${(actuals?.totalWorkedHours || 0).toFixed(1)}h / ${quotation?.estimatedHours || 0}h`,
-        icon: Target,
-        color: hoursProgress >= 100 ? "text-green-700" : hoursProgress >= 75 ? "text-blue-700" : "text-orange-700",
-        bgColor: hoursProgress >= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : hoursProgress >= 75 ? "bg-gradient-to-br from-blue-50 to-blue-100" : "bg-gradient-to-br from-orange-50 to-orange-100"
-      },
-      {
-        label: "Presupuesto",
-        value: `${budgetUtilization.toFixed(1)}%`,
-        subtitle: `$${(actuals?.totalWorkedCost || 0).toLocaleString()} / $${(quotation?.baseCost || 0).toLocaleString()}`,
-        icon: DollarSign,
-        color: budgetUtilization <= 100 ? "text-green-700" : "text-red-700",
-        bgColor: budgetUtilization <= 100 ? "bg-gradient-to-br from-green-50 to-green-100" : "bg-gradient-to-br from-red-50 to-red-100"
-      },
-      {
-        label: "Registros",
-        value: `${actuals?.totalEntries || 0}`,
-        subtitle: `entradas de tiempo`,
-        icon: Clock,
-        color: "text-purple-700",
-        bgColor: "bg-gradient-to-br from-purple-50 to-purple-100"
-      }
-    ];
-  }, [completeData]);
-
-  // Estadísticas del equipo
-  const teamStats = useMemo(() => {
-    if (!completeData?.quotation?.team) return [];
-    
-    return completeData.quotation.team.map(member => ({
-      name: member.personnelName || 'Sin nombre',
-      hours: member.hours || 0,
-      cost: member.cost || 0,
-      personnelId: member.personnelId
-    }));
-  }, [completeData]);
-
-  if (isLoading || completeDataLoading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando proyecto...</p>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/6 mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!projectId || (!isLoading && !completeDataLoading && !project && !completeData)) {
+  if (!project) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Proyecto no encontrado</h2>
-          <p className="text-gray-600 mb-4">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
-          <p className="text-xs text-gray-500 mb-4">
-            Debug: projectId={projectId}, project={!!project}, completeData={!!completeData}
-          </p>
-          <Button onClick={() => setLocation("/active-projects")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Proyectos
-          </Button>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
+            <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
+          <div className="text-center py-12">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Proyecto no encontrado</h1>
+            <p className="text-gray-600">No se pudo cargar la información del proyecto.</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => setLocation("/active-projects")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {completeData?.quotation?.projectName || (project as any)?.subprojectName || 'Proyecto'}
+                {quotation?.projectName || (project as any)?.subprojectName || 'Proyecto'}
               </h1>
               <p className="text-gray-600">{client?.name || 'Cliente'}</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-4">
-            <Select
-              value={dateFilter.label}
-              onValueChange={(value) => {
-                const filter = dateFilters.find(f => f.label === value);
-                if (filter) setDateFilter(filter);
-              }}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Seleccionar período" />
+          <div className="flex items-center gap-4">
+            <Select value={dateFilter.label} onValueChange={(value) => {
+              const filter = dateFilters.find(f => f.label === value);
+              if (filter) setDateFilter(filter);
+            }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {dateFilters.map((filter) => (
@@ -333,117 +240,141 @@ const ProjectDetailsUnified: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {dateFilter.startDate.toLocaleDateString()} - {dateFilter.endDate.toLocaleDateString()}
+            </Badge>
           </div>
         </div>
 
-        {/* Métricas principales */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {metrics.map((metric, index) => (
-            <Card key={index} className={`border-0 ${metric.bgColor}`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{metric.label}</p>
-                    <p className={`text-2xl font-bold ${metric.color}`}>{metric.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{metric.subtitle}</p>
-                  </div>
-                  <metric.icon className={`h-8 w-8 ${metric.color}`} />
+          {kpiCards.map((card, index) => (
+            <Card key={index} className={`${card.bgColor} border-l-4 ${card.color.replace('text-', 'border-')}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <card.icon className="h-4 w-4" />
+                  {card.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${card.color} mb-1`}>
+                  {card.value}
                 </div>
+                <p className="text-xs text-gray-600">
+                  {card.subtitle}
+                </p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Tabs principales */}
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+        {/* Tabs */}
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard">Resumen Ejecutivo</TabsTrigger>
             <TabsTrigger value="team">Gestión del Equipo</TabsTrigger>
             <TabsTrigger value="analytics">Análisis Mensual</TabsTrigger>
           </TabsList>
 
-          {/* Resumen Ejecutivo */}
-          <TabsContent value="dashboard">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="h-5 w-5 mr-2" />
-                  Resumen Ejecutivo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Análisis de Rentabilidad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">Métricas Clave</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Markup Actual:</span>
-                        <span className="font-medium">{completeData.metrics.markup.toFixed(1)}x</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Markup Actual</span>
+                      <span className={`font-bold ${metrics.markup >= 2.5 ? "text-green-600" : metrics.markup >= 1.8 ? "text-blue-600" : "text-red-600"}`}>
+                        {metrics.markup.toFixed(1)}x
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Precio Cliente</span>
+                      <span className="font-bold">${metrics.totalAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Costo Real</span>
+                      <span className="font-bold">${metrics.totalWorkedCost.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Ganancia</span>
+                      <span className="font-bold text-green-600">
+                        ${(metrics.totalAmount - metrics.totalWorkedCost).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Progreso del Proyecto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">Horas Trabajadas</span>
+                        <span className="text-sm font-bold">{metrics.totalWorkedHours.toFixed(1)}h / {metrics.estimatedHours}h</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Eficiencia:</span>
-                        <span className="font-medium">{completeData.metrics.efficiency.toFixed(1)}%</span>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${metrics.hoursProgress >= 100 ? "bg-green-500" : metrics.hoursProgress >= 75 ? "bg-blue-500" : "bg-orange-500"}`}
+                          style={{ width: `${Math.min(metrics.hoursProgress, 100)}%` }}
+                        ></div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Utilización Presupuesto:</span>
-                        <span className="font-medium">{completeData.metrics.budgetUtilization.toFixed(1)}%</span>
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">Presupuesto Utilizado</span>
+                        <span className="text-sm font-bold">${metrics.totalWorkedCost.toLocaleString()} / ${metrics.baseCost.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full ${metrics.budgetUtilization <= 100 ? "bg-green-500" : "bg-red-500"}`}
+                          style={{ width: `${Math.min(metrics.budgetUtilization, 100)}%` }}
+                        ></div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">Comparación vs Estimado</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Horas Trabajadas:</span>
-                        <span className="font-medium">{completeData.actuals.totalWorkedHours.toFixed(1)}h</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Horas Estimadas:</span>
-                        <span className="font-medium">{completeData.quotation.estimatedHours}h</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Costo Real:</span>
-                        <span className="font-medium">${completeData.actuals.totalWorkedCost.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Costo Estimado:</span>
-                        <span className="font-medium">${completeData.quotation.baseCost.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
-          {/* Gestión del Equipo */}
-          <TabsContent value="team">
+          <TabsContent value="team" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  Gestión del Equipo
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Equipo del Proyecto
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {teamStats.map((member, index) => (
+                  {quotationTeam.map((member, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-blue-600 font-medium">
-                            {member.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                          </span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                          {member.personnelName?.charAt(0) || 'U'}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{member.name}</p>
-                          <p className="text-sm text-gray-600">ID: {member.personnelId}</p>
+                          <p className="font-medium">{member.personnelName}</p>
+                          <p className="text-sm text-gray-600">{member.hours}h estimadas</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-gray-900">{member.hours}h</p>
-                        <p className="text-sm text-gray-600">${member.cost.toLocaleString()}</p>
+                        <p className="font-bold">${member.cost?.toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">${member.rate}/h</p>
                       </div>
                     </div>
                   ))}
@@ -452,47 +383,30 @@ const ProjectDetailsUnified: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Análisis Mensual */}
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
                   Análisis Mensual
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">Análisis de Desviaciones</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Desviación Horas:</span>
-                        <span className={`font-medium ${completeData.metrics.hoursDeviation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {completeData.metrics.hoursDeviation.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Desviación Costo:</span>
-                        <span className={`font-medium ${completeData.metrics.costDeviation >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {completeData.metrics.costDeviation.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-medium text-blue-900">Horas Trabajadas</h4>
+                    <p className="text-2xl font-bold text-blue-700">{metrics.totalWorkedHours.toFixed(1)}h</p>
+                    <p className="text-sm text-blue-600">En el período seleccionado</p>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">Periodo Actual</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Filtro:</span>
-                        <span className="font-medium">{dateFilter.label}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Registros:</span>
-                        <span className="font-medium">{completeData.actuals.totalEntries}</span>
-                      </div>
-                    </div>
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-900">Costo Acumulado</h4>
+                    <p className="text-2xl font-bold text-green-700">${metrics.totalWorkedCost.toLocaleString()}</p>
+                    <p className="text-sm text-green-600">Costo real del período</p>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-lg">
+                    <h4 className="font-medium text-purple-900">Registros</h4>
+                    <p className="text-2xl font-bold text-purple-700">{filteredTimeEntries.length}</p>
+                    <p className="text-sm text-purple-600">Entradas de tiempo</p>
                   </div>
                 </div>
               </CardContent>
