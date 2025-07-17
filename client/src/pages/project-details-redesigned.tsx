@@ -1368,7 +1368,7 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
-                      const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                      const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                         sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                       const clientPrice = quotationData?.totalAmount || 0;
                       const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
@@ -1378,7 +1378,7 @@ export default function ProjectDetailsRedesigned() {
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
@@ -1392,7 +1392,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
@@ -1418,20 +1418,20 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0).toFixed(1)}h / {quotationData?.estimatedHours || 0}h
+                        {(filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0).toFixed(1)}h / {quotationData?.estimatedHours || 0}h
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const workedHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                        const workedHours = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
                         const estimatedHours = quotationData?.estimatedHours || 1;
                         return ((workedHours / estimatedHours) * 100).toFixed(1);
                       })()}%
                     </p>
                     <Progress value={(() => {
-                      const workedHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                      const workedHours = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
                       const estimatedHours = quotationData?.estimatedHours || 1;
                       return (workedHours / estimatedHours) * 100;
                     })()} className="h-2" />
@@ -1451,7 +1451,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        ${filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        ${(filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0).toLocaleString()}
                       </p>
                     </div>
@@ -1459,7 +1459,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const budget = quotationData?.baseCost || 1;
                         return ((actualCost / budget) * 100).toFixed(1);
@@ -1467,7 +1467,7 @@ export default function ProjectDetailsRedesigned() {
                     </p>
                     <Progress 
                       value={(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const budget = quotationData?.baseCost || 1;
                         return (actualCost / budget) * 100;
@@ -1489,7 +1489,7 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                      const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                         sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                       const clientPrice = quotationData?.totalAmount || 0;
                       const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
@@ -1498,7 +1498,7 @@ export default function ProjectDetailsRedesigned() {
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
@@ -1512,7 +1512,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
                           sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
