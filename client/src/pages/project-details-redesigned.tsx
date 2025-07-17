@@ -2206,6 +2206,17 @@ export default function ProjectDetailsRedesigned() {
                   ? baseTeam.reduce((sum, member) => sum + (member.hours || 0), 0)
                   : 1;
                 
+                // Debug logging to identify the source of 1819h
+                if (typeof window !== 'undefined') {
+                  console.log('🔍 TEAM EFFICIENCY DEBUG:');
+                  console.log('📊 baseTeam length:', baseTeam?.length);
+                  console.log('📊 baseTeam sample:', baseTeam?.slice(0, 3));
+                  console.log('📊 Individual hours from baseTeam:', baseTeam?.map(m => ({ name: m.personnel?.name, hours: m.hours })));
+                  console.log('📊 totalEstimated calculation:', totalEstimated);
+                  console.log('📊 teamStats length:', teamStats?.length);
+                  console.log('📊 teamStats sample:', teamStats?.slice(0, 3));
+                }
+                
                 const efficiency = totalEstimated > 0 ? (totalWorked / totalEstimated) * 100 : 0;
                 const isCritical = efficiency < 60;
                 const isWarning = efficiency >= 60 && efficiency < 80;
