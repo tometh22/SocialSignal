@@ -2425,7 +2425,7 @@ interface EfficiencyComponentProps {
   function EfficiencyComponent({ baseTeam, filteredTimeEntries, dateFilter }: EfficiencyComponentProps) {
   if (!baseTeam || baseTeam.length === 0) {
     return (
-      <div className="text-center py-4">
+      <div className="text-center py-6">
         <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
         <p className="text-sm text-gray-600">No hay equipo configurado</p>
       </div>
@@ -2434,14 +2434,14 @@ interface EfficiencyComponentProps {
 
   if (!filteredTimeEntries || filteredTimeEntries.length === 0) {
     return (
-      <div className="text-center py-4">
+      <div className="text-center py-6">
         <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
         <p className="text-sm text-gray-600">Sin registros para: {dateFilter.label}</p>
       </div>
     );
   }
 
-  // Procesar datos del equipo con fórmula multifactor
+  // Procesar datos del equipo con fórmula multifactor mejorada
   const teamData = baseTeam.map((member: any) => {
     const memberEntries = filteredTimeEntries.filter((entry: any) => 
       entry.personnelId === member.personnelId
@@ -2462,7 +2462,7 @@ interface EfficiencyComponentProps {
     
     // Fórmula multifactor: Tiempo (50%) + Peso (25%) + Consistencia (15%) + Costo (10%)
     const factorTiempo = horasEstimadas > 0 ? Math.min(horasEstimadas / Math.max(horasTrabajadas, 1), 2) : 1;
-    const factorPeso = pesoEnProyecto / 100; // Normalizado
+    const factorPeso = Math.min(pesoEnProyecto / 20, 1); // Normalizado para pesos típicos
     const factorConsistencia = registros > 0 ? Math.min(diasTrabajados / Math.max(registros, 1), 1) : 0;
     const factorCosto = tarifa > 0 ? Math.min(25 / tarifa, 1) : 0.5; // Normalizado para tarifas típicas
     
@@ -2497,7 +2497,7 @@ interface EfficiencyComponentProps {
 
   if (top5.length === 0) {
     return (
-      <div className="text-center py-4">
+      <div className="text-center py-6">
         <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
         <p className="text-sm text-gray-600">Sin datos de eficiencia para mostrar</p>
       </div>
@@ -2505,66 +2505,69 @@ interface EfficiencyComponentProps {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-gray-900">🏆 Top 5 Eficiencia</h3>
-        <span className="text-sm text-gray-500">Fórmula multifactor</span>
-      </div>
-      <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-50 rounded leading-tight">
-        <strong>Metodología:</strong> Tiempo (50%) + Peso (25%) + Consistencia (15%) + Costo (10%)
-      </div>
-      <div className="space-y-2">
-        {top5.map((persona, index) => {
-          const esExcelente = persona.eficiencia >= 100;
-          const esBueno = persona.eficiencia >= 80;
-          const color = esExcelente ? 'green' : esBueno ? 'blue' : 'amber';
-          
-          return (
-            <div key={persona.id} className={`p-2 rounded-lg border ${
-              color === 'green' ? 'bg-green-50 border-green-200' :
-              color === 'blue' ? 'bg-blue-50 border-blue-200' :
-              'bg-amber-50 border-amber-200'
-            }`}>
-              <div className="flex justify-between items-center">
-                <div className="flex gap-2 flex-1 min-w-0">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                    index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                    index === 1 ? 'bg-gray-100 text-gray-700' :
-                    index === 2 ? 'bg-orange-100 text-orange-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 text-sm truncate">{persona.nombre}</div>
-                    <div className="text-xs text-gray-600">
-                      {persona.horasTrabajadas.toFixed(1)}h / {persona.horasEstimadas}h • ${persona.tarifa}/h
-                    </div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {persona.detalleEficiencia}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {persona.pesoEnProyecto.toFixed(1)}% proyecto • {persona.diasTrabajados}d
-                    </div>
-                  </div>
+    <div className="space-y-4">
+      {top5.map((persona, index) => {
+        const esExcelente = persona.eficiencia >= 120;
+        const esBueno = persona.eficiencia >= 90;
+        const esRegular = persona.eficiencia >= 70;
+        
+        let colorScheme, textColor, bgColor, percentage;
+        
+        if (esExcelente) {
+          colorScheme = 'green';
+          textColor = 'text-green-600';
+          bgColor = 'bg-green-50';
+          percentage = `${Math.round(persona.eficiencia)}%`;
+        } else if (esBueno) {
+          colorScheme = 'blue';
+          textColor = 'text-blue-600';
+          bgColor = 'bg-blue-50';
+          percentage = `${Math.round(persona.eficiencia)}%`;
+        } else if (esRegular) {
+          colorScheme = 'amber';
+          textColor = 'text-amber-600';
+          bgColor = 'bg-amber-50';
+          percentage = `${Math.round(persona.eficiencia)}%`;
+        } else {
+          colorScheme = 'gray';
+          textColor = 'text-gray-600';
+          bgColor = 'bg-gray-50';
+          percentage = `${Math.round(persona.eficiencia)}%`;
+        }
+        
+        return (
+          <div key={persona.id} className="flex items-center justify-between p-3 rounded-lg bg-white border border-gray-100 hover:shadow-sm transition-shadow">
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${bgColor} text-sm font-bold ${textColor}`}>
+                {index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-gray-900 truncate text-sm">
+                  {persona.nombre}
                 </div>
-                <div className="text-right ml-2 flex-shrink-0">
-                  <div className={`text-lg font-bold ${
-                    color === 'green' ? 'text-green-600' :
-                    color === 'blue' ? 'text-blue-600' :
-                    'text-amber-600'
-                  }`}>
-                    {persona.eficiencia.toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {esExcelente ? 'Excelente' : esBueno ? 'Bueno' : 'Regular'}
-                  </div>
+                <div className="text-xs text-gray-500 space-x-2">
+                  <span>{persona.horasTrabajadas.toFixed(1)}h / {persona.horasEstimadas}h</span>
+                  <span>•</span>
+                  <span>${persona.tarifa}/h</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {persona.detalleEficiencia}
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
+            <div className="text-right">
+              <div className={`text-lg font-bold ${textColor}`}>
+                {percentage}
+              </div>
+              <div className="text-xs text-gray-500">
+                {esExcelente ? 'Excelente' : 
+                 esBueno ? 'Excelente' : 
+                 esRegular ? 'Bueno' : 'Bueno'}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
