@@ -2341,30 +2341,30 @@ export default function ProjectDetailsRedesigned() {
                     return (
                       <div className="space-y-4">
                         {/* Resumen compacto */}
-                        <div className="bg-white rounded-lg border p-3">
+                        <div className="bg-white rounded-lg border p-2.5">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium text-gray-700">
                               Período: {dateFilter.label}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {filteredTimeEntries.length} registros • {top5.length} activos
+                              {filteredTimeEntries.length} reg • {top5.length} activos
                             </span>
                           </div>
-                          <div className="grid grid-cols-3 gap-3 text-center">
-                            <div className="bg-blue-50 rounded p-2">
-                              <div className="text-lg font-bold text-blue-600">
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="bg-blue-50 rounded p-1.5">
+                              <div className="text-base font-bold text-blue-600">
                                 {teamData.reduce((sum, m) => sum + m.horasTrabajadas, 0).toFixed(1)}
                               </div>
                               <div className="text-xs text-blue-600">Trabajadas</div>
                             </div>
-                            <div className="bg-green-50 rounded p-2">
-                              <div className="text-lg font-bold text-green-600">
+                            <div className="bg-green-50 rounded p-1.5">
+                              <div className="text-base font-bold text-green-600">
                                 {teamData.reduce((sum, m) => sum + m.horasEstimadas, 0).toFixed(1)}
                               </div>
                               <div className="text-xs text-green-600">Estimadas</div>
                             </div>
-                            <div className="bg-purple-50 rounded p-2">
-                              <div className="text-lg font-bold text-purple-600">
+                            <div className="bg-purple-50 rounded p-1.5">
+                              <div className="text-base font-bold text-purple-600">
                                 ${teamData.reduce((sum, m) => sum + (m.horasTrabajadas * m.tarifa), 0).toFixed(0)}
                               </div>
                               <div className="text-xs text-purple-600">Costo</div>
@@ -2382,10 +2382,10 @@ export default function ProjectDetailsRedesigned() {
                               Eficiencia multifactor
                             </div>
                           </div>
-                          <div className="text-xs text-gray-600 mb-3 p-2 bg-gray-50 rounded">
-                            <strong>Metodología:</strong> Tiempo (50%) + Peso en proyecto (25%) + Consistencia (15%) + Costo-efectividad (10%)
+                          <div className="text-xs text-gray-600 mb-2 p-2 bg-gray-50 rounded leading-tight">
+                            <strong>Metodología:</strong> Tiempo (50%) + Peso (25%) + Consistencia (15%) + Costo (10%)
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             {top5.map((persona, index) => {
                               const esExcelente = persona.eficiencia >= 100;
                               const esBueno = persona.eficiencia >= 80;
@@ -2395,14 +2395,14 @@ export default function ProjectDetailsRedesigned() {
                               const explicacion = persona.detalleEficiencia || 'Sin datos suficientes';
                               
                               return (
-                                <div key={persona.id} className={`p-3 rounded-lg border ${
+                                <div key={persona.id} className={`p-2.5 rounded-lg border ${
                                   color === 'green' ? 'bg-green-50 border-green-200' :
                                   color === 'blue' ? 'bg-blue-50 border-blue-200' :
                                   'bg-amber-50 border-amber-200'
                                 }`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex gap-2 flex-1 min-w-0">
+                                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                                         index === 0 ? 'bg-yellow-100 text-yellow-700' :
                                         index === 1 ? 'bg-gray-100 text-gray-700' :
                                         index === 2 ? 'bg-orange-100 text-orange-700' :
@@ -2410,21 +2410,21 @@ export default function ProjectDetailsRedesigned() {
                                       }`}>
                                         {index + 1}
                                       </div>
-                                      <div>
-                                        <div className="font-medium text-gray-800 text-sm">{persona.nombre}</div>
-                                        <div className="text-xs text-gray-600">
-                                          Trabajó {persona.horasTrabajadas.toFixed(1)}h de {persona.horasEstimadas}h estimadas
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-gray-800 text-sm truncate">{persona.nombre}</div>
+                                        <div className="text-xs text-gray-600 leading-tight">
+                                          {persona.horasTrabajadas.toFixed(1)}h / {persona.horasEstimadas}h • ${persona.tarifa}/h
                                         </div>
-                                        <div className="text-xs text-gray-500">
-                                          {explicacion} • ${persona.tarifa}/h
+                                        <div className="text-xs text-gray-500 leading-tight truncate">
+                                          {explicacion}
                                         </div>
-                                        <div className="text-xs text-gray-400">
-                                          {persona.pesoEnProyecto.toFixed(1)}% del proyecto • {persona.diasTrabajados} días • {persona.registros} reg
+                                        <div className="text-xs text-gray-400 leading-tight">
+                                          {persona.pesoEnProyecto.toFixed(1)}% • {persona.diasTrabajados}d • {persona.registros}r
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="text-right">
-                                      <div className={`text-xl font-bold ${
+                                    <div className="text-right ml-2 flex-shrink-0">
+                                      <div className={`text-lg font-bold ${
                                         color === 'green' ? 'text-green-600' :
                                         color === 'blue' ? 'text-blue-600' :
                                         'text-amber-600'
