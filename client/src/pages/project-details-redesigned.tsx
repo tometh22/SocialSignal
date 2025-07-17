@@ -2081,11 +2081,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Score de Salud</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                              <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                                 <div className="font-bold">Score de Salud General</div>
                                 <div>Verde ≥80pts | Amarillo 50-79pts | Rojo &lt;50pts</div>
                                 <div className="mt-1 text-gray-300">
-                                  ${(costSummary?.totalCost || 0).toFixed(0)} gastado / ${(costSummary?.budget || 0).toFixed(0)} presupuestado
+                                  ${(costSummary?.totalCost || 0).toFixed(0)} gastado de ${(costSummary?.budget || 0).toFixed(0)} presupuestado
                                 </div>
                               </div>
                             </div>
@@ -2151,11 +2151,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Proyección Financiera</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                              <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                                 <div className="font-bold">Proyección Financiera</div>
                                 <div>Verde ≤80% | Amarillo 80-100% | Rojo &gt;100%</div>
                                 <div className="mt-1 text-gray-300">
-                                  Proyección: ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)} / ${(costSummary?.budget || 0).toFixed(0)} presupuesto
+                                  Proyección: ${((costSummary?.totalCost || 0) * 1.15).toFixed(0)} de ${(costSummary?.budget || 0).toFixed(0)} presupuesto
                                 </div>
                               </div>
                             </div>
@@ -2225,11 +2225,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Eficiencia Equipo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                              <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                                 <div className="font-bold">Eficiencia del Equipo</div>
                                 <div>Verde ≥80% | Amarillo 60-79% | Rojo &lt;60%</div>
                                 <div className="mt-1 text-gray-300">
-                                  {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(0)}h trabajadas / {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0)}h cotizadas
+                                  {teamStats?.reduce((sum, member) => sum + (member.hours || 0), 0).toFixed(0)}h trabajadas de {teamStats?.reduce((sum, member) => sum + (member.estimatedHours || 0), 0).toFixed(0)}h cotizadas
                                 </div>
                               </div>
                             </div>
@@ -2294,11 +2294,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Burn Rate</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                              <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                                 <div className="font-bold">Burn Rate</div>
                                 <div>Verde ≤80% | Amarillo 80-120% | Rojo &gt;120%</div>
                                 <div className="mt-1 text-gray-300">
-                                  ${((costSummary?.totalCost || 0) / Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30))).toFixed(0)}/mes vs ${((costSummary?.budget || 0) / 12).toFixed(0)}/mes planificado
+                                  ${((costSummary?.totalCost || 0) / Math.max(1, (new Date().getTime() - new Date(project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30))).toFixed(0)}/mes de ${((costSummary?.budget || 0) / 12).toFixed(0)}/mes planificado
                                 </div>
                               </div>
                             </div>
@@ -2361,11 +2361,11 @@ export default function ProjectDetailsRedesigned() {
                             }`}>Progreso Tiempo</p>
                             <div className="group relative">
                               <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                              <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                              <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                                 <div className="font-bold">Progreso de Tiempo</div>
                                 <div>Verde ≤75% | Amarillo 75-100% | Rojo &gt;100%</div>
                                 <div className="mt-1 text-gray-300">
-                                  {(costSummary?.filteredHours || 0).toFixed(0)}h trabajadas / {(costSummary?.targetHours || 0).toFixed(0)}h cotizadas
+                                  {(costSummary?.filteredHours || 0).toFixed(0)}h trabajadas de {(costSummary?.targetHours || 0).toFixed(0)}h cotizadas
                                 </div>
                               </div>
                             </div>
@@ -2413,7 +2413,7 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-xs font-medium text-gray-700 mb-1">Score Calidad</p>
                         <div className="group relative">
                           <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
-                          <div className="absolute top-6 right-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg min-w-max">
+                          <div className="absolute top-6 left-0 hidden group-hover:block z-50 bg-black text-white text-xs rounded p-2 shadow-lg w-48">
                             <div className="font-bold">Score de Calidad</div>
                             <div>Excelente ≥90pts | Bueno 70-89pts | Regular 50-69pts</div>
                             <div className="mt-1 text-gray-300">
