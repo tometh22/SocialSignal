@@ -2369,8 +2369,33 @@ export default function ProjectDetailsRedesigned() {
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <Zap className="h-5 w-5 text-yellow-600" />
                     Mapa de Calor del Equipo
+                    <div className="group relative ml-2">
+                      <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                        <div className="bg-black text-white text-xs rounded-lg py-3 px-4 whitespace-nowrap max-w-xs">
+                          <div className="font-bold mb-2">Criterios de Color:</div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-green-500 rounded"></div>
+                              <span>Verde: ≤110% presupuesto + eficiencia ≥90%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                              <span>Amarillo: ≤130% presupuesto + eficiencia ≥70%</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-red-500 rounded"></div>
+                              <span>Rojo: &gt;130% presupuesto o eficiencia &lt;70%</span>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-gray-300 text-xs">
+                            La intensidad refleja qué tan cerca están del ratio óptimo (1.0)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardTitle>
-                  <CardDescription>Análisis visual de rendimiento por miembro</CardDescription>
+                  <CardDescription>Análisis visual de rendimiento por miembro - Hover en cada cuadro para detalles</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
                   {(() => {
@@ -2490,8 +2515,24 @@ export default function ProjectDetailsRedesigned() {
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <Crown className="h-5 w-5 text-blue-600" />
                     Top Performers
+                    <div className="group relative ml-2">
+                      <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                        <div className="bg-black text-white text-xs rounded-lg py-3 px-4 whitespace-nowrap max-w-sm">
+                          <div className="font-bold mb-2">Sistema de Puntuación (0-100 pts):</div>
+                          <div className="space-y-1">
+                            <div><strong>Eficiencia (40 pts):</strong> Mantenerse dentro del presupuesto</div>
+                            <div><strong>Peso del proyecto (30 pts):</strong> Importancia por horas asignadas</div>
+                            <div><strong>Uso óptimo (30 pts):</strong> Penaliza excesos de presupuesto</div>
+                          </div>
+                          <div className="mt-2 text-gray-300 text-xs">
+                            Usa datos reales de time entries vs horas estimadas de cotización
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardTitle>
-                  <CardDescription>Basado en eficiencia, peso del proyecto y uso de horas</CardDescription>
+                  <CardDescription>Ranking basado en eficiencia, peso del proyecto y uso óptimo de horas</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-4">
