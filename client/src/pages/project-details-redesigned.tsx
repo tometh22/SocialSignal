@@ -2363,7 +2363,7 @@ export default function ProjectDetailsRedesigned() {
 
             {/* Advanced Team Performance Analysis */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Team Performance Heat Map - Fixed Data Source */}
+              {/* Real Heat Map Visualization */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
@@ -2373,69 +2373,114 @@ export default function ProjectDetailsRedesigned() {
                   <CardDescription>Análisis visual de rendimiento por miembro</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="space-y-3">
-                    {(() => {
-                      // Use baseTeam data which should have the real team member information
-                      const teamMembers = baseTeam || teamStats || [];
-                      console.log('🔍 Team data for heat map:', { baseTeam, teamStats, teamMembers });
-                      
-                      if (!teamMembers || teamMembers.length === 0) {
-                        return (
-                          <div className="text-center py-8 text-gray-500">
-                            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No hay datos del equipo disponibles</p>
+                  {(() => {
+                    // Use baseTeam data which should have the real team member information
+                    const teamMembers = baseTeam || teamStats || [];
+                    
+                    if (!teamMembers || teamMembers.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-gray-500">
+                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No hay datos del equipo disponibles</p>
+                        </div>
+                      );
+                    }
+                    
+                    // Create a grid-based heat map
+                    const gridCols = 4;
+                    const displayMembers = teamMembers.slice(0, 12); // Show up to 12 members
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Legend */}
+                        <div className="flex items-center justify-center gap-4 text-xs">
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span>Excelente</span>
                           </div>
-                        );
-                      }
-                      
-                      return teamMembers.slice(0, 8).map((member: any, index: number) => {
-                        const workedHours = member.hours || 0;
-                        const estimatedHours = member.estimatedHours || 1;
-                        const efficiency = estimatedHours > 0 ? (estimatedHours / Math.max(workedHours, 0.1)) : 0;
-                        
-                        // Strategic color coding
-                        const isCritical = efficiency < 0.7 || workedHours > estimatedHours * 1.3;
-                        const isWarning = efficiency < 0.9 || workedHours > estimatedHours * 1.1;
-                        const isGood = efficiency >= 0.9 && workedHours <= estimatedHours * 1.1;
-                        
-                        const colorClasses = {
-                          bg: isCritical ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : isGood ? 'bg-green-500' : 'bg-gray-500',
-                          border: isCritical ? 'border-red-200' : isWarning ? 'border-yellow-200' : isGood ? 'border-green-200' : 'border-gray-200'
-                        };
-                        
-                        return (
-                          <div key={member.personnelId || index} className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors border ${colorClasses.border}`}>
-                            <div className="relative">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center font-semibold text-gray-700 text-sm">
-                                {member.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2) || 'NN'}
-                              </div>
-                              <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${colorClasses.bg} rounded-full border-2 border-white`}></div>
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-medium text-gray-900">{member.name || 'Miembro sin nombre'}</span>
-                                <Badge 
-                                  variant={isCritical ? 'destructive' : isWarning ? 'secondary' : isGood ? 'default' : 'outline'} 
-                                  className="text-xs"
-                                >
-                                  {isCritical ? 'Crítico' : isWarning ? 'Atención' : isGood ? 'Excelente' : 'Regular'}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-600">{workedHours.toFixed(1)}h trabajadas</span>
-                                <span className="text-sm text-gray-500">•</span>
-                                <span className="text-sm text-gray-600">{estimatedHours.toFixed(1)}h estimadas</span>
-                              </div>
-                              <Progress 
-                                value={Math.min(100, (workedHours / Math.max(estimatedHours, 1)) * 100)} 
-                                className="h-2 mt-2" 
-                              />
-                            </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Atención</span>
                           </div>
-                        );
-                      });
-                    })()}
-                  </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span>Crítico</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                            <span>Sin datos</span>
+                          </div>
+                        </div>
+                        
+                        {/* Heat Map Grid */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {displayMembers.map((member: any, index: number) => {
+                            // Get real data from baseTeam (hours worked from time entries)
+                            const workedHours = member.hours || 0; // Real hours from time entries
+                            const estimatedHours = member.estimatedHours || 1; // Estimated hours from quotation
+                            const name = member.name || member.personnel?.name || 'Sin nombre';
+                            
+                            // Calculate efficiency: closer to 1.0 is better (worked hours close to estimated)
+                            const efficiency = estimatedHours > 0 ? Math.min(2, estimatedHours / Math.max(workedHours, 0.1)) : 0;
+                            
+                            // Strategic color coding based on performance
+                            const usageRatio = workedHours / Math.max(estimatedHours, 1);
+                            const isCritical = usageRatio > 1.3 || efficiency < 0.7; // Over 130% usage or low efficiency
+                            const isWarning = usageRatio > 1.1 || efficiency < 0.9; // Over 110% usage or medium efficiency
+                            const isGood = usageRatio <= 1.1 && efficiency >= 0.9; // Within range and good efficiency
+                            
+                            const bgColor = isCritical ? 'bg-red-500' : 
+                                           isWarning ? 'bg-yellow-500' : 
+                                           isGood ? 'bg-green-500' : 
+                                           'bg-gray-400';
+                            
+                            // Intensity based on deviation from optimal (1.0 usage ratio)
+                            const deviation = Math.abs(usageRatio - 1.0);
+                            const intensity = Math.max(30, Math.min(100, 100 - (deviation * 50)));
+                            
+                            return (
+                              <div 
+                                key={member.personnelId || index}
+                                className={`relative aspect-square ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
+                                style={{ opacity: intensity / 100 }}
+                                title={`${name}: ${workedHours.toFixed(1)}h trabajadas / ${estimatedHours.toFixed(1)}h estimadas`}
+                              >
+                                <div className="text-white text-xs font-bold text-center">
+                                  {name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                </div>
+                                <div className="text-white text-xs text-center mt-1">
+                                  {workedHours.toFixed(1)}h
+                                </div>
+                                
+                                {/* Enhanced Tooltip */}
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                                  <div className="bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                                    <div className="font-medium">{name}</div>
+                                    <div>Trabajadas: {workedHours.toFixed(1)}h</div>
+                                    <div>Estimadas: {estimatedHours.toFixed(1)}h</div>
+                                    <div>Ratio: {(usageRatio * 100).toFixed(0)}%</div>
+                                    <div className={`font-medium ${
+                                      isCritical ? 'text-red-300' :
+                                      isWarning ? 'text-yellow-300' :
+                                      isGood ? 'text-green-300' :
+                                      'text-gray-300'
+                                    }`}>
+                                      {isCritical ? 'Crítico' : isWarning ? 'Atención' : isGood ? 'Excelente' : 'Regular'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          
+                          {/* Fill empty spaces if needed */}
+                          {Array.from({ length: Math.max(0, 12 - displayMembers.length) }).map((_, index) => (
+                            <div key={`empty-${index}`} className="aspect-square bg-gray-100 rounded-lg opacity-30"></div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -2464,26 +2509,30 @@ export default function ProjectDetailsRedesigned() {
                       }
                       
                       const performersWithScore = teamMembers.map((member: any) => {
-                        const workedHours = member.hours || 0;
-                        const estimatedHours = member.estimatedHours || 1;
-                        const hourlyRate = member.hourlyRate || 10;
+                        // Get real data from updated backend (time entries)
+                        const workedHours = member.hours || 0; // Real hours from time entries
+                        const estimatedHours = member.estimatedHours || 1; // Estimated from quotation
+                        const hourlyRate = member.hourlyRate || member.rate || 10;
+                        const name = member.name || member.personnel?.name || 'Sin nombre';
                         
-                        // Efficiency score (0-40 points)
-                        const efficiency = estimatedHours > 0 ? Math.min(1, estimatedHours / Math.max(workedHours, 0.1)) : 0;
+                        // Efficiency score (0-40 points) - how well they stay within estimates
+                        const usageRatio = workedHours / Math.max(estimatedHours, 1);
+                        const efficiency = usageRatio <= 1 ? 1 : Math.max(0, 1 - (usageRatio - 1));
                         const efficiencyScore = efficiency * 40;
                         
                         // Project weight score (0-30 points) - based on estimated hours in project
-                        const maxEstimatedInProject = Math.max(...teamMembers.map((m: any) => m.estimatedHours || 0));
+                        const maxEstimatedInProject = Math.max(...teamMembers.map((m: any) => (m.estimatedHours || 0)));
                         const projectWeightScore = maxEstimatedInProject > 0 ? (estimatedHours / maxEstimatedInProject) * 30 : 0;
                         
-                        // Hour usage score (0-30 points) - penalize over-usage, reward optimal usage
-                        const usageRatio = workedHours / Math.max(estimatedHours, 1);
+                        // Hour usage score (0-30 points) - optimal usage around estimate
                         const hourUsageScore = usageRatio <= 1 ? 30 : Math.max(0, 30 - ((usageRatio - 1) * 20));
                         
                         const totalScore = efficiencyScore + projectWeightScore + hourUsageScore;
                         
                         return {
                           ...member,
+                          name,
+                          workedHours,
                           totalScore,
                           efficiencyScore,
                           projectWeightScore,

@@ -3646,24 +3646,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Enriquecer con información de personal y roles
+      // Enriquecer con información de personal, roles y horas trabajadas reales
       const enrichedTeam = await Promise.all(
         baseTeam.map(async (member) => {
           const [personnelData] = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
           const [roleData] = await db.select().from(roles).where(eq(roles.id, member.roleId));
           
+          // Calcular horas trabajadas reales desde time entries
+          const { rows: timeEntryRows } = await pool.query(`
+            SELECT COALESCE(SUM(hours), 0) as total_hours
+            FROM time_entries 
+            WHERE personnel_id = $1 AND project_id = $2
+          `, [member.personnelId, projectId]);
+          
+          const workedHours = parseFloat(timeEntryRows[0]?.total_hours || '0');
+          
           const enrichedMember = {
             ...member,
             personnel: personnelData,
-            role: roleData
+            role: roleData,
+            name: personnelData?.name || 'Sin nombre',
+            hours: workedHours, // Real worked hours from time entries
+            estimatedHours: member.hours || member.estimatedHours, // Original estimated hours
+            hourlyRate: member.rate || member.hourlyRate // Hourly rate
           };
           
           console.log(`🚀 ENVIANDO AL FRONTEND - ${personnelData?.name}:`, {
-            hours: member.hours,
+            hours: workedHours,
             rate: member.rate,
             cost: member.cost,
-            estimatedHours: member.estimatedHours,
-            hourlyRate: member.hourlyRate,
+            estimatedHours: member.hours || member.estimatedHours,
+            hourlyRate: member.rate || member.hourlyRate,
             personnelId: member.personnelId
           });
           
