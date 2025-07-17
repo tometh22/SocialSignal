@@ -46,9 +46,11 @@ export const useCompleteProjectData = (projectId: number, timeFilter: string = '
     queryFn: async () => {
       const url = `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
       const response = await apiRequest(url);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch complete project data');
+        throw new Error(`Failed to fetch complete project data: ${response.status}`);
       }
+      
       return response.json();
     },
     enabled: !!projectId,

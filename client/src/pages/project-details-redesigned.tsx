@@ -718,6 +718,8 @@ export default function ProjectDetailsRedesigned() {
     getTimeFilterForHook(dateFilter)
   );
 
+
+
   // Datos del proyecto (mantenido para compatibilidad)
   const { data: project, isLoading } = useQuery({
     queryKey: [`/api/active-projects/${projectId}`],

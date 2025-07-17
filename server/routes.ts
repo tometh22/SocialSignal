@@ -191,10 +191,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-      const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.cost || 0), 0);
+      const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
       
       console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
       console.log(`📊 Total worked hours:`, totalWorkedHours);
+      console.log(`📊 Total worked cost:`, totalWorkedCost);
 
       // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
       let adjustedEstimatedHours = estimatedHours;
