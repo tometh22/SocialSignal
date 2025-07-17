@@ -224,13 +224,13 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
           </div>
         </TabsContent>
 
-        {/* Contenido: Equipo y Recursos */}
+        {/* Contenido: Equipo y Recursos - USING UNIFIED DATA SOURCE */}
         <TabsContent value="team" className="mt-0 space-y-6">
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2">
               {renderChartPlaceholder(
                 "Distribución de Horas por Persona", 
-                "Tiempo dedicado por cada miembro del equipo", 
+                "Tiempo dedicado por cada miembro del equipo del período seleccionado", 
                 <Users className="h-4 w-4 text-primary" />, 
                 "personnelBar",
                 "h-72"
@@ -241,40 +241,39 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  Asignación por Rol
+                  Equipo del Proyecto
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Distribución de horas según rol
+                  Datos del período: {timeFilter === "last_month" ? "Mes pasado" : "Período seleccionado"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-2">
-                {timeByPersonnelData.length > 0 ? (
+                {completeData?.quotation?.team?.length > 0 ? (
                   <div className="space-y-3 mt-2">
-                    {roles.map(role => {
-                      const personelInRole = timeByPersonnelData.filter(
-                        p => personnel.find(per => per.id === p.id)?.roleId === role.id
-                      );
-                      const totalHoursInRole = personelInRole.reduce((sum, p) => sum + p.hours, 0);
-
-                      if (totalHoursInRole <= 0) return null;
+                    {completeData.quotation.team.map(member => {
+                      const estimatedHours = member.hours || 0;
+                      const memberCost = member.cost || 0;
+                      const percentOfTeam = completeData.quotation?.estimatedHours > 0 
+                        ? ((estimatedHours / completeData.quotation.estimatedHours) * 100).toFixed(1)
+                        : '0';
 
                       return (
-                        <div key={role.id} className="p-2 rounded-md bg-muted/10">
-                          <div className="flex justify-between items-baseline mb-1">
-                            <span className="text-sm font-medium">{role.name}</span>
+                        <div key={member.id} className="p-3 rounded-md bg-muted/10 border">
+                          <div className="flex justify-between items-baseline mb-2">
+                            <span className="text-sm font-medium">{member.personnelName || 'Sin nombre'}</span>
                             <span className="text-xs text-muted-foreground">
-                              {personelInRole.length} persona{personelInRole.length !== 1 ? 's' : ''}
+                              {percentOfTeam}% del equipo
                             </span>
                           </div>
-                          <div className="flex justify-between items-baseline mb-1">
-                            <span className="text-lg font-semibold">{formatNumber(totalHoursInRole, 1)}h</span>
+                          <div className="flex justify-between items-baseline mb-2">
+                            <span className="text-lg font-semibold">{formatNumber(estimatedHours, 1)}h</span>
                             <span className="text-xs">
-                              {(totalHoursInRole / (projectMetrics?.actualHours || 1) * 100).toFixed(1)}%
+                              ${memberCost.toLocaleString()}
                             </span>
                           </div>
                           <Progress 
-                            value={totalHoursInRole} 
-                            max={projectMetrics?.actualHours || 0} 
+                            value={estimatedHours} 
+                            max={Math.max(...completeData.quotation.team.map(m => m.hours || 0))} 
                             className="h-1.5" 
                           />
                         </div>
@@ -283,7 +282,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                    No hay datos disponibles
+                    No hay equipo en la cotización
                   </div>
                 )}
               </CardContent>
@@ -295,61 +294,55 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
               <div className="flex justify-between">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  Equipo del Proyecto
+                  Detalle del Equipo
                 </CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 text-xs"
-                >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                  Actualizar
-                </Button>
+                <Badge variant="outline" className="text-xs">
+                  {completeData?.quotation?.team?.length || 0} miembros
+                </Badge>
               </div>
               <CardDescription className="text-xs">
-                Detalle de asignación y carga de trabajo
+                Información de la cotización y estimaciones
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-              {timeByPersonnelData.length > 0 ? (
+              {completeData?.quotation?.team?.length > 0 ? (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="grid grid-cols-12 gap-2 p-3 bg-muted/20 text-xs font-medium">
-                    <div className="col-span-3">Nombre</div>
-                    <div className="col-span-2">Rol</div>
-                    <div className="col-span-2">Horas</div>
-                    <div className="col-span-2">% del Total</div>
-                    <div className="col-span-3">Distribución</div>
+                    <div className="col-span-4">Nombre</div>
+                    <div className="col-span-2">Horas Est.</div>
+                    <div className="col-span-2">Tarifa</div>
+                    <div className="col-span-2">Costo</div>
+                    <div className="col-span-2">% Equipo</div>
                   </div>
 
                   <div className="divide-y">
-                    {timeByPersonnelData.map((person, index) => {
-                      const personDetails = personnel.find(p => p.id === person.id);
-                      const roleDetails = roles.find(r => r.id === personDetails?.roleId);
-                      const percentOfTotal = ((person.hours / (projectMetrics?.actualHours || 1)) * 100).toFixed(1);
+                    {completeData.quotation.team.map((member, index) => {
+                      const estimatedHours = member.hours || 0;
+                      const hourlyRate = member.rate || 0;
+                      const memberCost = member.cost || 0;
+                      const percentOfTeam = completeData.quotation?.estimatedHours > 0 
+                        ? ((estimatedHours / completeData.quotation.estimatedHours) * 100).toFixed(1)
+                        : '0';
 
                       return (
                         <div key={index} className="grid grid-cols-12 gap-2 p-3 text-sm border-b last:border-b-0">
-                          <div className="col-span-3 flex items-center gap-2">
+                          <div className="col-span-4 flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                              {person.name.substring(0, 2).toUpperCase()}
+                              {(member.personnelName || 'NN').substring(0, 2).toUpperCase()}
                             </div>
-                            <span className="font-medium truncate">{person.name}</span>
+                            <span className="font-medium truncate">{member.personnelName || 'Sin nombre'}</span>
                           </div>
                           <div className="col-span-2 flex items-center">
-                            <span className="text-muted-foreground">{roleDetails?.name || 'Sin rol'}</span>
+                            <span className="font-medium">{formatNumber(estimatedHours, 1)}h</span>
                           </div>
                           <div className="col-span-2 flex items-center">
-                            <span className="font-medium">{formatNumber(person.hours, 1)}h</span>
+                            <span className="text-muted-foreground">${hourlyRate.toFixed(1)}</span>
                           </div>
                           <div className="col-span-2 flex items-center">
-                            <span className="text-muted-foreground">{percentOfTotal}%</span>
+                            <span className="font-medium">${memberCost.toLocaleString()}</span>
                           </div>
-                          <div className="col-span-3 flex items-center">
-                            <Progress 
-                              value={person.hours} 
-                              max={Math.max(...timeByPersonnelData.map(p => p.hours))} 
-                              className="h-2 flex-1" 
-                            />
+                          <div className="col-span-2 flex items-center">
+                            <span className="text-muted-foreground">{percentOfTeam}%</span>
                           </div>
                         </div>
                       );
@@ -358,7 +351,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                  No hay datos disponibles
+                  No hay datos del equipo disponibles
                 </div>
               )}
             </CardContent>
@@ -697,7 +690,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
           )}
         </TabsContent>
 
-        {/* Enhanced Team Performance Analysis */}
+        {/* Enhanced Team Performance Analysis - USING UNIFIED DATA SOURCE */}
         <TabsContent value="performance" className="mt-0 space-y-6">
           <Card className="shadow-lg border-0 bg-gradient-to-br from-slate-50 to-slate-100">
             <CardHeader className="pb-3">
@@ -708,7 +701,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                     Análise de Rendimiento del Equipo
                   </CardTitle>
                   <CardDescription className="text-sm text-slate-600 mt-1">
-                    Métricas avanzadas de productividad y eficiencia por miembro
+                    Métricas basadas en datos reales del período seleccionado
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 border-indigo-200">
@@ -722,19 +715,19 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-4">
-                {personnel.length > 0 ? (
-                  personnel.map((member) => {
-                    const memberHours = timeEntries
-                      .filter(entry => entry.personnelId === member.id)
-                      .reduce((sum, entry) => sum + (entry.hours || 0), 0);
+                {completeData?.quotation?.team?.length > 0 ? (
+                  completeData.quotation.team.map((member) => {
+                    // Usar datos únicamente de la fuente consolidada
+                    const estimatedHours = member.hours || 0;
+                    const memberHourlyRate = member.rate || 0;
+                    // Para datos trabajados reales, buscar en los datos consolidados si están disponibles
+                    const memberWorkedHours = completeData?.actuals?.totalWorkedHours 
+                      ? (completeData.actuals.totalWorkedHours * (estimatedHours / (completeData.quotation?.estimatedHours || 1)))
+                      : 0;
                     
-                    const memberRole = roles.find(role => role.id === member.roleId);
-                    const memberInTimeData = timeByPersonnelData.find(p => p.id === member.id);
-                    const estimatedHours = memberInTimeData ? memberInTimeData.hours : 0;
-                    
-                    const hasActivity = memberHours > 0;
-                    const costGenerated = memberHours * member.hourlyRate;
-                    const efficiency = estimatedHours > 0 ? (memberHours / estimatedHours) * 100 : 0;
+                    const hasActivity = memberWorkedHours > 0;
+                    const costGenerated = memberWorkedHours * memberHourlyRate;
+                    const efficiency = estimatedHours > 0 ? (memberWorkedHours / estimatedHours) * 100 : 0;
                     
                     // Performance classification
                     const getPerformanceColor = (eff: number) => {
@@ -754,12 +747,12 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center font-semibold text-slate-700">
-                              {member.name.substring(0, 2).toUpperCase()}
+                              {(member.personnelName || 'NN').substring(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <h4 className={`font-semibold ${perfColors.text}`}>{member.name}</h4>
+                              <h4 className={`font-semibold ${perfColors.text}`}>{member.personnelName || 'Sin nombre'}</h4>
                               <p className="text-sm text-slate-600">
-                                {memberRole?.name || 'Sin rol'} • ${member.hourlyRate.toFixed(1)}/h
+                                Cotizado • ${memberHourlyRate.toFixed(1)}/h
                               </p>
                             </div>
                           </div>
@@ -772,7 +765,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 
                         <div className="grid grid-cols-4 gap-4 mb-3">
                           <div className="text-center">
-                            <p className="text-lg font-bold text-slate-800">{formatNumber(memberHours, 1)}h</p>
+                            <p className="text-lg font-bold text-slate-800">{formatNumber(memberWorkedHours, 1)}h</p>
                             <p className="text-xs text-slate-600">Trabajadas</p>
                           </div>
                           <div className="text-center">
@@ -785,7 +778,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                           </div>
                           <div className="text-center">
                             <p className={`text-lg font-bold ${perfColors.text}`}>
-                              {hasActivity ? formatNumber(memberHours / Math.max(projectMetrics?.daysElapsed || 1, 1), 1) + 'h/día' : '0h/día'}
+                              {hasActivity ? formatNumber(memberWorkedHours / 30, 1) + 'h/día' : '0h/día'}
                             </p>
                             <p className="text-xs text-slate-600">Promedio</p>
                           </div>
@@ -809,7 +802,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 ) : (
                   <div className="text-center py-12 text-slate-500">
                     <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No hay personal asignado al proyecto</p>
+                    <p>No hay personal asignado al proyecto en la cotización</p>
                   </div>
                 )}
               </div>
