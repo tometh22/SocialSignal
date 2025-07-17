@@ -718,11 +718,7 @@ export default function ProjectDetailsRedesigned() {
     getTimeFilterForHook(dateFilter)
   );
 
-  // DEBUG: Verificar qué datos está recibiendo el frontend
-  console.log('🔍 DEBUG - Complete Data:', completeData);
-  console.log('🔍 DEBUG - Loading:', completeDataLoading);
-  console.log('🔍 DEBUG - Metrics:', completeData?.metrics);
-  console.log('🔍 DEBUG - Markup:', completeData?.metrics?.markup);
+
 
 
 
@@ -1359,14 +1355,20 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
-                      const markup = completeData?.metrics?.markup || 0;
+                      const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                      const clientPrice = quotationData?.totalAmount || 0;
+                      const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
                       if (markup >= 2.5) return 'default';
                       if (markup >= 1.8) return 'secondary';
-                      if (markup >= 1.2) return 'destructive';
+                      if (markup >= 1.2) return 'outline';
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const markup = completeData?.metrics?.markup || 0;
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const clientPrice = quotationData?.totalAmount || 0;
+                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
                         if (markup >= 2.5) return 'Excelente';
                         if (markup >= 1.8) return 'Bueno';
                         if (markup >= 1.2) return 'Aceptable';
@@ -1376,7 +1378,13 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      {completeData?.metrics?.markup ? `${completeData.metrics.markup.toFixed(1)}x` : '0.0x'}
+                      {(() => {
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const clientPrice = quotationData?.totalAmount || 0;
+                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                        return markup > 0 ? `${markup.toFixed(1)}x` : '0.0x';
+                      })()}
                     </p>
                     <p className="text-xs text-gray-500">
                       Rentabilidad del proyecto
@@ -1397,15 +1405,23 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {completeData?.actuals?.totalWorkedHours?.toFixed(1) || 0}h / {completeData?.quotation?.estimatedHours || 0}h
+                        {filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0).toFixed(1)}h / {quotationData?.estimatedHours || 0}h
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(completeData?.metrics?.efficiency || 0).toFixed(1)}%
+                      {(() => {
+                        const workedHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                        const estimatedHours = quotationData?.estimatedHours || 1;
+                        return ((workedHours / estimatedHours) * 100).toFixed(1);
+                      })()}%
                     </p>
-                    <Progress value={completeData?.metrics?.efficiency || 0} className="h-2" />
+                    <Progress value={(() => {
+                      const workedHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+                      const estimatedHours = quotationData?.estimatedHours || 1;
+                      return (workedHours / estimatedHours) * 100;
+                    })()} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
@@ -1422,16 +1438,27 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        ${completeData?.actuals?.totalWorkedCost?.toLocaleString() || 0}
+                        ${filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0).toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(completeData?.metrics?.budgetUtilization || 0).toFixed(1)}%
+                      {(() => {
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const budget = quotationData?.baseCost || 1;
+                        return ((actualCost / budget) * 100).toFixed(1);
+                      })()}%
                     </p>
                     <Progress 
-                      value={completeData?.metrics?.budgetUtilization || 0} 
+                      value={(() => {
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const budget = quotationData?.baseCost || 1;
+                        return (actualCost / budget) * 100;
+                      })()} 
                       className="h-2"
                     />
                   </div>
@@ -1449,16 +1476,22 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      const efficiency = completeData?.metrics?.efficiency || 0;
-                      if (efficiency >= 90) return 'default';
-                      if (efficiency >= 70) return 'secondary';
+                      const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                        sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                      const clientPrice = quotationData?.totalAmount || 0;
+                      const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                      if (markup >= 2.0) return 'default';
+                      if (markup >= 1.5) return 'secondary';
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const efficiency = completeData?.metrics?.efficiency || 0;
-                        if (efficiency >= 90) return 'Excelente';
-                        if (efficiency >= 70) return 'Bueno';
-                        if (efficiency >= 50) return 'Regular';
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const clientPrice = quotationData?.totalAmount || 0;
+                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                        if (markup >= 2.0) return 'Excelente';
+                        if (markup >= 1.5) return 'Bueno';
+                        if (markup >= 1.2) return 'Regular';
                         return 'Crítico';
                       })()}
                     </Badge>
@@ -1466,10 +1499,13 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        const efficiency = completeData?.metrics?.efficiency || 0;
-                        if (efficiency >= 90) return 'Excelente';
-                        if (efficiency >= 70) return 'Bueno';
-                        if (efficiency >= 50) return 'Regular';
+                        const actualCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const clientPrice = quotationData?.totalAmount || 0;
+                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                        if (markup >= 2.0) return 'Excelente';
+                        if (markup >= 1.5) return 'Bueno';
+                        if (markup >= 1.2) return 'Regular';
                         return 'Crítico';
                       })()}
                     </p>
