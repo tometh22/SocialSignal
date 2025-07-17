@@ -2257,13 +2257,101 @@ export default function ProjectDetailsRedesigned() {
           </TabsContent>
 
           <TabsContent value="dashboard" className="space-y-4">
-            <ProjectDashboard 
-              project={project}
-              baseTeam={baseTeam}
-              teamStats={teamStats}
-              dateFilter={dateFilter}
-              filterTimeEntriesByDateRange={filterTimeEntriesByDateRange}
-            />
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-gray-900">
+                  <Activity className="h-5 w-5 text-blue-600" />
+                  Panel de Control del Proyecto
+                </CardTitle>
+                <CardDescription className="text-gray-600">
+                  Vista general del estado y progreso del proyecto
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Métricas básicas del dashboard */}
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-800">Progreso General</p>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {costSummary?.budget ? Math.round((costSummary.totalCost / costSummary.budget) * 100) : 0}%
+                          </p>
+                        </div>
+                        <Target className="h-8 w-8 text-blue-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-green-50 border-green-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-800">Horas Trabajadas</p>
+                          <p className="text-2xl font-bold text-green-900">
+                            {costSummary?.filteredHours?.toFixed(1) || '0.0'}h
+                          </p>
+                        </div>
+                        <Clock className="h-8 w-8 text-green-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-purple-50 border-purple-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-purple-800">Equipo Activo</p>
+                          <p className="text-2xl font-bold text-purple-900">
+                            {teamStats?.filter((member: any) => member.hours > 0).length || 0}
+                          </p>
+                        </div>
+                        <Users className="h-8 w-8 text-purple-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Información adicional */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Resumen del Período: {dateFilter.label}</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Costo Total:</span>
+                      <span className="font-medium text-gray-900 ml-2">
+                        ${costSummary?.totalCost?.toFixed(0) || '0'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Presupuesto:</span>
+                      <span className="font-medium text-gray-900 ml-2">
+                        ${costSummary?.budget?.toFixed(0) || '0'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Horas Estimadas:</span>
+                      <span className="font-medium text-gray-900 ml-2">
+                        {costSummary?.targetHours?.toFixed(1) || '0.0'}h
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Eficiencia:</span>
+                      <span className={`font-medium ml-2 ${
+                        costSummary?.budget && costSummary?.totalCost
+                          ? costSummary.totalCost <= costSummary.budget ? 'text-green-600' : 'text-red-600'
+                          : 'text-gray-900'
+                      }`}>
+                        {costSummary?.budget && costSummary?.totalCost
+                          ? costSummary.totalCost <= costSummary.budget ? 'Dentro del presupuesto' : 'Sobre presupuesto'
+                          : 'Sin datos'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>
