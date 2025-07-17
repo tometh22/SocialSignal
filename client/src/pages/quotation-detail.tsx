@@ -106,15 +106,33 @@ const QuotationDetail: React.FC = () => {
       
       try {
         // Obtener cotización
+        console.log('🔍 Fetching quotation with ID:', quotationId);
         const quotationRes = await fetch(`/api/quotations/${quotationId}`);
-        if (!quotationRes.ok) throw new Error('Error al cargar la cotización');
+        console.log('📊 Quotation response status:', quotationRes.status);
+        
+        if (!quotationRes.ok) {
+          const errorData = await quotationRes.json();
+          console.error('❌ Quotation API error:', errorData);
+          throw new Error(`Error al cargar la cotización: ${errorData.message || quotationRes.status}`);
+        }
+        
         const quotationData = await quotationRes.json();
+        console.log('✅ Quotation data loaded:', quotationData);
         setQuotation(quotationData);
         
         // Obtener equipo
+        console.log('👥 Fetching team for quotation ID:', quotationId);
         const teamRes = await fetch(`/api/quotation-team/${quotationId}`);
-        if (!teamRes.ok) throw new Error('Error al cargar el equipo');
+        console.log('👥 Team response status:', teamRes.status);
+        
+        if (!teamRes.ok) {
+          const errorData = await teamRes.json();
+          console.error('❌ Team API error:', errorData);
+          throw new Error(`Error al cargar el equipo: ${errorData.message || teamRes.status}`);
+        }
+        
         const teamData = await teamRes.json();
+        console.log('✅ Team data loaded:', teamData);
         setTeamMembers(teamData);
         
         // Obtener datos del cliente
