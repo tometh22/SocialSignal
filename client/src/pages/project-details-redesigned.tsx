@@ -718,6 +718,17 @@ export default function ProjectDetailsRedesigned() {
     getTimeFilterForHook(dateFilter)
   );
 
+  // DEBUG TEMPORAL: Ver qué datos hay disponibles
+  console.log('🔍 CARDS DEBUG - filteredTimeEntries:', filteredTimeEntries?.length || 0, 'entries');
+  console.log('🔍 CARDS DEBUG - quotationData:', quotationData?.totalAmount || 0, 'precio');
+  if (filteredTimeEntries && filteredTimeEntries.length > 0) {
+    console.log('🔍 CARDS DEBUG - Primera entrada:', filteredTimeEntries[0]);
+    const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
+    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
+      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+    console.log('🔍 CARDS DEBUG - Total horas:', totalHours, 'Total costo:', totalCost);
+  }
+
 
 
 
