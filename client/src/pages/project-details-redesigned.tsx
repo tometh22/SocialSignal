@@ -713,6 +713,9 @@ export default function ProjectDetailsRedesigned() {
   
   // Crear filteredTimeEntries vacío por compatibilidad (todos los datos vienen del endpoint unificado)
   const filteredTimeEntries: any[] = [];
+  
+  // Variables faltantes para compatibilidad con componentes existentes
+  const completeData = unifiedData;
 
   // DEBUG DATOS UNIFICADOS
   console.log('🚀 SINGLE SOURCE OF TRUTH:');
