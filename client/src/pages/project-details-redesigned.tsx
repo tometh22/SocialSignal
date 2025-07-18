@@ -668,17 +668,17 @@ export default function ProjectDetailsRedesigned() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
 
-  // Estado del filtro temporal - configurado por defecto para mostrar datos reales de junio 2025
+  // Estado del filtro temporal - configurado por defecto para mostrar "Este mes" (julio 2025)
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
-    // Configurar por defecto para mostrar junio 2025 como "mes pasado" 
+    // Configurar por defecto para mostrar julio 2025 como "este mes" 
     const currentDate = new Date();
-    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const thisMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const monthName = thisMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     return {
       type: 'month',
-      startDate: startOfMonth(lastMonth),
-      endDate: endOfMonth(lastMonth),
-      label: `Mes pasado (${monthName})`
+      startDate: startOfMonth(thisMonth),
+      endDate: endOfMonth(thisMonth),
+      label: `Este mes (${monthName})`
     };
   });
 
