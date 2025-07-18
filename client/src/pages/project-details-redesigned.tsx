@@ -2369,9 +2369,9 @@ export default function ProjectDetailsRedesigned() {
                       );
                     }
                     
-                    // Create a grid-based heat map
+                    // Create a grid-based heat map - show ALL members who worked on the project
                     const gridCols = 4;
-                    const displayMembers = teamMembers.slice(0, 12); // Show up to 12 members
+                    const displayMembers = teamMembers.filter(member => member.hours > 0); // Only show members with actual hours
                     
                     return (
                       <div className="space-y-4">
@@ -2508,12 +2508,14 @@ export default function ProjectDetailsRedesigned() {
                         );
                       }
                       
-                      const performersWithScore = teamMembers.map((member: any) => {
+                      // Filter to only include members who actually worked (have hours > 0)
+                      const workingMembers = teamMembers.filter(member => member.hours > 0);
+                      const performersWithScore = workingMembers.map((member: any) => {
                         // Get real data from completeData.actuals.teamBreakdown (time entries)
                         const workedHours = member.hours || 0; // Real hours from time entries
                         const estimatedHours = member.estimatedHours || 1; // Estimated from quotation
                         const hourlyRate = member.hourlyRate || member.rate || 10;
-                        const name = member.name || member.personnelName || `Miembro ${teamMembers.indexOf(member) + 1}`;
+                        const name = member.name || member.personnelName || `Miembro ${workingMembers.indexOf(member) + 1}`;
                         
                         // Efficiency score (0-40 points) - how well they stay within estimates
                         const usageRatio = workedHours / Math.max(estimatedHours, 1);
@@ -2521,7 +2523,7 @@ export default function ProjectDetailsRedesigned() {
                         const efficiencyScore = efficiency * 40;
                         
                         // Project weight score (0-30 points) - based on estimated hours in project
-                        const maxEstimatedInProject = Math.max(...teamMembers.map((m: any) => (m.estimatedHours || 0)));
+                        const maxEstimatedInProject = Math.max(...workingMembers.map((m: any) => (m.estimatedHours || 0)));
                         const projectWeightScore = maxEstimatedInProject > 0 ? (estimatedHours / maxEstimatedInProject) * 30 : 0;
                         
                         // Hour usage score (0-30 points) - optimal usage around estimate
