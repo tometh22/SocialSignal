@@ -67,7 +67,8 @@ import {
   DollarSign,
   Timer,
   Edit3,
-  Calendar as CalendarIconLucide
+  Calendar as CalendarIconLucide,
+  ArrowUpDown
 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -205,7 +206,10 @@ const CompactTimeForm: React.FC<{
         );
       });
 
-      // SOLO invalidar cache (evitar duplicación)
+      // Actualizar estado local inmediatamente
+      updateLocalEntries(newEntry);
+
+      // Invalidar cache para sincronizar con servidor
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
 
       toast({
@@ -541,6 +545,7 @@ const TimeEntries: React.FC = () => {
   const [filterType, setFilterType] = useState<"all" | "billable" | "non-billable">("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [sortBy, setSortBy] = useState<"createdAt" | "date">("createdAt");
 
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
 
@@ -548,8 +553,10 @@ const TimeEntries: React.FC = () => {
     setLocalTimeEntries(prev => {
       // Remover entrada existente si ya existe (evitar duplicados)
       const filtered = prev.filter(e => e.id !== entry.id);
-      // Agregar al principio y mantener orden por fecha (más reciente primero)
-      return [entry, ...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Agregar al principio y mantener orden por fecha de creación (más reciente primero)
+      const updated = [entry, ...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      console.log('📝 Estado local actualizado:', updated.length, 'registros');
+      return updated;
     });
   };
 
@@ -799,7 +806,14 @@ const TimeEntries: React.FC = () => {
         }
 
         return true;
-      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      }).sort((a, b) => {
+        // Ordenar por fecha de creación o fecha del registro según el filtro seleccionado
+        if (sortBy === "createdAt") {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        } else {
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        }
+      })
     : [];
 
   // Opciones de filtro profesionales con todos los meses
@@ -970,6 +984,17 @@ const TimeEntries: React.FC = () => {
                         <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="billable">Facturables</SelectItem>
                         <SelectItem value="non-billable">No facturables</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                      <SelectTrigger className="w-48 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <ArrowUpDown className="mr-2 h-4 w-4 text-gray-400" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="createdAt">Fecha de creación</SelectItem>
+                        <SelectItem value="date">Fecha del registro</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
