@@ -971,8 +971,8 @@ const TimeEntries: React.FC = () => {
                       <tbody className="divide-y divide-gray-100 bg-white">
                         {filteredEntries.map((entry) => {
                           const person = personnel?.find(p => p.id === entry.personnelId);
-                          // Detectar registros temporales: ID basado en timestamp (Date.now()) o sin approvedDate
-                          const isTemporary = entry.id > 1000000000000 || !entry.approvedDate;
+                          // Detectar registros temporales: solo los que tienen ID muy grande (timestamp) Y no están aprobados
+                          const isTemporary = entry.id > 1000000000000 && !entry.approvedDate;
                           
                           return (
                             <tr 
