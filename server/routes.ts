@@ -314,7 +314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             personnelName: member.personnel?.name,
             hours: member.hours,
             rate: member.rate,
-            cost: member.cost
+            cost: member.cost,
+            personnel: member.personnel,
+            role: member.role
           }))
         },
         

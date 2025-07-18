@@ -665,8 +665,36 @@ export class DatabaseStorage implements IStorage {
     console.log(`📊 Storage: Getting team members for quotation ${quotationId}`);
 
     try {
-      const members = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
-      console.log(`📊 Storage: Found ${members.length} team members for quotation ${quotationId}:`, members);
+      const members = await db
+        .select({
+          id: quotationTeamMembers.id,
+          quotationId: quotationTeamMembers.quotationId,
+          personnelId: quotationTeamMembers.personnelId,
+          roleId: quotationTeamMembers.roleId,
+          hours: quotationTeamMembers.hours,
+          rate: quotationTeamMembers.rate,
+          cost: quotationTeamMembers.cost,
+          fte: quotationTeamMembers.fte,
+          dedication: quotationTeamMembers.dedication,
+          personnel: {
+            id: personnel.id,
+            name: personnel.name,
+            email: personnel.email,
+            hourlyRate: personnel.hourlyRate,
+            profilePicture: personnel.profilePicture
+          },
+          role: {
+            id: roles.id,
+            name: roles.name,
+            description: roles.description
+          }
+        })
+        .from(quotationTeamMembers)
+        .leftJoin(personnel, eq(quotationTeamMembers.personnelId, personnel.id))
+        .leftJoin(roles, eq(quotationTeamMembers.roleId, roles.id))
+        .where(eq(quotationTeamMembers.quotationId, quotationId));
+      
+      console.log(`📊 Storage: Found ${members.length} team members for quotation ${quotationId} with complete data:`, members.slice(0, 2));
       return members;
     } catch (error) {
       console.error(`❌ Storage: Error getting team members for quotation ${quotationId}:`, error);

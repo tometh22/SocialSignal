@@ -356,9 +356,15 @@ function ProjectTeamSection({ projectId, unifiedData }: {
       ...quotationMember,
       // Combinar datos reales si existen
       actualHours: actualData?.hours || 0,
-      actualName: actualData?.name || quotationMember.personnelName || 'Miembro del Equipo',
+      actualName: actualData?.name || quotationMember.personnel?.name || 'Miembro del Equipo',
       actualRoleName: actualData?.roleName || quotationMember.role?.name || 'Operations Lead',
-      actualRate: actualData?.hourlyRate || quotationMember.rate || 0
+      actualRate: actualData?.hourlyRate || quotationMember.rate || 0,
+      // Mantener datos originales de la cotización para cálculos
+      estimatedHours: quotationMember.hours || 0,
+      hourlyRate: quotationMember.rate || 0,
+      // Información completa del personal y rol
+      personnel: quotationMember.personnel,
+      role: quotationMember.role
     };
   });
   
