@@ -335,29 +335,30 @@ function ProjectTeamSection({ projectId, unifiedData }: {
 
   // Combinar datos del equipo estimado y real
   const quotationTeam = unifiedData?.quotation?.team || [];
-  const teamBreakdown = unifiedData?.actuals?.teamBreakdown || {};
+  const teamBreakdownArray = unifiedData?.actuals?.teamBreakdown || [];
   
   // Debug: Ver qué datos llegan del backend
   console.log('🔍 DEBUG - Datos del backend:', {
     quotationTeam: quotationTeam.slice(0, 2),
-    teamBreakdown: Object.keys(teamBreakdown).slice(0, 2).map(key => ({
-      key,
-      data: teamBreakdown[key]
-    }))
+    teamBreakdownArray: teamBreakdownArray.slice(0, 2),
+    totalTeamMembers: quotationTeam.length,
+    totalActualMembers: teamBreakdownArray.length
   });
   
   // Crear lista combinada de miembros del equipo
   const baseTeam = quotationTeam.map((quotationMember: any) => {
-    // Buscar datos reales usando el personnelId como clave string
-    const actualData = teamBreakdown[quotationMember.personnelId.toString()];
+    // Buscar datos reales usando el personnelId
+    const actualData = teamBreakdownArray.find((member: any) => 
+      member.personnelId === quotationMember.personnelId
+    );
     
     return {
       ...quotationMember,
       // Combinar datos reales si existen
       actualHours: actualData?.hours || 0,
-      actualName: actualData?.name || quotationMember.personnel?.name || 'Miembro del Equipo',
+      actualName: actualData?.name || quotationMember.personnelName || 'Miembro del Equipo',
       actualRoleName: actualData?.roleName || quotationMember.role?.name || 'Operations Lead',
-      actualRate: actualData?.hourlyRate || quotationMember.hourlyRate || 0
+      actualRate: actualData?.hourlyRate || quotationMember.rate || 0
     };
   });
   
