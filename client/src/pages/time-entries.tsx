@@ -159,14 +159,20 @@ const CompactTimeForm: React.FC<{
       const hourlyRate = selectedPerson?.hourlyRate || 10; // Default mínimo
       const totalCost = data.hours * hourlyRate;
       
-      return apiRequest("/api/time-entries", "POST", {
-        ...data,
-        projectId,
-        date: data.date.toISOString(),
-        // Agregar campos requeridos
-        totalCost,
-        hourlyRateAtTime: hourlyRate,
-        entryType: 'hours' as const,
+      return apiRequest("/api/time-entries", {
+        method: "POST",
+        body: {
+          projectId,
+          personnelId: data.personnelId,
+          componentId: data.componentId || null,
+          date: data.date.toISOString(),
+          hours: data.hours,
+          description: data.description || null,
+          billable: data.billable,
+          totalCost,
+          hourlyRateAtTime: hourlyRate,
+          entryType: 'hours' as const,
+        }
       });
     },
     onMutate: async (data: z.infer<typeof formSchema>) => {
@@ -205,11 +211,8 @@ const CompactTimeForm: React.FC<{
         );
       });
 
-      setLocalTimeEntries(prev => 
-        prev.map(entry => 
-          entry.id === context?.tempEntry.id ? newEntry : entry
-        )
-      );
+      // Actualizar las entradas locales mediante la función proporcionada
+      updateLocalEntries(newEntry);
 
       // Invalidar cache inmediatamente para refrescar datos
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
@@ -236,9 +239,8 @@ const CompactTimeForm: React.FC<{
           return oldData.filter(entry => entry.id !== context.tempEntry.id);
         });
 
-        setLocalTimeEntries(prev => 
-          prev.filter(entry => entry.id !== context.tempEntry.id)
-        );
+        // Simplificar el manejo de errores usando solo React Query
+        console.log('Error al crear registro, entrada temporal removida del cache');
       }
 
       toast({
