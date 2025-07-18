@@ -66,12 +66,14 @@ import {
   Users,
   DollarSign,
   Timer,
+  Edit3,
   Calendar as CalendarIconLucide
 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import BulkTimeForm from "@/components/forms/BulkTimeForm";
+import EditTimeForm from "@/components/forms/EditTimeForm";
 
 // Interfaces
 interface Personnel {
@@ -470,6 +472,8 @@ const TimeEntries: React.FC = () => {
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [entryToEdit, setEntryToEdit] = useState<TimeEntry | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "billable" | "non-billable">("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -479,6 +483,11 @@ const TimeEntries: React.FC = () => {
 
   const updateLocalEntries = (entry: TimeEntry) => {
     setLocalTimeEntries(prev => [...prev, entry]);
+  };
+
+  const openEditDialog = (entry: TimeEntry) => {
+    setEntryToEdit(entry);
+    setEditDialogOpen(true);
   };
 
   // Queries
@@ -1052,6 +1061,13 @@ const TimeEntries: React.FC = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem 
+                                      onClick={() => openEditDialog(entry)}
+                                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    >
+                                      <Edit3 className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
                                       onClick={() => {
                                         setEntryToDelete(entry.id);
                                         setDeleteDialogOpen(true);
@@ -1142,6 +1158,43 @@ const TimeEntries: React.FC = () => {
                     Eliminar
                   </Button>
                 </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Diálogo de edición */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Edit3 className="h-5 w-5 text-blue-600" />
+                    Editar Registro de Tiempo
+                  </DialogTitle>
+                  <DialogDescription>
+                    Modifica los detalles del registro de tiempo seleccionado
+                  </DialogDescription>
+                </DialogHeader>
+                {entryToEdit && (
+                  <EditTimeForm
+                    entry={entryToEdit}
+                    personnel={personnel || []}
+                    projectId={projectId}
+                    onSuccess={() => {
+                      setEditDialogOpen(false);
+                      setEntryToEdit(null);
+                    }}
+                    onCancel={() => {
+                      setEditDialogOpen(false);
+                      setEntryToEdit(null);
+                    }}
+                    updateLocalEntries={(updatedEntry) => {
+                      setLocalTimeEntries(prev => 
+                        prev.map(entry => 
+                          entry.id === updatedEntry.id ? updatedEntry : entry
+                        )
+                      );
+                    }}
+                  />
+                )}
               </DialogContent>
             </Dialog>
           </>
