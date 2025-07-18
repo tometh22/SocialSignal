@@ -72,7 +72,7 @@ export function setupAuth(app: Express, storage: IStorage) {
     rolling: true, // Renovar cookie en cada respuesta para mantener activo
     cookie: {
       secure: false, // No HTTPS en desarrollo
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 días para evitar logouts frecuentes
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días para sesiones persistentes
       sameSite: 'lax' as const, // Mejorar compatibilidad
       httpOnly: false, // Permitir acceso desde JS para debugging
       path: '/',
