@@ -684,20 +684,27 @@ export default function ProjectDetailsRedesigned() {
 
   // Mapear el filtro temporal al formato que espera el hook
   const getTimeFilterForHook = (filter: DateFilter) => {
-    if (filter.label.includes('Mes pasado')) return 'last_month';
-    if (filter.label.includes('Este mes')) return 'current_month';
-    if (filter.label.includes('Trimestre pasado')) return 'last_quarter';
-    if (filter.label.includes('Este trimestre')) return 'current_quarter';
-    if (filter.label.includes('Semestre pasado')) return 'last_semester';
-    if (filter.label.includes('Este semestre')) return 'current_semester';
-    if (filter.label.includes('Año')) return 'current_year';
+    const label = filter.label.toLowerCase();
+    if (label.includes('mes pasado')) return 'last_month';
+    if (label.includes('este mes')) return 'current_month';
+    if (label.includes('trimestre pasado')) return 'last_quarter';
+    if (label.includes('este trimestre')) return 'current_quarter';
+    if (label.includes('semestre pasado')) return 'last_semester';
+    if (label.includes('este semestre')) return 'current_semester';
+    if (label.includes('año')) return 'current_year';
+    if (label.includes('total')) return 'all';
+    // Mapeo adicional para labels específicos del selector
+    if (label === 'última semana') return 'last_week';
+    if (label === 'últimos 30 días') return 'last_30_days';
+    if (label === 'últimos 3 meses') return 'last_quarter';
     return 'all';
   };
 
   // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
+  const timeFilterForHook = getTimeFilterForHook(dateFilter);
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
-    dateFilter.label === 'Mes pasado' ? 'last_month' : 'all'
+    timeFilterForHook
   );
 
   // Cliente del proyecto
@@ -718,14 +725,21 @@ export default function ProjectDetailsRedesigned() {
   const completeData = unifiedData;
   const baseTeam = unifiedData?.team || [];
 
-  // DEBUG DATOS UNIFICADOS
+  // DEBUG DATOS UNIFICADOS Y FILTROS TEMPORALES
   console.log('🚀 SINGLE SOURCE OF TRUTH:');
+  console.log('🚀 dateFilter:', dateFilter);
+  console.log('🚀 timeFilterForHook:', timeFilterForHook);
   console.log('🚀 unifiedData available:', !!unifiedData);
+  console.log('🚀 dataLoading:', dataLoading);
   if (unifiedData) {
-    console.log('🚀 Estimated hours from single source:', unifiedData.quotation?.estimatedHours || -1);
-    console.log('🚀 Total worked hours from single source:', unifiedData.actuals?.totalWorkedHours || -1);
-    console.log('🚀 Total worked cost from single source:', unifiedData.actuals?.totalWorkedCost || -1);
-    console.log('🚀 This should always be 969h for Warner Bros project');
+    console.log('🚀 CURRENT DATA SET:');
+    console.log('  - Estimated hours:', unifiedData.quotation?.estimatedHours || -1);
+    console.log('  - Total worked hours:', unifiedData.actuals?.totalWorkedHours || -1);
+    console.log('  - Total worked cost:', unifiedData.actuals?.totalWorkedCost || -1);
+    console.log('  - Markup:', unifiedData.metrics?.markup || -1);
+    console.log('  - Efficiency:', unifiedData.metrics?.efficiency || -1);
+    console.log('  - Total entries:', unifiedData.actuals?.totalEntries || -1);
+    console.log('🚀 Data should change when filter changes above');
   }
 
   // MÉTRICAS SIMPLIFICADAS - TODAS DESDE SINGLE SOURCE OF TRUTH

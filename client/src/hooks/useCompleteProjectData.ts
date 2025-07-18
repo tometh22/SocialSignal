@@ -64,11 +64,19 @@ export const useCompleteProjectData = (projectId: number, timeFilter: string = '
       }
       
       const data = await response.json();
-      console.log('🔍 HOOK: Success data:', data);
+      console.log('🔍 HOOK: Success data received:', {
+        projectId,
+        timeFilter,
+        estimatedHours: data.quotation?.estimatedHours,
+        workedHours: data.actuals?.totalWorkedHours,
+        totalCost: data.actuals?.totalWorkedCost,
+        markup: data.metrics?.markup
+      });
       return data;
     },
     enabled: !!projectId,
-    staleTime: 30000, // 30 seconds
-    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // No stale time - always fetch fresh data when timeFilter changes
+    cacheTime: 1 * 60 * 1000, // 1 minute cache
+    refetchOnWindowFocus: false, // Disable refetch on window focus
   });
 };
