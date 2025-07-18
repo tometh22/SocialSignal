@@ -469,7 +469,7 @@ const TimeEntries: React.FC = () => {
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "billable" | "non-billable">("all");
-  const [monthFilter, setMonthFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
@@ -557,17 +557,93 @@ const TimeEntries: React.FC = () => {
     }
   };
 
-  // Filtrado de entradas
+  // Función para obtener rango de fechas según filtro
+  const getDateRange = (filter: string) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const quarter = Math.floor(month / 3);
+    
+    switch (filter) {
+      case "this-month":
+        return {
+          start: new Date(year, month, 1),
+          end: new Date(year, month + 1, 0)
+        };
+      case "last-month":
+        return {
+          start: new Date(year, month - 1, 1),
+          end: new Date(year, month, 0)
+        };
+      case "this-quarter":
+        return {
+          start: new Date(year, quarter * 3, 1),
+          end: new Date(year, quarter * 3 + 3, 0)
+        };
+      case "last-quarter":
+        const lastQuarter = quarter === 0 ? 3 : quarter - 1;
+        const lastQuarterYear = quarter === 0 ? year - 1 : year;
+        return {
+          start: new Date(lastQuarterYear, lastQuarter * 3, 1),
+          end: new Date(lastQuarterYear, lastQuarter * 3 + 3, 0)
+        };
+      case "this-semester":
+        const semester = Math.floor(month / 6);
+        return {
+          start: new Date(year, semester * 6, 1),
+          end: new Date(year, semester * 6 + 6, 0)
+        };
+      case "last-semester":
+        const lastSemester = Math.floor(month / 6) === 0 ? 1 : 0;
+        const lastSemesterYear = Math.floor(month / 6) === 0 ? year - 1 : year;
+        return {
+          start: new Date(lastSemesterYear, lastSemester * 6, 1),
+          end: new Date(lastSemesterYear, lastSemester * 6 + 6, 0)
+        };
+      case "this-year":
+        return {
+          start: new Date(year, 0, 1),
+          end: new Date(year, 11, 31)
+        };
+      case "q1":
+        return {
+          start: new Date(year, 0, 1),
+          end: new Date(year, 2, 31)
+        };
+      case "q2":
+        return {
+          start: new Date(year, 3, 1),
+          end: new Date(year, 5, 30)
+        };
+      case "q3":
+        return {
+          start: new Date(year, 6, 1),
+          end: new Date(year, 8, 30)
+        };
+      case "q4":
+        return {
+          start: new Date(year, 9, 1),
+          end: new Date(year, 11, 31)
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Filtrado de entradas con filtros profesionales
   const filteredEntries = localTimeEntries
     ? localTimeEntries.filter(entry => {
         // Filtro por tipo
         if (filterType === "billable" && !entry.billable) return false;
         if (filterType === "non-billable" && entry.billable) return false;
 
-        // Filtro por mes
-        if (monthFilter !== "all") {
-          const entryMonth = format(new Date(entry.date), "yyyy-MM");
-          if (entryMonth !== monthFilter) return false;
+        // Filtro por fecha
+        if (dateFilter !== "all") {
+          const range = getDateRange(dateFilter);
+          if (range) {
+            const entryDate = new Date(entry.date);
+            if (entryDate < range.start || entryDate > range.end) return false;
+          }
         }
 
         // Filtro por búsqueda
@@ -586,18 +662,21 @@ const TimeEntries: React.FC = () => {
       }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     : [];
 
-  // Agrupar por mes para estadísticas
-  const entriesByMonth = filteredEntries.reduce((acc, entry) => {
-    const month = format(new Date(entry.date), "yyyy-MM");
-    if (!acc[month]) {
-      acc[month] = [];
-    }
-    acc[month].push(entry);
-    return acc;
-  }, {} as { [key: string]: typeof filteredEntries });
-
-  // Obtener meses disponibles para el filtro
-  const availableMonths = Object.keys(entriesByMonth).sort().reverse();
+  // Opciones de filtro profesionales
+  const dateFilterOptions = [
+    { value: "all", label: "Todos los períodos" },
+    { value: "this-month", label: "Este mes" },
+    { value: "last-month", label: "Mes pasado" },
+    { value: "this-quarter", label: "Este trimestre" },
+    { value: "last-quarter", label: "Trimestre pasado" },
+    { value: "this-semester", label: "Este semestre" },
+    { value: "last-semester", label: "Semestre pasado" },
+    { value: "this-year", label: "Este año" },
+    { value: "q1", label: "Q1 (Ene-Mar)" },
+    { value: "q2", label: "Q2 (Abr-Jun)" },
+    { value: "q3", label: "Q3 (Jul-Sep)" },
+    { value: "q4", label: "Q4 (Oct-Dic)" }
+  ];
 
   // Estadísticas rápidas
   const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -624,91 +703,95 @@ const TimeEntries: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50/50">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
         {projectLoading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
           <>
-            {/* Header compacto */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setLocation(`/active-projects/${projectId}?tab=time-management`)}
-                  className="mb-3 text-muted-foreground hover:text-white hover:bg-blue-600"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Volver al proyecto
-                </Button>
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    ⏱️ Registro de Horas
-                  </h1>
-                  <p className="text-muted-foreground mt-1">
-                    {project?.quotation?.projectName || "Proyecto"}
-                  </p>
+            {/* Header profesional */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setLocation(`/active-projects/${projectId}?tab=time-management`)}
+                    className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Volver al proyecto
+                  </Button>
+                  <div className="h-8 w-px bg-gray-300" />
+                  <div>
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                      Registro de Horas
+                    </h1>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {project?.quotation?.projectName || "Proyecto"} • {project?.quotation?.clientName || "Cliente"}
+                    </p>
+                  </div>
                 </div>
+                <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Registro
+                </Button>
               </div>
-              <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="mr-2 h-5 w-5" />
-                Nuevo Registro
-              </Button>
             </div>
 
-            {/* Panel de estadísticas y controles */}
-            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                  {/* Estadísticas compactas */}
-                  <div className="flex items-center gap-8">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{totalHours}h</div>
-                      <div className="text-xs text-muted-foreground">Total</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{billableHours}h</div>
-                      <div className="text-xs text-muted-foreground">Facturables</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600">{totalHours - billableHours}h</div>
-                      <div className="text-xs text-muted-foreground">No facturables</div>
-                    </div>
+            {/* Panel de estadísticas y controles profesional */}
+            <div className="bg-white rounded-lg shadow-sm border">
+              {/* Estadísticas */}
+              <div className="border-b border-gray-200 p-6">
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900">{totalHours.toFixed(1)}h</div>
+                    <div className="text-sm text-gray-500 mt-1">Total Horas</div>
                   </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-emerald-600">{billableHours.toFixed(1)}h</div>
+                    <div className="text-sm text-gray-500 mt-1">Facturables</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-amber-600">{(totalHours - billableHours).toFixed(1)}h</div>
+                    <div className="text-sm text-gray-500 mt-1">No Facturables</div>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Controles de búsqueda y filtro */}
+              {/* Controles de filtro */}
+              <div className="p-6">
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        placeholder="Buscar..."
+                        placeholder="Buscar por persona, descripción..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 w-48 h-9"
+                        className="pl-10 w-64 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>
 
-                    <Select value={monthFilter} onValueChange={(value) => setMonthFilter(value)}>
-                      <SelectTrigger className="w-36 h-9">
-                        <CalendarIconLucide className="mr-2 h-4 w-4" />
-                        <SelectValue placeholder="Mes" />
+                    <Select value={dateFilter} onValueChange={(value) => setDateFilter(value)}>
+                      <SelectTrigger className="w-48 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <CalendarIconLucide className="mr-2 h-4 w-4 text-gray-400" />
+                        <SelectValue placeholder="Seleccionar período" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {availableMonths.map(month => (
-                          <SelectItem key={month} value={month}>
-                            {format(new Date(month + '-01'), 'MMM yyyy', { locale: es })}
+                        {dateFilterOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
 
                     <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-                      <SelectTrigger className="w-36 h-9">
-                        <Filter className="mr-2 h-4 w-4" />
+                      <SelectTrigger className="w-40 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <Filter className="mr-2 h-4 w-4 text-gray-400" />
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -718,30 +801,53 @@ const TimeEntries: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Lista de registros compacta */}
-            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between">
-                  <span className="text-xl">Registros ({filteredEntries.length})</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-sm text-gray-500">
+                      {filteredEntries.length} registro{filteredEntries.length !== 1 ? 's' : ''}
+                    </span>
+                    {dateFilter !== "all" && (
+                      <Badge variant="secondary" className="text-xs">
+                        {dateFilterOptions.find(opt => opt.value === dateFilter)?.label}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de registros profesional */}
+            <div className="bg-white rounded-lg shadow-sm border">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Registros de Tiempo
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Gestiona y visualiza todos los registros de tiempo del proyecto
+                </p>
+              </div>
+              
+              <div className="overflow-hidden">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : filteredEntries.length === 0 ? (
                   <div className="text-center py-16">
-                    <Timer className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">No hay registros</h3>
-                    <p className="text-muted-foreground mb-6">
-                      {search ? "No se encontraron registros con esos criterios." : "Aún no hay registros de tiempo para este proyecto."}
+                    <div className="mx-auto h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Timer className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No hay registros</h3>
+                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                      {search || dateFilter !== "all" ? 
+                        "No se encontraron registros con los filtros aplicados. Intenta ajustar los criterios de búsqueda." : 
+                        "Aún no hay registros de tiempo para este proyecto. Comienza creando tu primer registro."
+                      }
                     </p>
-                    <Button onClick={() => setDialogOpen(true)} variant="outline">
+                    <Button 
+                      onClick={() => setDialogOpen(true)} 
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       Crear primer registro
                     </Button>
@@ -750,17 +856,17 @@ const TimeEntries: React.FC = () => {
                   // Vista de tabla profesional
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50/50 border-b">
+                      <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                          <th className="text-left p-4 font-medium text-sm text-gray-700">Persona</th>
-                          <th className="text-left p-4 font-medium text-sm text-gray-700">Fecha</th>
-                          <th className="text-left p-4 font-medium text-sm text-gray-700">Horas</th>
-                          <th className="text-left p-4 font-medium text-sm text-gray-700">Tipo</th>
-                          <th className="text-left p-4 font-medium text-sm text-gray-700">Descripción</th>
-                          <th className="text-right p-4 font-medium text-sm text-gray-700">Acciones</th>
+                          <th className="text-left px-6 py-4 font-medium text-sm text-gray-700">Persona</th>
+                          <th className="text-left px-6 py-4 font-medium text-sm text-gray-700">Fecha</th>
+                          <th className="text-left px-6 py-4 font-medium text-sm text-gray-700">Horas</th>
+                          <th className="text-left px-6 py-4 font-medium text-sm text-gray-700">Tipo</th>
+                          <th className="text-left px-6 py-4 font-medium text-sm text-gray-700">Descripción</th>
+                          <th className="text-right px-6 py-4 font-medium text-sm text-gray-700">Acciones</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 bg-white">
                         {filteredEntries.map((entry) => {
                           const person = personnel?.find(p => p.id === entry.personnelId);
                           const isTemporary = entry.id > 999999999; // Detectar registros temporales
@@ -770,82 +876,82 @@ const TimeEntries: React.FC = () => {
                               key={entry.id}
                               data-entry-id={entry.id}
                               className={cn(
-                                "hover:bg-gray-50/50 transition-all duration-300 ease-in-out",
-                                "animate-in slide-in-from-top-2 fade-in-50",
-                                isTemporary && "opacity-70 bg-blue-50/30"
+                                "hover:bg-gray-50 transition-colors duration-150",
+                                isTemporary && "opacity-70 bg-blue-50"
                               )}
-                              style={{
-                                animationDelay: '0ms',
-                                animationDuration: '300ms'
-                              }}
                             >
                               {/* Persona */}
-                              <td className="p-4">
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center gap-3">
-                                  <PersonAvatar name={person?.name || "Usuario"} className="h-8 w-8" />
+                                  <PersonAvatar name={person?.name || "Usuario"} className="h-9 w-9" />
                                   <div>
-                                    <div className="font-medium text-sm flex items-center gap-2">
+                                    <div className="font-medium text-sm text-gray-900 flex items-center gap-2">
                                       {person?.name}
                                       {isTemporary && (
                                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
                                       )}
                                     </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {person?.roleId ? `ID: ${person.roleId}` : ''}
+                                    <div className="text-xs text-gray-500">
+                                      {person?.roleId ? `Rol ID: ${person.roleId}` : 'Personal'}
                                     </div>
                                   </div>
                                 </div>
                               </td>
 
                               {/* Fecha */}
-                              <td className="p-4">
-                                <div className="text-sm font-medium">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
                                   {format(new Date(entry.date), "dd/MM/yyyy", { locale: es })}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
+                                <div className="text-xs text-gray-500 capitalize">
                                   {format(new Date(entry.date), "EEEE", { locale: es })}
                                 </div>
                               </td>
 
                               {/* Horas */}
-                              <td className="p-4">
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-lg font-bold text-blue-600">
                                   {entry.hours}h
                                 </div>
                               </td>
 
                               {/* Tipo */}
-                              <td className="p-4">
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 {entry.billable ? (
-                                  <Badge variant="default" className="text-xs">
+                                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">
                                     <DollarSign className="h-3 w-3 mr-1" />
                                     Facturable
                                   </Badge>
                                 ) : (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="bg-gray-100 text-gray-700">
                                     No facturable
                                   </Badge>
                                 )}
                               </td>
 
                               {/* Descripción */}
-                              <td className="p-4">
+                              <td className="px-6 py-4">
                                 <div className="text-sm text-gray-700 max-w-xs">
                                   {entry.description ? (
                                     <div className="truncate" title={entry.description}>
                                       {entry.description}
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground italic">Sin descripción</span>
+                                    <span className="text-gray-400 italic">Sin descripción</span>
                                   )}
                                 </div>
                               </td>
 
                               {/* Acciones */}
-                              <td className="p-4 text-right">
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" disabled={isTemporary}>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      disabled={isTemporary}
+                                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                                    >
                                       <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -855,7 +961,7 @@ const TimeEntries: React.FC = () => {
                                         setEntryToDelete(entry.id);
                                         setDeleteDialogOpen(true);
                                       }}
-                                      className="text-red-600"
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
                                       Eliminar
@@ -870,8 +976,8 @@ const TimeEntries: React.FC = () => {
                     </table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Diálogo de nuevo registro */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
