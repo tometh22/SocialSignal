@@ -665,33 +665,29 @@ export class DatabaseStorage implements IStorage {
     console.log(`📊 Storage: Getting team members for quotation ${quotationId}`);
 
     try {
-      const members = await db
-        .select({
-          id: quotationTeamMembers.id,
-          quotationId: quotationTeamMembers.quotationId,
-          personnelId: quotationTeamMembers.personnelId,
-          roleId: quotationTeamMembers.roleId,
-          hours: quotationTeamMembers.hours,
-          rate: quotationTeamMembers.rate,
-          cost: quotationTeamMembers.cost,
-          fte: quotationTeamMembers.fte,
-          dedication: quotationTeamMembers.dedication,
-          // Personnel fields
-          personnelName: personnel.name,
-          personnelEmail: personnel.email,
-          personnelHourlyRate: personnel.hourlyRate,
-          personnelProfilePicture: personnel.profilePicture,
-          // Role fields
-          roleName: roles.name,
-          roleDescription: roles.description
-        })
-        .from(quotationTeamMembers)
-        .leftJoin(personnel, eq(quotationTeamMembers.personnelId, personnel.id))
-        .leftJoin(roles, eq(quotationTeamMembers.roleId, roles.id))
-        .where(eq(quotationTeamMembers.quotationId, quotationId));
+      // Primero obtener los miembros básicos
+      const basicMembers = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
       
-      console.log(`📊 Storage: Found ${members.length} team members for quotation ${quotationId} with complete data:`, members.slice(0, 2));
-      return members;
+      // Luego enriquecer con datos de personal y roles
+      const enrichedMembers = await Promise.all(
+        basicMembers.map(async (member) => {
+          const personnelData = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
+          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId));
+          
+          return {
+            ...member,
+            personnelName: personnelData[0]?.name || 'Unknown',
+            personnelEmail: personnelData[0]?.email || '',
+            personnelHourlyRate: personnelData[0]?.hourlyRate || 0,
+            personnelProfilePicture: personnelData[0]?.profilePicture || '',
+            roleName: roleData[0]?.name || 'Unknown Role',
+            roleDescription: roleData[0]?.description || ''
+          };
+        })
+      );
+      
+      console.log(`📊 Storage: Found ${enrichedMembers.length} team members for quotation ${quotationId} with complete data:`, enrichedMembers.slice(0, 2));
+      return enrichedMembers;
     } catch (error) {
       console.error(`❌ Storage: Error getting team members for quotation ${quotationId}:`, error);
       throw error;
