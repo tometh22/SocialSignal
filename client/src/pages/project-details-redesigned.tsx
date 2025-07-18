@@ -685,6 +685,13 @@ export default function ProjectDetailsRedesigned() {
   // Mapear el filtro temporal al formato que espera el hook
   const getTimeFilterForHook = (filter: DateFilter) => {
     const label = filter.label.toLowerCase();
+    
+    // CRITICAL: Check for specific months like "mayo 2025"
+    if (label.includes('mayo 2025')) return 'may_2025';
+    if (label.includes('junio 2025')) return 'june_2025';
+    if (label.includes('julio 2025')) return 'july_2025';
+    
+    // General patterns
     if (label.includes('mes pasado')) return 'last_month';
     if (label.includes('este mes')) return 'current_month';
     if (label.includes('trimestre pasado')) return 'last_quarter';
@@ -693,10 +700,13 @@ export default function ProjectDetailsRedesigned() {
     if (label.includes('este semestre')) return 'current_semester';
     if (label.includes('año')) return 'current_year';
     if (label.includes('total')) return 'all';
-    // Mapeo adicional para labels específicos del selector
+    
+    // Additional specific mappings
     if (label === 'última semana') return 'last_week';
     if (label === 'últimos 30 días') return 'last_30_days';
     if (label === 'últimos 3 meses') return 'last_quarter';
+    
+    console.log('🚨 UNMAPPED FILTER LABEL:', label, '- using "all" as fallback');
     return 'all';
   };
 

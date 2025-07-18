@@ -30,6 +30,13 @@ interface CompleteProjectData {
     totalWorkedHours: number;
     totalWorkedCost: number;
     totalEntries: number;
+    teamBreakdown?: { [personnelId: string]: {
+      name: string;
+      hours: number;
+      cost: number;
+      entries: number;
+      lastActivity: string | null;
+    }};
   };
   metrics: {
     efficiency: number;

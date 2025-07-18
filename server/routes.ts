@@ -145,6 +145,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDate = new Date(2025, 4, 1); // Mayo 2025
             endDate = new Date(2025, 4, 31);
             break;
+          case 'june_2025':
+            startDate = new Date(2025, 5, 1); // Junio 2025
+            endDate = new Date(2025, 5, 30);
+            break;
+          case 'july_2025':
+            startDate = new Date(2025, 6, 1); // Julio 2025
+            endDate = new Date(2025, 6, 31);
+            break;
           case 'current_quarter':
             const currentQuarter = Math.floor(now.getMonth() / 3);
             startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
