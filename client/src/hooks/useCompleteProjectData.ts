@@ -45,13 +45,27 @@ export const useCompleteProjectData = (projectId: number, timeFilter: string = '
     queryKey: ['projects', projectId, 'complete-data', timeFilter],
     queryFn: async () => {
       const url = `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
-      const response = await apiRequest(url);
+      console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, url });
+      
+      const response = await fetch(url, {
+        credentials: "include",
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('🔍 HOOK: Response status:', response.status);
+      console.log('🔍 HOOK: Response ok:', response.ok);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch complete project data: ${response.status}`);
+        const errorText = await response.text();
+        console.error('🔍 HOOK: Error response:', errorText);
+        throw new Error(`Failed to fetch complete project data: ${response.status} - ${errorText}`);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 HOOK: Success data:', data);
+      return data;
     },
     enabled: !!projectId,
     staleTime: 30000, // 30 seconds

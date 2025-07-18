@@ -697,7 +697,7 @@ export default function ProjectDetailsRedesigned() {
   // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
-    getTimeFilterForHook(dateFilter)
+    dateFilter.label === 'Mes pasado' ? 'last_month' : 'all'
   );
 
   // Cliente del proyecto
