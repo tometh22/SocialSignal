@@ -364,9 +364,33 @@ function ProjectTeamSection({ projectId, unifiedData }: {
       hourlyRate: quotationMember.rate || 0,
       // Información completa del personal y rol
       personnel: quotationMember.personnel,
-      role: quotationMember.role
+      role: quotationMember.role,
+      isQuoted: true, // Miembro estaba en cotización original
+      isUnquoted: false
     };
   });
+  
+  // Agregar PERSONAL NO COTIZADO (que trabajó pero no estaba en cotización)
+  const unquotedMembers = teamBreakdownArray.filter((actualMember: any) => 
+    !quotationTeam.some((quotedMember: any) => quotedMember.personnelId === actualMember.personnelId)
+  ).map((unquotedMember: any) => ({
+    id: `unquoted-${unquotedMember.personnelId}`,
+    personnelId: unquotedMember.personnelId,
+    actualHours: unquotedMember.hours || 0,
+    actualName: unquotedMember.name || 'Personal No Cotizado',
+    actualRoleName: unquotedMember.roleName || 'Sin Rol Definido',
+    actualRate: unquotedMember.hourlyRate || 0,
+    // Para personal no cotizado, NO hay estimaciones
+    estimatedHours: 0,
+    hourlyRate: unquotedMember.hourlyRate || 0,
+    personnel: { name: unquotedMember.name },
+    role: { name: unquotedMember.roleName },
+    isQuoted: false,
+    isUnquoted: true // MARCADO como no cotizado originalmente
+  }));
+  
+  // Combinar equipos: primero cotizados, luego no cotizados
+  const completeTeam = [...baseTeam, ...unquotedMembers];
   
   const teamLoading = !unifiedData;
 
@@ -413,7 +437,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     );
   }
 
-  if (!baseTeam || baseTeam.length === 0) {
+  if (!completeTeam || completeTeam.length === 0) {
     return (
       <div className="text-center py-8 text-purple-500">
         <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />

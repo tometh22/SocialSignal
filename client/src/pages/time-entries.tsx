@@ -53,6 +53,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import UnquotedPersonnelDialog from "@/components/UnquotedPersonnelDialog";
 import { 
   CalendarIcon, 
   Loader2, 
@@ -146,6 +147,10 @@ const CompactTimeForm: React.FC<{
   onCancel: () => void;
   updateLocalEntries: (entry: TimeEntry) => void;
 }> = ({ personnel, projectId, onSuccess, onCancel, updateLocalEntries }) => {
+  const [showUnquotedDialog, setShowUnquotedDialog] = useState(false);
+  const [unquotedPersonnel, setUnquotedPersonnel] = useState<Personnel | null>(null);
+  const [pendingFormData, setPendingFormData] = useState<z.infer<typeof formSchema> | null>(null);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -154,6 +159,12 @@ const CompactTimeForm: React.FC<{
       billable: true,
       componentId: null,
     },
+  });
+
+  // Query para obtener datos completos del proyecto (equipo cotizado)
+  const { data: projectData } = useQuery({
+    queryKey: [`/api/projects/${projectId}/complete-data`],
+    queryFn: () => apiRequest(`/api/projects/${projectId}/complete-data`),
   });
 
   const createTimeEntryMutation = useMutation({
@@ -249,9 +260,36 @@ const CompactTimeForm: React.FC<{
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    // Mutación inmediata sin demoras
+  // Función para verificar si una persona está cotizada
+  const isPersonnelQuoted = (personnelId: number) => {
+    if (!projectData?.baseTeam) return false;
+    return projectData.baseTeam.some((member: any) => member.personnelId === personnelId);
+  };
+
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    // Verificar si la persona está cotizada
+    if (!isPersonnelQuoted(data.personnelId)) {
+      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
+      if (selectedPerson) {
+        // Persona no cotizada - mostrar diálogo
+        setUnquotedPersonnel(selectedPerson);
+        setPendingFormData(data);
+        setShowUnquotedDialog(true);
+        return;
+      }
+    }
+
+    // Persona cotizada - proceder normalmente
     createTimeEntryMutation.mutate(data);
+  };
+
+  // Función para continuar con el registro después de asignar horas
+  const continueWithTimeEntry = () => {
+    if (pendingFormData) {
+      createTimeEntryMutation.mutate(pendingFormData);
+      setPendingFormData(null);
+      setUnquotedPersonnel(null);
+    }
   };
 
   const isPending = createTimeEntryMutation.isPending;
@@ -518,6 +556,17 @@ const CompactTimeForm: React.FC<{
           </DialogFooter>
         </form>
       </Form>
+
+      {/* Diálogo para personal no cotizado */}
+      {unquotedPersonnel && (
+        <UnquotedPersonnelDialog
+          open={showUnquotedDialog}
+          onOpenChange={setShowUnquotedDialog}
+          personnel={unquotedPersonnel}
+          projectId={projectId}
+          onHoursAssigned={continueWithTimeEntry}
+        />
+      )}
     </div>
   );
 };

@@ -213,6 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Find estimated hours for this personnel from quotation team
           const quotationMember = quotationTeam.find(m => m.personnelId === entry.personnelId);
           const estimatedHours = quotationMember ? quotationMember.hours : 0;
+          const isQuoted = quotationMember !== undefined;
           
           teamBreakdown[personnelId] = {
             personnelId: entry.personnelId,
@@ -224,7 +225,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entries: 0,
             lastActivity: null,
             estimatedHours: estimatedHours,
-            rate: quotationMember?.rate || 0
+            rate: quotationMember?.rate || 0,
+            isQuoted: isQuoted, // NUEVO: Marca si el personal estaba en cotización original
+            isUnquoted: !isQuoted // NUEVO: Marca si el personal NO estaba cotizado originalmente
           };
         }
         teamBreakdown[personnelId].hours += entry.hours || 0;
@@ -360,6 +363,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting complete project data:", error);
       res.status(500).json({ message: "Failed to get complete project data" });
+    }
+  });
+
+  // Endpoint para asignar horas a personal no cotizado
+  app.post("/api/projects/assign-unquoted-personnel", requireAuth, async (req, res) => {
+    try {
+      const { projectId, personnelId, estimatedHours, hourlyRate } = req.body;
+      
+      if (!projectId || !personnelId || !estimatedHours) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      console.log(`🔧 Assigning ${estimatedHours} hours to unquoted personnel ${personnelId} in project ${projectId}`);
+      
+      // Crear registro en tabla de personal no cotizado
+      const result = await storage.assignUnquotedPersonnel(projectId, personnelId, estimatedHours, hourlyRate);
+      
+      console.log(`✅ Successfully assigned hours to unquoted personnel:`, result);
+      
+      res.json({ 
+        success: true, 
+        message: "Hours assigned successfully",
+        assignment: result 
+      });
+    } catch (error) {
+      console.error("Error assigning hours to unquoted personnel:", error);
+      res.status(500).json({ message: "Failed to assign hours to unquoted personnel" });
     }
   });
 

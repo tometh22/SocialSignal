@@ -21,13 +21,14 @@ import {
   type ProjectBaseTeam, type InsertProjectBaseTeam,
   type QuickTimeEntry, type InsertQuickTimeEntry,
   type QuickTimeEntryDetail, type InsertQuickTimeEntryDetail,
+  type UnquotedPersonnel, type InsertUnquotedPersonnel,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
-  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens
+  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
@@ -238,6 +239,11 @@ export interface IStorage {
   deleteQuickTimeEntryDetail(id: number): Promise<boolean>;
   submitQuickTimeEntry(id: number): Promise<QuickTimeEntry | undefined>;
   approveQuickTimeEntry(id: number, approverId: number): Promise<QuickTimeEntry | undefined>;
+
+  // Unquoted personnel operations
+  assignUnquotedPersonnel(projectId: number, personnelId: number, estimatedHours: number, hourlyRate: number): Promise<any>;
+  getUnquotedPersonnel(projectId: number): Promise<any[]>;
+  checkIfPersonnelIsUnquoted(projectId: number, personnelId: number): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -2405,6 +2411,96 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // ==================== UNQUOTED PERSONNEL OPERATIONS ====================
+
+  async assignUnquotedPersonnel(projectId: number, personnelId: number, estimatedHours: number, hourlyRate: number): Promise<UnquotedPersonnel> {
+    try {
+      console.log(`🔧 Assigning unquoted personnel: projectId=${projectId}, personnelId=${personnelId}, estimatedHours=${estimatedHours}, hourlyRate=${hourlyRate}`);
+      
+      // Verificar si ya existe una asignación para este personal en este proyecto
+      const existing = await db.select()
+        .from(unquotedPersonnel)
+        .where(
+          and(
+            eq(unquotedPersonnel.projectId, projectId),
+            eq(unquotedPersonnel.personnelId, personnelId)
+          )
+        );
+
+      if (existing.length > 0) {
+        console.log(`✅ Personnel ${personnelId} already assigned to project ${projectId}, updating hours`);
+        // Actualizar las horas existentes
+        const [updated] = await db.update(unquotedPersonnel)
+          .set({ 
+            estimatedHours, 
+            hourlyRate,
+            assignedDate: new Date()
+          })
+          .where(eq(unquotedPersonnel.id, existing[0].id))
+          .returning();
+        return updated;
+      }
+
+      // Crear nueva asignación
+      const [created] = await db.insert(unquotedPersonnel)
+        .values({
+          projectId,
+          personnelId,
+          estimatedHours,
+          hourlyRate,
+          assignedBy: null, // TODO: Add user ID from session
+          notes: "Asignación automática al registrar tiempo"
+        })
+        .returning();
+
+      console.log(`✅ Successfully assigned unquoted personnel:`, created);
+      return created;
+    } catch (error) {
+      console.error("Error assigning unquoted personnel:", error);
+      throw error;
+    }
+  }
+
+  async getUnquotedPersonnel(projectId: number): Promise<any[]> {
+    try {
+      const result = await db.select({
+        id: unquotedPersonnel.id,
+        personnelId: unquotedPersonnel.personnelId,
+        estimatedHours: unquotedPersonnel.estimatedHours,
+        hourlyRate: unquotedPersonnel.hourlyRate,
+        assignedDate: unquotedPersonnel.assignedDate,
+        notes: unquotedPersonnel.notes,
+        personnelName: personnel.name,
+        personnelEmail: personnel.email,
+      })
+      .from(unquotedPersonnel)
+      .leftJoin(personnel, eq(unquotedPersonnel.personnelId, personnel.id))
+      .where(eq(unquotedPersonnel.projectId, projectId));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting unquoted personnel:", error);
+      throw error;
+    }
+  }
+
+  async checkIfPersonnelIsUnquoted(projectId: number, personnelId: number): Promise<boolean> {
+    try {
+      // Verificar si el personal está en el equipo base de la cotización
+      const project = await this.getActiveProject(projectId);
+      if (!project || !project.quotationId) {
+        return false;
+      }
+
+      const quotationTeam = await this.getQuotationTeamMembers(project.quotationId);
+      const isInQuotation = quotationTeam.some(member => member.personnelId === personnelId);
+      
+      return !isInQuotation;
+    } catch (error) {
+      console.error("Error checking if personnel is unquoted:", error);
+      return false;
+    }
+  }
 
 }
 

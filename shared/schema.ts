@@ -415,6 +415,27 @@ export const insertProjectBaseTeamSchema = createInsertSchema(projectBaseTeam).o
 export type ProjectBaseTeam = typeof projectBaseTeam.$inferSelect;
 export type InsertProjectBaseTeam = z.infer<typeof insertProjectBaseTeamSchema>;
 
+// ==================== PERSONAL NO COTIZADO ====================
+// Personal que registra tiempo pero no estaba en la cotización original
+export const unquotedPersonnel = pgTable("unquoted_personnel", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  estimatedHours: doublePrecision("estimated_hours").notNull(),
+  hourlyRate: doublePrecision("hourly_rate").notNull(),
+  assignedDate: timestamp("assigned_date").notNull().defaultNow(),
+  assignedBy: integer("assigned_by").references(() => users.id),
+  notes: text("notes"),
+});
+
+export const insertUnquotedPersonnelSchema = createInsertSchema(unquotedPersonnel).omit({
+  id: true,
+  assignedDate: true,
+});
+
+export type UnquotedPersonnel = typeof unquotedPersonnel.$inferSelect;
+export type InsertUnquotedPersonnel = z.infer<typeof insertUnquotedPersonnelSchema>;
+
 // ==================== REGISTRO RÁPIDO DE HORAS ====================
 // Registro masivo de horas para el equipo base por períodos
 export const quickTimeEntries = pgTable("quick_time_entries", {
