@@ -63,6 +63,7 @@ import {
   Filter,
   MoreHorizontal,
   User,
+  Users,
   DollarSign,
   Timer,
   Calendar as CalendarIconLucide
@@ -70,6 +71,7 @@ import {
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import BulkTimeForm from "@/components/forms/BulkTimeForm";
 
 // Interfaces
 interface Personnel {
@@ -465,6 +467,7 @@ const TimeEntries: React.FC = () => {
   }
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -806,10 +809,20 @@ const TimeEntries: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Registro
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nuevo Registro
+                  </Button>
+                  <Button 
+                    onClick={() => setBulkDialogOpen(true)} 
+                    variant="outline" 
+                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    Registro Masivo
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -1076,6 +1089,31 @@ const TimeEntries: React.FC = () => {
                   onSuccess={() => setDialogOpen(false)}
                   onCancel={() => setDialogOpen(false)}
                   updateLocalEntries={updateLocalEntries}
+                />
+              </DialogContent>
+            </Dialog>
+
+            {/* Diálogo de registro masivo */}
+            <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+              <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Registro Masivo de Horas
+                  </DialogTitle>
+                  <DialogDescription>
+                    Registra horas para múltiples personas del equipo de forma simultánea
+                  </DialogDescription>
+                </DialogHeader>
+                <BulkTimeForm
+                  personnel={personnel || []}
+                  projectId={projectId}
+                  onSuccess={() => setBulkDialogOpen(false)}
+                  onCancel={() => setBulkDialogOpen(false)}
+                  updateLocalEntries={(entries) => {
+                    // Actualizar con múltiples entradas
+                    entries.forEach(entry => updateLocalEntries(entry));
+                  }}
                 />
               </DialogContent>
             </Dialog>
