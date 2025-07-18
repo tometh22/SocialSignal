@@ -830,10 +830,10 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       <span className="text-sm font-medium text-blue-800">Horas Trabajadas</span>
                     </div>
                     <p className="text-2xl font-bold text-blue-900">
-                      {formatNumber(timeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0), 1)}h
+                      {formatNumber(completeData?.actuals?.totalWorkedHours || 0, 1)}h
                     </p>
                     <p className="text-xs text-blue-700 mt-1">
-                      {((timeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0) / Math.max(projectMetrics?.plannedHours || 1, 1)) * 100).toFixed(1)}% del total
+                      {((completeData?.actuals?.totalWorkedHours || 0) / Math.max(completeData?.quotation?.estimatedHours || 1, 1) * 100).toFixed(1)}% del total
                     </p>
                   </div>
 
@@ -843,16 +843,10 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       <span className="text-sm font-medium text-green-800">Costo Generado</span>
                     </div>
                     <p className="text-2xl font-bold text-green-900">
-                      {formatCurrency(timeEntries.reduce((sum, entry) => {
-                        const person = personnel.find(p => p.id === entry.personnelId);
-                        return sum + ((entry.hours || 0) * (person?.hourlyRate || 0));
-                      }, 0))}
+                      {formatCurrency(completeData?.actuals?.totalWorkedCost || 0)}
                     </p>
                     <p className="text-xs text-green-700 mt-1">
-                      {((timeEntries.reduce((sum, entry) => {
-                        const person = personnel.find(p => p.id === entry.personnelId);
-                        return sum + ((entry.hours || 0) * (person?.hourlyRate || 0));
-                      }, 0) / Math.max(costSummary?.estimatedCost || 1, 1)) * 100).toFixed(1)}% del presupuesto
+                      {((completeData?.actuals?.totalWorkedCost || 0) / Math.max(completeData?.quotation?.baseCost || 1, 1) * 100).toFixed(1)}% del presupuesto
                     </p>
                   </div>
 
@@ -862,10 +856,10 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       <span className="text-sm font-medium text-purple-800">Miembros Activos</span>
                     </div>
                     <p className="text-2xl font-bold text-purple-900">
-                      {timeByPersonnelData.filter(p => timeEntries.some(e => e.personnelId === p.id && (e.hours || 0) > 0)).length}
+                      {completeData?.actuals?.teamBreakdown?.filter(member => (member.hours || 0) > 0).length || 0}
                     </p>
                     <p className="text-xs text-purple-700 mt-1">
-                      de {personnel.length} total
+                      de {completeData?.quotation?.team?.length || 0} total
                     </p>
                   </div>
 
@@ -875,7 +869,7 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                       <span className="text-sm font-medium text-orange-800">Registros</span>
                     </div>
                     <p className="text-2xl font-bold text-orange-900">
-                      {timeEntries.filter(entry => entry.personnelId).length}
+                      {completeData?.actuals?.totalEntries || 0}
                     </p>
                     <p className="text-xs text-orange-700 mt-1">
                       entradas de tiempo
@@ -886,22 +880,18 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 rounded-lg">
                   <h4 className="font-semibold text-slate-800 mb-2">Distribución por Roles</h4>
                   <div className="space-y-2">
-                    {roles.map(role => {
-                      const roleHours = timeEntries.reduce((sum, entry) => {
-                        const person = personnel.find(p => p.id === entry.personnelId);
-                        return person?.roleId === role.id ? sum + (entry.hours || 0) : sum;
-                      }, 0);
-                      
-                      const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-                      const percentage = totalHours > 0 ? (roleHours / totalHours) * 100 : 0;
+                    {completeData?.actuals?.teamBreakdown?.map(member => {
+                      const memberHours = member.hours || 0;
+                      const totalHours = completeData?.actuals?.totalWorkedHours || 0;
+                      const percentage = totalHours > 0 ? (memberHours / totalHours) * 100 : 0;
 
-                      if (roleHours === 0) return null;
+                      if (memberHours === 0) return null;
 
                       return (
-                        <div key={role.id} className="flex justify-between items-center">
-                          <span className="text-sm text-slate-700">{role.name}</span>
+                        <div key={member.personnelId} className="flex justify-between items-center">
+                          <span className="text-sm text-slate-700">{member.personnelName}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-slate-800">{formatNumber(roleHours, 1)}h</span>
+                            <span className="text-sm font-medium text-slate-800">{formatNumber(memberHours, 1)}h</span>
                             <span className="text-xs text-slate-600">({percentage.toFixed(1)}%)</span>
                           </div>
                         </div>
@@ -928,17 +918,15 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg">
                   <h4 className="font-semibold text-emerald-800 mb-3">Mapa de Rendimiento del Equipo</h4>
                   <div className="grid grid-cols-5 gap-2">
-                    {personnel.slice(0, 15).map((member, index) => {
-                      const memberHours = timeEntries
-                        .filter(entry => entry.personnelId === member.id)
-                        .reduce((sum, entry) => sum + (entry.hours || 0), 0);
-                      
-                      const intensity = Math.min(memberHours / 10, 1); // Normalize to 0-1
+                    {completeData?.actuals?.teamBreakdown?.slice(0, 15).map((member, index) => {
+                      const memberHours = member.hours || 0;
+                      const maxHours = Math.max(...(completeData?.actuals?.teamBreakdown?.map(m => m.hours || 0) || [1]));
+                      const intensity = Math.min(memberHours / maxHours, 1); // Normalize to 0-1
                       const bgIntensity = Math.round(intensity * 9);
                       
                       return (
                         <div
-                          key={member.id}
+                          key={member.personnelId}
                           className={`
                             w-8 h-8 rounded-md flex items-center justify-center text-xs font-medium
                             ${bgIntensity === 0 ? 'bg-slate-100 text-slate-400' :
@@ -946,9 +934,9 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
                               bgIntensity <= 6 ? 'bg-orange-300 text-orange-900' :
                               'bg-emerald-400 text-emerald-900'}
                           `}
-                          title={`${member.name}: ${memberHours.toFixed(1)}h`}
+                          title={`${member.personnelName}: ${memberHours.toFixed(1)}h`}
                         >
-                          {member.name.substring(0, 2).toUpperCase()}
+                          {member.personnelName.substring(0, 2).toUpperCase()}
                         </div>
                       );
                     })}
