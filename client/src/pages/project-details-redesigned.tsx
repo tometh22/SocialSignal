@@ -738,6 +738,13 @@ export default function ProjectDetailsRedesigned() {
   // Debug: Log client data to verify logoUrl is present
   console.log('Client data:', client);
 
+  // Usar el hook unificado para obtener datos completos del proyecto
+  const { data: unifiedData, isLoading: isUnifiedDataLoading } = useCompleteProjectData(
+    parseInt(projectId), 
+    dateFilter.value
+  );
+
+  // Datos legacy para compatibilidad (deprecated)
   const { data: timeEntries = [] } = useQuery({
     queryKey: [`/api/time-entries/project/${projectId}`],
     enabled: !!projectId,
@@ -823,27 +830,14 @@ export default function ProjectDetailsRedesigned() {
     return (project as any).quotation;
   }, [project]);
 
-  // DEBUG TEMPORAL: Ver qué datos hay disponibles
-  console.log('🔍 CARDS DEBUG - filteredTimeEntries:', filteredTimeEntries?.length || 0, 'entries');
-  console.log('🔍 CARDS DEBUG - timeEntries raw:', timeEntries?.length || 0, 'entries');
-  console.log('🔍 CARDS DEBUG - quotationData:', quotationData?.totalAmount || 0, 'precio');
-  console.log('🔍 CARDS DEBUG - dateFilter:', dateFilter);
-  console.log('🔍 CARDS DEBUG - project:', project ? 'loaded' : 'null');
-  
-  // Debug específico para el problema de filtrado
-  if (timeEntries && timeEntries.length > 0) {
-    console.log('🔍 CARDS DEBUG - Primera entrada RAW:', timeEntries[0]);
-    console.log('🔍 CARDS DEBUG - Fecha primera entrada:', timeEntries[0].date);
-    console.log('🔍 CARDS DEBUG - Tipo fecha:', typeof timeEntries[0].date);
-    console.log('🔍 CARDS DEBUG - Parsed fecha:', new Date(timeEntries[0].date));
-  }
-  
-  if (filteredTimeEntries && filteredTimeEntries.length > 0) {
-    console.log('🔍 CARDS DEBUG - Primera entrada filtrada:', filteredTimeEntries[0]);
-    const totalHours = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-    const totalCost = filteredTimeEntries.reduce((sum: number, entry: TimeEntry) => 
-      sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-    console.log('🔍 CARDS DEBUG - Total horas:', totalHours, 'Total costo:', totalCost);
+  // DEBUG DATOS UNIFICADOS
+  console.log('🚀 SINGLE SOURCE OF TRUTH:');
+  console.log('🚀 unifiedData available:', !!unifiedData);
+  if (unifiedData) {
+    console.log('🚀 Estimated hours from single source:', unifiedData.quotation?.estimatedHours || -1);
+    console.log('🚀 Total worked hours from single source:', unifiedData.actuals?.totalWorkedHours || -1);
+    console.log('🚀 Total worked cost from single source:', unifiedData.actuals?.totalWorkedCost || -1);
+    console.log('🚀 This should always be 969h for Warner Bros project');
   }
 
   // Cálculos principales basados en objetivos de cotización aprobada
@@ -1404,11 +1398,11 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                        const clientPrice = quotationData?.totalAmount || 0;
-                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                        return markup > 0 ? `${markup.toFixed(1)}x` : '0.0x';
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
+                          const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
+                          return `${markup.toFixed(1)}x`;
+                        }
+                        return '0.0x';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -1430,22 +1424,24 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        {(filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0).toFixed(1)}h / {quotationData?.estimatedHours || 0}h
+                        {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const workedHours = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-                        const estimatedHours = quotationData?.estimatedHours || 1;
-                        return ((workedHours / estimatedHours) * 100).toFixed(1);
+                        if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
+                          return ((unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100).toFixed(1);
+                        }
+                        return '0.0';
                       })()}%
                     </p>
                     <Progress value={(() => {
-                      const workedHours = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => sum + (entry.hours || 0), 0);
-                      const estimatedHours = quotationData?.estimatedHours || 1;
-                      return (workedHours / estimatedHours) * 100;
+                      if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
+                        return (unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100;
+                      }
+                      return 0;
                     })()} className="h-2" />
                   </div>
                 </CardContent>
@@ -1463,26 +1459,25 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
-                        ${(filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0).toLocaleString()}
+                        ${unifiedData?.actuals?.totalWorkedCost?.toLocaleString() || '0'}
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
                       {(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                        const budget = quotationData?.baseCost || 1;
-                        return ((actualCost / budget) * 100).toFixed(1);
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          return ((unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100).toFixed(1);
+                        }
+                        return '0.0';
                       })()}%
                     </p>
                     <Progress 
                       value={(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                        const budget = quotationData?.baseCost || 1;
-                        return (actualCost / budget) * 100;
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          return (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                        }
+                        return 0;
                       })()} 
                       className="h-2"
                     />
@@ -1501,37 +1496,37 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                        sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                      const clientPrice = quotationData?.totalAmount || 0;
-                      const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                      if (markup >= 2.0) return 'default';
-                      if (markup >= 1.5) return 'secondary';
+                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
+                        const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
+                        if (markup >= 2.0) return 'default';
+                        if (markup >= 1.5) return 'secondary';
+                        return 'destructive';
+                      }
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                        const clientPrice = quotationData?.totalAmount || 0;
-                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                        if (markup >= 2.0) return 'Excelente';
-                        if (markup >= 1.5) return 'Bueno';
-                        if (markup >= 1.2) return 'Regular';
-                        return 'Crítico';
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
+                          const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
+                          if (markup >= 2.0) return 'Excelente';
+                          if (markup >= 1.5) return 'Bueno';
+                          if (markup >= 1.2) return 'Regular';
+                          return 'Crítico';
+                        }
+                        return 'Sin datos';
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
-                        const clientPrice = quotationData?.totalAmount || 0;
-                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                        if (markup >= 2.0) return 'Excelente';
-                        if (markup >= 1.5) return 'Bueno';
-                        if (markup >= 1.2) return 'Regular';
-                        return 'Crítico';
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
+                          const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
+                          if (markup >= 2.0) return 'Excelente';
+                          if (markup >= 1.5) return 'Bueno';
+                          if (markup >= 1.2) return 'Regular';
+                          return 'Crítico';
+                        }
+                        return 'Sin datos';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">Evaluación integral</p>
