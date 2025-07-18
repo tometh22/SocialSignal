@@ -190,10 +190,7 @@ const CompactTimeForm: React.FC<{
         createdAt: new Date().toISOString(),
       };
 
-      // Agregar inmediatamente a la lista local
-      updateLocalEntries(tempEntry);
-      
-      // También actualizar el cache de React Query
+      // SOLO actualizar el cache de React Query (evitar duplicación)
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
         return [tempEntry, ...oldData];
       });
@@ -208,10 +205,7 @@ const CompactTimeForm: React.FC<{
         );
       });
 
-      // Actualizar las entradas locales mediante la función proporcionada
-      updateLocalEntries(newEntry);
-
-      // Invalidar cache inmediatamente para refrescar datos
+      // SOLO invalidar cache (evitar duplicación)
       queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
 
       toast({
@@ -249,6 +243,7 @@ const CompactTimeForm: React.FC<{
   });
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    // Mutación inmediata sin demoras
     createTimeEntryMutation.mutate(data);
   };
 
@@ -550,7 +545,12 @@ const TimeEntries: React.FC = () => {
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
 
   const updateLocalEntries = (entry: TimeEntry) => {
-    setLocalTimeEntries(prev => [...prev, entry]);
+    setLocalTimeEntries(prev => {
+      // Remover entrada existente si ya existe (evitar duplicados)
+      const filtered = prev.filter(e => e.id !== entry.id);
+      // Agregar al principio y mantener orden por fecha (más reciente primero)
+      return [entry, ...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
   };
 
   const openEditDialog = (entry: TimeEntry) => {
