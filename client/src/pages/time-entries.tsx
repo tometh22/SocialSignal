@@ -625,6 +625,66 @@ const TimeEntries: React.FC = () => {
           start: new Date(year, 9, 1),
           end: new Date(year, 11, 31)
         };
+      case "january":
+        return {
+          start: new Date(year, 0, 1),
+          end: new Date(year, 0, 31)
+        };
+      case "february":
+        return {
+          start: new Date(year, 1, 1),
+          end: new Date(year, 1, 28 + (year % 4 === 0 ? 1 : 0))
+        };
+      case "march":
+        return {
+          start: new Date(year, 2, 1),
+          end: new Date(year, 2, 31)
+        };
+      case "april":
+        return {
+          start: new Date(year, 3, 1),
+          end: new Date(year, 3, 30)
+        };
+      case "may":
+        return {
+          start: new Date(year, 4, 1),
+          end: new Date(year, 4, 31)
+        };
+      case "june":
+        return {
+          start: new Date(year, 5, 1),
+          end: new Date(year, 5, 30)
+        };
+      case "july":
+        return {
+          start: new Date(year, 6, 1),
+          end: new Date(year, 6, 31)
+        };
+      case "august":
+        return {
+          start: new Date(year, 7, 1),
+          end: new Date(year, 7, 31)
+        };
+      case "september":
+        return {
+          start: new Date(year, 8, 1),
+          end: new Date(year, 8, 30)
+        };
+      case "october":
+        return {
+          start: new Date(year, 9, 1),
+          end: new Date(year, 9, 31)
+        };
+      case "november":
+        return {
+          start: new Date(year, 10, 1),
+          end: new Date(year, 10, 30)
+        };
+      case "december":
+        return {
+          start: new Date(year, 11, 1),
+          end: new Date(year, 11, 31)
+        };
       default:
         return null;
     }
@@ -662,20 +722,32 @@ const TimeEntries: React.FC = () => {
       }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     : [];
 
-  // Opciones de filtro profesionales
+  // Opciones de filtro profesionales con todos los meses
   const dateFilterOptions = [
-    { value: "all", label: "Todos los períodos" },
-    { value: "this-month", label: "Este mes" },
-    { value: "last-month", label: "Mes pasado" },
-    { value: "this-quarter", label: "Este trimestre" },
-    { value: "last-quarter", label: "Trimestre pasado" },
-    { value: "this-semester", label: "Este semestre" },
-    { value: "last-semester", label: "Semestre pasado" },
-    { value: "this-year", label: "Este año" },
-    { value: "q1", label: "Q1 (Ene-Mar)" },
-    { value: "q2", label: "Q2 (Abr-Jun)" },
-    { value: "q3", label: "Q3 (Jul-Sep)" },
-    { value: "q4", label: "Q4 (Oct-Dic)" }
+    { value: "all", label: "Todos los períodos", group: "General" },
+    { value: "this-month", label: "Este mes", group: "General" },
+    { value: "last-month", label: "Mes pasado", group: "General" },
+    { value: "this-quarter", label: "Este trimestre", group: "General" },
+    { value: "last-quarter", label: "Trimestre pasado", group: "General" },
+    { value: "this-semester", label: "Este semestre", group: "General" },
+    { value: "last-semester", label: "Semestre pasado", group: "General" },
+    { value: "this-year", label: "Este año", group: "General" },
+    { value: "q1", label: "Q1 (Ene-Mar)", group: "Trimestres" },
+    { value: "q2", label: "Q2 (Abr-Jun)", group: "Trimestres" },
+    { value: "q3", label: "Q3 (Jul-Sep)", group: "Trimestres" },
+    { value: "q4", label: "Q4 (Oct-Dic)", group: "Trimestres" },
+    { value: "january", label: "Enero", group: "Meses" },
+    { value: "february", label: "Febrero", group: "Meses" },
+    { value: "march", label: "Marzo", group: "Meses" },
+    { value: "april", label: "Abril", group: "Meses" },
+    { value: "may", label: "Mayo", group: "Meses" },
+    { value: "june", label: "Junio", group: "Meses" },
+    { value: "july", label: "Julio", group: "Meses" },
+    { value: "august", label: "Agosto", group: "Meses" },
+    { value: "september", label: "Septiembre", group: "Meses" },
+    { value: "october", label: "Octubre", group: "Meses" },
+    { value: "november", label: "Noviembre", group: "Meses" },
+    { value: "december", label: "Diciembre", group: "Meses" }
   ];
 
   // Estadísticas rápidas
@@ -781,10 +853,20 @@ const TimeEntries: React.FC = () => {
                         <SelectValue placeholder="Seleccionar período" />
                       </SelectTrigger>
                       <SelectContent>
-                        {dateFilterOptions.map(option => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
+                        {/* Agrupar opciones por categoría */}
+                        {["General", "Trimestres", "Meses"].map(group => (
+                          <div key={group}>
+                            <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
+                              {group}
+                            </div>
+                            {dateFilterOptions
+                              .filter(option => option.group === group)
+                              .map(option => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                          </div>
                         ))}
                       </SelectContent>
                     </Select>
@@ -807,7 +889,7 @@ const TimeEntries: React.FC = () => {
                       {filteredEntries.length} registro{filteredEntries.length !== 1 ? 's' : ''}
                     </span>
                     {dateFilter !== "all" && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                         {dateFilterOptions.find(opt => opt.value === dateFilter)?.label}
                       </Badge>
                     )}
