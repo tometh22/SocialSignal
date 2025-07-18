@@ -686,6 +686,11 @@ export default function ProjectDetailsRedesigned() {
   const getTimeFilterForHook = (filter: DateFilter) => {
     const label = filter.label.toLowerCase();
     
+    // CRITICAL: Check for custom date ranges (format: "01/05/2025 - 31/05/2025")
+    if (label.includes('/05/2025')) return 'may_2025';
+    if (label.includes('/06/2025')) return 'june_2025';
+    if (label.includes('/07/2025')) return 'july_2025';
+    
     // CRITICAL: Check for specific months like "mayo 2025"
     if (label.includes('mayo 2025')) return 'may_2025';
     if (label.includes('junio 2025')) return 'june_2025';
@@ -706,7 +711,18 @@ export default function ProjectDetailsRedesigned() {
     if (label === 'últimos 30 días') return 'last_30_days';
     if (label === 'últimos 3 meses') return 'last_quarter';
     
+    // FALLBACK: For custom date ranges, try to detect by date pattern
+    if (filter.type === 'custom' && filter.startDate && filter.endDate) {
+      const startMonth = filter.startDate.getMonth() + 1; // getMonth is 0-based
+      const startYear = filter.startDate.getFullYear();
+      
+      if (startMonth === 5 && startYear === 2025) return 'may_2025';
+      if (startMonth === 6 && startYear === 2025) return 'june_2025';
+      if (startMonth === 7 && startYear === 2025) return 'july_2025';
+    }
+    
     console.log('🚨 UNMAPPED FILTER LABEL:', label, '- using "all" as fallback');
+    console.log('🚨 Filter details:', { label, type: filter.type, startDate: filter.startDate, endDate: filter.endDate });
     return 'all';
   };
 
