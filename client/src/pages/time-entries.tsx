@@ -469,6 +469,8 @@ const TimeEntries: React.FC = () => {
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "billable" | "non-billable">("all");
+  const [monthFilter, setMonthFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   const [localTimeEntries, setLocalTimeEntries] = useState<TimeEntry[]>([]);
 
@@ -562,6 +564,12 @@ const TimeEntries: React.FC = () => {
         if (filterType === "billable" && !entry.billable) return false;
         if (filterType === "non-billable" && entry.billable) return false;
 
+        // Filtro por mes
+        if (monthFilter !== "all") {
+          const entryMonth = format(new Date(entry.date), "yyyy-MM");
+          if (entryMonth !== monthFilter) return false;
+        }
+
         // Filtro por búsqueda
         if (search) {
           const person = personnel?.find(p => p.id === entry.personnelId);
@@ -577,6 +585,19 @@ const TimeEntries: React.FC = () => {
         return true;
       }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     : [];
+
+  // Agrupar por mes para estadísticas
+  const entriesByMonth = filteredEntries.reduce((acc, entry) => {
+    const month = format(new Date(entry.date), "yyyy-MM");
+    if (!acc[month]) {
+      acc[month] = [];
+    }
+    acc[month].push(entry);
+    return acc;
+  }, {} as { [key: string]: typeof filteredEntries });
+
+  // Obtener meses disponibles para el filtro
+  const availableMonths = Object.keys(entriesByMonth).sort().reverse();
 
   // Estadísticas rápidas
   const totalHours = filteredEntries.reduce((sum, entry) => sum + entry.hours, 0);
@@ -670,6 +691,21 @@ const TimeEntries: React.FC = () => {
                       />
                     </div>
 
+                    <Select value={monthFilter} onValueChange={(value) => setMonthFilter(value)}>
+                      <SelectTrigger className="w-36 h-9">
+                        <CalendarIconLucide className="mr-2 h-4 w-4" />
+                        <SelectValue placeholder="Mes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {availableMonths.map(month => (
+                          <SelectItem key={month} value={month}>
+                            {format(new Date(month + '-01'), 'MMM yyyy', { locale: es })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
                       <SelectTrigger className="w-36 h-9">
                         <Filter className="mr-2 h-4 w-4" />
@@ -711,83 +747,127 @@ const TimeEntries: React.FC = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100">
-                    {filteredEntries.map((entry) => {
-                      const person = personnel?.find(p => p.id === entry.personnelId);
-                      const isTemporary = entry.id > 999999999; // Detectar registros temporales
-                      
-                      return (
-                        <div 
-                          key={entry.id}
-                          data-entry-id={entry.id}
-                          className={cn(
-                            "flex items-center justify-between p-4 hover:bg-gray-50/50 transition-all duration-300 ease-in-out",
-                            "animate-in slide-in-from-top-2 fade-in-50",
-                            isTemporary && "opacity-70 bg-blue-50/30"
-                          )}
-                          style={{
-                            animationDelay: '0ms',
-                            animationDuration: '300ms'
-                          }}
-                        >
-                          <div className="flex items-center gap-4">
-                            <PersonAvatar name={person?.name || "Usuario"} className="h-10 w-10" />
-                            <div>
-                              <div className="font-medium text-sm flex items-center gap-2">
-                                {person?.name}
-                                {isTemporary && (
-                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {format(new Date(entry.date), "EEEE, dd MMM", { locale: es })}
-                              </div>
-                              {entry.description && (
-                                <div className="text-xs text-muted-foreground truncate max-w-md mt-1">
-                                  {entry.description}
+                  // Vista de tabla profesional
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50/50 border-b">
+                        <tr>
+                          <th className="text-left p-4 font-medium text-sm text-gray-700">Persona</th>
+                          <th className="text-left p-4 font-medium text-sm text-gray-700">Fecha</th>
+                          <th className="text-left p-4 font-medium text-sm text-gray-700">Horas</th>
+                          <th className="text-left p-4 font-medium text-sm text-gray-700">Tipo</th>
+                          <th className="text-left p-4 font-medium text-sm text-gray-700">Descripción</th>
+                          <th className="text-right p-4 font-medium text-sm text-gray-700">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredEntries.map((entry) => {
+                          const person = personnel?.find(p => p.id === entry.personnelId);
+                          const isTemporary = entry.id > 999999999; // Detectar registros temporales
+                          
+                          return (
+                            <tr 
+                              key={entry.id}
+                              data-entry-id={entry.id}
+                              className={cn(
+                                "hover:bg-gray-50/50 transition-all duration-300 ease-in-out",
+                                "animate-in slide-in-from-top-2 fade-in-50",
+                                isTemporary && "opacity-70 bg-blue-50/30"
+                              )}
+                              style={{
+                                animationDelay: '0ms',
+                                animationDuration: '300ms'
+                              }}
+                            >
+                              {/* Persona */}
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <PersonAvatar name={person?.name || "Usuario"} className="h-8 w-8" />
+                                  <div>
+                                    <div className="font-medium text-sm flex items-center gap-2">
+                                      {person?.name}
+                                      {isTemporary && (
+                                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {person?.roleId ? `ID: ${person.roleId}` : ''}
+                                    </div>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
+                              </td>
 
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="font-bold text-lg">{entry.hours}h</div>
-                              {entry.billable ? (
-                                <Badge variant="default" className="text-xs">
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  Facturable
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-xs">
-                                  No facturable
-                                </Badge>
-                              )}
-                            </div>
+                              {/* Fecha */}
+                              <td className="p-4">
+                                <div className="text-sm font-medium">
+                                  {format(new Date(entry.date), "dd/MM/yyyy", { locale: es })}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {format(new Date(entry.date), "EEEE", { locale: es })}
+                                </div>
+                              </td>
 
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" disabled={isTemporary}>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    setEntryToDelete(entry.id);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              {/* Horas */}
+                              <td className="p-4">
+                                <div className="text-lg font-bold text-blue-600">
+                                  {entry.hours}h
+                                </div>
+                              </td>
+
+                              {/* Tipo */}
+                              <td className="p-4">
+                                {entry.billable ? (
+                                  <Badge variant="default" className="text-xs">
+                                    <DollarSign className="h-3 w-3 mr-1" />
+                                    Facturable
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">
+                                    No facturable
+                                  </Badge>
+                                )}
+                              </td>
+
+                              {/* Descripción */}
+                              <td className="p-4">
+                                <div className="text-sm text-gray-700 max-w-xs">
+                                  {entry.description ? (
+                                    <div className="truncate" title={entry.description}>
+                                      {entry.description}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground italic">Sin descripción</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Acciones */}
+                              <td className="p-4 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" disabled={isTemporary}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem 
+                                      onClick={() => {
+                                        setEntryToDelete(entry.id);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>
