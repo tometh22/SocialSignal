@@ -337,11 +337,19 @@ function ProjectTeamSection({ projectId, unifiedData }: {
   const quotationTeam = unifiedData?.quotation?.team || [];
   const teamBreakdown = unifiedData?.actuals?.teamBreakdown || {};
   
+  // Debug: Ver qué datos llegan del backend
+  console.log('🔍 DEBUG - Datos del backend:', {
+    quotationTeam: quotationTeam.slice(0, 2),
+    teamBreakdown: Object.keys(teamBreakdown).slice(0, 2).map(key => ({
+      key,
+      data: teamBreakdown[key]
+    }))
+  });
+  
   // Crear lista combinada de miembros del equipo
   const baseTeam = quotationTeam.map((quotationMember: any) => {
-    const actualData = Object.values(teamBreakdown).find((member: any) => 
-      member.personnelId === quotationMember.personnelId
-    );
+    // Buscar datos reales usando el personnelId como clave string
+    const actualData = teamBreakdown[quotationMember.personnelId.toString()];
     
     return {
       ...quotationMember,
