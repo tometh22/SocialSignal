@@ -210,12 +210,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const entry of timeEntries) {
         const personnelId = entry.personnelId.toString();
         if (!teamBreakdown[personnelId]) {
+          // Find estimated hours for this personnel from quotation team
+          const quotationMember = quotationTeam.find(m => m.personnelId === entry.personnelId);
+          const estimatedHours = quotationMember ? quotationMember.hours : 0;
+          
           teamBreakdown[personnelId] = {
+            personnelId: entry.personnelId,
             name: entry.personnel?.name || 'Unknown',
             hours: 0,
             cost: 0,
             entries: 0,
-            lastActivity: null
+            lastActivity: null,
+            estimatedHours: estimatedHours,
+            rate: quotationMember?.rate || 0
           };
         }
         teamBreakdown[personnelId].hours += entry.hours || 0;
