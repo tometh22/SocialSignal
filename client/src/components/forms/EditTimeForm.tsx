@@ -54,7 +54,7 @@ interface EditTimeFormProps {
 const editTimeSchema = z.object({
   personnelId: z.number().min(1, "Selecciona una persona"),
   date: z.date({ required_error: "Selecciona una fecha" }),
-  hours: z.number().min(0.1, "Mínimo 0.1 horas").max(24, "Máximo 24 horas"),
+  hours: z.number().min(0.1, "Mínimo 0.1 horas").max(500, "Máximo 500 horas (para registros de período)"),
   description: z.string().optional(),
   billable: z.boolean().default(true),
   componentId: z.number().nullable().optional(),

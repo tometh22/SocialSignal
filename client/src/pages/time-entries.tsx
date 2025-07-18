@@ -108,7 +108,7 @@ const formSchema = z.object({
   }),
   hours: z.number({
     required_error: "Ingresa las horas",
-  }).min(0.5, "Mínimo 0.5 horas").max(24, "Máximo 24 horas"),
+  }).min(0.5, "Mínimo 0.5 horas").max(500, "Máximo 500 horas (para registros de período)"),
   description: z.string().optional(),
   billable: z.boolean().default(true),
   componentId: z.number().nullable().optional(),

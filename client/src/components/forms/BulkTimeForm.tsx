@@ -45,7 +45,7 @@ const bulkTimeSchema = z.object({
   description: z.string().min(1, "La descripción es requerida"),
   entries: z.array(z.object({
     personnelId: z.number(),
-    hours: z.number().min(0, "Las horas deben ser positivas"),
+    hours: z.number().min(0, "Las horas deben ser positivas").max(500, "Máximo 500 horas"),
     billable: z.boolean()
   }))
 });
