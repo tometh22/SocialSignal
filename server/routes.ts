@@ -2301,8 +2301,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Proyecto no encontrado" });
       }
 
+      // 🔍 DETECCIÓN DE PERSONAL NO COTIZADO ORIGINALMENTE
+      let isUncotizedPersonnel = false;
+      const personnelId = validatedData.personnelId;
+      
+      if (project.quotationId && personnelId) {
+        // Verificar si esta persona estaba en el equipo original de la cotización
+        const originalTeam = await storage.getQuotationTeamMembers(project.quotationId);
+        const wasInOriginalTeam = originalTeam.some(member => member.personnelId === personnelId);
+        
+        if (!wasInOriginalTeam) {
+          console.log(`🚨 PERSONAL NO COTIZADO DETECTADO: ${personnelId} no estaba en cotización ${project.quotationId}`);
+          isUncotizedPersonnel = true;
+          
+          // Verificar si ya existe en el equipo base del proyecto
+          const baseTeam = await storage.getProjectBaseTeam(validatedData.projectId);
+          const alreadyInBaseTeam = baseTeam.some(member => member.personnelId === personnelId);
+          
+          if (!alreadyInBaseTeam) {
+            // Obtener información del personal para crear el registro
+            const personnel = await storage.getPersonnelById(personnelId);
+            if (personnel) {
+              console.log(`📝 Agregando ${personnel.name} al equipo base del proyecto automáticamente`);
+              
+              // Crear registro en projectBaseTeam para este personal no cotizado
+              await storage.createProjectBaseTeamMember({
+                projectId: validatedData.projectId,
+                personnelId: personnelId,
+                roleId: personnel.roleId || 1, // Usar rol por defecto si no tiene
+                estimatedHours: 0, // No se estimó originalmente
+                hourlyRate: personnel.hourlyRate,
+                isActive: true
+              });
+              
+              console.log(`✅ ${personnel.name} agregado al equipo base del proyecto`);
+            }
+          }
+        }
+      }
+
+      // Crear el registro de tiempo con información adicional
       const entry = await storage.createTimeEntry(validatedData);
-      res.status(201).json(entry);
+      
+      // Agregar flag de personal no cotizado al response
+      const entryWithMetadata = {
+        ...entry,
+        isUncotizedPersonnel,
+        warningMessage: isUncotizedPersonnel ? 
+          "Esta persona no estaba en el equipo original de la cotización" : null
+      };
+
+      res.status(201).json(entryWithMetadata);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Error de validación:", error.errors);

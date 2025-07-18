@@ -52,6 +52,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   CalendarIcon, 
   Loader2, 
@@ -68,7 +69,9 @@ import {
   Timer,
   Edit3,
   Calendar as CalendarIconLucide,
-  ArrowUpDown
+  ArrowUpDown,
+  AlertTriangle,
+  Info
 } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -586,6 +589,36 @@ const TimeEntries: React.FC = () => {
     queryKey: ['/api/personnel'],
   });
 
+  // Query para obtener el equipo original de la cotización
+  const { data: quotationTeam } = useQuery({
+    queryKey: [`/api/quotations/${project?.quotationId}/team`],
+    enabled: !!project?.quotationId,
+  });
+
+  // Función para detectar personal no cotizado
+  const detectUncotizedPersonnel = () => {
+    if (!timeEntries || !quotationTeam || !personnel) return [];
+    
+    const uncotizedPersonnel = [];
+    
+    // Obtener IDs de personal original de la cotización
+    const originalPersonnelIds = quotationTeam.map(member => member.personnelId);
+    
+    // Buscar personal que ha registrado tiempo pero no estaba en la cotización
+    timeEntries.forEach(entry => {
+      if (!originalPersonnelIds.includes(entry.personnelId)) {
+        const person = personnel.find(p => p.id === entry.personnelId);
+        if (person && !uncotizedPersonnel.find(up => up.id === person.id)) {
+          uncotizedPersonnel.push(person);
+        }
+      }
+    });
+    
+    return uncotizedPersonnel;
+  };
+
+  const uncotizedPersonnel = detectUncotizedPersonnel();
+
   // Mutación para eliminar
   const deleteTimeEntryMutation = useMutation({
     mutationFn: async (entryId: number) => {
@@ -1013,6 +1046,29 @@ const TimeEntries: React.FC = () => {
               </div>
             </div>
 
+            {/* Alerta de personal no cotizado */}
+            {uncotizedPersonnel.length > 0 && (
+              <Alert className="mb-6 border-orange-200 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  <div className="font-medium mb-2">Personal no cotizado originalmente detectado:</div>
+                  <div className="text-sm">
+                    {uncotizedPersonnel.map((person, index) => (
+                      <span key={person.id} className="inline-flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-md mr-2 mb-1">
+                        <User className="h-3 w-3" />
+                        {person.name}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="text-xs mt-2 text-orange-700">
+                    <Info className="h-3 w-3 inline mr-1" />
+                    Esta{uncotizedPersonnel.length > 1 ? 's personas' : ' persona'} no estaba{uncotizedPersonnel.length > 1 ? 'n' : ''} en el equipo original de la cotización. 
+                    Se ha{uncotizedPersonnel.length > 1 ? 'n' : ''} agregado automáticamente al equipo del proyecto.
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Tabla de registros profesional */}
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -1068,6 +1124,8 @@ const TimeEntries: React.FC = () => {
                           const person = personnel?.find(p => p.id === entry.personnelId);
                           // Detectar registros temporales: solo los que tienen ID muy grande (timestamp) Y no están aprobados
                           const isTemporary = entry.id > 1000000000000 && !entry.approvedDate;
+                          // Detectar si es personal no cotizado
+                          const isUncotizedPersonnel = uncotizedPersonnel.some(up => up.id === entry.personnelId);
                           
                           return (
                             <tr 
@@ -1075,7 +1133,8 @@ const TimeEntries: React.FC = () => {
                               data-entry-id={entry.id}
                               className={cn(
                                 "hover:bg-gray-50 transition-colors duration-150",
-                                isTemporary && "opacity-70 bg-blue-50"
+                                isTemporary && "opacity-70 bg-blue-50",
+                                isUncotizedPersonnel && "bg-red-50 border-l-4 border-red-400"
                               )}
                             >
                               {/* Persona */}
@@ -1087,6 +1146,11 @@ const TimeEntries: React.FC = () => {
                                       {person?.name}
                                       {isTemporary && (
                                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+                                      )}
+                                      {isUncotizedPersonnel && (
+                                        <Badge variant="destructive" className="text-xs px-2 py-0.5 bg-red-100 text-red-800 border-red-300">
+                                          No cotizado
+                                        </Badge>
                                       )}
                                     </div>
                                     <div className="text-xs text-gray-500">

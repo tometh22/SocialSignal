@@ -219,6 +219,7 @@ export interface IStorage {
   // Project base team operations
   getProjectBaseTeam(projectId: number): Promise<ProjectBaseTeam[]>;
   createProjectBaseTeam(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam>;
+  createProjectBaseTeamMember(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam>;
   updateProjectBaseTeam(id: number, team: Partial<InsertProjectBaseTeam>): Promise<ProjectBaseTeam | undefined>;
   deleteProjectBaseTeam(id: number): Promise<boolean>;
   copyQuotationTeamToProject(quotationId: number, projectId: number): Promise<ProjectBaseTeam[]>;
@@ -2154,6 +2155,16 @@ export class DatabaseStorage implements IStorage {
       return created;
     } catch (error) {
       console.error("Error al crear miembro del equipo base:", error);
+      throw error;
+    }
+  }
+
+  async createProjectBaseTeamMember(team: InsertProjectBaseTeam): Promise<ProjectBaseTeam> {
+    try {
+      const [created] = await db.insert(projectBaseTeam).values(team).returning();
+      return created;
+    } catch (error) {
+      console.error("Error al crear miembro individual del equipo base:", error);
       throw error;
     }
   }
