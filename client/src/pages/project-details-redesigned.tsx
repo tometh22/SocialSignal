@@ -630,7 +630,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <span className="font-medium">
               {(() => {
                 const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
                 const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                 return `${percentage}%`;
               })()}
@@ -641,7 +641,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
               className={`h-2 rounded-full transition-all duration-300 ${
                 (() => {
                   const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
                   const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                   return percentage >= 100 ? 'bg-green-500' : 
                          percentage >= 75 ? 'bg-yellow-500' : 'bg-blue-500';
@@ -650,7 +650,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
               style={{ 
                 width: `${Math.min((() => {
                   const totalEstimated = baseTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0);
+                  const totalWorked = baseTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
                   return totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                 })(), 100)}%` 
               }}
