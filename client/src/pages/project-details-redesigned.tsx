@@ -2356,8 +2356,8 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent className="p-6">
                   {(() => {
-                    // Use baseTeam data which should have the real team member information
-                    const teamMembers = baseTeam || teamStats || [];
+                    // Use completeData.actuals.teamBreakdown which has the filtered team member information
+                    const teamMembers = completeData?.actuals?.teamBreakdown || [];
                     
                     if (!teamMembers || teamMembers.length === 0) {
                       return (
@@ -2397,10 +2397,10 @@ export default function ProjectDetailsRedesigned() {
                         {/* Heat Map Grid */}
                         <div className="grid grid-cols-4 gap-2">
                           {displayMembers.map((member: any, index: number) => {
-                            // Get real data from baseTeam (hours worked from time entries)
+                            // Get real data from completeData.actuals.teamBreakdown (hours worked from time entries)
                             const workedHours = member.hours || 0; // Real hours from time entries
                             const estimatedHours = member.estimatedHours || 1; // Estimated hours from quotation
-                            const name = member.name || member.personnel?.name || 'Sin nombre';
+                            const name = member.personnelName || member.name || 'Sin nombre';
                             
                             // Calculate efficiency: closer to 1.0 is better (worked hours close to estimated)
                             const efficiency = estimatedHours > 0 ? Math.min(2, estimatedHours / Math.max(workedHours, 0.1)) : 0;
@@ -2495,7 +2495,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-4">
                     {(() => {
                       // Calculate top performers based on efficiency + project weight + hour usage
-                      const teamMembers = baseTeam || teamStats || [];
+                      const teamMembers = completeData?.actuals?.teamBreakdown || [];
                       
                       if (!teamMembers || teamMembers.length === 0) {
                         return (
@@ -2507,11 +2507,11 @@ export default function ProjectDetailsRedesigned() {
                       }
                       
                       const performersWithScore = teamMembers.map((member: any) => {
-                        // Get real data from updated backend (time entries)
+                        // Get real data from completeData.actuals.teamBreakdown (time entries)
                         const workedHours = member.hours || 0; // Real hours from time entries
                         const estimatedHours = member.estimatedHours || 1; // Estimated from quotation
                         const hourlyRate = member.hourlyRate || member.rate || 10;
-                        const name = member.name || member.personnel?.name || 'Sin nombre';
+                        const name = member.personnelName || member.name || 'Sin nombre';
                         
                         // Efficiency score (0-40 points) - how well they stay within estimates
                         const usageRatio = workedHours / Math.max(estimatedHours, 1);
