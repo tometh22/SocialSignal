@@ -217,6 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamBreakdown[personnelId] = {
             personnelId: entry.personnelId,
             name: entry.personnel?.name || 'Unknown',
+            roleName: quotationMember?.role?.name || 'Operations Lead',
+            hourlyRate: quotationMember?.rate || 0,
             hours: 0,
             cost: 0,
             entries: 0,
