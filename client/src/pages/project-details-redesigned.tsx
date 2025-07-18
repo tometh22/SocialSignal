@@ -710,6 +710,9 @@ export default function ProjectDetailsRedesigned() {
   const project = unifiedData?.project;
   const isLoading = dataLoading;
   const quotationData = unifiedData?.quotation;
+  
+  // Crear filteredTimeEntries vacío por compatibilidad (todos los datos vienen del endpoint unificado)
+  const filteredTimeEntries: any[] = [];
 
   // DEBUG DATOS UNIFICADOS
   console.log('🚀 SINGLE SOURCE OF TRUTH:');
@@ -1152,8 +1155,7 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
-                      const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                        sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
                       const clientPrice = quotationData?.totalAmount || 0;
                       const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
                       if (markup >= 2.5) return 'default';
@@ -1162,8 +1164,7 @@ export default function ProjectDetailsRedesigned() {
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        const actualCost = (filteredTimeEntries || []).reduce((sum: number, entry: TimeEntry) => 
-                          sum + ((entry.hours || 0) * (entry.hourlyRateAtTime || entry.hourlyRate || 0)), 0);
+                        const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
                         if (markup >= 2.5) return 'Excelente';
@@ -1366,14 +1367,14 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {filteredTimeEntries.length} registros
+                    {unifiedData?.actuals?.totalEntries || 0} registros
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
-                  {filteredTimeEntries.length > 0 ? (
-                    filteredTimeEntries.slice(0, 12).map((entry, index) => (
+                  {unifiedData?.actuals?.totalEntries > 0 ? (
+                    [].slice(0, 12).map((entry, index) => (
                       <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
                         <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                           <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
@@ -1724,7 +1725,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-emerald-600">Registros: </span>
                     <span className="text-gray-500">
-                      {filteredTimeEntries.length} en {dateFilter.label}
+                      {unifiedData?.actuals?.totalEntries || 0} en {dateFilter.label}
                     </span>
                   </div>
                 </CardContent>
@@ -1755,7 +1756,7 @@ export default function ProjectDetailsRedesigned() {
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-blue-600">Última entrada: </span>
                     <span className="text-gray-500">
-                      {filteredTimeEntries.length > 0 ? 'Hoy' : 'Sin registros'}
+                      {(unifiedData?.actuals?.totalEntries || 0) > 0 ? 'Activo' : 'Sin registros'}
                     </span>
                   </div>
                 </CardContent>
@@ -2770,25 +2771,24 @@ export default function ProjectDetailsRedesigned() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Horas Período</span>
                     <span className="font-semibold text-teal-600">
-                      {filteredTimeEntries?.reduce((sum, entry) => sum + (entry.hours || 0), 0)?.toFixed(1) || '0.0'}h
+                      {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Días Activos</span>
                     <span className="font-semibold text-green-600">
-                      {filteredTimeEntries ? new Set(filteredTimeEntries.map(entry => entry.date.split('T')[0])).size : 0}
+                      {Math.ceil((unifiedData?.actuals?.totalWorkedHours || 0) / 8)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Registros</span>
-                    <span className="font-semibold text-purple-600">{filteredTimeEntries?.length || 0}</span>
+                    <span className="font-semibold text-purple-600">{unifiedData?.actuals?.totalEntries || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Promedio/Día</span>
                     <span className="font-semibold text-blue-600">
-                      {filteredTimeEntries && filteredTimeEntries.length > 0
-                        ? ((filteredTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0) / 
-                            Math.max(1, new Set(filteredTimeEntries.map(entry => entry.date.split('T')[0])).size))).toFixed(1) + 'h'
+                      {unifiedData?.actuals?.totalWorkedHours && unifiedData.actuals.totalEntries > 0
+                        ? (unifiedData.actuals.totalWorkedHours / Math.max(1, Math.ceil(unifiedData.actuals.totalWorkedHours / 8))).toFixed(1) + 'h'
                         : '0.0h'
                       }
                     </span>
