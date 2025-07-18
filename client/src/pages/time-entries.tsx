@@ -106,9 +106,11 @@ const formSchema = z.object({
   date: z.date({
     required_error: "Selecciona una fecha",
   }),
+  endDate: z.date().optional(), // Para registros de período
+  isPeriod: z.boolean().default(false), // Indica si es registro de período
   hours: z.number({
     required_error: "Ingresa las horas",
-  }).min(0.5, "Mínimo 0.5 horas").max(500, "Máximo 500 horas (para registros de período)"),
+  }).min(0.1, "Mínimo 0.1 horas").max(500, "Máximo 500 horas (para registros de período)"),
   description: z.string().optional(),
   billable: z.boolean().default(true),
   componentId: z.number().nullable().optional(),
@@ -257,7 +259,31 @@ const CompactTimeForm: React.FC<{
     <div className="space-y-4">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {/* Línea 1: Persona y Calendario en una sola línea */}
+          {/* Checkbox para habilitar registro de período */}
+          <FormField
+            control={form.control}
+            name="isPeriod"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center space-x-2">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm cursor-pointer">
+                    Registro de período (fecha inicio y fin)
+                  </FormLabel>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Línea 1: Persona y Fecha(s) */}
           <div className="grid grid-cols-2 gap-3">
             <FormField
               control={form.control}
@@ -295,7 +321,9 @@ const CompactTimeForm: React.FC<{
               name="date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm">Fecha</FormLabel>
+                  <FormLabel className="text-sm">
+                    {form.watch('isPeriod') ? 'Fecha de inicio' : 'Fecha'}
+                  </FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -331,6 +359,49 @@ const CompactTimeForm: React.FC<{
             />
           </div>
 
+          {/* Fecha final (solo si es período) */}
+          {form.watch('isPeriod') && (
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Fecha de finalización</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full h-9 justify-start text-left font-normal text-sm",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIconLucide className="mr-2 h-4 w-4" />
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy")
+                          ) : (
+                            <span>Fecha final</span>
+                          )}
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           {/* Línea 2: Horas y Tipo */}
           <div className="grid grid-cols-2 gap-3">
             <FormField
@@ -343,9 +414,9 @@ const CompactTimeForm: React.FC<{
                     <FormControl>
                       <Input
                         type="number"
-                        step="0.5"
-                        min="0.5"
-                        max="24"
+                        step="0.1"
+                        min="0.1"
+                        max="500"
                         className="h-9 pl-8 text-sm"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value))}
