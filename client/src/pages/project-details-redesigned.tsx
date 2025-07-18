@@ -333,22 +333,27 @@ function ProjectTeamSection({ projectId, unifiedData }: {
 }) {
   const { toast } = useToast();
 
-  // Usar datos del equipo de la cotización desde unifiedData
-  const baseTeam = unifiedData?.quotation?.team || [];
-  const teamLoading = !unifiedData;
+  // Combinar datos del equipo estimado y real
+  const quotationTeam = unifiedData?.quotation?.team || [];
+  const teamBreakdown = unifiedData?.actuals?.teamBreakdown || {};
   
-  // Función para obtener nombre real del personal
-  const getPersonnelName = (personnelId: number) => {
-    const teamBreakdown = unifiedData?.actuals?.teamBreakdown;
-    if (!teamBreakdown) return 'Miembro del Equipo';
-    
-    // Buscar el miembro específico en teamBreakdown que tiene los nombres reales
-    const memberData = Object.values(teamBreakdown).find((member: any) => 
-      member.personnelId === personnelId
+  // Crear lista combinada de miembros del equipo
+  const baseTeam = quotationTeam.map((quotationMember: any) => {
+    const actualData = Object.values(teamBreakdown).find((member: any) => 
+      member.personnelId === quotationMember.personnelId
     );
     
-    return memberData?.name || 'Miembro del Equipo';
-  };
+    return {
+      ...quotationMember,
+      // Combinar datos reales si existen
+      actualHours: actualData?.hours || 0,
+      actualName: actualData?.name || quotationMember.personnel?.name || 'Miembro del Equipo',
+      actualRoleName: actualData?.roleName || quotationMember.role?.name || 'Operations Lead',
+      actualRate: actualData?.hourlyRate || quotationMember.hourlyRate || 0
+    };
+  });
+  
+  const teamLoading = !unifiedData;
 
   const copyTeamMutation = useMutation({
     mutationFn: async () => {
@@ -376,19 +381,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     },
   });
 
-  // Obtener tiempo trabajado real por miembro desde unifiedData
-  const getTimeWorkedByMember = (personnelId: number) => {
-    // Usar datos reales del backend desde unifiedData.actuals.teamBreakdown
-    const teamBreakdown = unifiedData?.actuals?.teamBreakdown;
-    if (!teamBreakdown) return 0;
-    
-    // Buscar el miembro específico en teamBreakdown
-    const memberData = Object.values(teamBreakdown).find((member: any) => 
-      member.personnelId === personnelId
-    );
-    
-    return memberData ? (memberData.hours || 0) : 0;
-  };
+
 
   const getProgressPercentage = (workedHours: number, estimatedHours: number) => {
     if (estimatedHours === 0) return 0;
@@ -437,7 +430,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     <TooltipProvider>
       <div className="space-y-3">
         {baseTeam.map((member: any, index: number) => {
-          const workedHours = getTimeWorkedByMember(member.personnelId);
+          const workedHours = member.actualHours || 0;
           const estimatedHours = member.estimatedHours || 0;
           const progressPercent = getProgressPercentage(workedHours, estimatedHours);
           const remainingHours = Math.max(0, estimatedHours - workedHours);
@@ -501,7 +494,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                 <div className="relative">
                   <div className={`w-10 h-10 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
                     <span className="text-white text-xs font-bold">
-                      {getPersonnelName(member.personnelId).split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
+                      {(member.actualName || 'MB').split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
                     </span>
                   </div>
                   {/* Badge de progreso - más discreto pero legible */}
@@ -516,10 +509,10 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                 </div>
                 <div className="flex-1">
                   <div className={`font-medium text-sm ${cardStyle.nameColor}`}>
-                    {getPersonnelName(member.personnelId)}
+                    {member.actualName || 'Miembro del Equipo'}
                   </div>
                   <div className={`text-xs ${cardStyle.roleColor} opacity-75`}>
-                    {member.role?.name || 'Operations Lead'}
+                    {member.actualRoleName || 'Operations Lead'}
                   </div>
                 </div>
               </div>
@@ -581,10 +574,10 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                 {/* Costo más discreto */}
                 <div className="text-right min-w-[70px]">
                   <div className={`text-sm font-semibold ${cardStyle.nameColor}`}>
-                    ${(workedHours * (member.hourlyRate || 0)).toFixed(0)}
+                    ${(workedHours * (member.actualRate || 0)).toFixed(0)}
                   </div>
                   <div className="text-xs text-gray-500">
-                    ${member.hourlyRate || 0}/h
+                    ${member.actualRate || 0}/h
                   </div>
                 </div>
               </div>
@@ -606,7 +599,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
               <span className="text-muted-foreground">Costo Estimado:</span>
               <span className="font-medium">
                 ${baseTeam.reduce((sum: number, member: any) => 
-                  sum + ((member.estimatedHours || 0) * (member.hourlyRate || 0)), 0
+                  sum + ((member.estimatedHours || 0) * (member.actualRate || 0)), 0
                 ).toFixed(0)}
               </span>
             </div>
@@ -615,15 +608,15 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Horas Trabajadas:</span>
               <span className="font-medium text-blue-600">
-                {baseTeam.reduce((sum: number, member: any) => sum + getTimeWorkedByMember(member.personnelId), 0).toFixed(1)}h
+                {baseTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0).toFixed(1)}h
               </span>
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Costo Real:</span>
               <span className="font-medium text-blue-600">
                 ${baseTeam.reduce((sum: number, member: any) => {
-                  const workedHours = getTimeWorkedByMember(member.personnelId);
-                  return sum + (workedHours * (member.hourlyRate || 0));
+                  const workedHours = member.actualHours || 0;
+                  return sum + (workedHours * (member.actualRate || 0));
                 }, 0).toFixed(0)}
               </span>
             </div>
