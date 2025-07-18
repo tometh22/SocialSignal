@@ -197,9 +197,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
       const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
       
+      // Generate team breakdown from filtered time entries
+      const teamBreakdown: { [personnelId: string]: any } = {};
+      for (const entry of timeEntries) {
+        const personnelId = entry.personnelId.toString();
+        if (!teamBreakdown[personnelId]) {
+          teamBreakdown[personnelId] = {
+            name: entry.personnel?.name || 'Unknown',
+            hours: 0,
+            cost: 0,
+            entries: 0,
+            lastActivity: null
+          };
+        }
+        teamBreakdown[personnelId].hours += entry.hours || 0;
+        teamBreakdown[personnelId].cost += entry.totalCost || 0;
+        teamBreakdown[personnelId].entries += 1;
+        
+        // Update last activity if this entry is more recent
+        const entryDate = new Date(entry.date);
+        if (!teamBreakdown[personnelId].lastActivity || entryDate > new Date(teamBreakdown[personnelId].lastActivity)) {
+          teamBreakdown[personnelId].lastActivity = entryDate.toISOString();
+        }
+      }
+      
       console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
       console.log(`📊 Total worked hours:`, totalWorkedHours);
       console.log(`📊 Total worked cost:`, totalWorkedCost);
+      console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members`);
 
       // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
       let adjustedEstimatedHours = estimatedHours;
@@ -276,11 +301,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }))
         },
         
-        // Datos reales trabajados
+        // Datos reales trabajados (FILTERED BY DATE RANGE)
         actuals: {
           totalWorkedHours,
           totalWorkedCost,
-          totalEntries: timeEntries.length
+          totalEntries: timeEntries.length,
+          teamBreakdown // CRITICAL: Team data filtered by selected time period
         },
         
         // Métricas calculadas (ÚNICA FUENTE)

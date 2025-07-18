@@ -875,9 +875,22 @@ export default function ProjectDetailsRedesigned() {
     ];
   }, [unifiedData, project]);
 
-  // SIMPLIFICADO: Ya no necesitamos recent time entries y team stats complejos
-  // Los datos ya están filtrados en el backend
-  const teamStats = unifiedData?.quotation?.team || [];
+  // CRITICAL FIX: Use filtered team data from actuals instead of quotation team
+  // This ensures temporal filtering is respected across ALL tabs
+  const teamStats = useMemo(() => {
+    if (!unifiedData?.actuals?.teamBreakdown) return [];
+    
+    // Convert team breakdown from backend into format expected by UI
+    return Object.entries(unifiedData.actuals.teamBreakdown).map(([personnelId, data]: [string, any]) => ({
+      id: parseInt(personnelId),
+      personnelId: parseInt(personnelId),
+      name: data.name,
+      hours: data.hours,
+      cost: data.cost,
+      entries: data.entries || 0,
+      lastActivity: data.lastActivity || null
+    }));
+  }, [unifiedData?.actuals?.teamBreakdown]);
 
   // SINGLE SOURCE OF TRUTH: usar unifiedData para todas las métricas
   const costSummary = useMemo(() => {
@@ -1493,8 +1506,8 @@ export default function ProjectDetailsRedesigned() {
                         <Activity className="h-6 w-6 text-orange-600" />
                       </div>
                       <div className="text-3xl font-bold text-orange-600 mb-1">
-                        {teamStats && teamStats.length > 0 
-                          ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length).toFixed(1)
+                        {unifiedData?.actuals?.totalWorkedHours && teamStats && teamStats.length > 0 
+                          ? (unifiedData.actuals.totalWorkedHours / teamStats.length).toFixed(1)
                           : '0.0'}h
                       </div>
                       <div className="text-sm font-medium text-gray-600">Promedio</div>
@@ -1704,8 +1717,8 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      {teamStats && teamStats.length > 0 
-                        ? (teamStats.reduce((acc, member) => acc + member.hours, 0) / teamStats.length / 30).toFixed(1)
+                      {unifiedData?.actuals?.totalWorkedHours && teamStats && teamStats.length > 0 
+                        ? (unifiedData.actuals.totalWorkedHours / teamStats.length / 30).toFixed(1)
                         : '0.0'}h
                     </p>
                     <p className="text-xs text-gray-500">
