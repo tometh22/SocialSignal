@@ -159,20 +159,17 @@ const CompactTimeForm: React.FC<{
       const hourlyRate = selectedPerson?.hourlyRate || 10; // Default mínimo
       const totalCost = data.hours * hourlyRate;
       
-      return apiRequest("/api/time-entries", {
-        method: "POST",
-        body: {
-          projectId,
-          personnelId: data.personnelId,
-          componentId: data.componentId || null,
-          date: data.date.toISOString(),
-          hours: data.hours,
-          description: data.description || null,
-          billable: data.billable,
-          totalCost,
-          hourlyRateAtTime: hourlyRate,
-          entryType: 'hours' as const,
-        }
+      return apiRequest("/api/time-entries", "POST", {
+        projectId,
+        personnelId: data.personnelId,
+        componentId: data.componentId || null,
+        date: data.date.toISOString(),
+        hours: data.hours,
+        description: data.description || null,
+        billable: data.billable,
+        totalCost,
+        hourlyRateAtTime: hourlyRate,
+        entryType: 'hours' as const,
       });
     },
     onMutate: async (data: z.infer<typeof formSchema>) => {
