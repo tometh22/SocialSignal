@@ -168,9 +168,8 @@ const CompactTimeForm: React.FC<{
       });
     },
     onMutate: async (data: z.infer<typeof formSchema>) => {
-      // Crear un registro temporal para animación optimista
-      const selectedPerson = personnel?.find(p => p.id === data.personnelId);
-      const tempId = Math.floor(Math.random() * 1000000) + 999999999; // ID temporal más corto
+      // Crear un registro temporal para animación optimista con ID único pero más pequeño
+      const tempId = Date.now(); // ID temporal basado en timestamp
       const tempEntry: TimeEntry = {
         id: tempId,
         projectId,
@@ -197,7 +196,7 @@ const CompactTimeForm: React.FC<{
       return { tempEntry };
     },
     onSuccess: (newEntry, variables, context) => {
-      // Reemplazar el registro temporal con el real
+      // Reemplazar el registro temporal con el real inmediatamente
       queryClient.setQueryData([`/api/time-entries/project/${projectId}`], (oldData: TimeEntry[] = []) => {
         return oldData.map(entry => 
           entry.id === context?.tempEntry.id ? newEntry : entry
@@ -210,9 +209,8 @@ const CompactTimeForm: React.FC<{
         )
       );
 
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
-      }, 100);
+      // Invalidar cache inmediatamente para refrescar datos
+      queryClient.invalidateQueries({ queryKey: [`/api/time-entries/project/${projectId}`] });
 
       toast({
         title: "✅ Tiempo registrado",
@@ -973,7 +971,8 @@ const TimeEntries: React.FC = () => {
                       <tbody className="divide-y divide-gray-100 bg-white">
                         {filteredEntries.map((entry) => {
                           const person = personnel?.find(p => p.id === entry.personnelId);
-                          const isTemporary = entry.id > 999999999; // Detectar registros temporales
+                          // Detectar registros temporales: ID basado en timestamp (Date.now()) o sin approvedDate
+                          const isTemporary = entry.id > 1000000000000 || !entry.approvedDate;
                           
                           return (
                             <tr 
