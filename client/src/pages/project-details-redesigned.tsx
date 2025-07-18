@@ -2358,8 +2358,9 @@ export default function ProjectDetailsRedesigned() {
                   {(() => {
                     // Use completeData.actuals.teamBreakdown which has the filtered team member information
                     const teamMembers = completeData?.actuals?.teamBreakdown || [];
+                    console.log('🔍 HeatMap - teamMembers:', teamMembers, 'isArray:', Array.isArray(teamMembers));
                     
-                    if (!teamMembers || teamMembers.length === 0) {
+                    if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
                       return (
                         <div className="text-center py-8 text-gray-500">
                           <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -2496,8 +2497,9 @@ export default function ProjectDetailsRedesigned() {
                     {(() => {
                       // Calculate top performers based on efficiency + project weight + hour usage
                       const teamMembers = completeData?.actuals?.teamBreakdown || [];
+                      console.log('🔍 TopPerformers - teamMembers:', teamMembers, 'isArray:', Array.isArray(teamMembers));
                       
-                      if (!teamMembers || teamMembers.length === 0) {
+                      if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
                         return (
                           <div className="text-center py-8 text-gray-500">
                             <Crown className="h-8 w-8 mx-auto mb-2 opacity-50" />
