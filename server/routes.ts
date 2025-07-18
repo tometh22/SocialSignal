@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalWorkedHours,
           totalWorkedCost,
           totalEntries: timeEntries.length,
-          teamBreakdown // CRITICAL: Team data filtered by selected time period
+          teamBreakdown: Object.values(teamBreakdown) // Convert object to array for frontend
         },
         
         // Métricas calculadas (ÚNICA FUENTE)
