@@ -902,7 +902,19 @@ export class DatabaseStorage implements IStorage {
 
   // Time entry operations
   async getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
-    return await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
+    const entries = await db
+      .select({
+        ...timeEntries,
+        personnel: {
+          id: personnel.id,
+          name: personnel.name
+        }
+      })
+      .from(timeEntries)
+      .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+      .where(eq(timeEntries.projectId, projectId));
+    
+    return entries as any[];
   }
 
   async getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]> {

@@ -2358,7 +2358,7 @@ export default function ProjectDetailsRedesigned() {
                   {(() => {
                     // Use completeData.actuals.teamBreakdown which has the filtered team member information
                     const teamMembers = completeData?.actuals?.teamBreakdown || [];
-                    console.log('🔍 HeatMap - teamMembers:', teamMembers, 'isArray:', Array.isArray(teamMembers));
+
                     
                     if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
                       return (
@@ -2401,7 +2401,7 @@ export default function ProjectDetailsRedesigned() {
                             // Get real data from completeData.actuals.teamBreakdown (hours worked from time entries)
                             const workedHours = member.hours || 0; // Real hours from time entries
                             const estimatedHours = member.estimatedHours || 1; // Estimated hours from quotation
-                            const name = member.personnelName || member.name || 'Sin nombre';
+                            const name = member.name || member.personnelName || `Miembro ${index + 1}`;
                             
                             // Calculate efficiency: closer to 1.0 is better (worked hours close to estimated)
                             const efficiency = estimatedHours > 0 ? Math.min(2, estimatedHours / Math.max(workedHours, 0.1)) : 0;
@@ -2497,7 +2497,7 @@ export default function ProjectDetailsRedesigned() {
                     {(() => {
                       // Calculate top performers based on efficiency + project weight + hour usage
                       const teamMembers = completeData?.actuals?.teamBreakdown || [];
-                      console.log('🔍 TopPerformers - teamMembers:', teamMembers, 'isArray:', Array.isArray(teamMembers));
+
                       
                       if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
                         return (
@@ -2513,7 +2513,7 @@ export default function ProjectDetailsRedesigned() {
                         const workedHours = member.hours || 0; // Real hours from time entries
                         const estimatedHours = member.estimatedHours || 1; // Estimated from quotation
                         const hourlyRate = member.hourlyRate || member.rate || 10;
-                        const name = member.personnelName || member.name || 'Sin nombre';
+                        const name = member.name || member.personnelName || `Miembro ${teamMembers.indexOf(member) + 1}`;
                         
                         // Efficiency score (0-40 points) - how well they stay within estimates
                         const usageRatio = workedHours / Math.max(estimatedHours, 1);
