@@ -1063,7 +1063,7 @@ const TimeEntries: React.FC = () => {
                   <div className="text-xs mt-2 text-orange-700">
                     <Info className="h-3 w-3 inline mr-1" />
                     Esta{uncotizedPersonnel.length > 1 ? 's personas' : ' persona'} no estaba{uncotizedPersonnel.length > 1 ? 'n' : ''} en el equipo original de la cotización. 
-                    Se ha{uncotizedPersonnel.length > 1 ? 'n' : ''} agregado automáticamente al equipo del proyecto.
+                    Sus horas se incluirán en el total del proyecto pero no tendrán comparación individual con estimaciones.
                   </div>
                 </AlertDescription>
               </Alert>

@@ -103,6 +103,7 @@ This is a comprehensive internal project management platform built for Epical Di
 
 ## Recent Changes
 
+- July 18, 2025: **SISTEMA COMPLETO DE DETECCIÓN DE PERSONAL NO COTIZADO** - Implementado sistema profesional para detectar automáticamente cuando personal registra tiempo sin estar en cotización original, incluye alertas visuales naranjas informativas, indicadores rojos en tabla con badge "No cotizado", y bordes distintivos en registros, el personal no cotizado NO se agrega al equipo base sino que solo se marca visualmente para incluir sus horas en totales del proyecto sin comparación individual con estimaciones
 - July 18, 2025: **SESSION PERSISTENCE EXTENDED TO 30 DAYS** - Fixed session configuration to maintain user authentication for 30 days instead of 7 days, preventing frequent logouts and improving user experience with persistent sessions that survive server restarts
 - July 18, 2025: **COMPLETE OPTIMISTIC ANIMATION SYSTEM** - Implemented instant modal closure after time entry creation, optimized temporary record detection with timestamp-based IDs, immediate cache invalidation for better performance, and smooth animations with minimal "thinking" time
 - July 18, 2025: **FULL EDITING FUNCTIONALITY COMPLETED** - Added comprehensive edit capability for existing time entries with professional modal interface, all fields editable (person, date, hours, description, billable status), automatic cost calculation, and complete validation system

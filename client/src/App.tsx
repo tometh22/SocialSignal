@@ -124,6 +124,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
+                  <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />

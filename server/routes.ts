@@ -2314,28 +2314,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🚨 PERSONAL NO COTIZADO DETECTADO: ${personnelId} no estaba en cotización ${project.quotationId}`);
           isUncotizedPersonnel = true;
           
-          // Verificar si ya existe en el equipo base del proyecto
-          const baseTeam = await storage.getProjectBaseTeam(validatedData.projectId);
-          const alreadyInBaseTeam = baseTeam.some(member => member.personnelId === personnelId);
-          
-          if (!alreadyInBaseTeam) {
-            // Obtener información del personal para crear el registro
-            const personnel = await storage.getPersonnelById(personnelId);
-            if (personnel) {
-              console.log(`📝 Agregando ${personnel.name} al equipo base del proyecto automáticamente`);
-              
-              // Crear registro en projectBaseTeam para este personal no cotizado
-              await storage.createProjectBaseTeamMember({
-                projectId: validatedData.projectId,
-                personnelId: personnelId,
-                roleId: personnel.roleId || 1, // Usar rol por defecto si no tiene
-                estimatedHours: 0, // No se estimó originalmente
-                hourlyRate: personnel.hourlyRate,
-                isActive: true
-              });
-              
-              console.log(`✅ ${personnel.name} agregado al equipo base del proyecto`);
-            }
+          // Obtener información del personal para logging
+          const personnel = await storage.getPersonnelById(personnelId);
+          if (personnel) {
+            console.log(`📝 Personal no cotizado: ${personnel.name} - Solo marcado visualmente, NO agregado al equipo base`);
           }
         }
       }
