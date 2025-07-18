@@ -336,6 +336,19 @@ function ProjectTeamSection({ projectId, unifiedData }: {
   // Usar datos del equipo de la cotización desde unifiedData
   const baseTeam = unifiedData?.quotation?.team || [];
   const teamLoading = !unifiedData;
+  
+  // Función para obtener nombre real del personal
+  const getPersonnelName = (personnelId: number) => {
+    const teamBreakdown = unifiedData?.actuals?.teamBreakdown;
+    if (!teamBreakdown) return 'Miembro del Equipo';
+    
+    // Buscar el miembro específico en teamBreakdown que tiene los nombres reales
+    const memberData = Object.values(teamBreakdown).find((member: any) => 
+      member.personnelId === personnelId
+    );
+    
+    return memberData?.name || 'Miembro del Equipo';
+  };
 
   const copyTeamMutation = useMutation({
     mutationFn: async () => {
@@ -363,10 +376,18 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     },
   });
 
-  // Simular tiempo trabajado por miembro (simplificado para demostración)
+  // Obtener tiempo trabajado real por miembro desde unifiedData
   const getTimeWorkedByMember = (personnelId: number) => {
-    // En una implementación real, esto vendría de los datos unificados
-    return Math.random() * 50; // Temporal para mostrar funcionalidad
+    // Usar datos reales del backend desde unifiedData.actuals.teamBreakdown
+    const teamBreakdown = unifiedData?.actuals?.teamBreakdown;
+    if (!teamBreakdown) return 0;
+    
+    // Buscar el miembro específico en teamBreakdown
+    const memberData = Object.values(teamBreakdown).find((member: any) => 
+      member.personnelId === personnelId
+    );
+    
+    return memberData ? (memberData.hours || 0) : 0;
   };
 
   const getProgressPercentage = (workedHours: number, estimatedHours: number) => {
@@ -480,7 +501,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                 <div className="relative">
                   <div className={`w-10 h-10 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
                     <span className="text-white text-xs font-bold">
-                      {member.personnel?.name?.split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase() || 'MB'}
+                      {getPersonnelName(member.personnelId).split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
                     </span>
                   </div>
                   {/* Badge de progreso - más discreto pero legible */}
@@ -495,7 +516,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                 </div>
                 <div className="flex-1">
                   <div className={`font-medium text-sm ${cardStyle.nameColor}`}>
-                    {member.personnel?.name || 'Miembro del Equipo'}
+                    {getPersonnelName(member.personnelId)}
                   </div>
                   <div className={`text-xs ${cardStyle.roleColor} opacity-75`}>
                     {member.role?.name || 'Operations Lead'}
