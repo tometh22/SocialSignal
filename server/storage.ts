@@ -676,18 +676,14 @@ export class DatabaseStorage implements IStorage {
           cost: quotationTeamMembers.cost,
           fte: quotationTeamMembers.fte,
           dedication: quotationTeamMembers.dedication,
-          personnel: {
-            id: personnel.id,
-            name: personnel.name,
-            email: personnel.email,
-            hourlyRate: personnel.hourlyRate,
-            profilePicture: personnel.profilePicture
-          },
-          role: {
-            id: roles.id,
-            name: roles.name,
-            description: roles.description
-          }
+          // Personnel fields
+          personnelName: personnel.name,
+          personnelEmail: personnel.email,
+          personnelHourlyRate: personnel.hourlyRate,
+          personnelProfilePicture: personnel.profilePicture,
+          // Role fields
+          roleName: roles.name,
+          roleDescription: roles.description
         })
         .from(quotationTeamMembers)
         .leftJoin(personnel, eq(quotationTeamMembers.personnelId, personnel.id))

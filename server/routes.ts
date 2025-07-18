@@ -311,12 +311,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           team: quotationTeam.map(member => ({
             id: member.id,
             personnelId: member.personnelId,
-            personnelName: member.personnel?.name,
+            personnelName: member.personnelName,
             hours: member.hours,
             rate: member.rate,
             cost: member.cost,
-            personnel: member.personnel,
-            role: member.role
+            personnel: {
+              id: member.personnelId,
+              name: member.personnelName,
+              email: member.personnelEmail,
+              hourlyRate: member.personnelHourlyRate,
+              profilePicture: member.personnelProfilePicture
+            },
+            role: {
+              id: member.roleId,
+              name: member.roleName,
+              description: member.roleDescription
+            }
           }))
         },
         
