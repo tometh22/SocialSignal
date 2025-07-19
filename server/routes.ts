@@ -213,6 +213,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDate = new Date(2025, 0, 1); // Todo el año 2025
             endDate = new Date(2025, 11, 31);
             break;
+          // Meses específicos de 2025
+          case 'january_2025':
+            startDate = new Date(2025, 0, 1);
+            endDate = new Date(2025, 0, 31);
+            break;
+          case 'february_2025':
+            startDate = new Date(2025, 1, 1);
+            endDate = new Date(2025, 1, 28);
+            break;
+          case 'march_2025':
+            startDate = new Date(2025, 2, 1);
+            endDate = new Date(2025, 2, 31);
+            break;
+          case 'april_2025':
+            startDate = new Date(2025, 3, 1);
+            endDate = new Date(2025, 3, 30);
+            break;
+          case 'august_2025':
+            startDate = new Date(2025, 7, 1);
+            endDate = new Date(2025, 7, 31);
+            break;
+          case 'september_2025':
+            startDate = new Date(2025, 8, 1);
+            endDate = new Date(2025, 8, 30);
+            break;
+          case 'october_2025':
+            startDate = new Date(2025, 9, 1);
+            endDate = new Date(2025, 9, 31);
+            break;
+          case 'november_2025':
+            startDate = new Date(2025, 10, 1);
+            endDate = new Date(2025, 10, 30);
+            break;
+          case 'december_2025':
+            startDate = new Date(2025, 11, 1);
+            endDate = new Date(2025, 11, 31);
+            break;
           case 'all':
             return null; // Sin filtro temporal - mostrar todo
           default:
@@ -332,6 +369,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'may_2025':
           case 'june_2025':
           case 'july_2025':
+          case 'january_2025':
+          case 'february_2025':
+          case 'march_2025':
+          case 'april_2025':
+          case 'august_2025':
+          case 'september_2025':
+          case 'october_2025':
+          case 'november_2025':
+          case 'december_2025':
             return 1;
           case 'current_quarter':
           case 'last_quarter':

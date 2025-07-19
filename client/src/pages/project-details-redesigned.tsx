@@ -116,104 +116,204 @@ function TimeRangeFilter({
 
   const currentDate = new Date();
 
-  const presets: { label: string; type: DateFilter['type'] | 'lastMonth' | 'lastQuarter' | 'lastSemester' | 'semester' | 'year'; value: () => DateFilter }[] = [
-    {
-      label: "Este mes",
-      type: "month", 
-      value: () => ({
-        type: 'month',
-        startDate: startOfMonth(currentDate),
-        endDate: endOfMonth(currentDate),
-        label: "Este mes"
-      })
-    },
-    {
-      label: "Mes pasado",
-      type: "lastMonth",
-      value: () => {
-        const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        const monthName = lastMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-        return {
-          type: 'month',
-          startDate: startOfMonth(lastMonth),
-          endDate: endOfMonth(lastMonth),
-          label: `Mes pasado (${monthName})`
-        };
-      }
-    },
-    {
-      label: "Este trimestre",
-      type: "quarter",
-      value: () => ({
-        type: 'quarter',
-        startDate: startOfQuarter(currentDate),
-        endDate: endOfQuarter(currentDate),
-        label: "Este trimestre"
-      })
-    },
-    {
-      label: "Trimestre pasado",
-      type: "lastQuarter",
-      value: () => {
-        const lastQuarter = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
-        const quarterStart = startOfQuarter(lastQuarter);
-        const quarterEnd = endOfQuarter(lastQuarter);
-        const quarterName = `Q${Math.floor(quarterStart.getMonth() / 3) + 1} ${quarterStart.getFullYear()}`;
-        return {
-          type: 'quarter',
-          startDate: quarterStart,
-          endDate: quarterEnd,
-          label: `Trimestre pasado (${quarterName})`
-        };
-      }
-    },
-    {
-      label: "Este semestre",
-      type: "semester",
-      value: () => {
-        const currentSemester = Math.floor(currentDate.getMonth() / 6);
-        const semesterStart = new Date(currentDate.getFullYear(), currentSemester * 6, 1);
-        const semesterEnd = new Date(currentDate.getFullYear(), (currentSemester + 1) * 6 - 1, 0);
-        return {
-          type: 'custom',
-          startDate: semesterStart,
-          endDate: semesterEnd,
-          label: `Este semestre (${currentSemester === 0 ? 'Enero-Junio' : 'Julio-Diciembre'})`
-        };
-      }
-    },
-    {
-      label: "Semestre pasado",
-      type: "lastSemester",
-      value: () => {
-        const currentSemester = Math.floor(currentDate.getMonth() / 6);
-        const lastSemester = currentSemester === 0 ? 1 : 0;
-        const year = currentSemester === 0 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
-        const semesterStart = new Date(year, lastSemester * 6, 1);
-        const semesterEnd = new Date(year, (lastSemester + 1) * 6 - 1, 0);
-        return {
-          type: 'custom',
-          startDate: semesterStart,
-          endDate: semesterEnd,
-          label: `Semestre pasado (${lastSemester === 0 ? 'Enero-Junio' : 'Julio-Diciembre'} ${year})`
-        };
-      }
-    },
-    {
-      label: "Total año",
-      type: "year",
-      value: () => ({
-        type: 'custom',
-        startDate: new Date(currentDate.getFullYear(), 0, 1),
-        endDate: new Date(currentDate.getFullYear(), 11, 31),
-        label: `Año ${currentDate.getFullYear()}`
-      })
-    }
+  // FILTROS IDÉNTICOS A TIME-ENTRIES
+  const dateFilterOptions = [
+    { value: "all", label: "Todos los períodos", group: "General" },
+    { value: "this-month", label: "Este mes", group: "General" },
+    { value: "last-month", label: "Mes pasado", group: "General" },
+    { value: "this-quarter", label: "Este trimestre", group: "General" },
+    { value: "last-quarter", label: "Trimestre pasado", group: "General" },
+    { value: "this-semester", label: "Este semestre", group: "General" },
+    { value: "last-semester", label: "Semestre pasado", group: "General" },
+    { value: "this-year", label: "Este año", group: "General" },
+    { value: "q1", label: "Q1 (Ene-Mar)", group: "Trimestres" },
+    { value: "q2", label: "Q2 (Abr-Jun)", group: "Trimestres" },
+    { value: "q3", label: "Q3 (Jul-Sep)", group: "Trimestres" },
+    { value: "q4", label: "Q4 (Oct-Dic)", group: "Trimestres" },
+    { value: "january", label: "Enero", group: "Meses" },
+    { value: "february", label: "Febrero", group: "Meses" },
+    { value: "march", label: "Marzo", group: "Meses" },
+    { value: "april", label: "Abril", group: "Meses" },
+    { value: "may", label: "Mayo", group: "Meses" },
+    { value: "june", label: "Junio", group: "Meses" },
+    { value: "july", label: "Julio", group: "Meses" },
+    { value: "august", label: "Agosto", group: "Meses" },
+    { value: "september", label: "Septiembre", group: "Meses" },
+    { value: "october", label: "Octubre", group: "Meses" },
+    { value: "november", label: "Noviembre", group: "Meses" },
+    { value: "december", label: "Diciembre", group: "Meses" }
   ];
 
-  const handlePresetSelect = (preset: typeof presets[0]) => {
-    const filter = preset.value();
-    onFilterChange(filter);
+  // Función para obtener el rango de fechas basado en el valor del filtro
+  const getDateRangeFromFilter = (filterValue: string) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    
+    switch (filterValue) {
+      case "all":
+        return { startDate: null, endDate: null, label: "Todos los períodos" };
+      case "this-month":
+        return {
+          startDate: new Date(currentYear, currentMonth, 1),
+          endDate: new Date(currentYear, currentMonth + 1, 0),
+          label: "Este mes"
+        };
+      case "last-month":
+        return {
+          startDate: new Date(currentYear, currentMonth - 1, 1),
+          endDate: new Date(currentYear, currentMonth, 0),
+          label: "Mes pasado"
+        };
+      case "this-quarter":
+        const currentQuarter = Math.floor(currentMonth / 3);
+        return {
+          startDate: new Date(currentYear, currentQuarter * 3, 1),
+          endDate: new Date(currentYear, (currentQuarter + 1) * 3, 0),
+          label: "Este trimestre"
+        };
+      case "last-quarter":
+        const lastQuarter = Math.floor(currentMonth / 3) - 1;
+        const quarterYear = lastQuarter < 0 ? currentYear - 1 : currentYear;
+        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+        return {
+          startDate: new Date(quarterYear, adjustedQuarter * 3, 1),
+          endDate: new Date(quarterYear, (adjustedQuarter + 1) * 3, 0),
+          label: "Trimestre pasado"
+        };
+      case "this-semester":
+        const currentSemester = Math.floor(currentMonth / 6);
+        return {
+          startDate: new Date(currentYear, currentSemester * 6, 1),
+          endDate: new Date(currentYear, (currentSemester + 1) * 6, 0),
+          label: "Este semestre"
+        };
+      case "last-semester":
+        const lastSemester = Math.floor(currentMonth / 6) - 1;
+        const semesterYear = lastSemester < 0 ? currentYear - 1 : currentYear;
+        const adjustedSemester = lastSemester < 0 ? 1 : lastSemester;
+        return {
+          startDate: new Date(semesterYear, adjustedSemester * 6, 1),
+          endDate: new Date(semesterYear, (adjustedSemester + 1) * 6, 0),
+          label: "Semestre pasado"
+        };
+      case "this-year":
+        return {
+          startDate: new Date(currentYear, 0, 1),
+          endDate: new Date(currentYear, 11, 31),
+          label: "Este año"
+        };
+      // Trimestres específicos
+      case "q1":
+        return {
+          startDate: new Date(currentYear, 0, 1),
+          endDate: new Date(currentYear, 2, 31),
+          label: "Q1 (Ene-Mar)"
+        };
+      case "q2":
+        return {
+          startDate: new Date(currentYear, 3, 1),
+          endDate: new Date(currentYear, 5, 30),
+          label: "Q2 (Abr-Jun)"
+        };
+      case "q3":
+        return {
+          startDate: new Date(currentYear, 6, 1),
+          endDate: new Date(currentYear, 8, 30),
+          label: "Q3 (Jul-Sep)"
+        };
+      case "q4":
+        return {
+          startDate: new Date(currentYear, 9, 1),
+          endDate: new Date(currentYear, 11, 31),
+          label: "Q4 (Oct-Dic)"
+        };
+      // Meses específicos
+      case "january":
+        return {
+          startDate: new Date(currentYear, 0, 1),
+          endDate: new Date(currentYear, 0, 31),
+          label: "Enero"
+        };
+      case "february":
+        return {
+          startDate: new Date(currentYear, 1, 1),
+          endDate: new Date(currentYear, 1, 28),
+          label: "Febrero"
+        };
+      case "march":
+        return {
+          startDate: new Date(currentYear, 2, 1),
+          endDate: new Date(currentYear, 2, 31),
+          label: "Marzo"
+        };
+      case "april":
+        return {
+          startDate: new Date(currentYear, 3, 1),
+          endDate: new Date(currentYear, 3, 30),
+          label: "Abril"
+        };
+      case "may":
+        return {
+          startDate: new Date(currentYear, 4, 1),
+          endDate: new Date(currentYear, 4, 31),
+          label: "Mayo"
+        };
+      case "june":
+        return {
+          startDate: new Date(currentYear, 5, 1),
+          endDate: new Date(currentYear, 5, 30),
+          label: "Junio"
+        };
+      case "july":
+        return {
+          startDate: new Date(currentYear, 6, 1),
+          endDate: new Date(currentYear, 6, 31),
+          label: "Julio"
+        };
+      case "august":
+        return {
+          startDate: new Date(currentYear, 7, 1),
+          endDate: new Date(currentYear, 7, 31),
+          label: "Agosto"
+        };
+      case "september":
+        return {
+          startDate: new Date(currentYear, 8, 1),
+          endDate: new Date(currentYear, 8, 30),
+          label: "Septiembre"
+        };
+      case "october":
+        return {
+          startDate: new Date(currentYear, 9, 1),
+          endDate: new Date(currentYear, 9, 31),
+          label: "Octubre"
+        };
+      case "november":
+        return {
+          startDate: new Date(currentYear, 10, 1),
+          endDate: new Date(currentYear, 10, 30),
+          label: "Noviembre"
+        };
+      case "december":
+        return {
+          startDate: new Date(currentYear, 11, 1),
+          endDate: new Date(currentYear, 11, 31),
+          label: "Diciembre"
+        };
+      default:
+        return { startDate: null, endDate: null, label: "Todos los períodos" };
+    }
+  };
+
+  const handleFilterSelect = (filterValue: string) => {
+    const dateRange = getDateRangeFromFilter(filterValue);
+    onFilterChange({
+      type: 'custom',
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      label: dateRange.label
+    });
   };
 
   const handleCustomApply = () => {
@@ -228,35 +328,38 @@ function TimeRangeFilter({
     }
   };
 
+  // Obtener el valor actual del filtro
+  const getCurrentFilterValue = () => {
+    const label = selectedFilter.label.toLowerCase();
+    return dateFilterOptions.find(option => 
+      option.label.toLowerCase() === label ||
+      (label.includes('todos') && option.value === 'all') ||
+      (label.includes('este mes') && option.value === 'this-month') ||
+      (label.includes('mes pasado') && option.value === 'last-month') ||
+      (label.includes('este trimestre') && option.value === 'this-quarter') ||
+      (label.includes('trimestre pasado') && option.value === 'last-quarter') ||
+      (label.includes('este semestre') && option.value === 'this-semester') ||
+      (label.includes('semestre pasado') && option.value === 'last-semester') ||
+      (label.includes('este año') && option.value === 'this-year') ||
+      label.includes(option.label.toLowerCase())
+    )?.value || 'all';
+  };
+
   return (
     <div className={className}>
       <div className="flex items-center gap-2">
         <Label className="text-sm font-medium">Período:</Label>
         <Select 
-          value={selectedFilter.type === 'custom' ? 'custom' : 
-                selectedFilter.label.includes('Trimestre pasado') ? 'lastQuarter' :
-                selectedFilter.label.includes('Mes pasado') ? 'lastMonth' :
-                selectedFilter.label.includes('Semestre pasado') ? 'lastSemester' :
-                selectedFilter.label.includes('Este semestre') ? 'semester' :
-                selectedFilter.label.includes('Año') ? 'year' :
-                selectedFilter.type} 
+          value={getCurrentFilterValue()}
           onValueChange={(value) => {
             if (value === 'custom') {
               setIsCustomOpen(true);
             } else {
-              const preset = presets.find(p => 
-                p.type === value || 
-                (value === 'lastMonth' && p.type === 'lastMonth') || 
-                (value === 'lastQuarter' && p.type === 'lastQuarter') ||
-                (value === 'lastSemester' && p.type === 'lastSemester') ||
-                (value === 'semester' && p.type === 'semester') ||
-                (value === 'year' && p.type === 'year')
-              );
-              if (preset) handlePresetSelect(preset);
+              handleFilterSelect(value);
             }
           }}
         >
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-56">
             <SelectValue placeholder="Seleccionar período">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4" />
@@ -264,15 +367,31 @@ function TimeRangeFilter({
               </div>
             </SelectValue>
           </SelectTrigger>
-          <SelectContent>
-            {presets.map((preset, index) => (
-              <SelectItem 
-                key={`${preset.type}-${index}`} 
-                value={preset.type === 'lastMonth' ? 'lastMonth' : preset.type === 'lastQuarter' ? 'lastQuarter' : preset.type}
-              >
-                {preset.label}
+          <SelectContent className="max-h-80">
+            {/* General */}
+            <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-50">General</div>
+            {dateFilterOptions.filter(option => option.group === 'General').map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
+            
+            {/* Trimestres */}
+            <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-50 mt-1">Trimestres</div>
+            {dateFilterOptions.filter(option => option.group === 'Trimestres').map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+            
+            {/* Meses */}
+            <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-50 mt-1">Meses</div>
+            {dateFilterOptions.filter(option => option.group === 'Meses').map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+            
             <SelectItem value="custom">Personalizado</SelectItem>
           </SelectContent>
         </Select>
@@ -717,40 +836,48 @@ export default function ProjectDetailsRedesigned() {
   const getTimeFilterForHook = (filter: DateFilter) => {
     const label = filter.label.toLowerCase();
     
-    // CRITICAL: Check for custom date ranges (format: "01/05/2025 - 31/05/2025")
-    if (label.includes('/05/2025')) return 'may_2025';
-    if (label.includes('/06/2025')) return 'june_2025';
-    if (label.includes('/07/2025')) return 'july_2025';
-    
-    // CRITICAL: Check for specific months like "mayo 2025"
-    if (label.includes('mayo 2025')) return 'may_2025';
-    if (label.includes('junio 2025')) return 'june_2025';
-    if (label.includes('julio 2025')) return 'july_2025';
-    
-    // General patterns
-    if (label.includes('mes pasado')) return 'last_month';
+    // MAPEO DIRECTO AL SISTEMA DE TIME-ENTRIES
+    if (label.includes('todos los períodos')) return 'all';
     if (label.includes('este mes')) return 'current_month';
-    if (label.includes('trimestre pasado')) return 'last_quarter';
+    if (label.includes('mes pasado')) return 'last_month';
     if (label.includes('este trimestre')) return 'current_quarter';
-    if (label.includes('semestre pasado')) return 'last_semester';
+    if (label.includes('trimestre pasado')) return 'last_quarter';
     if (label.includes('este semestre')) return 'current_semester';
-    if (label.includes('total año') || label.includes('todo el año')) return 'year_2025';
-    if (label.includes('año')) return 'current_year';
-    if (label.includes('total')) return 'all';
+    if (label.includes('semestre pasado')) return 'last_semester';
+    if (label.includes('este año')) return 'current_year';
     
-    // Additional specific mappings
-    if (label === 'última semana') return 'last_week';
-    if (label === 'últimos 30 días') return 'last_30_days';
-    if (label === 'últimos 3 meses') return 'last_quarter';
+    // Trimestres específicos
+    if (label.includes('q1') || label.includes('ene-mar')) return 'q1_2025';
+    if (label.includes('q2') || label.includes('abr-jun')) return 'q2_2025';
+    if (label.includes('q3') || label.includes('jul-sep')) return 'q3_2025';
+    if (label.includes('q4') || label.includes('oct-dic')) return 'q4_2025';
     
-    // FALLBACK: For custom date ranges, try to detect by date pattern
+    // Meses específicos
+    if (label.includes('enero')) return 'january_2025';
+    if (label.includes('febrero')) return 'february_2025';
+    if (label.includes('marzo')) return 'march_2025';
+    if (label.includes('abril')) return 'april_2025';
+    if (label.includes('mayo')) return 'may_2025';
+    if (label.includes('junio')) return 'june_2025';
+    if (label.includes('julio')) return 'july_2025';
+    if (label.includes('agosto')) return 'august_2025';
+    if (label.includes('septiembre')) return 'september_2025';
+    if (label.includes('octubre')) return 'october_2025';
+    if (label.includes('noviembre')) return 'november_2025';
+    if (label.includes('diciembre')) return 'december_2025';
+    
+    // FALLBACK: Para rangos personalizados, detectar por fechas
     if (filter.type === 'custom' && filter.startDate && filter.endDate) {
-      const startMonth = filter.startDate.getMonth() + 1; // getMonth is 0-based
+      const startMonth = filter.startDate.getMonth() + 1;
       const startYear = filter.startDate.getFullYear();
+      const endMonth = filter.endDate.getMonth() + 1;
+      const endYear = filter.endDate.getFullYear();
       
-      if (startMonth === 5 && startYear === 2025) return 'may_2025';
-      if (startMonth === 6 && startYear === 2025) return 'june_2025';
-      if (startMonth === 7 && startYear === 2025) return 'july_2025';
+      // Si es un mes completo del año actual
+      if (startYear === 2025 && endYear === 2025 && startMonth === endMonth) {
+        const monthNames = ['january_2025', 'february_2025', 'march_2025', 'april_2025', 'may_2025', 'june_2025', 'july_2025', 'august_2025', 'september_2025', 'october_2025', 'november_2025', 'december_2025'];
+        return monthNames[startMonth - 1];
+      }
     }
     
     console.log('🚨 UNMAPPED FILTER LABEL:', label, '- using "all" as fallback');
