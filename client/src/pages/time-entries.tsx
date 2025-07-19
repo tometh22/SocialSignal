@@ -164,7 +164,7 @@ const CompactTimeForm: React.FC<{
   // Query para obtener datos completos del proyecto (equipo cotizado)
   const { data: projectData } = useQuery({
     queryKey: [`/api/projects/${projectId}/complete-data`],
-    queryFn: () => apiRequest(`/api/projects/${projectId}/complete-data`),
+    enabled: projectId > 0,
   });
 
   const createTimeEntryMutation = useMutation({
@@ -264,17 +264,26 @@ const CompactTimeForm: React.FC<{
   const isPersonnelQuoted = (personnelId: number) => {
     console.log('🔍 Verificando personal cotizado:', {
       personnelId,
+      projectId,
       hasProjectData: !!projectData,
       hasQuotation: !!projectData?.quotation,
       hasTeam: !!projectData?.quotation?.team,
       teamSize: projectData?.quotation?.team?.length || 0,
-      team: projectData?.quotation?.team
+      team: projectData?.quotation?.team,
+      fullProjectData: projectData
     });
     
-    if (!projectData?.quotation?.team) return false;
+    if (!projectData?.quotation?.team) {
+      console.log('❌ No hay datos de equipo cotizado disponibles');
+      return false;
+    }
     
     const isQuoted = projectData.quotation.team.some((member: any) => member.personnelId === personnelId);
-    console.log('🔍 Resultado de verificación:', { personnelId, isQuoted });
+    console.log('🔍 Resultado de verificación:', { 
+      personnelId, 
+      isQuoted,
+      teamMembers: projectData.quotation.team.map((m: any) => ({ id: m.personnelId, name: m.personnelName }))
+    });
     
     return isQuoted;
   };
