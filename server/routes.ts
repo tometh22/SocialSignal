@@ -372,15 +372,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
+      // Agregar campos principales en el nivel superior para compatibilidad con frontend
+      const responseData = {
+        ...completeData,
+        // Campos principales para acceso directo desde frontend
+        estimatedHours: adjustedEstimatedHours,
+        estimatedCost: adjustedBaseCost,
+        workedHours: totalWorkedHours,
+        workedCost: totalWorkedCost,
+        efficiency: completeData.metrics.efficiency,
+        markup: completeData.metrics.markup,
+        timeFilter: timeFilter,
+        isAlwaysOn: project.quotation?.projectType === 'always-on'
+      };
+
       console.log(`📊 Complete data prepared for project ${id}:`, {
-        estimatedHours: completeData.quotation.estimatedHours,
-        workedHours: completeData.actuals.totalWorkedHours,
+        estimatedHours: adjustedEstimatedHours,
+        workedHours: totalWorkedHours,
         efficiency: completeData.metrics.efficiency,
         timeFilter: timeFilter,
         isAlwaysOn: project.quotation?.projectType === 'always-on'
       });
 
-      res.json(completeData);
+      res.json(responseData);
     } catch (error) {
       console.error("Error getting complete project data:", error);
       res.status(500).json({ message: "Failed to get complete project data" });
