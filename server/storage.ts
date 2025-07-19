@@ -243,6 +243,7 @@ export interface IStorage {
   // Unquoted personnel operations
   assignUnquotedPersonnel(projectId: number, personnelId: number, estimatedHours: number, hourlyRate: number): Promise<any>;
   getUnquotedPersonnel(projectId: number): Promise<any[]>;
+  getUnquotedPersonnelByProject(projectId: number): Promise<any[]>;
   checkIfPersonnelIsUnquoted(projectId: number, personnelId: number): Promise<boolean>;
 }
 
@@ -2480,6 +2481,39 @@ export class DatabaseStorage implements IStorage {
       return result;
     } catch (error) {
       console.error("Error getting unquoted personnel:", error);
+      throw error;
+    }
+  }
+
+  async getUnquotedPersonnelByProject(projectId: number): Promise<any[]> {
+    try {
+      const result = await db.select({
+        id: unquotedPersonnel.id,
+        personnelId: unquotedPersonnel.personnelId,
+        estimatedHours: unquotedPersonnel.estimatedHours,
+        estimatedRate: unquotedPersonnel.hourlyRate,
+        assignedDate: unquotedPersonnel.assignedDate,
+        notes: unquotedPersonnel.notes,
+        personnel: {
+          id: personnel.id,
+          name: personnel.name,
+          email: personnel.email,
+          hourlyRate: personnel.hourlyRate
+        },
+        role: {
+          id: roles.id,
+          name: roles.name,
+          description: roles.description
+        }
+      })
+      .from(unquotedPersonnel)
+      .leftJoin(personnel, eq(unquotedPersonnel.personnelId, personnel.id))
+      .leftJoin(roles, eq(personnel.primaryRoleId, roles.id))
+      .where(eq(unquotedPersonnel.projectId, projectId));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting unquoted personnel by project:", error);
       throw error;
     }
   }

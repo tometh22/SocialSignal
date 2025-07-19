@@ -215,17 +215,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const estimatedHours = quotationMember ? quotationMember.hours : 0;
           const isQuoted = quotationMember !== undefined;
           
+          // Para personal no cotizado, buscar datos reales en unquoted_personnel
+          let actualRole = quotationMember?.role?.name || 'Operations Lead';
+          let actualRate = quotationMember?.rate || 0;
+          
+          if (!isQuoted) {
+            // Buscar datos de personal no cotizado para este proyecto
+            const unquotedData = await storage.getUnquotedPersonnelByProject(parseInt(id));
+            const unquotedEntry = unquotedData.find(up => up.personnelId === entry.personnelId);
+            
+            if (unquotedEntry) {
+              actualRole = unquotedEntry.role?.name || entry.personnel?.roles?.[0]?.name || 'Unknown Role';
+              actualRate = unquotedEntry.estimatedRate || entry.personnel?.hourlyRate || 0;
+              console.log(`📊 Found unquoted personnel data:`, {
+                personnelId: entry.personnelId,
+                name: entry.personnel?.name,
+                role: actualRole,
+                rate: actualRate
+              });
+            }
+          }
+          
           teamBreakdown[personnelId] = {
             personnelId: entry.personnelId,
             name: entry.personnel?.name || 'Unknown',
-            roleName: quotationMember?.role?.name || 'Operations Lead',
-            hourlyRate: quotationMember?.rate || 0,
+            roleName: actualRole,
+            hourlyRate: actualRate,
             hours: 0,
             cost: 0,
             entries: 0,
             lastActivity: null,
             estimatedHours: estimatedHours,
-            rate: quotationMember?.rate || 0,
+            rate: actualRate,
             isQuoted: isQuoted, // NUEVO: Marca si el personal estaba en cotización original
             isUnquoted: !isQuoted // NUEVO: Marca si el personal NO estaba cotizado originalmente
           };
