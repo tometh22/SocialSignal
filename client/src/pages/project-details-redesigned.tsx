@@ -1999,6 +1999,15 @@ export default function ProjectDetailsRedesigned() {
                       const scaledEstimatedHours = baseEstimatedHours * multiplier;
                       const percentage = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
                       
+                      // DEBUG DE ESCALAMIENTO
+                      console.log('🔍 CARD HORAS DEBUG:');
+                      console.log('  - baseEstimatedHours:', baseEstimatedHours);
+                      console.log('  - multiplier:', multiplier);
+                      console.log('  - scaledEstimatedHours:', scaledEstimatedHours);
+                      console.log('  - timeFilterForHook:', timeFilterForHook);
+                      console.log('  - quotation type:', completeData?.quotation?.projectType);
+                      console.log('  - billing freq:', completeData?.quotation?.billingFrequency);
+                      
                       return (
                         <>
                           <p className="text-2xl font-bold text-gray-900">
@@ -2051,6 +2060,12 @@ export default function ProjectDetailsRedesigned() {
                       const multiplier = getQuotationMultiplier();
                       const scaledEstimatedCost = baseEstimatedCost * multiplier;
                       const percentage = scaledEstimatedCost > 0 ? (workedCost / scaledEstimatedCost) * 100 : 0;
+                      
+                      // DEBUG DE ESCALAMIENTO COSTO
+                      console.log('🔍 CARD COSTO DEBUG:');
+                      console.log('  - baseEstimatedCost:', baseEstimatedCost);
+                      console.log('  - multiplier:', multiplier);
+                      console.log('  - scaledEstimatedCost:', scaledEstimatedCost);
                       
                       return (
                         <>
