@@ -342,7 +342,10 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     quotationTeam: quotationTeam.slice(0, 2),
     teamBreakdownArray: teamBreakdownArray.slice(0, 2),
     totalTeamMembers: quotationTeam.length,
-    totalActualMembers: teamBreakdownArray.length
+    totalActualMembers: teamBreakdownArray.length,
+    unifiedDataKeys: Object.keys(unifiedData || {}),
+    actualsKeys: Object.keys(unifiedData?.actuals || {}),
+    fullTeamBreakdown: teamBreakdownArray
   });
   
   // Crear lista combinada de miembros del equipo
