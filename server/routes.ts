@@ -215,9 +215,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const estimatedHours = quotationMember ? quotationMember.hours : 0;
           const isQuoted = quotationMember !== undefined;
           
-          // Para personal no cotizado, buscar datos reales en unquoted_personnel
-          let actualRole = quotationMember?.role?.name || 'Operations Lead';
-          let actualRate = quotationMember?.rate || 0;
+          // Usar el rol REAL del personal desde su perfil, no el rol de la cotización
+          let actualRole = entry.role?.name || 'Sin Rol';
+          let actualRate = quotationMember?.rate || entry.personnel?.hourlyRate || 0;
           
           if (!isQuoted) {
             // Buscar datos de personal no cotizado para este proyecto
@@ -225,7 +225,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const unquotedEntry = unquotedData.find(up => up.personnelId === entry.personnelId);
             
             if (unquotedEntry) {
-              actualRole = unquotedEntry.role?.name || entry.personnel?.roles?.[0]?.name || 'Unknown Role';
+              // Para personal no cotizado, usar también el rol real de su perfil
+              actualRole = entry.role?.name || unquotedEntry.role?.name || 'Sin Rol';
               actualRate = unquotedEntry.estimatedRate || entry.personnel?.hourlyRate || 0;
               console.log(`📊 Found unquoted personnel data:`, {
                 personnelId: entry.personnelId,

@@ -935,11 +935,19 @@ export class DatabaseStorage implements IStorage {
         ...timeEntries,
         personnel: {
           id: personnel.id,
-          name: personnel.name
+          name: personnel.name,
+          hourlyRate: personnel.hourlyRate,
+          roleId: personnel.roleId
+        },
+        role: {
+          id: roles.id,
+          name: roles.name,
+          description: roles.description
         }
       })
       .from(timeEntries)
       .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+      .leftJoin(roles, eq(personnel.roleId, roles.id))
       .where(eq(timeEntries.projectId, projectId));
     
     return entries as any[];
