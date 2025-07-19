@@ -846,43 +846,48 @@ export default function ProjectDetailsRedesigned() {
 
   // FUNCIÓN PARA CALCULAR MULTIPLICADOR DE COTIZACIÓN SEGÚN PERÍODO TEMPORAL
   const getQuotationMultiplier = useCallback(() => {
-    if (!project?.quotation) return 1;
+    if (!unifiedData?.quotation) return 1;
 
-    // Si es un proyecto one-shot, siempre usar multiplicador 1
-    const isOneShot = project.quotation.projectType === 'one_shot' || 
-                     project.quotation.billingFrequency === 'one_time' ||
-                     !project.quotation.billingFrequency;
+    const quotation = unifiedData.quotation;
+    
+    // Verificar si es Always-On (fee mensual recurrente)
+    const isAlwaysOn = quotation.billingFrequency === 'monthly' || 
+                       quotation.projectType === 'always_on' ||
+                       quotation.projectType === 'retainer';
 
-    if (isOneShot) return 1;
+    // Si es proyecto one-shot, no aplicar multiplicador
+    if (!isAlwaysOn) return 1;
 
-    // Para proyectos con fee mensual, calcular multiplicador según período
+    // Para proyectos Always-On, calcular multiplicador según período temporal
     switch (timeFilterForHook) {
       case "current_month":
       case "last_month":
         return 1; // 1 mes
       case "current_quarter":
       case "last_quarter":
-        return 3; // 3 meses
+        return 3; // 3 meses (trimestre)
       case "current_semester":
       case "last_semester":
-        return 6; // 6 meses
+        return 6; // 6 meses (semestre)
       case "current_year":
-        return 12; // 12 meses
+        return 12; // 12 meses (año completo)
       case "custom":
-        // Para filtros personalizados, aproximar por meses
-        return 1; // Por defecto 1 mes
+        // Para filtros personalizados, usar 1 por defecto
+        return 1;
       case "all":
-        // Para "all", usar multiplicador 1 ya que el backend maneja el total
+        // Para "all", usar 1 porque el backend ya maneja el total
         return 1;
       default:
         return 1;
     }
-  }, [timeFilterForHook, project]);
+  }, [timeFilterForHook, unifiedData]);
 
   // DEBUG DATOS UNIFICADOS Y FILTROS TEMPORALES
   console.log('🚀 SINGLE SOURCE OF TRUTH:');
   console.log('🚀 dateFilter:', dateFilter);
   console.log('🚀 timeFilterForHook:', timeFilterForHook);
+  console.log('🚀 quotation type:', unifiedData?.quotation?.projectType);
+  console.log('🚀 billing frequency:', unifiedData?.quotation?.billingFrequency);
   console.log('🚀 multiplier:', getQuotationMultiplier());
   console.log('🚀 unifiedData available:', !!unifiedData);
   console.log('🚀 dataLoading:', dataLoading);
