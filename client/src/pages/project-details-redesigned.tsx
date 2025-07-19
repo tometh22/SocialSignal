@@ -1301,6 +1301,104 @@ export default function ProjectDetailsRedesigned() {
 
 
         </div>
+
+        {/* CARDS DE MÉTRICAS PRINCIPALES - Nuevo diseño */}
+        <div className="px-6 py-6 bg-white border-t border-gray-100">
+          <div className="mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Métricas del Proyecto</h2>
+            <p className="text-sm text-gray-600">Resumen de rendimiento para {dateFilter.label}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* Horas Estimadas */}
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700 mb-1">Horas Estimadas</p>
+                    <p className="text-2xl font-bold text-blue-900">
+                      {unifiedData?.quotation?.estimatedHours?.toFixed(0) || '0'}h
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">Cotización Original</p>
+                  </div>
+                  <div className="p-2 bg-blue-200 rounded-lg">
+                    <Target className="h-5 w-5 text-blue-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Horas Trabajadas */}
+            <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700 mb-1">Horas Trabajadas</p>
+                    <p className="text-2xl font-bold text-green-900">
+                      {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {unifiedData?.quotation?.estimatedHours && unifiedData?.actuals?.totalWorkedHours 
+                        ? `${((unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100).toFixed(1)}% del objetivo`
+                        : 'Sin datos'
+                      }
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-200 rounded-lg">
+                    <Clock className="h-5 w-5 text-green-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Costo Real */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700 mb-1">Costo Real</p>
+                    <p className="text-2xl font-bold text-purple-900">
+                      ${unifiedData?.actuals?.totalWorkedCost?.toFixed(0) || '0'}
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">
+                      {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost
+                        ? `${((unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100).toFixed(1)}% del presupuesto`
+                        : 'Sin datos'
+                      }
+                    </p>
+                  </div>
+                  <div className="p-2 bg-purple-200 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-purple-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Progreso General */}
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700 mb-1">Progreso General</p>
+                    <p className="text-2xl font-bold text-orange-900">
+                      {unifiedData?.quotation?.estimatedHours && unifiedData?.actuals?.totalWorkedHours 
+                        ? `${((unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100).toFixed(0)}%`
+                        : '0%'
+                      }
+                    </p>
+                    <p className="text-xs text-orange-600 mt-1">
+                      {dateFilter.label}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-orange-200 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-orange-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+          </div>
+        </div>
       </div>
 
       {/* Dialog de Registro Rápido de Tiempo */}
