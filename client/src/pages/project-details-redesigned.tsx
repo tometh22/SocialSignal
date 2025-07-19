@@ -534,7 +534,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                     )}
                   </div>
                   <div className={`text-xs ${cardStyle.roleColor} opacity-75`}>
-                    {member.actualRoleName || 'Operations Lead'}
+                    {member.actualRoleName || member.roleName || 'Sin Rol'}
                   </div>
                 </div>
               </div>
