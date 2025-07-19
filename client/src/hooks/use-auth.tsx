@@ -114,6 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('🚀 Login successful, user data set in cache');
 
+      // Eliminar tempUserId si existe ya que ahora tenemos sesión real
+      localStorage.removeItem('tempUserId');
+
       toast({
         title: "Inicio de sesión exitoso",
         description: `Bienvenido ${userData.firstName}`,
@@ -123,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Redirect automático al dashboard después del login
       setTimeout(() => {
         window.location.href = "/";
-      }, 500);
+      }, 100);
     },
     onError: (error) => {
       console.error('❌ Login mutation error:', error);

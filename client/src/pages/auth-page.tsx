@@ -413,7 +413,7 @@ export default function AuthPage() {
               </Button>
             </form>
 
-            <div className="text-center pt-4">
+            <div className="text-center pt-4 space-y-3">
               <button
                 onClick={toggleMode}
                 className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
@@ -423,6 +423,38 @@ export default function AuthPage() {
                   : '¿Ya tienes cuenta? Inicia sesión'
                 }
               </button>
+              
+              {/* Acceso rápido para testing */}
+              <div className="text-xs text-gray-500 border-t pt-3">
+                <p className="mb-2">Credenciales de prueba:</p>
+                <div className="space-y-1">
+                  <button
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        email: 'demo@epical.digital',
+                        password: 'demo123'
+                      }));
+                    }}
+                    className="text-blue-600 hover:text-blue-700 underline text-xs"
+                  >
+                    demo@epical.digital / demo123
+                  </button>
+                  <br />
+                  <button
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        email: 'tomas@epical.digital',
+                        password: 'epical2025'
+                      }));
+                    }}
+                    className="text-blue-600 hover:text-blue-700 underline text-xs"
+                  >
+                    tomas@epical.digital / epical2025
+                  </button>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

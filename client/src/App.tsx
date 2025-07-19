@@ -38,8 +38,7 @@ import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+
 import { useEffect } from "react";
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
@@ -163,14 +162,11 @@ function AppRoutes() {
 }
 
 function App() {
-  // App ya está envuelto en QueryClientProvider en main.tsx
   return (
     <ErrorBoundary>
       <AuthProvider>
         <ChatProvider>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
+          <AppRoutes />
           <Toaster />
         </ChatProvider>
       </AuthProvider>
