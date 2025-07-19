@@ -262,8 +262,21 @@ const CompactTimeForm: React.FC<{
 
   // Función para verificar si una persona está cotizada
   const isPersonnelQuoted = (personnelId: number) => {
-    if (!projectData?.baseTeam) return false;
-    return projectData.baseTeam.some((member: any) => member.personnelId === personnelId);
+    console.log('🔍 Verificando personal cotizado:', {
+      personnelId,
+      hasProjectData: !!projectData,
+      hasQuotation: !!projectData?.quotation,
+      hasTeam: !!projectData?.quotation?.team,
+      teamSize: projectData?.quotation?.team?.length || 0,
+      team: projectData?.quotation?.team
+    });
+    
+    if (!projectData?.quotation?.team) return false;
+    
+    const isQuoted = projectData.quotation.team.some((member: any) => member.personnelId === personnelId);
+    console.log('🔍 Resultado de verificación:', { personnelId, isQuoted });
+    
+    return isQuoted;
   };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
