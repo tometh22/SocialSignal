@@ -860,24 +860,113 @@ export default function ProjectDetailsRedesigned() {
 
     // Para proyectos Always-On, calcular multiplicador según período temporal
     switch (timeFilterForHook) {
+      // FILTROS MENSUALES (x1)
       case "current_month":
       case "last_month":
+      case "this-month":
+      case "last-month":
+      case "january":
+      case "february": 
+      case "march":
+      case "april":
+      case "may":
+      case "june":
+      case "july":
+      case "august":
+      case "september":
+      case "october":
+      case "november":
+      case "december":
+      // Meses con sufijo de año
+      case "january_2025":
+      case "february_2025":
+      case "march_2025":
+      case "april_2025":
+      case "may_2025":
+      case "june_2025":
+      case "july_2025":
+      case "august_2025":
+      case "september_2025":
+      case "october_2025":
+      case "november_2025":
+      case "december_2025":
+      case "january_2024":
+      case "february_2024": 
+      case "march_2024":
+      case "april_2024":
+      case "may_2024":
+      case "june_2024":
+      case "july_2024":
+      case "august_2024":
+      case "september_2024":
+      case "october_2024":
+      case "november_2024":
+      case "december_2024":
         return 1; // 1 mes
+        
+      // FILTROS TRIMESTRALES (x3)
       case "current_quarter":
       case "last_quarter":
+      case "this-quarter":
+      case "last-quarter":
+      case "q1":
+      case "q2": 
+      case "q3":
+      case "q4":
+      // Trimestres con sufijo de año
+      case "q1_2025":
+      case "q2_2025":
+      case "q3_2025":
+      case "q4_2025":
+      case "q1_2024":
+      case "q2_2024":
+      case "q3_2024":
+      case "q4_2024":
         return 3; // 3 meses (trimestre)
+        
+      // FILTROS SEMESTRALES (x6)
       case "current_semester":
       case "last_semester":
+      case "this-semester":
+      case "last-semester":
+      case "first_semester":
+      case "second_semester":
+      case "first_semester_2025":
+      case "second_semester_2025":
+      case "first_semester_2024":
+      case "second_semester_2024":
         return 6; // 6 meses (semestre)
+        
+      // FILTROS ANUALES (x12)
       case "current_year":
+      case "last_year":
+      case "this-year":
+      case "last-year":
+      case "full_year":
+      case "year_2025":
+      case "year_2024":
+      case "2025":
+      case "2024":
         return 12; // 12 meses (año completo)
+        
+      // CASOS ESPECIALES
       case "custom":
-        // Para filtros personalizados, usar 1 por defecto
+        // Para filtros personalizados, intentar detectar duración
+        // TODO: En el futuro se podría calcular basado en rango de fechas
         return 1;
       case "all":
-        // Para "all", usar 1 porque el backend ya maneja el total
+        // Para "all", usar 1 porque el backend ya maneja el total acumulado
+        return 1;
+      case "today":
+      case "week":
+      case "last_week":
+      case "this_week":
+        // Períodos menores a un mes
         return 1;
       default:
+        // Log para detectar filtros no contemplados y poder agregarlos
+        console.warn('⚠️ Filtro temporal no reconocido para escalamiento:', timeFilterForHook, '- usando multiplicador x1');
+        console.warn('⚠️ Si este filtro representa múltiples meses, agregar a la función getQuotationMultiplier');
         return 1;
     }
   }, [timeFilterForHook, unifiedData]);
