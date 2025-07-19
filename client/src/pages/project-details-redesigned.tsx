@@ -727,73 +727,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
         })}
       </div>
 
-      <div className="pt-3 border-t space-y-2">
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Horas Estimadas:</span>
-              <span className="font-medium">
-                {unifiedData?.estimatedHours || 0}h
-              </span>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-muted-foreground">Costo Estimado:</span>
-              <span className="font-medium">
-                ${unifiedData?.estimatedCost?.toFixed(0) || 0}
-              </span>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Horas Trabajadas:</span>
-              <span className="font-medium text-blue-600">
-                {unifiedData?.workedHours?.toFixed(1) || 0}h
-              </span>
-            </div>
-            <div className="flex justify-between mt-1">
-              <span className="text-muted-foreground">Costo Real:</span>
-              <span className="font-medium text-blue-600">
-                ${unifiedData?.workedCost?.toFixed(0) || 0}
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {/* Progreso general del proyecto */}
-        <div className="pt-2">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">Progreso General:</span>
-            <span className="font-medium">
-              {(() => {
-                const totalEstimated = unifiedData?.estimatedHours || 0;
-                const totalWorked = unifiedData?.workedHours || 0;
-                const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
-                return `${percentage}%`;
-              })()}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                (() => {
-                  const totalEstimated = unifiedData?.estimatedHours || 0;
-                  const totalWorked = unifiedData?.workedHours || 0;
-                  const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
-                  return percentage >= 100 ? 'bg-green-500' : 
-                         percentage >= 75 ? 'bg-yellow-500' : 'bg-blue-500';
-                })()
-              }`}
-              style={{ 
-                width: `${Math.min((() => {
-                  const totalEstimated = unifiedData?.estimatedHours || 0;
-                  const totalWorked = unifiedData?.workedHours || 0;
-                  return totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
-                })(), 100)}%` 
-              }}
-            />
-          </div>
-        </div>
-      </div>
     </TooltipProvider>
   );
 }
