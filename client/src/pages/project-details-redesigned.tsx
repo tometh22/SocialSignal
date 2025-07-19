@@ -1912,12 +1912,24 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1) * 100).toFixed(2)}%
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      de {costSummary?.targetHours || 0}h estimadas
-                    </p>
+                    {(() => {
+                      const workedHours = costSummary?.filteredHours || 0;
+                      const baseEstimatedHours = completeData?.quotation?.estimatedHours || 0;
+                      const multiplier = getQuotationMultiplier();
+                      const scaledEstimatedHours = baseEstimatedHours * multiplier;
+                      const percentage = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {percentage.toFixed(2)}%
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            de {scaledEstimatedHours.toFixed(0)}h estimadas {multiplier > 1 ? `(x${multiplier})` : ''}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
@@ -2561,7 +2573,11 @@ export default function ProjectDetailsRedesigned() {
 
               {/* Time Progress - Strategic Colors */}
               {(() => {
-                const progress = ((costSummary?.filteredHours || 0) / (costSummary?.targetHours || 1)) * 100;
+                const workedHours = costSummary?.filteredHours || 0;
+                const baseEstimatedHours = completeData?.quotation?.estimatedHours || 0;
+                const multiplier = getQuotationMultiplier();
+                const scaledEstimatedHours = baseEstimatedHours * multiplier;
+                const progress = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
                 const isCritical = progress > 100;
                 const isWarning = progress > 85;
                 const isGood = progress <= 75;
@@ -2589,7 +2605,7 @@ export default function ProjectDetailsRedesigned() {
                                 <div className="font-bold">Progreso de Tiempo</div>
                                 <div>Verde ≤75% | Amarillo 75-100% | Rojo &gt;100%</div>
                                 <div className="mt-1 text-gray-300">
-                                  {(costSummary?.filteredHours || 0).toFixed(0)}h trabajadas de {(costSummary?.targetHours || 0).toFixed(0)}h cotizadas
+                                  {workedHours.toFixed(0)}h trabajadas de {scaledEstimatedHours.toFixed(0)}h cotizadas {multiplier > 1 ? `(x${multiplier})` : ''}
                                 </div>
                               </div>
                             </div>
@@ -2606,7 +2622,7 @@ export default function ProjectDetailsRedesigned() {
                             isGood ? 'text-green-600' :
                             'text-gray-600'
                           }`}>
-                            {costSummary?.filteredHours?.toFixed(1) || 0}h / {costSummary?.targetHours?.toFixed(1) || 0}h
+                            {workedHours.toFixed(1)}h / {scaledEstimatedHours.toFixed(1)}h
                           </p>
                         </div>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
