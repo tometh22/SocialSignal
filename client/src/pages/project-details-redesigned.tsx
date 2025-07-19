@@ -844,10 +844,46 @@ export default function ProjectDetailsRedesigned() {
   const completeData = unifiedData;
   const baseTeam = unifiedData?.team || [];
 
+  // FUNCIÓN PARA CALCULAR MULTIPLICADOR DE COTIZACIÓN SEGÚN PERÍODO TEMPORAL
+  const getQuotationMultiplier = useCallback(() => {
+    if (!project?.quotation) return 1;
+
+    // Si es un proyecto one-shot, siempre usar multiplicador 1
+    const isOneShot = project.quotation.projectType === 'one_shot' || 
+                     project.quotation.billingFrequency === 'one_time' ||
+                     !project.quotation.billingFrequency;
+
+    if (isOneShot) return 1;
+
+    // Para proyectos con fee mensual, calcular multiplicador según período
+    switch (timeFilterForHook) {
+      case "current_month":
+      case "last_month":
+        return 1; // 1 mes
+      case "current_quarter":
+      case "last_quarter":
+        return 3; // 3 meses
+      case "current_semester":
+      case "last_semester":
+        return 6; // 6 meses
+      case "current_year":
+        return 12; // 12 meses
+      case "custom":
+        // Para filtros personalizados, aproximar por meses
+        return 1; // Por defecto 1 mes
+      case "all":
+        // Para "all", usar multiplicador 1 ya que el backend maneja el total
+        return 1;
+      default:
+        return 1;
+    }
+  }, [timeFilterForHook, project]);
+
   // DEBUG DATOS UNIFICADOS Y FILTROS TEMPORALES
   console.log('🚀 SINGLE SOURCE OF TRUTH:');
   console.log('🚀 dateFilter:', dateFilter);
   console.log('🚀 timeFilterForHook:', timeFilterForHook);
+  console.log('🚀 multiplier:', getQuotationMultiplier());
   console.log('🚀 unifiedData available:', !!unifiedData);
   console.log('🚀 dataLoading:', dataLoading);
   if (unifiedData) {
@@ -1847,7 +1883,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Nueva Card: Horas Totales vs Estimadas */}
+              {/* Nueva Card: Horas Totales vs Estimadas - CON ESCALAMIENTO TEMPORAL */}
               <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1862,33 +1898,45 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {(completeData?.workedHours || 0).toFixed(1)}h
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      de {(completeData?.estimatedHours || 0).toFixed(0)}h estimadas
-                    </p>
-                    <div className="mt-2">
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div 
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            (completeData?.workedHours || 0) > (completeData?.estimatedHours || 1) 
-                              ? 'bg-red-500' 
-                              : (completeData?.workedHours || 0) > (completeData?.estimatedHours || 1) * 0.8 
-                                ? 'bg-yellow-500' 
-                                : 'bg-blue-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(((completeData?.workedHours || 0) / (completeData?.estimatedHours || 1)) * 100, 100)}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
+                    {(() => {
+                      const workedHours = completeData?.actuals?.totalWorkedHours || 0;
+                      const baseEstimatedHours = completeData?.quotation?.estimatedHours || 0;
+                      const multiplier = getQuotationMultiplier();
+                      const scaledEstimatedHours = baseEstimatedHours * multiplier;
+                      const percentage = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {workedHours.toFixed(1)}h
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            de {scaledEstimatedHours.toFixed(0)}h estimadas {multiplier > 1 ? `(x${multiplier})` : ''}
+                          </p>
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full transition-all duration-300 ${
+                                  percentage > 100 
+                                    ? 'bg-red-500' 
+                                    : percentage > 80 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-blue-500'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(percentage, 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Nueva Card: Costo Total vs Estimado */}
+              {/* Nueva Card: Costo Total vs Estimado - CON ESCALAMIENTO TEMPORAL */}
               <Card className="border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 via-indigo-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1903,28 +1951,40 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${(completeData?.workedCost || 0).toFixed(0)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      de ${(completeData?.estimatedCost || 0).toFixed(0)} estimado
-                    </p>
-                    <div className="mt-2">
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div 
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            (completeData?.workedCost || 0) > (completeData?.estimatedCost || 1) 
-                              ? 'bg-red-500' 
-                              : (completeData?.workedCost || 0) > (completeData?.estimatedCost || 1) * 0.8 
-                                ? 'bg-yellow-500' 
-                                : 'bg-indigo-500'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(((completeData?.workedCost || 0) / (completeData?.estimatedCost || 1)) * 100, 100)}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
+                    {(() => {
+                      const workedCost = completeData?.actuals?.totalWorkedCost || 0;
+                      const baseEstimatedCost = completeData?.quotation?.baseCost || 0;
+                      const multiplier = getQuotationMultiplier();
+                      const scaledEstimatedCost = baseEstimatedCost * multiplier;
+                      const percentage = scaledEstimatedCost > 0 ? (workedCost / scaledEstimatedCost) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">
+                            ${workedCost.toFixed(0)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            de ${scaledEstimatedCost.toFixed(0)} estimado {multiplier > 1 ? `(x${multiplier})` : ''}
+                          </p>
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full transition-all duration-300 ${
+                                  percentage > 100 
+                                    ? 'bg-red-500' 
+                                    : percentage > 80 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-indigo-500'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(percentage, 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </CardContent>
               </Card>
