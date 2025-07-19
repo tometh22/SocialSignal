@@ -345,6 +345,8 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     totalActualMembers: teamBreakdownArray.length,
     unifiedDataKeys: Object.keys(unifiedData || {}),
     actualsKeys: Object.keys(unifiedData?.actuals || {}),
+    expectationsKeys: Object.keys(unifiedData?.expectations || {}),
+    fullUnifiedData: unifiedData,
     fullTeamBreakdown: teamBreakdownArray
   });
   
