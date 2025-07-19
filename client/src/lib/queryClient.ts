@@ -106,12 +106,32 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   };
 }
 
-// Generic function for API requests
+// Generic function for API requests (overloaded)
+export async function apiRequest(
+  endpoint: string,
+  options: { method: string; body?: any }
+): Promise<any>;
 export async function apiRequest(
   endpoint: string,
   method: string,
   data?: any
+): Promise<any>;
+export async function apiRequest(
+  endpoint: string,
+  methodOrOptions: string | { method: string; body?: any },
+  data?: any
 ) {
+  // Handle different parameter formats
+  let method: string;
+  let requestData: any;
+  
+  if (typeof methodOrOptions === 'string') {
+    method = methodOrOptions;
+    requestData = data;
+  } else {
+    method = methodOrOptions.method;
+    requestData = methodOrOptions.body;
+  }
   const url = endpoint;
   
   // SOLUCIÓN TEMPORAL: Obtener user ID del localStorage
@@ -132,8 +152,8 @@ export async function apiRequest(
       credentials: "include",
     };
     
-    if (data) {
-      options.body = JSON.stringify(data);
+    if (requestData) {
+      options.body = JSON.stringify(requestData);
     }
     
     // Realizar la solicitud
