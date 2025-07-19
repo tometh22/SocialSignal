@@ -181,8 +181,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDate = new Date(now.getFullYear(), 0, 1);
             endDate = new Date(now.getFullYear(), 11, 31);
             break;
+          case 'last_year':
+            startDate = new Date(now.getFullYear() - 1, 0, 1);
+            endDate = new Date(now.getFullYear() - 1, 11, 31);
+            break;
+          case 'q1_2025':
+            startDate = new Date(2025, 0, 1); // Q1: Enero-Marzo 2025
+            endDate = new Date(2025, 2, 31);
+            break;
+          case 'q2_2025':
+            startDate = new Date(2025, 3, 1); // Q2: Abril-Junio 2025
+            endDate = new Date(2025, 5, 30);
+            break;
+          case 'q3_2025':
+            startDate = new Date(2025, 6, 1); // Q3: Julio-Septiembre 2025
+            endDate = new Date(2025, 8, 30);
+            break;
+          case 'q4_2025':
+            startDate = new Date(2025, 9, 1); // Q4: Octubre-Diciembre 2025
+            endDate = new Date(2025, 11, 31);
+            break;
+          case 'semester1_2025':
+            startDate = new Date(2025, 0, 1); // Primer semestre 2025
+            endDate = new Date(2025, 5, 30);
+            break;
+          case 'semester2_2025':
+            startDate = new Date(2025, 6, 1); // Segundo semestre 2025
+            endDate = new Date(2025, 11, 31);
+            break;
+          case 'year_2025':
+            startDate = new Date(2025, 0, 1); // Todo el año 2025
+            endDate = new Date(2025, 11, 31);
+            break;
+          case 'all':
+            return null; // Sin filtro temporal - mostrar todo
           default:
-            return null; // Sin filtro
+            // Para filtros personalizados o no reconocidos
+            return null;
         }
 
         console.log(`📅 Date range for filter ${filter}:`, startDate.toISOString(), 'to', endDate.toISOString());
@@ -294,14 +329,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         switch (filter) {
           case 'current_month':
           case 'last_month':
+          case 'may_2025':
+          case 'june_2025':
+          case 'july_2025':
             return 1;
           case 'current_quarter':
           case 'last_quarter':
+          case 'q1_2025':
+          case 'q2_2025':
+          case 'q3_2025':
+          case 'q4_2025':
             return 3;
           case 'current_semester':
           case 'last_semester':
+          case 'semester1_2025':
+          case 'semester2_2025':
             return 6;
           case 'current_year':
+          case 'last_year':
+          case 'year_2025':
             return 12;
           default:
             return 0;

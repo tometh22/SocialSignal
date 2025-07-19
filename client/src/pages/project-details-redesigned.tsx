@@ -734,6 +734,7 @@ export default function ProjectDetailsRedesigned() {
     if (label.includes('este trimestre')) return 'current_quarter';
     if (label.includes('semestre pasado')) return 'last_semester';
     if (label.includes('este semestre')) return 'current_semester';
+    if (label.includes('total año') || label.includes('todo el año')) return 'year_2025';
     if (label.includes('año')) return 'current_year';
     if (label.includes('total')) return 'all';
     
