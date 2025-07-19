@@ -612,15 +612,13 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Horas Estimadas:</span>
               <span className="font-medium">
-                {completeTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0)}h
+                {unifiedData?.expectations?.estimatedHours || 0}h
               </span>
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Costo Estimado:</span>
               <span className="font-medium">
-                ${completeTeam.reduce((sum: number, member: any) => 
-                  sum + ((member.estimatedHours || 0) * (member.actualRate || 0)), 0
-                ).toFixed(0)}
+                ${unifiedData?.expectations?.estimatedCost?.toFixed(0) || 0}
               </span>
             </div>
           </div>
@@ -628,16 +626,13 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Horas Trabajadas:</span>
               <span className="font-medium text-blue-600">
-                {completeTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0).toFixed(1)}h
+                {unifiedData?.actuals?.workedHours?.toFixed(1) || 0}h
               </span>
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Costo Real:</span>
               <span className="font-medium text-blue-600">
-                ${completeTeam.reduce((sum: number, member: any) => {
-                  const workedHours = member.actualHours || 0;
-                  return sum + (workedHours * (member.actualRate || 0));
-                }, 0).toFixed(0)}
+                ${unifiedData?.actuals?.workedCost?.toFixed(0) || 0}
               </span>
             </div>
           </div>
@@ -649,8 +644,8 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <span className="text-muted-foreground">Progreso General:</span>
             <span className="font-medium">
               {(() => {
-                const totalEstimated = completeTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                const totalWorked = completeTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
+                const totalEstimated = unifiedData?.expectations?.estimatedHours || 0;
+                const totalWorked = unifiedData?.actuals?.workedHours || 0;
                 const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                 return `${percentage}%`;
               })()}
@@ -660,8 +655,8 @@ function ProjectTeamSection({ projectId, unifiedData }: {
             <div 
               className={`h-2 rounded-full transition-all duration-300 ${
                 (() => {
-                  const totalEstimated = completeTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                  const totalWorked = completeTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
+                  const totalEstimated = unifiedData?.expectations?.estimatedHours || 0;
+                  const totalWorked = unifiedData?.actuals?.workedHours || 0;
                   const percentage = totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                   return percentage >= 100 ? 'bg-green-500' : 
                          percentage >= 75 ? 'bg-yellow-500' : 'bg-blue-500';
@@ -669,8 +664,8 @@ function ProjectTeamSection({ projectId, unifiedData }: {
               }`}
               style={{ 
                 width: `${Math.min((() => {
-                  const totalEstimated = completeTeam.reduce((sum: number, member: any) => sum + (member.estimatedHours || 0), 0);
-                  const totalWorked = completeTeam.reduce((sum: number, member: any) => sum + (member.actualHours || 0), 0);
+                  const totalEstimated = unifiedData?.expectations?.estimatedHours || 0;
+                  const totalWorked = unifiedData?.actuals?.workedHours || 0;
                   return totalEstimated > 0 ? Math.round((totalWorked / totalEstimated) * 100) : 0;
                 })(), 100)}%` 
               }}
