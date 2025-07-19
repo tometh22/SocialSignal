@@ -1772,7 +1772,7 @@ export default function ProjectDetailsRedesigned() {
 
           <TabsContent value="time-management" className="space-y-6">
             {/* SECCIÓN 1: Métricas de Tiempo Compactas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1843,6 +1843,88 @@ export default function ProjectDetailsRedesigned() {
                     <p className="text-xs text-gray-500">
                       por miembro del equipo
                     </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Nueva Card: Horas Totales vs Estimadas */}
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-blue-700">Horas Trabajadas</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                      vs estimadas
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(completeData?.workedHours || 0).toFixed(1)}h
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      de {(completeData?.estimatedHours || 0).toFixed(0)}h estimadas
+                    </p>
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div 
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            (completeData?.workedHours || 0) > (completeData?.estimatedHours || 1) 
+                              ? 'bg-red-500' 
+                              : (completeData?.workedHours || 0) > (completeData?.estimatedHours || 1) * 0.8 
+                                ? 'bg-yellow-500' 
+                                : 'bg-blue-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(((completeData?.workedHours || 0) / (completeData?.estimatedHours || 1)) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Nueva Card: Costo Total vs Estimado */}
+              <Card className="border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 via-indigo-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <span className="text-sm font-medium text-indigo-700">Costo Real</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 text-xs">
+                      vs estimado
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${(completeData?.workedCost || 0).toFixed(0)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      de ${(completeData?.estimatedCost || 0).toFixed(0)} estimado
+                    </p>
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div 
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            (completeData?.workedCost || 0) > (completeData?.estimatedCost || 1) 
+                              ? 'bg-red-500' 
+                              : (completeData?.workedCost || 0) > (completeData?.estimatedCost || 1) * 0.8 
+                                ? 'bg-yellow-500' 
+                                : 'bg-indigo-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(((completeData?.workedCost || 0) / (completeData?.estimatedCost || 1)) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
