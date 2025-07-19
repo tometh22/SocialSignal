@@ -850,15 +850,10 @@ export default function ProjectDetailsRedesigned() {
 
     const quotation = unifiedData.quotation;
     
-    // Verificar si es Always-On (fee mensual recurrente)
-    const isAlwaysOn = quotation.billingFrequency === 'monthly' || 
-                       quotation.projectType === 'always_on' ||
-                       quotation.projectType === 'retainer';
+    // TODOS LOS PROYECTOS deben escalarse temporalmente para comparación justa
+    // No importa si es Always-On o One-Shot, la cotización se escala según período
 
-    // Si es proyecto one-shot, no aplicar multiplicador
-    if (!isAlwaysOn) return 1;
-
-    // Para proyectos Always-On, calcular multiplicador según período temporal
+    // Calcular multiplicador según período temporal para CUALQUIER tipo de proyecto
     switch (timeFilterForHook) {
       // FILTROS MENSUALES (x1)
       case "current_month":
