@@ -2494,24 +2494,29 @@ export class DatabaseStorage implements IStorage {
         estimatedRate: unquotedPersonnel.hourlyRate,
         assignedDate: unquotedPersonnel.assignedDate,
         notes: unquotedPersonnel.notes,
-        personnel: {
-          id: personnel.id,
-          name: personnel.name,
-          email: personnel.email,
-          hourlyRate: personnel.hourlyRate
-        },
-        role: {
-          id: roles.id,
-          name: roles.name,
-          description: roles.description
-        }
+        personnelName: personnel.name,
+        personnelEmail: personnel.email,
+        personnelHourlyRate: personnel.hourlyRate,
+        roleName: roles.name,
+        roleDescription: roles.description
       })
       .from(unquotedPersonnel)
       .leftJoin(personnel, eq(unquotedPersonnel.personnelId, personnel.id))
       .leftJoin(roles, eq(personnel.primaryRoleId, roles.id))
       .where(eq(unquotedPersonnel.projectId, projectId));
 
-      return result;
+      return result.map(row => ({
+        ...row,
+        personnel: {
+          name: row.personnelName,
+          email: row.personnelEmail,
+          hourlyRate: row.personnelHourlyRate
+        },
+        role: {
+          name: row.roleName,
+          description: row.roleDescription
+        }
+      }));
     } catch (error) {
       console.error("Error getting unquoted personnel by project:", error);
       throw error;
