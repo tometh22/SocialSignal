@@ -2502,7 +2502,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(unquotedPersonnel)
       .leftJoin(personnel, eq(unquotedPersonnel.personnelId, personnel.id))
-      .leftJoin(roles, eq(personnel.primaryRoleId, roles.id))
+      .leftJoin(roles, eq(personnel.roleId, roles.id))
       .where(eq(unquotedPersonnel.projectId, projectId));
 
       return result.map(row => ({
