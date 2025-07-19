@@ -333,12 +333,12 @@ function ProjectTeamSection({ projectId, unifiedData }: {
 }) {
   const { toast } = useToast();
 
-  // Combinar datos del equipo estimado y real
+  // USAR DIRECTAMENTE LOS DATOS YA PREPARADOS POR EL BACKEND
   const quotationTeam = unifiedData?.quotation?.team || [];
   const teamBreakdownArray = unifiedData?.actuals?.teamBreakdown || [];
   
   // Debug: Ver qué datos llegan del backend
-  console.log('🔍 DEBUG - Datos del backend:', {
+  console.log('🔍 DEBUG - Datos del backend (FIXED):', {
     quotationTeam: quotationTeam.slice(0, 2),
     teamBreakdownArray: teamBreakdownArray.slice(0, 2),
     totalTeamMembers: quotationTeam.length,
@@ -348,52 +348,25 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     fullTeamBreakdown: teamBreakdownArray
   });
   
-  // Crear lista combinada de miembros del equipo
-  const baseTeam = quotationTeam.map((quotationMember: any) => {
-    // Buscar datos reales usando el personnelId
-    const actualData = teamBreakdownArray.find((member: any) => 
-      member.personnelId === quotationMember.personnelId
-    );
+  // SIMPLIFICADO: Usar directamente el teamBreakdown del backend que ya tiene toda la lógica
+  const completeTeam = teamBreakdownArray.map((member: any) => {
+    // Buscar datos de cotización para mostrar estimaciones
+    const quotationMember = quotationTeam.find((q: any) => q.personnelId === member.personnelId);
     
     return {
-      ...quotationMember,
-      // Combinar datos reales si existen
-      actualHours: actualData?.hours || 0,
-      actualName: actualData?.name || quotationMember.personnel?.name || 'Miembro del Equipo',
-      actualRoleName: actualData?.roleName || quotationMember.role?.name || 'Operations Lead',
-      actualRate: actualData?.hourlyRate || quotationMember.rate || 0,
-      // Mantener datos originales de la cotización para cálculos
-      estimatedHours: quotationMember.hours || 0,
-      hourlyRate: quotationMember.rate || 0,
-      // Información completa del personal y rol
-      personnel: quotationMember.personnel,
-      role: quotationMember.role,
-      isQuoted: true, // Miembro estaba en cotización original
-      isUnquoted: false
+      ...member,
+      // Datos reales (ya vienen del backend correctos)
+      actualHours: member.hours || 0,
+      actualName: member.name || 'Sin Nombre',
+      actualRoleName: member.roleName || 'Sin Rol',
+      actualRate: member.rate || member.hourlyRate || 0,
+      // Datos de estimación (de la cotización original)
+      estimatedHours: quotationMember?.hours || 0,
+      // Flags de estado (ya vienen del backend)
+      isQuoted: member.isQuoted || false,
+      isUnquoted: member.isUnquoted || false
     };
   });
-  
-  // Agregar PERSONAL NO COTIZADO (que trabajó pero no estaba en cotización)
-  const unquotedMembers = teamBreakdownArray.filter((actualMember: any) => 
-    !quotationTeam.some((quotedMember: any) => quotedMember.personnelId === actualMember.personnelId)
-  ).map((unquotedMember: any) => ({
-    id: `unquoted-${unquotedMember.personnelId}`,
-    personnelId: unquotedMember.personnelId,
-    actualHours: unquotedMember.hours || 0,
-    actualName: unquotedMember.name || 'Personal No Cotizado',
-    actualRoleName: unquotedMember.roleName || 'Sin Rol Definido',
-    actualRate: unquotedMember.hourlyRate || 0,
-    // Para personal no cotizado, NO hay estimaciones
-    estimatedHours: 0,
-    hourlyRate: unquotedMember.hourlyRate || 0,
-    personnel: { name: unquotedMember.name },
-    role: { name: unquotedMember.roleName },
-    isQuoted: false,
-    isUnquoted: true // MARCADO como no cotizado originalmente
-  }));
-  
-  // Combinar equipos: primero cotizados, luego no cotizados
-  const completeTeam = [...baseTeam, ...unquotedMembers];
   
   const teamLoading = !unifiedData;
 
@@ -471,7 +444,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
   return (
     <TooltipProvider>
       <div className="space-y-3">
-        {baseTeam.map((member: any, index: number) => {
+        {completeTeam.map((member: any, index: number) => {
           const workedHours = member.actualHours || 0;
           const estimatedHours = member.estimatedHours || 0;
           const progressPercent = getProgressPercentage(workedHours, estimatedHours);
@@ -531,7 +504,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
           const cardStyle = getCardStyle();
 
           return (
-            <div key={member.id} className={`flex items-center justify-between p-3 border-l-4 ${cardStyle.borderColor} bg-white/60 backdrop-blur-sm rounded-lg hover:bg-white/80 transition-all duration-200 border border-gray-100`}>
+            <div key={member.personnelId || member.id} className={`flex items-center justify-between p-3 border-l-4 ${cardStyle.borderColor} bg-white/60 backdrop-blur-sm rounded-lg hover:bg-white/80 transition-all duration-200 border border-gray-100 ${member.isUnquoted ? 'border-orange-300 bg-orange-50/30' : ''}`}>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className={`w-10 h-10 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
@@ -550,8 +523,13 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className={`font-medium text-sm ${cardStyle.nameColor}`}>
+                  <div className={`font-medium text-sm ${cardStyle.nameColor} flex items-center gap-2`}>
                     {member.actualName || 'Miembro del Equipo'}
+                    {member.isUnquoted && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
+                        No cotizado
+                      </Badge>
+                    )}
                   </div>
                   <div className={`text-xs ${cardStyle.roleColor} opacity-75`}>
                     {member.actualRoleName || 'Operations Lead'}
