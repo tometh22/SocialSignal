@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trophy, Target, BarChart3, DollarSign, Clock, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings } from "lucide-react";
 import { RankingType, PersonnelMetrics } from "@shared/ranking-config";
 import { sortByRankingType } from "@shared/ranking-utils";
+import { useState } from "react";
 
 interface EconomicRankingsProps {
   rankings: PersonnelMetrics[];
@@ -11,6 +13,7 @@ interface EconomicRankingsProps {
 }
 
 export function EconomicRankings({ rankings, loading = false }: EconomicRankingsProps) {
+  const [showConfig, setShowConfig] = useState(false);
   if (loading) {
     return (
       <Card>
@@ -73,7 +76,7 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
       case 'impact':
         return "Combina la eficiencia personal con el valor económico del proyecto que gestiona. Las personas que manejan mayor porcentaje del presupesto tienen mayor impacto potencial.";
       case 'unified':
-        return "Balance configurable entre eficiencia individual e impacto económico. Proporciona una vista integral del rendimiento considerando tanto la ejecución como el valor estratégico.";
+        return "Balance 50/50 entre eficiencia individual e impacto económico. Con esta configuración, Matías puede estar #1 por su eficiencia perfecta (100%) aunque maneje solo 4.6% del presupuesto. Un enfoque más estratégico (70% impacto) priorizaría a quienes gestionan mayor valor económico.";
       default:
         return "";
     }
@@ -197,6 +200,48 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
               <span className="text-gray-600">Menos de 40 puntos</span>
             </div>
           </div>
+        </div>
+
+        {/* Panel de Configuración del Ranking Unificado */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Configuración Ranking Unificado
+            </h4>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowConfig(!showConfig)}
+            >
+              {showConfig ? 'Ocultar' : 'Ajustar'}
+            </Button>
+          </div>
+          
+          {showConfig && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                Actualmente: <strong>Balance 50/50</strong> (Eficiencia 50% + Impacto Económico 50%)
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="p-3 bg-white rounded border">
+                  <div className="font-medium">Conservativo</div>
+                  <div className="text-gray-500">Eficiencia 70% + Impacto 30%</div>
+                  <div className="text-xs text-gray-400 mt-1">Prioriza cumplimiento individual</div>
+                </div>
+                <div className="p-3 bg-blue-100 rounded border border-blue-300">
+                  <div className="font-medium">Balanceado ✓</div>
+                  <div className="text-gray-500">Eficiencia 50% + Impacto 50%</div>
+                  <div className="text-xs text-gray-400 mt-1">Configuración actual</div>
+                </div>
+                <div className="p-3 bg-white rounded border">
+                  <div className="font-medium">Estratégico</div>
+                  <div className="text-gray-500">Eficiencia 30% + Impacto 70%</div>
+                  <div className="text-xs text-gray-400 mt-1">Prioriza valor económico</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
