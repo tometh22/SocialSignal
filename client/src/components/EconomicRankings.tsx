@@ -117,7 +117,7 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
-                      {member.economicWeight.toFixed(1)}%
+                      {(member.pricePercentage * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
