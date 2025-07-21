@@ -412,7 +412,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamRankingData = Object.values(teamBreakdown).map(member => {
         // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas individuales
         const baseEstimatedHours = member.estimatedHours || 0;
-        const scaledEstimatedHours = baseEstimatedHours * timeMultiplier;
+        const temporalMultiplier = getTimeMultiplier(timeFilter);
+        const scaledEstimatedHours = baseEstimatedHours * temporalMultiplier;
         const scaledEstimatedCost = scaledEstimatedHours * (member.rate || 0);
         
         return {
