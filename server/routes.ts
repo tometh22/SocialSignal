@@ -410,19 +410,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Preparar datos del equipo para rankings
       const teamRankingData = Object.values(teamBreakdown).map(member => {
-        // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas individuales
+        // NO ESCALAR las horas estimadas individuales - mantener valores base de cotización
         const baseEstimatedHours = member.estimatedHours || 0;
-        const temporalMultiplier = getMonthsInFilter(timeFilter);
-        const scaledEstimatedHours = baseEstimatedHours * temporalMultiplier;
-        const scaledEstimatedCost = scaledEstimatedHours * (member.rate || 0);
+        const baseEstimatedCost = baseEstimatedHours * (member.rate || 0);
         
         return {
           personnelId: member.personnelId,
           name: member.name || `Miembro ${member.personnelId}`,
           personnelName: member.name || `Miembro ${member.personnelId}`,
-          estimatedHours: scaledEstimatedHours, // ESCALADO SEGÚN PERÍODO TEMPORAL
+          estimatedHours: baseEstimatedHours, // HORAS BASE SIN ESCALAMIENTO
           actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
-          estimatedCost: scaledEstimatedCost, // ESCALADO SEGÚN PERÍODO TEMPORAL
+          estimatedCost: baseEstimatedCost, // COSTO BASE SIN ESCALAMIENTO
           actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
         };
       });
