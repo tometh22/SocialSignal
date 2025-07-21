@@ -428,23 +428,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 Total worked cost:`, totalWorkedCost);
       console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members (including quotation team)`);
 
+      // Función para calcular meses reales con datos
+      function calculateActualMonthsWithData(entries: any[], dateRange: any): number {
+        if (!entries || entries.length === 0) return 0;
+        
+        const monthsSet = new Set<string>();
+        entries.forEach(entry => {
+          const entryDate = new Date(entry.date);
+          const monthKey = `${entryDate.getFullYear()}-${entryDate.getMonth() + 1}`;
+          monthsSet.add(monthKey);
+        });
+        
+        return monthsSet.size;
+      }
+
       // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
       let adjustedEstimatedHours = estimatedHours;
       let adjustedBaseCost = baseCost;
       let adjustedTotalAmount = totalAmount;
       
-      // Para proyectos Always-On, calcular estimaciones proporcionales al período
-      if (project.quotation?.projectType === 'always-on' && dateRange && timeFilter !== 'all') {
-        const monthsInFilter = getMonthsInFilter(timeFilter);
-        if (monthsInFilter > 0) {
-          // Las cotizaciones Always-On son anuales, dividimos por 12 y multiplicamos por el período
-          adjustedEstimatedHours = (estimatedHours / 12) * monthsInFilter;
-          adjustedBaseCost = (baseCost / 12) * monthsInFilter;
-          adjustedTotalAmount = (totalAmount / 12) * monthsInFilter;
+      // Para proyectos de fee mensual o Always-On, calcular estimaciones proporcionales al período
+      console.log(`📊 Checking temporal scaling conditions:`, {
+        projectType: project.quotation?.projectType,
+        dateRange: !!dateRange,
+        timeFilter,
+        shouldScale: (project.quotation?.projectType === 'always-on' || project.quotation?.projectType === 'fee-mensual') && dateRange && timeFilter !== 'all'
+      });
+      
+      if ((project.quotation?.projectType === 'always-on' || project.quotation?.projectType === 'fee-mensual') && dateRange && timeFilter !== 'all') {
+        // Calcular meses reales con datos en lugar de meses teóricos del filtro
+        const actualMonthsWithData = calculateActualMonthsWithData(timeEntries, dateRange);
+        const theoreticalMonths = getMonthsInFilter(timeFilter);
+        
+        // Usar el menor entre meses teóricos y meses con datos reales
+        const monthsToUse = Math.min(actualMonthsWithData, theoreticalMonths) || theoreticalMonths;
+        
+        if (monthsToUse > 0) {
+          // Las cotizaciones de contratos mensuales son por mes, multiplicamos por el período
+          adjustedEstimatedHours = estimatedHours * monthsToUse;
+          adjustedBaseCost = baseCost * monthsToUse;
+          adjustedTotalAmount = totalAmount * monthsToUse;
           
-          console.log(`📊 Always-On project adjustment for ${monthsInFilter} months:`, {
-            original: estimatedHours,
-            adjusted: adjustedEstimatedHours
+          console.log(`📊 Monthly contract adjustment for ${monthsToUse} months (${project.quotation?.projectType}):`, {
+            theoretical: theoreticalMonths,
+            actualWithData: actualMonthsWithData,
+            used: monthsToUse,
+            originalHours: estimatedHours,
+            adjustedHours: adjustedEstimatedHours,
+            originalCost: baseCost,
+            adjustedCost: adjustedBaseCost,
+            originalAmount: totalAmount,
+            adjustedAmount: adjustedTotalAmount
           });
         }
       }
