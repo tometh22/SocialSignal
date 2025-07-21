@@ -2767,76 +2767,79 @@ export default function ProjectDetailsRedesigned() {
                         {/* Heat Map Grid */}
                         <div className="grid grid-cols-4 gap-2">
                           {displayMembers.map((member: any, index: number) => {
-                            // Get real data from completeData.actuals.teamBreakdown (hours worked from time entries)
-                            const workedHours = member.hours || 0; // Real hours from time entries
-                            const baseEstimatedHours = member.estimatedHours || 1; // Base estimated hours from quotation
-                            
-                            // ESCALAMIENTO TEMPORAL CORREGIDO: Solo para Always-On y períodos futuros
-                            const isAlwaysOn = completeData?.quotation?.isAlwaysOn || false;
-                            const isHistoricalPeriod = timeFilterForHook === 'last_month' || timeFilterForHook === 'last_quarter';
-                            const shouldScale = isAlwaysOn && !isHistoricalPeriod;
-                            
-                            const multiplier = shouldScale ? getQuotationMultiplier() : 1;
-                            const estimatedHours = baseEstimatedHours * multiplier;
                             const name = member.name || member.personnelName || `Miembro ${index + 1}`;
+                            const hourlyRate = member.hourlyRate || member.rate || 10;
                             
-
+                            // DATOS BASE NUEVAS MÉTRICAS (P, Ce, Cr, He, Hr)
+                            const P = completeData?.quotation?.totalAmount || 0;
+                            const Ce = member.estimatedHours * hourlyRate;
+                            const Cr = member.hours * hourlyRate;
+                            const He = member.estimatedHours || 0;
+                            const Hr = member.hours || 0;
                             
-                            // CORREGIR LÓGICA DE EFICIENCIA PARA CONSISTENCIA
-                            const usageRatio = workedHours / Math.max(estimatedHours, 1);
+                            // CÁLCULO DE α Y MÉTRICAS
+                            const Ce_total = displayMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
+                            const alpha = Ce_total > 0 ? Ce / Ce_total : 0;
+                            const precioAsignado = P * alpha;
                             
-                            // Criterios consistentes con Top Performers
-                            const isCritical = usageRatio > 1.5 || usageRatio < 0.5; // Muy fuera de rango
-                            const isWarning = (usageRatio > 1.3 || usageRatio < 0.7) && !isCritical; // Moderadamente fuera
-                            const isGood = usageRatio >= 0.8 && usageRatio <= 1.2; // Rango óptimo
+                            const CV = Ce > 0 ? (Ce - Cr) / Ce : 0;
+                            const SV = He > 0 ? (He - Hr) / He : 0;
+                            const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0;
+                            const Ep = Cr > 0 ? precioAsignado / Cr : 0;
                             
-                            // Calcular eficiencia normalizada para tooltips
-                            let efficiency = 0;
-                            if (usageRatio >= 0.8 && usageRatio <= 1.2) {
-                              efficiency = 1 - Math.abs(usageRatio - 1) * 2; // Pico en 1.0
-                            } else if (usageRatio < 0.8) {
-                              efficiency = Math.max(0, usageRatio / 0.8 * 0.5);
-                            } else {
-                              efficiency = Math.max(0, 1 - (usageRatio - 1.2) * 2);
-                            }
+                            // SCORE COMPUESTO SIMPLIFICADO PARA MAPA DE CALOR
+                            // Usamos métricas directas sin normalización compleja
+                            const performanceScore = (
+                              Math.max(0, Math.min(1, CV + 0.5)) * 0.4 + // CV ajustado
+                              Math.max(0, Math.min(1, SV + 0.5)) * 0.35 + // SV ajustado
+                              Math.max(0, Math.min(1, MPH / 50)) * 0.15 + // MPH escalado
+                              Math.max(0, Math.min(1, Ep / 3)) * 0.1 // Ep escalado
+                            );
                             
-                            const bgColor = isCritical ? 'bg-red-500' : 
-                                           isWarning ? 'bg-yellow-500' : 
-                                           isGood ? 'bg-green-500' : 
-                                           'bg-gray-400';
+                            // COLORES BASADOS EN PERFORMANCE SCORE
+                            const isGood = performanceScore >= 0.7;
+                            const isWarning = performanceScore >= 0.4 && performanceScore < 0.7;
+                            const isCritical = performanceScore < 0.4;
                             
-                            // Intensity based on deviation from optimal (1.0 usage ratio)
-                            const deviation = Math.abs(usageRatio - 1.0);
-                            const intensity = Math.max(30, Math.min(100, 100 - (deviation * 50)));
+                            const bgColor = isGood ? 'bg-green-500' :
+                                           isWarning ? 'bg-yellow-500' :
+                                           'bg-red-500';
+                            
+                            const intensity = Math.max(30, Math.min(100, performanceScore * 100));
                             
                             return (
                               <div 
                                 key={member.personnelId || index}
                                 className={`relative aspect-square ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
                                 style={{ opacity: intensity / 100 }}
-                                title={`${name}: ${workedHours.toFixed(1)}h trabajadas / ${estimatedHours.toFixed(1)}h estimadas ${multiplier > 1 ? `(escalado x${multiplier})` : ''}`}
+                                title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
                               >
                                 <div className="text-white text-xs font-bold text-center leading-tight">
                                   {name.length > 12 ? name.substring(0, 12) + '...' : name}
                                 </div>
                                 <div className="text-white text-xs text-center mt-1">
-                                  {workedHours.toFixed(1)}h
+                                  {Hr.toFixed(1)}h
                                 </div>
                                 
-                                {/* Enhanced Tooltip */}
+                                {/* Enhanced Tooltip con Nuevas Métricas */}
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                                  <div className="bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                                    <div className="font-medium">{name}</div>
-                                    <div>Trabajadas: {workedHours.toFixed(1)}h</div>
-                                    <div>Estimadas: {estimatedHours.toFixed(1)}h {multiplier > 1 ? `(x${multiplier})` : ''}</div>
-                                    <div>Ratio: {(usageRatio * 100).toFixed(0)}%</div>
-                                    <div className={`font-medium ${
-                                      isCritical ? 'text-red-300' :
-                                      isWarning ? 'text-yellow-300' :
-                                      isGood ? 'text-green-300' :
-                                      'text-gray-300'
-                                    }`}>
-                                      {isCritical ? 'Crítico' : isWarning ? 'Atención' : isGood ? 'Excelente' : 'Regular'}
+                                  <div className="bg-black text-white text-xs rounded py-2 px-3 min-w-max">
+                                    <div className="font-medium mb-1">{name}</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      <div>CV: <span className={CV >= 0 ? 'text-green-300' : 'text-red-300'}>{(CV * 100).toFixed(0)}%</span></div>
+                                      <div>SV: <span className={SV >= 0 ? 'text-green-300' : 'text-red-300'}>{(SV * 100).toFixed(0)}%</span></div>
+                                      <div>MPH: <span className="text-blue-300">${MPH.toFixed(0)}/h</span></div>
+                                      <div>Ep: <span className="text-purple-300">{Ep.toFixed(1)}x</span></div>
+                                    </div>
+                                    <div className="border-t border-gray-600 pt-1 mt-1">
+                                      <div>Score: <span className="font-medium">{(performanceScore * 100).toFixed(0)}/100</span></div>
+                                      <div className={`font-medium ${
+                                        isGood ? 'text-green-300' :
+                                        isWarning ? 'text-yellow-300' :
+                                        'text-red-300'
+                                      }`}>
+                                        {isGood ? 'Excelente' : isWarning ? 'Moderado' : 'Crítico'}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -2902,87 +2905,104 @@ export default function ProjectDetailsRedesigned() {
                       // Filter to only include members who actually worked (have hours > 0)
                       const workingMembers = teamMembers.filter(member => member.hours > 0);
                       const performersWithScore = workingMembers.map((member: any) => {
-                        // Get real data from completeData.actuals.teamBreakdown (time entries)
-                        const workedHours = member.hours || 0; // Real hours from time entries
-                        const baseEstimatedHours = member.estimatedHours || 1; // Base estimated from quotation
-                        
-                        // ESCALAMIENTO TEMPORAL CORREGIDO: Solo para Always-On y solo para filtros futuros
-                        const isAlwaysOn = completeData?.quotation?.isAlwaysOn || false;
-                        const isHistoricalPeriod = timeFilterForHook === 'last_month' || timeFilterForHook === 'last_quarter';
-                        const shouldScale = isAlwaysOn && !isHistoricalPeriod;
-                        
-                        const multiplier = shouldScale ? getQuotationMultiplier() : 1;
-                        const estimatedHours = baseEstimatedHours * multiplier;
-                        const hourlyRate = member.hourlyRate || member.rate || 10;
                         const name = member.name || member.personnelName || `Miembro ${workingMembers.indexOf(member) + 1}`;
+                        const hourlyRate = member.hourlyRate || member.rate || 10;
                         
-
+                        // DATOS BASE REALES (P, Ce, Cr, He, Hr)
+                        const P = completeData?.quotation?.totalAmount || 0; // Precio al cliente
+                        const Ce = member.estimatedHours * hourlyRate; // Costo estimado individual
+                        const Cr = member.hours * hourlyRate; // Costo real individual  
+                        const He = member.estimatedHours || 0; // Horas estimadas
+                        const Hr = member.hours || 0; // Horas reales
                         
-                        // Efficiency score (0-40 points) - penaliza excesos y sub-trabajo
-                        const usageRatio = workedHours / Math.max(estimatedHours, 1);
-                        // Optimal range: 0.8-1.2 (80%-120% de lo estimado)
-                        let efficiency = 0;
-                        if (usageRatio >= 0.8 && usageRatio <= 1.2) {
-                          // Rango óptimo: máxima puntuación
-                          efficiency = 1 - Math.abs(usageRatio - 1) * 2; // Pico en 1.0
-                        } else if (usageRatio < 0.8) {
-                          // Sub-trabajo: penalizar severamente
-                          efficiency = Math.max(0, usageRatio / 0.8 * 0.5);
-                        } else {
-                          // Sobre-trabajo: penalizar gradualmente
-                          efficiency = Math.max(0, 1 - (usageRatio - 1.2) * 2);
-                        }
-                        const efficiencyScore = efficiency * 40;
+                        // CÁLCULO DE α (ALFA) - Peso económico real
+                        const Ce_total = workingMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
+                        const alpha = Ce_total > 0 ? Ce / Ce_total : 0; // α = Cei / Ce_total
+                        const precioAsignado = P * alpha; // Precio asignado a esta persona
                         
-                        // Project weight score (0-30 points) - based on estimated hours in project
-                        const maxEstimatedInProject = Math.max(...workingMembers.map((m: any) => (m.estimatedHours || 0)));
-                        const projectWeightScore = maxEstimatedInProject > 0 ? (estimatedHours / maxEstimatedInProject) * 30 : 0;
+                        // MÉTRICAS BASE POR PERSONA
+                        const CV = Ce > 0 ? (Ce - Cr) / Ce : 0; // Varianza de costo
+                        const SV = He > 0 ? (He - Hr) / He : 0; // Varianza de horas
+                        const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0; // Margen por hora
+                        const Ep = Cr > 0 ? precioAsignado / Cr : 0; // Eficiencia facturación
                         
-                        // Hour usage score (0-30 points) - premia trabajo completo pero dentro de límites
-                        let hourUsageScore = 0;
-                        if (usageRatio >= 0.9 && usageRatio <= 1.1) {
-                          hourUsageScore = 30; // Rango perfecto: 90%-110%
-                        } else if (usageRatio >= 0.7 && usageRatio <= 1.3) {
-                          hourUsageScore = 20; // Rango aceptable: 70%-130%
-                        } else if (usageRatio >= 0.5 && usageRatio <= 1.5) {
-                          hourUsageScore = 10; // Rango marginal: 50%-150%
-                        } else {
-                          hourUsageScore = 0; // Fuera de rangos aceptables
-                        }
+                        // NORMALIZACIÓN Z-SCORE (para que todas las métricas estén en la misma escala)
+                        // Calculamos estadísticas del equipo para normalizar
+                        const teamCVs = workingMembers.map(m => {
+                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
+                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
+                          return mCe > 0 ? (mCe - mCr) / mCe : 0;
+                        });
+                        const teamSVs = workingMembers.map(m => {
+                          return m.estimatedHours > 0 ? (m.estimatedHours - m.hours) / m.estimatedHours : 0;
+                        });
+                        const teamMPHs = workingMembers.map(m => {
+                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
+                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
+                          const mAlpha = Ce_total > 0 ? mCe / Ce_total : 0;
+                          const mPrecio = P * mAlpha;
+                          return m.hours > 0 ? (mPrecio - mCr) / m.hours : 0;
+                        });
+                        const teamEps = workingMembers.map(m => {
+                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
+                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
+                          const mAlpha = Ce_total > 0 ? mCe / Ce_total : 0;
+                          const mPrecio = P * mAlpha;
+                          return mCr > 0 ? mPrecio / mCr : 0;
+                        });
                         
-                        const totalScore = efficiencyScore + projectWeightScore + hourUsageScore;
+                        // Funciones de normalización min-max (0-1)
+                        const normalize = (value, array) => {
+                          const min = Math.min(...array);
+                          const max = Math.max(...array);
+                          if (max === min) return 0.5; // Si todos son iguales, asignar neutral
+                          return (value - min) / (max - min);
+                        };
                         
-                        // AUDITORÍA DETALLADA - Solo para casos específicos
-                        if (['Ina Ceravolo', 'Xavier Aranza', 'Santiago Berisso', 'Aylen Magali', 'Romi Figueroa'].includes(name)) {
-                          console.log(`🔍 AUDIT ${name}:`, {
-                            shouldScale,
-                            isAlwaysOn,
-                            isHistoricalPeriod,
-                            multiplier,
-                            baseEstimatedHours,
-                            scaledEstimatedHours: estimatedHours,
-                            workedHours,
-                            usageRatio: usageRatio.toFixed(3),
-                            efficiency: efficiency.toFixed(3),
-                            scores: {
-                              efficiency: efficiencyScore.toFixed(1),
-                              projectWeight: projectWeightScore.toFixed(1),
-                              hourUsage: hourUsageScore.toFixed(1),
-                              total: totalScore.toFixed(1)
-                            }
+                        const zCV = normalize(CV, teamCVs);
+                        const zSV = normalize(SV, teamSVs);  
+                        const zMPH = normalize(MPH, teamMPHs);
+                        const zEp = normalize(Ep, teamEps);
+                        
+                        // SCORE COMPUESTO DE DESEMPEÑO (según pesos de Epical)
+                        const performanceScore = 
+                          0.40 * zCV +   // 40% - Varianza de costo (eficiencia interna)
+                          0.35 * zSV +   // 35% - Varianza de horas (eficiencia interna)
+                          0.15 * zMPH +  // 15% - Margen por hora (valor capturado)
+                          0.10 * zEp;    // 10% - Eficiencia facturación (valor capturado)
+                        
+                        const totalScore = performanceScore * 100; // Convertir a escala 0-100
+                        
+                        // AUDITORÍA DETALLADA
+                        if (['Ina Ceravolo', 'Xavier Aranza', 'Santiago Berisso'].includes(name)) {
+                          console.log(`🏆 NEW METRICS ${name}:`, {
+                            datosBase: { P: P.toFixed(0), Ce: Ce.toFixed(1), Cr: Cr.toFixed(1), He, Hr },
+                            alpha: (alpha * 100).toFixed(2) + '%',
+                            precioAsignado: precioAsignado.toFixed(1),
+                            metricas: {
+                              CV: (CV * 100).toFixed(1) + '%',
+                              SV: (SV * 100).toFixed(1) + '%', 
+                              MPH: MPH.toFixed(1),
+                              Ep: Ep.toFixed(2) + 'x'
+                            },
+                            normalizadas: { zCV: zCV.toFixed(3), zSV: zSV.toFixed(3), zMPH: zMPH.toFixed(3), zEp: zEp.toFixed(3) },
+                            totalScore: totalScore.toFixed(1)
                           });
                         }
                         
                         return {
                           ...member,
                           name,
-                          workedHours,
                           totalScore,
-                          efficiencyScore,
-                          projectWeightScore,
-                          hourUsageScore,
-                          efficiency,
-                          usageRatio
+                          // Métricas originales
+                          CV, SV, MPH, Ep,
+                          // Métricas normalizadas
+                          zCV, zSV, zMPH, zEp,
+                          // Datos base
+                          Ce, Cr, He, Hr, alpha, precioAsignado,
+                          // Para compatibilidad con UI existente
+                          workedHours: Hr,
+                          usageRatio: He > 0 ? Hr / He : 0
                         };
                       });
                       
@@ -2992,9 +3012,9 @@ export default function ProjectDetailsRedesigned() {
                         .slice(0, 5);
                       
                       // AUDITORÍA FINAL DEL RANKING
-                      console.log('🏆 TOP PERFORMERS RANKING:');
+                      console.log('🏆 NEW TOP PERFORMERS RANKING:');
                       topPerformers.forEach((p, i) => {
-                        console.log(`  ${i+1}. ${p.name}: ${p.totalScore.toFixed(1)} pts (${(p.usageRatio * 100).toFixed(0)}% eficiencia)`);
+                        console.log(`  ${i+1}. ${p.name}: ${p.totalScore.toFixed(1)} pts | CV:${(p.CV*100).toFixed(0)}% SV:${(p.SV*100).toFixed(0)}% MPH:$${p.MPH.toFixed(0)} Ep:${p.Ep.toFixed(1)}x`);
                       });
                       
                       return topPerformers.map((performer, index) => {
@@ -3027,23 +3047,29 @@ export default function ProjectDetailsRedesigned() {
                                   {performer.totalScore.toFixed(0)} pts
                                 </span>
                               </div>
-                              <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="text-center">
-                                  <p className="font-medium text-gray-700">Eficiencia</p>
-                                  <p className={`font-bold ${performer.efficiency >= 0.9 ? 'text-green-600' : performer.efficiency >= 0.7 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                    {(performer.efficiency * 100).toFixed(0)}%
+                                  <p className="font-medium text-gray-700">CV</p>
+                                  <p className={`font-bold ${performer.CV >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {(performer.CV * 100).toFixed(0)}%
                                   </p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="font-medium text-gray-700">Peso Proyecto</p>
+                                  <p className="font-medium text-gray-700">SV</p>
+                                  <p className={`font-bold ${performer.SV >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {(performer.SV * 100).toFixed(0)}%
+                                  </p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-medium text-gray-700">MPH</p>
                                   <p className="font-bold text-blue-600">
-                                    {performer.estimatedHours}h
+                                    ${performer.MPH.toFixed(0)}/h
                                   </p>
                                 </div>
                                 <div className="text-center">
-                                  <p className="font-medium text-gray-700">Uso Horas</p>
-                                  <p className={`font-bold ${performer.usageRatio <= 1 ? 'text-green-600' : performer.usageRatio <= 1.2 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                    {(performer.usageRatio * 100).toFixed(0)}%
+                                  <p className="font-medium text-gray-700">Ep</p>
+                                  <p className="font-bold text-purple-600">
+                                    {performer.Ep.toFixed(1)}x
                                   </p>
                                 </div>
                               </div>
