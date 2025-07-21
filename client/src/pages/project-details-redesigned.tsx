@@ -993,37 +993,13 @@ export default function ProjectDetailsRedesigned() {
     };
   }, [unifiedData?.quotation, getQuotationMultiplier, timeFilterForHook]);
 
-  // DEBUG DATOS UNIFICADOS Y FILTROS TEMPORALES
-  console.log('🚀 ESCALAMIENTO TEMPORAL - ANÁLISIS COMPLETO:');
-  console.log('🚀 Filtro actual:', dateFilter.label);
-  console.log('🚀 Filtro para hook:', timeFilterForHook);
-  console.log('🚀 Multiplicador calculado:', getQuotationMultiplier());
-  console.log('🚀 Datos cotización:', {
-    estimatedHours: unifiedData?.quotation?.estimatedHours,
-    baseCost: unifiedData?.quotation?.baseCost,
-    projectType: unifiedData?.quotation?.projectType,
-    billingFrequency: unifiedData?.quotation?.billingFrequency
-  });
-  console.log('🚀 Datos trabajados:', {
-    totalWorkedHours: unifiedData?.actuals?.totalWorkedHours,
-    totalWorkedCost: unifiedData?.actuals?.totalWorkedCost
-  });
-  
-  // VALIDACIÓN AUTOMÁTICA DEL ESCALAMIENTO
+  // VALIDACIÓN SILENCIOSA DEL ESCALAMIENTO TEMPORAL
   const validation = validateScalingLogic();
-  console.log('🔍 VALIDACIÓN ESCALAMIENTO:', validation);
   
+  // Solo mostrar errores críticos en consola
   if (!validation.isValid) {
-    console.error('❌ ERROR EN ESCALAMIENTO:', validation.reason);
-  } else {
-    console.log('✅ ESCALAMIENTO VÁLIDO:', {
-      base: `${validation.baseHours}h / $${validation.baseCost}`,
-      scaled: `${validation.scaledHours}h / $${validation.scaledCost}`,
-      factor: `x${validation.multiplier}`
-    });
+    console.warn('⚠️ Problema con escalamiento temporal:', validation.reason);
   }
-  console.log('🚀 unifiedData available:', !!unifiedData);
-  console.log('🚀 dataLoading:', dataLoading);
   if (unifiedData) {
     console.log('🚀 CURRENT DATA SET:');
     console.log('  - Estimated hours:', unifiedData.quotation?.estimatedHours || -1);
@@ -2793,8 +2769,14 @@ export default function ProjectDetailsRedesigned() {
                           {displayMembers.map((member: any, index: number) => {
                             // Get real data from completeData.actuals.teamBreakdown (hours worked from time entries)
                             const workedHours = member.hours || 0; // Real hours from time entries
-                            const estimatedHours = member.estimatedHours || 1; // Estimated hours from quotation
+                            const baseEstimatedHours = member.estimatedHours || 1; // Base estimated hours from quotation
+                            
+                            // APLICAR ESCALAMIENTO TEMPORAL PARA CONSISTENCIA
+                            const multiplier = getQuotationMultiplier();
+                            const estimatedHours = baseEstimatedHours * multiplier; // Escalar según filtro temporal
                             const name = member.name || member.personnelName || `Miembro ${index + 1}`;
+                            
+
                             
                             // Calculate efficiency: closer to 1.0 is better (worked hours close to estimated)
                             const efficiency = estimatedHours > 0 ? Math.min(2, estimatedHours / Math.max(workedHours, 0.1)) : 0;
@@ -2819,7 +2801,7 @@ export default function ProjectDetailsRedesigned() {
                                 key={member.personnelId || index}
                                 className={`relative aspect-square ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
                                 style={{ opacity: intensity / 100 }}
-                                title={`${name}: ${workedHours.toFixed(1)}h trabajadas / ${estimatedHours.toFixed(1)}h estimadas`}
+                                title={`${name}: ${workedHours.toFixed(1)}h trabajadas / ${estimatedHours.toFixed(1)}h estimadas ${multiplier > 1 ? `(escalado x${multiplier})` : ''}`}
                               >
                                 <div className="text-white text-xs font-bold text-center leading-tight">
                                   {name.length > 12 ? name.substring(0, 12) + '...' : name}
@@ -2833,7 +2815,7 @@ export default function ProjectDetailsRedesigned() {
                                   <div className="bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap">
                                     <div className="font-medium">{name}</div>
                                     <div>Trabajadas: {workedHours.toFixed(1)}h</div>
-                                    <div>Estimadas: {estimatedHours.toFixed(1)}h</div>
+                                    <div>Estimadas: {estimatedHours.toFixed(1)}h {multiplier > 1 ? `(x${multiplier})` : ''}</div>
                                     <div>Ratio: {(usageRatio * 100).toFixed(0)}%</div>
                                     <div className={`font-medium ${
                                       isCritical ? 'text-red-300' :
@@ -2877,7 +2859,7 @@ export default function ProjectDetailsRedesigned() {
                             <div><strong>Uso óptimo (30 pts):</strong> Penaliza excesos de presupuesto</div>
                           </div>
                           <div className="mt-2 text-gray-300 text-xs">
-                            Usa datos reales de time entries vs horas estimadas de cotización
+                            Usa datos reales de time entries vs horas estimadas escaladas según período temporal
                           </div>
                         </div>
                       </div>
@@ -2906,9 +2888,15 @@ export default function ProjectDetailsRedesigned() {
                       const performersWithScore = workingMembers.map((member: any) => {
                         // Get real data from completeData.actuals.teamBreakdown (time entries)
                         const workedHours = member.hours || 0; // Real hours from time entries
-                        const estimatedHours = member.estimatedHours || 1; // Estimated from quotation
+                        const baseEstimatedHours = member.estimatedHours || 1; // Base estimated from quotation
+                        
+                        // APLICAR ESCALAMIENTO TEMPORAL PARA CONSISTENCIA CON CARDS PRINCIPALES
+                        const multiplier = getQuotationMultiplier();
+                        const estimatedHours = baseEstimatedHours * multiplier; // Escalar según filtro temporal
                         const hourlyRate = member.hourlyRate || member.rate || 10;
                         const name = member.name || member.personnelName || `Miembro ${workingMembers.indexOf(member) + 1}`;
+                        
+
                         
                         // Efficiency score (0-40 points) - how well they stay within estimates
                         const usageRatio = workedHours / Math.max(estimatedHours, 1);
