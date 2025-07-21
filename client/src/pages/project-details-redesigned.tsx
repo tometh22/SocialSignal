@@ -964,15 +964,64 @@ export default function ProjectDetailsRedesigned() {
         console.warn('⚠️ Si este filtro representa múltiples meses, agregar a la función getQuotationMultiplier');
         return 1;
     }
-  }, [timeFilterForHook, unifiedData]);
+  }, [timeFilterForHook, unifiedData?.quotation]);
+
+  // FUNCIÓN DE VALIDACIÓN PARA ASEGURAR CONSISTENCIA
+  const validateScalingLogic = useCallback(() => {
+    if (!unifiedData?.quotation) return { isValid: false, reason: 'No quotation data' };
+    
+    const multiplier = getQuotationMultiplier();
+    const baseHours = unifiedData.quotation.estimatedHours || 0;
+    const baseCost = unifiedData.quotation.baseCost || 0;
+    
+    // Validaciones
+    const isValid = 
+      multiplier >= 1 && multiplier <= 12 && // Multiplicador en rango válido
+      baseHours > 0 && // Horas base válidas
+      baseCost >= 0 && // Costo base válido
+      Number.isInteger(multiplier); // Multiplicador es entero
+    
+    return {
+      isValid,
+      multiplier,
+      baseHours,
+      baseCost,
+      scaledHours: baseHours * multiplier,
+      scaledCost: baseCost * multiplier,
+      filter: timeFilterForHook,
+      reason: !isValid ? 'Invalid multiplier or base values' : 'Valid'
+    };
+  }, [unifiedData?.quotation, getQuotationMultiplier, timeFilterForHook]);
 
   // DEBUG DATOS UNIFICADOS Y FILTROS TEMPORALES
-  console.log('🚀 SINGLE SOURCE OF TRUTH:');
-  console.log('🚀 dateFilter:', dateFilter);
-  console.log('🚀 timeFilterForHook:', timeFilterForHook);
-  console.log('🚀 quotation type:', unifiedData?.quotation?.projectType);
-  console.log('🚀 billing frequency:', unifiedData?.quotation?.billingFrequency);
-  console.log('🚀 multiplier:', getQuotationMultiplier());
+  console.log('🚀 ESCALAMIENTO TEMPORAL - ANÁLISIS COMPLETO:');
+  console.log('🚀 Filtro actual:', dateFilter.label);
+  console.log('🚀 Filtro para hook:', timeFilterForHook);
+  console.log('🚀 Multiplicador calculado:', getQuotationMultiplier());
+  console.log('🚀 Datos cotización:', {
+    estimatedHours: unifiedData?.quotation?.estimatedHours,
+    baseCost: unifiedData?.quotation?.baseCost,
+    projectType: unifiedData?.quotation?.projectType,
+    billingFrequency: unifiedData?.quotation?.billingFrequency
+  });
+  console.log('🚀 Datos trabajados:', {
+    totalWorkedHours: unifiedData?.actuals?.totalWorkedHours,
+    totalWorkedCost: unifiedData?.actuals?.totalWorkedCost
+  });
+  
+  // VALIDACIÓN AUTOMÁTICA DEL ESCALAMIENTO
+  const validation = validateScalingLogic();
+  console.log('🔍 VALIDACIÓN ESCALAMIENTO:', validation);
+  
+  if (!validation.isValid) {
+    console.error('❌ ERROR EN ESCALAMIENTO:', validation.reason);
+  } else {
+    console.log('✅ ESCALAMIENTO VÁLIDO:', {
+      base: `${validation.baseHours}h / $${validation.baseCost}`,
+      scaled: `${validation.scaledHours}h / $${validation.scaledCost}`,
+      factor: `x${validation.multiplier}`
+    });
+  }
   console.log('🚀 unifiedData available:', !!unifiedData);
   console.log('🚀 dataLoading:', dataLoading);
   if (unifiedData) {
@@ -2006,14 +2055,7 @@ export default function ProjectDetailsRedesigned() {
                       const scaledEstimatedHours = baseEstimatedHours * multiplier;
                       const percentage = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
                       
-                      // DEBUG DE ESCALAMIENTO
-                      console.log('🔍 CARD HORAS DEBUG:');
-                      console.log('  - baseEstimatedHours:', baseEstimatedHours);
-                      console.log('  - multiplier:', multiplier);
-                      console.log('  - scaledEstimatedHours:', scaledEstimatedHours);
-                      console.log('  - timeFilterForHook:', timeFilterForHook);
-                      console.log('  - quotation type:', completeData?.quotation?.projectType);
-                      console.log('  - billing freq:', completeData?.quotation?.billingFrequency);
+
                       
                       return (
                         <>
@@ -2068,11 +2110,7 @@ export default function ProjectDetailsRedesigned() {
                       const scaledEstimatedCost = baseEstimatedCost * multiplier;
                       const percentage = scaledEstimatedCost > 0 ? (workedCost / scaledEstimatedCost) * 100 : 0;
                       
-                      // DEBUG DE ESCALAMIENTO COSTO
-                      console.log('🔍 CARD COSTO DEBUG:');
-                      console.log('  - baseEstimatedCost:', baseEstimatedCost);
-                      console.log('  - multiplier:', multiplier);
-                      console.log('  - scaledEstimatedCost:', scaledEstimatedCost);
+
                       
                       return (
                         <>
