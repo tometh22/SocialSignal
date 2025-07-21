@@ -411,14 +411,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Preparar datos del equipo para rankings
       const teamRankingData = Object.values(teamBreakdown).map(member => ({
         personnelId: member.personnelId,
-        name: member.personnelName || member.name || `Miembro ${member.personnelId}`,
-        personnelName: member.personnelName || member.name || `Miembro ${member.personnelId}`,
+        name: member.name || `Miembro ${member.personnelId}`,
+        personnelName: member.name || `Miembro ${member.personnelId}`,
         estimatedHours: member.estimatedHours || 0,
-        actualHours: member.actualHours || 0,
-        estimatedCost: member.estimatedCost || 0,
-        actualCost: member.actualCost || 0
+        actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
+        estimatedCost: (member.estimatedHours || 0) * (member.rate || 0),
+        actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
       }));
 
+      // Debug: Ver datos que van al cálculo de rankings
+      console.log(`📊 Team ranking data prepared:`, teamRankingData.slice(0, 2)); // Solo mostrar primeros 2 para debug
+      
       // Calcular rankings con datos reales del proyecto
       const economicRankings = calculateTeamRankings(teamRankingData, adjustedTotalAmount);
 
