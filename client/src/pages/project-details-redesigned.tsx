@@ -1408,34 +1408,41 @@ export default function ProjectDetailsRedesigned() {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-4xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-5 w-full max-w-5xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
             >
               <Gauge className="h-4 w-4" />
-              Resumen Ejecutivo
+              Dashboard
             </TabsTrigger>
             <TabsTrigger 
               value="team-analysis" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
               <BarChart3 className="h-4 w-4" />
-              Análisis de Equipo
+              Equipo
+            </TabsTrigger>
+            <TabsTrigger 
+              value="performance-analysis" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+            >
+              <Flame className="h-4 w-4" />
+              Performance
             </TabsTrigger>
             <TabsTrigger 
               value="time-management" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
             >
               <Timer className="h-4 w-4" />
-              Registro de Tiempo
+              Tiempo
             </TabsTrigger>
             <TabsTrigger 
               value="details" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:shadow-sm"
             >
               <Calendar className="h-4 w-4" />
-              Análisis Mensual
+              Mensual
             </TabsTrigger>
           </TabsList>
 
@@ -1917,6 +1924,394 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance-analysis" className="space-y-6">
+            {/* ANÁLISIS DE PERFORMANCE - NUEVA PESTAÑA */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* TABLA PRINCIPAL - RANKING POR SCORE */}
+              <div className="xl:col-span-2 space-y-4">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 border-b">
+                    <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                      <Flame className="h-5 w-5 text-red-600" />
+                      Ranking de Performance
+                      <div className="group relative ml-2">
+                        <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                          <div className="bg-black text-white text-xs rounded-lg py-3 px-4 max-w-sm">
+                            <div className="font-bold mb-2">Fórmula del Score Compuesto:</div>
+                            <div className="space-y-1">
+                              <div><strong>CV (40%):</strong> Varianza de costo - eficiencia interna</div>
+                              <div><strong>SV (35%):</strong> Varianza de horas - eficiencia interna</div>
+                              <div><strong>MPH (15%):</strong> Margen por hora - valor capturado</div>
+                              <div><strong>Ep (10%):</strong> Eficiencia facturación - valor capturado</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardTitle>
+                    <CardDescription>Sistema basado en métricas CV, SV, MPH y Ep con distribución α por peso económico</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {(() => {
+                      if (!unifiedData?.actuals?.teamBreakdown) {
+                        return (
+                          <div className="text-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
+                            <p className="text-gray-500">Cargando análisis de performance...</p>
+                          </div>
+                        );
+                      }
+
+                      const teamMembers = unifiedData.actuals.teamBreakdown || [];
+                      const workingMembers = teamMembers.filter((member: any) => member.hours > 0);
+
+                      if (workingMembers.length === 0) {
+                        return (
+                          <div className="text-center py-8">
+                            <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-amber-500" />
+                            <p className="text-gray-500">No hay registros de tiempo para el período seleccionado</p>
+                          </div>
+                        );
+                      }
+
+                      // CÁLCULO COMPLETO DE MÉTRICAS DE PERFORMANCE
+                      const performanceData = workingMembers.map((member: any, index: number) => {
+                        const name = member.name || member.personnelName || `Miembro ${index + 1}`;
+                        const hourlyRate = member.hourlyRate || member.rate || 10;
+                        
+                        // DATOS BASE (P, Ce, Cr, He, Hr)
+                        const P = quotationData?.totalAmount || 0;
+                        const Ce = member.estimatedHours * hourlyRate;
+                        const Cr = member.hours * hourlyRate;
+                        const He = member.estimatedHours || 0;
+                        const Hr = member.hours || 0;
+                        
+                        // CÁLCULO DE α (DISTRIBUCIÓN POR PESO ECONÓMICO)
+                        const Ce_total = workingMembers.reduce((sum: number, m: any) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
+                        const alpha = Ce_total > 0 ? Ce / Ce_total : 0;
+                        const precioAsignado = P * alpha;
+                        
+                        // MÉTRICAS PRINCIPALES
+                        const CV = Ce > 0 ? (Ce - Cr) / Ce : 0; // Varianza de costo
+                        const SV = He > 0 ? (He - Hr) / He : 0; // Varianza de horas  
+                        const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0; // Margen por hora
+                        const Ep = Cr > 0 ? precioAsignado / Cr : 0; // Eficiencia facturación
+
+                        return {
+                          ...member,
+                          name,
+                          Ce, Cr, He, Hr, alpha, precioAsignado,
+                          CV, SV, MPH, Ep,
+                          // Indicadores de estado
+                          cvStatus: CV >= 0 ? 'positive' : 'negative',
+                          svStatus: SV >= 0 ? 'positive' : 'negative',
+                          criticalCV: CV < -0.05, // CV < -5%
+                          criticalSV: SV < -0.05  // SV < -5%
+                        };
+                      });
+
+                      // NORMALIZACIÓN PARA SCORE COMPUESTO
+                      const normalize = (value, array, invert = false) => {
+                        const min = Math.min(...array);
+                        const max = Math.max(...array);
+                        if (max === min) return 0.5;
+                        const normalized = (value - min) / (max - min);
+                        return invert ? 1 - normalized : normalized;
+                      };
+
+                      const CVs = performanceData.map(p => p.CV);
+                      const SVs = performanceData.map(p => p.SV);
+                      const MPHs = performanceData.map(p => p.MPH);
+                      const Eps = performanceData.map(p => p.Ep);
+
+                      // CÁLCULO DEL SCORE COMPUESTO
+                      const rankedPerformers = performanceData.map(performer => {
+                        const zCV = normalize(performer.CV, CVs);
+                        const zSV = normalize(performer.SV, SVs);
+                        const zMPH = normalize(performer.MPH, MPHs);
+                        const zEp = normalize(performer.Ep, Eps);
+
+                        const performanceScore = (
+                          0.40 * zCV +   // 40% CV
+                          0.35 * zSV +   // 35% SV
+                          0.15 * zMPH +  // 15% MPH
+                          0.10 * zEp     // 10% Ep
+                        ) * 100;
+
+                        return {
+                          ...performer,
+                          zCV, zSV, zMPH, zEp,
+                          performanceScore
+                        };
+                      }).sort((a, b) => b.performanceScore - a.performanceScore);
+
+                      return (
+                        <div className="space-y-4">
+                          {rankedPerformers.map((performer, index) => {
+                            const isTop3 = index < 3;
+                            const scoreColor = performer.performanceScore >= 70 ? 'text-green-700' :
+                                             performer.performanceScore >= 50 ? 'text-yellow-700' :
+                                             'text-red-700';
+
+                            return (
+                              <div key={performer.personnelId || index} 
+                                   className={`p-4 rounded-lg border-2 transition-all ${
+                                     isTop3 ? 'border-yellow-300 bg-yellow-50/50 shadow-md' : 
+                                     'border-gray-200 bg-white hover:border-gray-300'
+                                   }`}>
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
+                                      isTop3 ? 'bg-gradient-to-br from-yellow-200 to-yellow-300 text-yellow-800' :
+                                      'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-700'
+                                    }`}>
+                                      #{index + 1}
+                                    </div>
+                                    {isTop3 && <Crown className="h-5 w-5 text-yellow-600" />}
+                                    <div>
+                                      <div className="font-bold text-gray-900">{performer.name}</div>
+                                      <div className="text-xs text-gray-500">
+                                        α: {(performer.alpha * 100).toFixed(2)}% del precio total
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`text-xl font-bold ${scoreColor}`}>
+                                      {performer.performanceScore.toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-gray-500">Performance Score</div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-4 gap-3">
+                                  <div className={`text-center p-2 rounded ${
+                                    performer.criticalCV ? 'bg-red-100 border border-red-300' : 
+                                    performer.CV >= 0 ? 'bg-green-100' : 'bg-orange-100'
+                                  }`}>
+                                    <div className="text-xs font-medium text-gray-600">CV</div>
+                                    <div className={`font-bold ${
+                                      performer.criticalCV ? 'text-red-700' :
+                                      performer.CV >= 0 ? 'text-green-700' : 'text-orange-700'
+                                    }`}>
+                                      {(performer.CV * 100).toFixed(1)}%
+                                    </div>
+                                    {performer.criticalCV && (
+                                      <div className="text-xs text-red-600 font-medium">🚨 CRÍTICO</div>
+                                    )}
+                                  </div>
+
+                                  <div className={`text-center p-2 rounded ${
+                                    performer.criticalSV ? 'bg-red-100 border border-red-300' : 
+                                    performer.SV >= 0 ? 'bg-green-100' : 'bg-orange-100'
+                                  }`}>
+                                    <div className="text-xs font-medium text-gray-600">SV</div>
+                                    <div className={`font-bold ${
+                                      performer.criticalSV ? 'text-red-700' :
+                                      performer.SV >= 0 ? 'text-green-700' : 'text-orange-700'
+                                    }`}>
+                                      {(performer.SV * 100).toFixed(1)}%
+                                    </div>
+                                    {performer.criticalSV && (
+                                      <div className="text-xs text-red-600 font-medium">🚨 CRÍTICO</div>
+                                    )}
+                                  </div>
+
+                                  <div className="text-center p-2 rounded bg-blue-100">
+                                    <div className="text-xs font-medium text-gray-600">MPH</div>
+                                    <div className="font-bold text-blue-700">
+                                      ${performer.MPH.toFixed(0)}/h
+                                    </div>
+                                  </div>
+
+                                  <div className="text-center p-2 rounded bg-purple-100">
+                                    <div className="text-xs font-medium text-gray-600">Ep</div>
+                                    <div className="font-bold text-purple-700">
+                                      {performer.Ep.toFixed(2)}x
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 text-xs text-gray-500 grid grid-cols-2 gap-2">
+                                  <div>Horas: {performer.Hr}h de {performer.He}h</div>
+                                  <div>Precio asignado: ${performer.precioAsignado.toFixed(0)}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* PANEL LATERAL - ALERTAS Y ESTADÍSTICAS */}
+              <div className="space-y-4">
+                {/* Alertas Críticas */}
+                <Card className="border-l-4 border-l-red-500">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base text-red-700">
+                      <AlertTriangle className="h-4 w-4" />
+                      Alertas Críticas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {(() => {
+                      if (!unifiedData?.actuals?.teamBreakdown) return null;
+                      
+                      const teamMembers = unifiedData.actuals.teamBreakdown.filter((m: any) => m.hours > 0) || [];
+                      const alerts: any[] = [];
+                      
+                      teamMembers.forEach((member: any) => {
+                        const hourlyRate = member.hourlyRate || member.rate || 10;
+                        const Ce = member.estimatedHours * hourlyRate;
+                        const Cr = member.hours * hourlyRate;
+                        const He = member.estimatedHours || 0;
+                        const Hr = member.hours || 0;
+                        
+                        const CV = Ce > 0 ? (Ce - Cr) / Ce : 0;
+                        const SV = He > 0 ? (He - Hr) / He : 0;
+                        
+                        if (CV < -0.05) {
+                          alerts.push({
+                            type: 'CV',
+                            member: member.name || 'Sin nombre',
+                            value: (CV * 100).toFixed(1) + '%',
+                            severity: 'critical'
+                          });
+                        }
+                        
+                        if (SV < -0.05) {
+                          alerts.push({
+                            type: 'SV', 
+                            member: member.name || 'Sin nombre',
+                            value: (SV * 100).toFixed(1) + '%',
+                            severity: 'critical'
+                          });
+                        }
+                      });
+                      
+                      if (alerts.length === 0) {
+                        return (
+                          <div className="text-center py-4">
+                            <CheckCircle2 className="h-8 w-8 mx-auto text-green-500 mb-2" />
+                            <p className="text-sm text-green-700">Sin alertas críticas</p>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <div className="space-y-2">
+                          {alerts.map((alert, index) => (
+                            <div key={index} className="p-2 bg-red-50 rounded border border-red-200">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-red-700">{alert.type}</span>
+                                <span className="text-xs text-red-600">{alert.value}</span>
+                              </div>
+                              <div className="text-xs text-gray-600">{alert.member}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Estadísticas del Equipo */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base text-gray-700">
+                      <BarChart3 className="h-4 w-4" />
+                      Estadísticas del Equipo
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {(() => {
+                      if (!unifiedData?.actuals?.teamBreakdown) return null;
+                      
+                      const workingMembers = unifiedData.actuals.teamBreakdown.filter((m: any) => m.hours > 0) || [];
+                      const totalMembers = workingMembers.length;
+                      
+                      if (totalMembers === 0) return <p className="text-sm text-gray-500">Sin datos</p>;
+                      
+                      let positiveCV = 0, positiveSV = 0;
+                      
+                      workingMembers.forEach((member: any) => {
+                        const hourlyRate = member.hourlyRate || member.rate || 10;
+                        const Ce = member.estimatedHours * hourlyRate;
+                        const Cr = member.hours * hourlyRate; 
+                        const He = member.estimatedHours || 0;
+                        const Hr = member.hours || 0;
+                        
+                        const CV = Ce > 0 ? (Ce - Cr) / Ce : 0;
+                        const SV = He > 0 ? (He - Hr) / He : 0;
+                        
+                        if (CV >= 0) positiveCV++;
+                        if (SV >= 0) positiveSV++;
+                      });
+                      
+                      return (
+                        <div className="space-y-3 text-sm">
+                          <div className="flex justify-between">
+                            <span>Miembros activos:</span>
+                            <span className="font-bold">{totalMembers}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>CV positivo:</span>
+                            <span className={`font-bold ${positiveCV/totalMembers >= 0.7 ? 'text-green-600' : 'text-orange-600'}`}>
+                              {positiveCV}/{totalMembers} ({((positiveCV/totalMembers)*100).toFixed(0)}%)
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>SV positivo:</span>
+                            <span className={`font-bold ${positiveSV/totalMembers >= 0.7 ? 'text-green-600' : 'text-orange-600'}`}>
+                              {positiveSV}/{totalMembers} ({((positiveSV/totalMembers)*100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Filtros de Período */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base text-gray-700">
+                      <Filter className="h-4 w-4" />
+                      Filtro Temporal
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <Select 
+                      value={timeFilterForHook || 'current_month'} 
+                      onValueChange={(value) => {
+                        setTimeFilter(value);
+                        queryClient.invalidateQueries({ 
+                          queryKey: [`/api/projects/${projectId}/complete-data`] 
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="current_month">Este mes</SelectItem>
+                        <SelectItem value="last_month">Mes pasado</SelectItem>
+                        <SelectItem value="last_quarter">Trimestre pasado</SelectItem>
+                        <SelectItem value="last_semester">Semestre pasado</SelectItem>
+                        <SelectItem value="current_year">Todo el año</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Los cálculos se actualizan automáticamente
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 
