@@ -2703,15 +2703,15 @@ export default function ProjectDetailsRedesigned() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-green-500 rounded"></div>
-                              <span>Verde: ≤110% presupuesto + eficiencia ≥90%</span>
+                              <span>Verde: 80%-120% del estimado (rango óptimo)</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                              <span>Amarillo: ≤130% presupuesto + eficiencia ≥70%</span>
+                              <span>Amarillo: 70%-130% o 50%-150% del estimado</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 bg-red-500 rounded"></div>
-                              <span>Rojo: &gt;130% presupuesto o eficiencia &lt;70%</span>
+                              <span>Rojo: &lt;50% o &gt;150% del estimado</span>
                             </div>
                           </div>
                           <div className="mt-2 text-gray-300 text-xs">
@@ -2778,14 +2778,23 @@ export default function ProjectDetailsRedesigned() {
                             
 
                             
-                            // Calculate efficiency: closer to 1.0 is better (worked hours close to estimated)
-                            const efficiency = estimatedHours > 0 ? Math.min(2, estimatedHours / Math.max(workedHours, 0.1)) : 0;
-                            
-                            // Strategic color coding based on performance
+                            // CORREGIR LÓGICA DE EFICIENCIA PARA CONSISTENCIA
                             const usageRatio = workedHours / Math.max(estimatedHours, 1);
-                            const isCritical = usageRatio > 1.3 || efficiency < 0.7; // Over 130% usage or low efficiency
-                            const isWarning = usageRatio > 1.1 || efficiency < 0.9; // Over 110% usage or medium efficiency
-                            const isGood = usageRatio <= 1.1 && efficiency >= 0.9; // Within range and good efficiency
+                            
+                            // Criterios consistentes con Top Performers
+                            const isCritical = usageRatio > 1.5 || usageRatio < 0.5; // Muy fuera de rango
+                            const isWarning = (usageRatio > 1.3 || usageRatio < 0.7) && !isCritical; // Moderadamente fuera
+                            const isGood = usageRatio >= 0.8 && usageRatio <= 1.2; // Rango óptimo
+                            
+                            // Calcular eficiencia normalizada para tooltips
+                            let efficiency = 0;
+                            if (usageRatio >= 0.8 && usageRatio <= 1.2) {
+                              efficiency = 1 - Math.abs(usageRatio - 1) * 2; // Pico en 1.0
+                            } else if (usageRatio < 0.8) {
+                              efficiency = Math.max(0, usageRatio / 0.8 * 0.5);
+                            } else {
+                              efficiency = Math.max(0, 1 - (usageRatio - 1.2) * 2);
+                            }
                             
                             const bgColor = isCritical ? 'bg-red-500' : 
                                            isWarning ? 'bg-yellow-500' : 
@@ -2856,10 +2865,13 @@ export default function ProjectDetailsRedesigned() {
                           <div className="space-y-1">
                             <div><strong>Eficiencia (40 pts):</strong> Mantenerse dentro del presupuesto</div>
                             <div><strong>Peso del proyecto (30 pts):</strong> Importancia por horas asignadas</div>
-                            <div><strong>Uso óptimo (30 pts):</strong> Penaliza excesos de presupuesto</div>
+                            <div><strong>Uso óptimo (30 pts):</strong> Rango perfecto 90%-110%</div>
                           </div>
                           <div className="mt-2 text-gray-300 text-xs">
-                            Usa datos reales de time entries vs horas estimadas escaladas según período temporal
+                            <div><strong>Nuevos criterios mejorados:</strong></div>
+                            <div>• Óptimo: 80%-120% del estimado</div>
+                            <div>• Atención: 70%-130% o 50%-150%</div>
+                            <div>• Crítico: &lt;50% o &gt;150%</div>
                           </div>
                         </div>
                       </div>
@@ -2898,17 +2910,37 @@ export default function ProjectDetailsRedesigned() {
                         
 
                         
-                        // Efficiency score (0-40 points) - how well they stay within estimates
+                        // Efficiency score (0-40 points) - penaliza excesos y sub-trabajo
                         const usageRatio = workedHours / Math.max(estimatedHours, 1);
-                        const efficiency = usageRatio <= 1 ? 1 : Math.max(0, 1 - (usageRatio - 1));
+                        // Optimal range: 0.8-1.2 (80%-120% de lo estimado)
+                        let efficiency = 0;
+                        if (usageRatio >= 0.8 && usageRatio <= 1.2) {
+                          // Rango óptimo: máxima puntuación
+                          efficiency = 1 - Math.abs(usageRatio - 1) * 2; // Pico en 1.0
+                        } else if (usageRatio < 0.8) {
+                          // Sub-trabajo: penalizar severamente
+                          efficiency = Math.max(0, usageRatio / 0.8 * 0.5);
+                        } else {
+                          // Sobre-trabajo: penalizar gradualmente
+                          efficiency = Math.max(0, 1 - (usageRatio - 1.2) * 2);
+                        }
                         const efficiencyScore = efficiency * 40;
                         
                         // Project weight score (0-30 points) - based on estimated hours in project
                         const maxEstimatedInProject = Math.max(...workingMembers.map((m: any) => (m.estimatedHours || 0)));
                         const projectWeightScore = maxEstimatedInProject > 0 ? (estimatedHours / maxEstimatedInProject) * 30 : 0;
                         
-                        // Hour usage score (0-30 points) - optimal usage around estimate
-                        const hourUsageScore = usageRatio <= 1 ? 30 : Math.max(0, 30 - ((usageRatio - 1) * 20));
+                        // Hour usage score (0-30 points) - premia trabajo completo pero dentro de límites
+                        let hourUsageScore = 0;
+                        if (usageRatio >= 0.9 && usageRatio <= 1.1) {
+                          hourUsageScore = 30; // Rango perfecto: 90%-110%
+                        } else if (usageRatio >= 0.7 && usageRatio <= 1.3) {
+                          hourUsageScore = 20; // Rango aceptable: 70%-130%
+                        } else if (usageRatio >= 0.5 && usageRatio <= 1.5) {
+                          hourUsageScore = 10; // Rango marginal: 50%-150%
+                        } else {
+                          hourUsageScore = 0; // Fuera de rangos aceptables
+                        }
                         
                         const totalScore = efficiencyScore + projectWeightScore + hourUsageScore;
                         
