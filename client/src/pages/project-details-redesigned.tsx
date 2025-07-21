@@ -1580,7 +1580,7 @@ export default function ProjectDetailsRedesigned() {
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Rentabilidad del proyecto
+                      Precio cliente / Costo real
                     </p>
                   </div>
                 </CardContent>
@@ -1594,7 +1594,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="p-2 bg-green-100 rounded-lg">
                         <Clock className="h-4 w-4 text-green-600" />
                       </div>
-                      <span className="text-sm font-medium text-green-700">Progreso</span>
+                      <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
@@ -1629,7 +1629,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="p-2 bg-orange-100 rounded-lg">
                         <DollarSign className="h-4 w-4 text-orange-600" />
                       </div>
-                      <span className="text-sm font-medium text-orange-700">Presupuesto</span>
+                      <span className="text-sm font-medium text-orange-700">Uso de Budget</span>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-500">
