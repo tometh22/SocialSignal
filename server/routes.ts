@@ -405,6 +405,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const markup = totalWorkedCost > 0 ? adjustedTotalAmount / totalWorkedCost : 0;
       const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
 
+      // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
+      const { calculateTeamRankings } = await import('../shared/ranking-utils');
+      
+      // Preparar datos del equipo para rankings
+      const teamRankingData = Object.values(teamBreakdown).map(member => ({
+        personnelId: member.personnelId,
+        personnelName: member.personnelName,
+        estimatedHours: member.estimatedHours || 0,
+        actualHours: member.actualHours || 0,
+        estimatedCost: member.estimatedCost || 0,
+        actualCost: member.actualCost || 0
+      }));
+
+      // Calcular rankings con datos reales del proyecto
+      const economicRankings = calculateTeamRankings(teamRankingData, adjustedTotalAmount);
+
+      console.log(`📊 Economic rankings calculated for ${economicRankings.length} team members`);
+
       // 5. Crear el objeto consolidado (FUENTE ÚNICA DE VERDAD)
       const completeData = {
         // Datos base del proyecto
@@ -453,6 +471,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalWorkedCost,
           totalEntries: timeEntries.length,
           teamBreakdown: Object.values(teamBreakdown) // Convert object to array for frontend
+        },
+        
+        // NUEVOS RANKINGS ECONÓMICOS
+        rankings: {
+          economicMetrics: economicRankings,
+          summary: {
+            totalMembers: economicRankings.length,
+            excellentPerformers: economicRankings.filter(m => m.performanceColor === 'green').length,
+            goodPerformers: economicRankings.filter(m => m.performanceColor === 'yellow').length,
+            criticalPerformers: economicRankings.filter(m => m.performanceColor === 'red').length
+          }
         },
         
         // Métricas calculadas (ÚNICA FUENTE)
