@@ -2771,9 +2771,13 @@ export default function ProjectDetailsRedesigned() {
                             const workedHours = member.hours || 0; // Real hours from time entries
                             const baseEstimatedHours = member.estimatedHours || 1; // Base estimated hours from quotation
                             
-                            // APLICAR ESCALAMIENTO TEMPORAL PARA CONSISTENCIA
-                            const multiplier = getQuotationMultiplier();
-                            const estimatedHours = baseEstimatedHours * multiplier; // Escalar según filtro temporal
+                            // ESCALAMIENTO TEMPORAL CORREGIDO: Solo para Always-On y períodos futuros
+                            const isAlwaysOn = completeData?.quotation?.isAlwaysOn || false;
+                            const isHistoricalPeriod = timeFilterForHook === 'last_month' || timeFilterForHook === 'last_quarter';
+                            const shouldScale = isAlwaysOn && !isHistoricalPeriod;
+                            
+                            const multiplier = shouldScale ? getQuotationMultiplier() : 1;
+                            const estimatedHours = baseEstimatedHours * multiplier;
                             const name = member.name || member.personnelName || `Miembro ${index + 1}`;
                             
 
@@ -2902,9 +2906,13 @@ export default function ProjectDetailsRedesigned() {
                         const workedHours = member.hours || 0; // Real hours from time entries
                         const baseEstimatedHours = member.estimatedHours || 1; // Base estimated from quotation
                         
-                        // APLICAR ESCALAMIENTO TEMPORAL PARA CONSISTENCIA CON CARDS PRINCIPALES
-                        const multiplier = getQuotationMultiplier();
-                        const estimatedHours = baseEstimatedHours * multiplier; // Escalar según filtro temporal
+                        // ESCALAMIENTO TEMPORAL CORREGIDO: Solo para Always-On y solo para filtros futuros
+                        const isAlwaysOn = completeData?.quotation?.isAlwaysOn || false;
+                        const isHistoricalPeriod = timeFilterForHook === 'last_month' || timeFilterForHook === 'last_quarter';
+                        const shouldScale = isAlwaysOn && !isHistoricalPeriod;
+                        
+                        const multiplier = shouldScale ? getQuotationMultiplier() : 1;
+                        const estimatedHours = baseEstimatedHours * multiplier;
                         const hourlyRate = member.hourlyRate || member.rate || 10;
                         const name = member.name || member.personnelName || `Miembro ${workingMembers.indexOf(member) + 1}`;
                         
@@ -2944,6 +2952,27 @@ export default function ProjectDetailsRedesigned() {
                         
                         const totalScore = efficiencyScore + projectWeightScore + hourUsageScore;
                         
+                        // AUDITORÍA DETALLADA - Solo para casos específicos
+                        if (['Ina Ceravolo', 'Xavier Aranza', 'Santiago Berisso', 'Aylen Magali', 'Romi Figueroa'].includes(name)) {
+                          console.log(`🔍 AUDIT ${name}:`, {
+                            shouldScale,
+                            isAlwaysOn,
+                            isHistoricalPeriod,
+                            multiplier,
+                            baseEstimatedHours,
+                            scaledEstimatedHours: estimatedHours,
+                            workedHours,
+                            usageRatio: usageRatio.toFixed(3),
+                            efficiency: efficiency.toFixed(3),
+                            scores: {
+                              efficiency: efficiencyScore.toFixed(1),
+                              projectWeight: projectWeightScore.toFixed(1),
+                              hourUsage: hourUsageScore.toFixed(1),
+                              total: totalScore.toFixed(1)
+                            }
+                          });
+                        }
+                        
                         return {
                           ...member,
                           name,
@@ -2961,6 +2990,12 @@ export default function ProjectDetailsRedesigned() {
                       const topPerformers = performersWithScore
                         .sort((a, b) => b.totalScore - a.totalScore)
                         .slice(0, 5);
+                      
+                      // AUDITORÍA FINAL DEL RANKING
+                      console.log('🏆 TOP PERFORMERS RANKING:');
+                      topPerformers.forEach((p, i) => {
+                        console.log(`  ${i+1}. ${p.name}: ${p.totalScore.toFixed(1)} pts (${(p.usageRatio * 100).toFixed(0)}% eficiencia)`);
+                      });
                       
                       return topPerformers.map((performer, index) => {
                         const isTopPerformer = index === 0;
