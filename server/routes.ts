@@ -127,6 +127,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📊 Total estimated hours from quotation:`, estimatedHours);
       }
 
+      // 2.5. Obtener ajustes de horas mensuales
+      const monthlyHourAdjustments = await storage.getMonthlyHourAdjustments(id);
+      console.log(`📊 Monthly hour adjustments for project ${id}:`, monthlyHourAdjustments.length, 'adjustments');
+
+      // Función para obtener horas estimadas ajustadas por mes/año
+      const getAdjustedHours = (personnelId: number, originalHours: number, targetYear?: number, targetMonth?: number) => {
+        if (!targetYear || !targetMonth) return originalHours;
+        
+        const adjustment = monthlyHourAdjustments.find(adj => 
+          adj.personnelId === personnelId && 
+          adj.year === targetYear && 
+          adj.month === targetMonth
+        );
+        
+        if (adjustment) {
+          console.log(`📊 Found hour adjustment for personnel ${personnelId} (${adjustment.reason}): ${originalHours}h → ${adjustment.adjustedHours}h`);
+          return adjustment.adjustedHours;
+        }
+        
+        return originalHours;
+      };
+
       // 3. Función para aplicar filtros temporales
       const getDateRangeForFilter = (filter: string) => {
         const now = new Date();
@@ -285,8 +307,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!teamBreakdown[personnelId]) {
           // Find estimated hours for this personnel from quotation team
           const quotationMember = quotationTeam.find(m => m.personnelId === entry.personnelId);
-          const estimatedHours = quotationMember ? quotationMember.hours : 0;
+          let estimatedHours = quotationMember ? quotationMember.hours : 0;
           const isQuoted = quotationMember !== undefined;
+          
+          // Aplicar ajustes de horas mensuales si el filtro es específico de mes
+          if (dateRange && timeFilter.includes('may_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 5);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied May 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          } else if (dateRange && timeFilter.includes('june_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 6);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied June 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          } else if (dateRange && timeFilter.includes('july_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 7);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied July 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          }
           
           // Usar el rol REAL del personal desde su perfil, no el rol de la cotización
           let actualRole = entry.role?.name || 'Sin Rol';
@@ -336,10 +379,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // 4.5. Agregar miembros del equipo de cotización que no tienen time entries en este período
+      for (const quotationMember of quotationTeam) {
+        const personnelId = quotationMember.personnelId.toString();
+        if (!teamBreakdown[personnelId]) {
+          let estimatedHours = quotationMember.hours || 0;
+          
+          // Aplicar ajustes de horas mensuales si el filtro es específico de mes
+          if (dateRange && timeFilter.includes('may_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 5);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied May 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          } else if (dateRange && timeFilter.includes('june_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 6);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied June 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          } else if (dateRange && timeFilter.includes('july_2025')) {
+            const originalHours = estimatedHours;
+            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 7);
+            if (originalHours !== estimatedHours) {
+              console.log(`📊 Applied July 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+            }
+          }
+
+          teamBreakdown[personnelId] = {
+            personnelId: quotationMember.personnelId,
+            name: quotationMember.personnelName || 'Unknown',
+            roleName: quotationMember.roleName || 'Unknown Role',
+            hourlyRate: quotationMember.rate || 0,
+            hours: 0, // No worked hours in this period
+            cost: 0, // No cost in this period
+            entries: 0,
+            lastActivity: null,
+            estimatedHours: estimatedHours, // Adjusted hours
+            rate: quotationMember.rate || 0,
+            isQuoted: true,
+            isUnquoted: false
+          };
+        }
+      }
+
       console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
       console.log(`📊 Total worked hours:`, totalWorkedHours);
       console.log(`📊 Total worked cost:`, totalWorkedCost);
-      console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members`);
+      console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members (including quotation team)`);
 
       // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
       let adjustedEstimatedHours = estimatedHours;
