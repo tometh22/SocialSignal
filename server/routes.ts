@@ -411,7 +411,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Preparar datos del equipo para rankings
       const teamRankingData = Object.values(teamBreakdown).map(member => ({
         personnelId: member.personnelId,
-        personnelName: member.personnelName,
+        name: member.personnelName || member.name || `Miembro ${member.personnelId}`,
+        personnelName: member.personnelName || member.name || `Miembro ${member.personnelId}`,
         estimatedHours: member.estimatedHours || 0,
         actualHours: member.actualHours || 0,
         estimatedCost: member.estimatedCost || 0,
