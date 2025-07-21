@@ -1934,6 +1934,7 @@ export default function ProjectDetailsRedesigned() {
               <EconomicRankings 
                 rankings={unifiedData?.rankings?.economicMetrics || []}
                 loading={!unifiedData}
+                projectTotalPrice={unifiedData?.quotation?.totalAmount || 100000}
               />
             </div>
           </TabsContent>

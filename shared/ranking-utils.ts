@@ -107,11 +107,12 @@ export function calculateImpactScores(
  */
 export function calculateUnifiedScores(
   efficiencyScores: number[],
-  pricePercentages: number[]
+  pricePercentages: number[],
+  customWeights?: { efficiency: number; impact: number }
 ): number[] {
   if (efficiencyScores.length !== pricePercentages.length) return [];
   
-  const weights = RANKING_CONFIG.unifiedWeights;
+  const weights = customWeights || RANKING_CONFIG.unifiedWeights;
   
   // Normalizar porcentajes de precio a escala 0-100
   const normalizedPrices = normalizeToScale(pricePercentages);
@@ -159,7 +160,8 @@ export function calculateTeamRankings(
     estimatedCost: number;
     actualCost: number;
   }>,
-  totalProjectPrice: number
+  totalProjectPrice: number,
+  customUnifiedWeights?: { efficiency: number; impact: number }
 ): PersonnelMetrics[] {
   if (teamData.length === 0) return [];
   
@@ -184,7 +186,7 @@ export function calculateTeamRankings(
   const efficiencyScores = calculateEfficiencyScores(baseMetrics);
   const pricePercentages = baseMetrics.map(m => m.pricePercentage);
   const impactScores = calculateImpactScores(efficiencyScores, pricePercentages);
-  const unifiedScores = calculateUnifiedScores(efficiencyScores, pricePercentages);
+  const unifiedScores = calculateUnifiedScores(efficiencyScores, pricePercentages, customUnifiedWeights);
   
   // Asignar rankings
   const efficiencyRanks = assignRankings(efficiencyScores);

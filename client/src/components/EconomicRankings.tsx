@@ -2,18 +2,51 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings } from "lucide-react";
 import { RankingType, PersonnelMetrics } from "@shared/ranking-config";
-import { sortByRankingType } from "@shared/ranking-utils";
-import { useState } from "react";
+import { sortByRankingType, calculateTeamRankings } from "@shared/ranking-utils";
+import { useState, useMemo } from "react";
 
 interface EconomicRankingsProps {
   rankings: PersonnelMetrics[];
   loading?: boolean;
+  projectTotalPrice?: number; // Necesario para recalcular rankings dinámicamente
 }
 
-export function EconomicRankings({ rankings, loading = false }: EconomicRankingsProps) {
+export function EconomicRankings({ rankings, loading = false, projectTotalPrice = 100000 }: EconomicRankingsProps) {
   const [showConfig, setShowConfig] = useState(false);
+  const [impactWeight, setImpactWeight] = useState(50); // Por defecto 50% impacto, 50% eficiencia
+  
+  // Recalcular rankings dinámicamente cuando cambia el slider
+  const dynamicRankings = useMemo(() => {
+    if (!rankings || rankings.length === 0) return [];
+    
+    // Crear datos base para recalcular
+    const teamData = rankings.map(member => ({
+      personnelId: member.personnelId,
+      name: member.personnelName,
+      personnelName: member.personnelName,
+      estimatedHours: member.estimatedHours,
+      actualHours: member.actualHours,
+      estimatedCost: member.estimatedCost,
+      actualCost: member.actualCost
+    }));
+    
+    // Usar la nueva configuración de peso
+    const customConfig = {
+      impact: impactWeight / 100,
+      efficiency: (100 - impactWeight) / 100
+    };
+    
+    try {
+      // Recalcular con nueva configuración
+      return calculateTeamRankings(teamData, projectTotalPrice, customConfig);
+    } catch (error) {
+      console.warn('Error recalculando rankings:', error);
+      return rankings; // Fallback a rankings originales
+    }
+  }, [rankings, impactWeight, projectTotalPrice]);
   if (loading) {
     return (
       <Card>
@@ -51,10 +84,18 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
     );
   }
 
-  // Preparar los tres rankings diferentes
-  const efficiencyRanking = sortByRankingType(rankings, 'efficiency');
-  const impactRanking = sortByRankingType(rankings, 'impact');
-  const unifiedRanking = sortByRankingType(rankings, 'unified');
+  // Preparar los tres rankings diferentes usando rankings dinámicos
+  const efficiencyRanking = sortByRankingType(dynamicRankings, 'efficiency');
+  const impactRanking = sortByRankingType(dynamicRankings, 'impact');
+  const unifiedRanking = sortByRankingType(dynamicRankings, 'unified');
+  
+  // Función para obtener la configuración actual
+  const getCurrentConfig = () => {
+    const efficiency = 100 - impactWeight;
+    if (impactWeight <= 35) return { name: "Conservativo", desc: `Eficiencia ${efficiency}% + Impacto ${impactWeight}%` };
+    if (impactWeight >= 65) return { name: "Estratégico", desc: `Eficiencia ${efficiency}% + Impacto ${impactWeight}%` };
+    return { name: "Balanceado", desc: `Eficiencia ${efficiency}% + Impacto ${impactWeight}%` };
+  };
 
   const getRankingIcon = (rank: number) => {
     if (rank === 1) return <Trophy className="w-4 h-4 text-yellow-500" />;
@@ -124,8 +165,8 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
         {rankings.slice(0, 8).map((member) => {
           const score = member[scoreKey] as number;
           const rank = member[rankKey] as number;
-          // Intentar múltiples campos para obtener el nombre
-          const memberName = member.name || member.personnelName || member.personnelName || `Miembro ${member.personnelId}`;
+          // Obtener el nombre del miembro
+          const memberName = member.personnelName || `Miembro ${member.personnelId}`;
           
           return (
             <div
@@ -202,46 +243,76 @@ export function EconomicRankings({ rankings, loading = false }: EconomicRankings
           </div>
         </div>
 
-        {/* Panel de Configuración del Ranking Unificado */}
+        {/* Control Dinámico del Ranking Unificado */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h4 className="font-medium text-gray-900 flex items-center gap-2">
               <Settings className="w-4 h-4" />
-              Configuración Ranking Unificado
+              Balance Dinámico Ranking Unificado
             </h4>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowConfig(!showConfig)}
             >
-              {showConfig ? 'Ocultar' : 'Ajustar'}
+              {showConfig ? 'Ocultar' : 'Configurar'}
             </Button>
           </div>
           
-          {showConfig && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Actualmente: <strong>Balance 50/50</strong> (Eficiencia 50% + Impacto Económico 50%)
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                <div className="p-3 bg-white rounded border">
-                  <div className="font-medium">Conservativo</div>
-                  <div className="text-gray-500">Eficiencia 70% + Impacto 30%</div>
-                  <div className="text-xs text-gray-400 mt-1">Prioriza cumplimiento individual</div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-blue-600">Configuración: {getCurrentConfig().name}</span>
+              <span className="text-gray-600">{getCurrentConfig().desc}</span>
+            </div>
+            
+            {showConfig && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Eficiencia Individual</span>
+                    <span>Impacto Económico</span>
+                  </div>
+                  <Slider
+                    value={[impactWeight]}
+                    onValueChange={([value]) => setImpactWeight(value)}
+                    max={100}
+                    min={0}
+                    step={5}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>100% - 0%</span>
+                    <span>Actual: {100 - impactWeight}% - {impactWeight}%</span>
+                    <span>0% - 100%</span>
+                  </div>
                 </div>
-                <div className="p-3 bg-blue-100 rounded border border-blue-300">
-                  <div className="font-medium">Balanceado ✓</div>
-                  <div className="text-gray-500">Eficiencia 50% + Impacto 50%</div>
-                  <div className="text-xs text-gray-400 mt-1">Configuración actual</div>
-                </div>
-                <div className="p-3 bg-white rounded border">
-                  <div className="font-medium">Estratégico</div>
-                  <div className="text-gray-500">Eficiencia 30% + Impacto 70%</div>
-                  <div className="text-xs text-gray-400 mt-1">Prioriza valor económico</div>
+                
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <button 
+                    className={`p-2 rounded ${impactWeight <= 35 ? 'bg-blue-100 border border-blue-300' : 'bg-white border'}`}
+                    onClick={() => setImpactWeight(30)}
+                  >
+                    <div className="font-medium">Conservativo</div>
+                    <div className="text-gray-500">70% - 30%</div>
+                  </button>
+                  <button 
+                    className={`p-2 rounded ${impactWeight >= 45 && impactWeight <= 55 ? 'bg-blue-100 border border-blue-300' : 'bg-white border'}`}
+                    onClick={() => setImpactWeight(50)}
+                  >
+                    <div className="font-medium">Balanceado</div>
+                    <div className="text-gray-500">50% - 50%</div>
+                  </button>
+                  <button 
+                    className={`p-2 rounded ${impactWeight >= 65 ? 'bg-blue-100 border border-blue-300' : 'bg-white border'}`}
+                    onClick={() => setImpactWeight(70)}
+                  >
+                    <div className="font-medium">Estratégico</div>
+                    <div className="text-gray-500">30% - 70%</div>
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
