@@ -598,6 +598,28 @@ export const insertProgressReportSchema = createInsertSchema(progressReports).om
   createdAt: true,
 });
 
+// ==================== AJUSTES HISTÓRICOS DE HORAS ====================
+// Tabla para manejar horas estimadas variables por persona y mes
+export const monthlyHourAdjustments = pgTable("monthly_hour_adjustments", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  adjustedHours: doublePrecision("adjusted_hours").notNull(),
+  reason: text("reason"), // Opcional: explicar el motivo del ajuste
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMonthlyHourAdjustmentSchema = createInsertSchema(monthlyHourAdjustments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MonthlyHourAdjustment = typeof monthlyHourAdjustments.$inferSelect;
+export type InsertMonthlyHourAdjustment = z.infer<typeof insertMonthlyHourAdjustmentSchema>;
+
 // ==================== SISTEMA DE CHAT ====================
 // Tabla de conversaciones
 export const chatConversations = pgTable("chat_conversations", {

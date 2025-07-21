@@ -22,13 +22,14 @@ import {
   type QuickTimeEntry, type InsertQuickTimeEntry,
   type QuickTimeEntryDetail, type InsertQuickTimeEntryDetail,
   type UnquotedPersonnel, type InsertUnquotedPersonnel,
+  type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
-  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel
+  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
@@ -245,6 +246,13 @@ export interface IStorage {
   getUnquotedPersonnel(projectId: number): Promise<any[]>;
   getUnquotedPersonnelByProject(projectId: number): Promise<any[]>;
   checkIfPersonnelIsUnquoted(projectId: number, personnelId: number): Promise<boolean>;
+
+  // Monthly Hour Adjustment operations
+  getMonthlyHourAdjustments(projectId: number): Promise<any[]>;
+  getMonthlyHourAdjustment(projectId: number, personnelId: number, year: number, month: number): Promise<any | undefined>;
+  createMonthlyHourAdjustment(adjustment: any): Promise<any>;
+  updateMonthlyHourAdjustment(id: number, adjustment: any): Promise<any | undefined>;
+  deleteMonthlyHourAdjustment(id: number): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -2545,6 +2553,119 @@ export class DatabaseStorage implements IStorage {
       return !isInQuotation;
     } catch (error) {
       console.error("Error checking if personnel is unquoted:", error);
+      return false;
+    }
+  }
+
+  // ==================== MONTHLY HOUR ADJUSTMENTS OPERATIONS ====================
+
+  async getMonthlyHourAdjustments(projectId: number): Promise<MonthlyHourAdjustment[]> {
+    try {
+      const result = await db.select({
+        id: monthlyHourAdjustments.id,
+        projectId: monthlyHourAdjustments.projectId,
+        personnelId: monthlyHourAdjustments.personnelId,
+        year: monthlyHourAdjustments.year,
+        month: monthlyHourAdjustments.month,
+        adjustedHours: monthlyHourAdjustments.adjustedHours,
+        reason: monthlyHourAdjustments.reason,
+        createdBy: monthlyHourAdjustments.createdBy,
+        createdAt: monthlyHourAdjustments.createdAt,
+        personnelName: personnel.name
+      })
+      .from(monthlyHourAdjustments)
+      .leftJoin(personnel, eq(monthlyHourAdjustments.personnelId, personnel.id))
+      .where(eq(monthlyHourAdjustments.projectId, projectId));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting monthly hour adjustments:", error);
+      throw error;
+    }
+  }
+
+  async getMonthlyHourAdjustment(projectId: number, personnelId: number, year: number, month: number): Promise<MonthlyHourAdjustment | undefined> {
+    try {
+      const [result] = await db.select()
+        .from(monthlyHourAdjustments)
+        .where(
+          and(
+            eq(monthlyHourAdjustments.projectId, projectId),
+            eq(monthlyHourAdjustments.personnelId, personnelId),
+            eq(monthlyHourAdjustments.year, year),
+            eq(monthlyHourAdjustments.month, month)
+          )
+        );
+
+      return result;
+    } catch (error) {
+      console.error("Error getting monthly hour adjustment:", error);
+      throw error;
+    }
+  }
+
+  async createMonthlyHourAdjustment(adjustment: InsertMonthlyHourAdjustment): Promise<MonthlyHourAdjustment> {
+    try {
+      console.log(`🔧 Creating monthly hour adjustment:`, adjustment);
+      
+      // Verificar si ya existe un ajuste para este período
+      const existing = await this.getMonthlyHourAdjustment(
+        adjustment.projectId, 
+        adjustment.personnelId, 
+        adjustment.year, 
+        adjustment.month
+      );
+
+      if (existing) {
+        // Actualizar el ajuste existente
+        const [updated] = await db.update(monthlyHourAdjustments)
+          .set({ 
+            adjustedHours: adjustment.adjustedHours,
+            reason: adjustment.reason,
+            createdBy: adjustment.createdBy
+          })
+          .where(eq(monthlyHourAdjustments.id, existing.id))
+          .returning();
+        
+        console.log(`✅ Updated existing monthly hour adjustment:`, updated);
+        return updated;
+      }
+
+      // Crear nuevo ajuste
+      const [created] = await db.insert(monthlyHourAdjustments)
+        .values(adjustment)
+        .returning();
+
+      console.log(`✅ Successfully created monthly hour adjustment:`, created);
+      return created;
+    } catch (error) {
+      console.error("Error creating monthly hour adjustment:", error);
+      throw error;
+    }
+  }
+
+  async updateMonthlyHourAdjustment(id: number, adjustment: Partial<InsertMonthlyHourAdjustment>): Promise<MonthlyHourAdjustment | undefined> {
+    try {
+      const [updated] = await db.update(monthlyHourAdjustments)
+        .set(adjustment)
+        .where(eq(monthlyHourAdjustments.id, id))
+        .returning();
+
+      return updated;
+    } catch (error) {
+      console.error("Error updating monthly hour adjustment:", error);
+      throw error;
+    }
+  }
+
+  async deleteMonthlyHourAdjustment(id: number): Promise<boolean> {
+    try {
+      await db.delete(monthlyHourAdjustments)
+        .where(eq(monthlyHourAdjustments.id, id));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting monthly hour adjustment:", error);
       return false;
     }
   }

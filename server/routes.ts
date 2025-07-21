@@ -25,6 +25,7 @@ import {
   insertQuickTimeEntryDetailSchema,
   insertMonthlyInflationSchema,
   insertSystemConfigSchema,
+  insertMonthlyHourAdjustmentSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   exchangeRateHistory,
@@ -4462,6 +4463,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error approving quick time entry:", error);
       res.status(500).json({ message: "Failed to approve quick time entry" });
+    }
+  });
+
+  // ==================== MONTHLY HOUR ADJUSTMENTS ROUTES ====================
+
+  // Obtener todos los ajustes de horas mensuales de un proyecto
+  app.get("/api/projects/:id/monthly-hour-adjustments", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const adjustments = await storage.getMonthlyHourAdjustments(projectId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error fetching monthly hour adjustments:", error);
+      res.status(500).json({ message: "Failed to fetch monthly hour adjustments" });
+    }
+  });
+
+  // Crear o actualizar ajuste de horas mensuales
+  app.post("/api/projects/:id/monthly-hour-adjustments", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const adjustmentData = insertMonthlyHourAdjustmentSchema.parse({
+        ...req.body,
+        projectId,
+        createdBy: req.user?.id || 1
+      });
+
+      const adjustment = await storage.createMonthlyHourAdjustment(adjustmentData);
+      res.status(201).json(adjustment);
+    } catch (error) {
+      console.error("Error creating monthly hour adjustment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create monthly hour adjustment" });
+    }
+  });
+
+  // Obtener ajuste específico de horas mensuales
+  app.get("/api/projects/:id/monthly-hour-adjustments/:personnelId/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const personnelId = parseInt(req.params.personnelId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      if (isNaN(projectId) || isNaN(personnelId) || isNaN(year) || isNaN(month)) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const adjustment = await storage.getMonthlyHourAdjustment(projectId, personnelId, year, month);
+      if (!adjustment) {
+        return res.status(404).json({ message: "Adjustment not found" });
+      }
+
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Error fetching monthly hour adjustment:", error);
+      res.status(500).json({ message: "Failed to fetch monthly hour adjustment" });
+    }
+  });
+
+  // Actualizar ajuste de horas mensuales
+  app.patch("/api/monthly-hour-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const updateData = insertMonthlyHourAdjustmentSchema.partial().parse(req.body);
+      const adjustment = await storage.updateMonthlyHourAdjustment(id, updateData);
+      
+      if (!adjustment) {
+        return res.status(404).json({ message: "Adjustment not found" });
+      }
+
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Error updating monthly hour adjustment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update monthly hour adjustment" });
+    }
+  });
+
+  // Eliminar ajuste de horas mensuales
+  app.delete("/api/monthly-hour-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const success = await storage.deleteMonthlyHourAdjustment(id);
+      if (!success) {
+        return res.status(404).json({ message: "Adjustment not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting monthly hour adjustment:", error);
+      res.status(500).json({ message: "Failed to delete monthly hour adjustment" });
     }
   });
 
