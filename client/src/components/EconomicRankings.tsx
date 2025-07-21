@@ -12,9 +12,17 @@ interface EconomicRankingsProps {
   rankings: PersonnelMetrics[];
   loading?: boolean;
   projectTotalPrice?: number; // Necesario para recalcular rankings dinámicamente
+  timeFilter?: string; // Para aplicar escalamiento temporal
+  getTimeMultiplier?: () => number; // Función para obtener multiplicador temporal
 }
 
-export function EconomicRankings({ rankings, loading = false, projectTotalPrice = 100000 }: EconomicRankingsProps) {
+export function EconomicRankings({ 
+  rankings, 
+  loading = false, 
+  projectTotalPrice = 100000, 
+  timeFilter = 'current_month',
+  getTimeMultiplier = () => 1 
+}: EconomicRankingsProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [impactWeight, setImpactWeight] = useState(50); // Por defecto 50% impacto, 50% eficiencia
   
@@ -183,7 +191,7 @@ export function EconomicRankings({ rankings, loading = false, projectTotalPrice 
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {member.actualHours.toFixed(0)}h / {member.estimatedHours.toFixed(0)}h
+                      {member.actualHours.toFixed(0)}h / {(member.estimatedHours * getTimeMultiplier()).toFixed(0)}h
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />

@@ -409,15 +409,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
       
       // Preparar datos del equipo para rankings
-      const teamRankingData = Object.values(teamBreakdown).map(member => ({
-        personnelId: member.personnelId,
-        name: member.name || `Miembro ${member.personnelId}`,
-        personnelName: member.name || `Miembro ${member.personnelId}`,
-        estimatedHours: member.estimatedHours || 0,
-        actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
-        estimatedCost: (member.estimatedHours || 0) * (member.rate || 0),
-        actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
-      }));
+      const teamRankingData = Object.values(teamBreakdown).map(member => {
+        // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas individuales
+        const baseEstimatedHours = member.estimatedHours || 0;
+        const scaledEstimatedHours = baseEstimatedHours * timeMultiplier;
+        const scaledEstimatedCost = scaledEstimatedHours * (member.rate || 0);
+        
+        return {
+          personnelId: member.personnelId,
+          name: member.name || `Miembro ${member.personnelId}`,
+          personnelName: member.name || `Miembro ${member.personnelId}`,
+          estimatedHours: scaledEstimatedHours, // ESCALADO SEGÚN PERÍODO TEMPORAL
+          actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
+          estimatedCost: scaledEstimatedCost, // ESCALADO SEGÚN PERÍODO TEMPORAL
+          actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
+        };
+      });
 
       // Debug: Ver datos que van al cálculo de rankings
       console.log(`📊 Team ranking data prepared:`, teamRankingData.slice(0, 2)); // Solo mostrar primeros 2 para debug

@@ -475,6 +475,11 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     // Buscar datos de cotización para mostrar estimaciones
     const quotationMember = quotationTeam.find((q: any) => q.personnelId === member.personnelId);
     
+    // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas
+    const baseEstimatedHours = quotationMember?.hours || 0;
+    const multiplier = getQuotationMultiplier();
+    const scaledEstimatedHours = baseEstimatedHours * multiplier;
+    
     return {
       ...member,
       // Datos reales (ya vienen del backend correctos)
@@ -482,8 +487,10 @@ function ProjectTeamSection({ projectId, unifiedData }: {
       actualName: member.name || 'Sin Nombre',
       actualRoleName: member.roleName || 'Sin Rol',
       actualRate: member.rate || member.hourlyRate || 0,
-      // Datos de estimación (de la cotización original)
-      estimatedHours: quotationMember?.hours || 0,
+      // Datos de estimación (escalados según período temporal)
+      estimatedHours: scaledEstimatedHours,
+      baseEstimatedHours: baseEstimatedHours, // Para debugging
+      timeMultiplier: multiplier, // Para debugging
       // Flags de estado (ya vienen del backend)
       isQuoted: member.isQuoted || false,
       isUnquoted: member.isUnquoted || false
@@ -666,7 +673,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
                     {workedHours.toFixed(1)}h
                   </div>
                   <div className="text-xs text-gray-500">
-                    de {estimatedHours}h
+                    de {estimatedHours.toFixed(0)}h {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
                   </div>
                 </div>
 
@@ -1935,6 +1942,8 @@ export default function ProjectDetailsRedesigned() {
                 rankings={unifiedData?.rankings?.economicMetrics || []}
                 loading={!unifiedData}
                 projectTotalPrice={unifiedData?.quotation?.totalAmount || 100000}
+                timeFilter={timeFilterForHook}
+                getTimeMultiplier={getQuotationMultiplier}
               />
             </div>
           </TabsContent>
