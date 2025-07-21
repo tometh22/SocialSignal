@@ -447,11 +447,51 @@ function TimeRangeFilter({
 }
 
 // Component for ProjectTeamSection with enhanced functionality
-function ProjectTeamSection({ projectId, unifiedData }: { 
+function ProjectTeamSection({ projectId, unifiedData, timeFilter }: { 
   projectId: string; 
   unifiedData: any;
+  timeFilter: string;
 }) {
   const { toast } = useToast();
+
+  // FUNCIÓN PARA CALCULAR MULTIPLICADOR TEMPORAL
+  const getQuotationMultiplier = (filter: string): number => {
+    switch (filter) {
+      case 'current_month':
+      case 'last_month':
+      case 'may_2025':
+      case 'june_2025':
+      case 'july_2025':
+      case 'january_2025':
+      case 'february_2025':
+      case 'march_2025':
+      case 'april_2025':
+      case 'august_2025':
+      case 'september_2025':
+      case 'october_2025':
+      case 'november_2025':
+      case 'december_2025':
+        return 1;
+      case 'current_quarter':
+      case 'last_quarter':
+      case 'q1_2025':
+      case 'q2_2025':
+      case 'q3_2025':
+      case 'q4_2025':
+        return 3;
+      case 'current_semester':
+      case 'last_semester':
+      case 'semester1_2025':
+      case 'semester2_2025':
+        return 6;
+      case 'current_year':
+      case 'last_year':
+      case 'year_2025':
+        return 12;
+      default:
+        return 1;
+    }
+  };
 
   // USAR DIRECTAMENTE LOS DATOS YA PREPARADOS POR EL BACKEND
   const quotationTeam = unifiedData?.quotation?.team || [];
@@ -467,7 +507,8 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     actualsKeys: Object.keys(unifiedData?.actuals || {}),
     expectationsKeys: Object.keys(unifiedData?.expectations || {}),
     fullUnifiedData: unifiedData,
-    fullTeamBreakdown: teamBreakdownArray
+    fullTeamBreakdown: teamBreakdownArray,
+    timeFilter: timeFilter
   });
   
   // SIMPLIFICADO: Usar directamente el teamBreakdown del backend que ya tiene toda la lógica
@@ -477,7 +518,7 @@ function ProjectTeamSection({ projectId, unifiedData }: {
     
     // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas
     const baseEstimatedHours = quotationMember?.hours || 0;
-    const multiplier = getQuotationMultiplier();
+    const multiplier = getQuotationMultiplier(timeFilter);
     const scaledEstimatedHours = baseEstimatedHours * multiplier;
     
     return {
@@ -825,6 +866,45 @@ export default function ProjectDetailsRedesigned() {
     console.log('🚨 UNMAPPED FILTER LABEL:', label, '- using "all" as fallback');
     console.log('🚨 Filter details:', { label, type: filter.type, startDate: filter.startDate, endDate: filter.endDate });
     return 'all';
+  };
+
+  // FUNCIÓN AUXILIAR PARA MULTIPLICADOR TEMPORAL
+  const getTemporalMultiplier = (filter: string): number => {
+    switch (filter) {
+      case 'current_month':
+      case 'last_month':
+      case 'may_2025':
+      case 'june_2025':
+      case 'july_2025':
+      case 'january_2025':
+      case 'february_2025':
+      case 'march_2025':
+      case 'april_2025':
+      case 'august_2025':
+      case 'september_2025':
+      case 'october_2025':
+      case 'november_2025':
+      case 'december_2025':
+        return 1;
+      case 'current_quarter':
+      case 'last_quarter':
+      case 'q1_2025':
+      case 'q2_2025':
+      case 'q3_2025':
+      case 'q4_2025':
+        return 3;
+      case 'current_semester':
+      case 'last_semester':
+      case 'semester1_2025':
+      case 'semester2_2025':
+        return 6;
+      case 'current_year':
+      case 'last_year':
+      case 'year_2025':
+        return 12;
+      default:
+        return 1;
+    }
   };
 
   // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
@@ -2053,9 +2133,9 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     {(() => {
-                      const workedHours = completeData?.actuals?.totalWorkedHours || 0;
-                      const baseEstimatedHours = completeData?.quotation?.estimatedHours || 0;
-                      const multiplier = getQuotationMultiplier();
+                      const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                      const baseEstimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                      const multiplier = getTemporalMultiplier(timeFilterForHook);
                       const scaledEstimatedHours = baseEstimatedHours * multiplier;
                       const percentage = scaledEstimatedHours > 0 ? (workedHours / scaledEstimatedHours) * 100 : 0;
                       
@@ -2108,9 +2188,9 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     {(() => {
-                      const workedCost = completeData?.actuals?.totalWorkedCost || 0;
-                      const baseEstimatedCost = completeData?.quotation?.baseCost || 0;
-                      const multiplier = getQuotationMultiplier();
+                      const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const baseEstimatedCost = unifiedData?.quotation?.baseCost || 0;
+                      const multiplier = getTemporalMultiplier(timeFilterForHook);
                       const scaledEstimatedCost = baseEstimatedCost * multiplier;
                       const percentage = scaledEstimatedCost > 0 ? (workedCost / scaledEstimatedCost) * 100 : 0;
                       
@@ -2292,6 +2372,7 @@ export default function ProjectDetailsRedesigned() {
                 <ProjectTeamSection 
                   projectId={projectId!} 
                   unifiedData={unifiedData}
+                  timeFilter={timeFilterForHook}
                 />
               </CardContent>
             </Card>
@@ -3467,6 +3548,7 @@ export default function ProjectDetailsRedesigned() {
             <ProjectTeamSection 
               projectId={projectId!}
               unifiedData={unifiedData}
+              timeFilter={timeFilterForHook}
             />
           </TabsContent>
 
