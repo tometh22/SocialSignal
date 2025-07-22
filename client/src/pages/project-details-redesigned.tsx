@@ -1622,19 +1622,85 @@ export default function ProjectDetailsRedesigned() {
               </Card>
 
               {/* Costo Real Trabajado */}
-              <Card className="border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className={`border-l-4 ${(() => {
+                if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                  const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                  if (percentage <= 90) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white'; // Bajo presupuesto
+                  if (percentage <= 100) return 'border-l-gray-600 bg-gradient-to-br from-gray-50 via-gray-25 to-white'; // Dentro del presupuesto
+                  if (percentage <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white'; // Alerta temprana
+                  if (percentage <= 120) return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white'; // Crítico
+                  return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white'; // Crisis
+                }
+                return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white';
+              })()} shadow-sm hover:shadow-md transition-shadow`}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-orange-100 rounded-lg">
-                        <DollarSign className="h-4 w-4 text-orange-600" />
+                      <div className={`p-2 rounded-lg ${(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          if (percentage <= 90) return 'bg-green-100';
+                          if (percentage <= 100) return 'bg-gray-100';
+                          if (percentage <= 110) return 'bg-yellow-100';
+                          if (percentage <= 120) return 'bg-orange-100';
+                          return 'bg-red-100';
+                        }
+                        return 'bg-orange-100';
+                      })()}`}>
+                        <DollarSign className={`h-4 w-4 ${(() => {
+                          if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                            const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                            if (percentage <= 90) return 'text-green-600';
+                            if (percentage <= 100) return 'text-gray-600';
+                            if (percentage <= 110) return 'text-yellow-600';
+                            if (percentage <= 120) return 'text-orange-600';
+                            return 'text-red-600';
+                          }
+                          return 'text-orange-600';
+                        })()}`} />
                       </div>
-                      <span className="text-sm font-medium text-orange-700">Costo Real</span>
+                      <span className={`text-sm font-medium ${(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          if (percentage <= 90) return 'text-green-700';
+                          if (percentage <= 100) return 'text-gray-700';
+                          if (percentage <= 110) return 'text-yellow-700';
+                          if (percentage <= 120) return 'text-orange-700';
+                          return 'text-red-700';
+                        }
+                        return 'text-orange-700';
+                      })()}`}>Costo Real</span>
                     </div>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant={(() => {
+                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                        const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                        if (percentage <= 90) return 'default'; // Verde: Bajo presupuesto
+                        if (percentage <= 100) return 'secondary'; // Gris: Dentro del presupuesto
+                        if (percentage <= 110) return 'outline'; // Amarillo: Alerta temprana
+                        if (percentage <= 120) return 'destructive'; // Naranja: Crítico
+                        return 'destructive'; // Rojo: Crisis
+                      }
+                      return 'outline';
+                    })()} className={`text-xs ${(() => {
+                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                        const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                        if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
+                        if (percentage <= 100) return 'bg-gray-100 text-gray-800 border-gray-300';
+                        if (percentage <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                        if (percentage <= 120) return 'bg-orange-100 text-orange-800 border-orange-300';
+                        return 'bg-red-100 text-red-800 border-red-300';
+                      }
+                      return '';
+                    })()}`}>
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          return ((unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100).toFixed(0) + '% del budget';
+                          const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          const percentageText = percentage.toFixed(0) + '% del budget';
+                          if (percentage <= 90) return '✓ ' + percentageText;
+                          if (percentage <= 100) return percentageText;
+                          if (percentage <= 110) return '⚠ ' + percentageText;
+                          if (percentage <= 120) return '🔥 ' + percentageText;
+                          return '🚨 ' + percentageText;
                         }
                         return '0%';
                       })()}
