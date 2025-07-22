@@ -1900,7 +1900,7 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-xs text-gray-500 mt-1">total del período</div>
                     </div>
 
-                    {/* Eficiencia */}
+                    {/* Eficiencia del Equipo */}
                     <div className="text-center p-4 bg-white rounded-xl border border-purple-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
                         <Target className="h-6 w-6 text-purple-600" />
@@ -1910,8 +1910,8 @@ export default function ProjectDetailsRedesigned() {
                           ? ((costSummary.filteredHours / costSummary.targetHours) * 100).toFixed(0)
                           : '0'}%
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Progreso</div>
-                      <div className="text-xs text-gray-500 mt-1">vs. objetivo planeado</div>
+                      <div className="text-sm font-medium text-gray-600">Eficiencia del Equipo</div>
+                      <div className="text-xs text-gray-500 mt-1">horas reales vs estimadas</div>
                     </div>
 
                     {/* Costo Real del Equipo */}
