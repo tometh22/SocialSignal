@@ -1694,7 +1694,18 @@ export default function ProjectDetailsRedesigned() {
                     })()}`}>
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          const realCost = unifiedData.actuals.totalWorkedCost;
+                          const estimatedCost = unifiedData.quotation.baseCost;
+                          const percentage = (realCost / estimatedCost) * 100;
+                          
+                          // Debug: log the actual values being compared
+                          console.log('🔍 Debug Costo Real Card:', {
+                            realCost: realCost.toFixed(2),
+                            estimatedCost: estimatedCost.toFixed(2),
+                            percentage: percentage.toFixed(1),
+                            timeFilter: unifiedData?.timeFilter
+                          });
+                          
                           const percentageText = percentage.toFixed(0) + '% del budget';
                           if (percentage <= 90) return '✓ ' + percentageText;
                           if (percentage <= 100) return percentageText;
@@ -1816,7 +1827,15 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-2xl font-bold text-gray-900">
-                      ${(unifiedData?.quotation?.baseCost || 0).toLocaleString()}
+                      ${(() => {
+                        const baseCost = unifiedData?.quotation?.baseCost || 0;
+                        console.log('🔍 Debug Costo Estimado Card:', {
+                          baseCost: baseCost.toFixed(2),
+                          timeFilter: unifiedData?.timeFilter,
+                          quotationData: unifiedData?.quotation
+                        });
+                        return baseCost.toLocaleString();
+                      })()}
                     </p>
                     <p className="text-xs text-gray-500">
                       Costo operativo planificado
