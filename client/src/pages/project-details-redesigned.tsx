@@ -1537,7 +1537,7 @@ export default function ProjectDetailsRedesigned() {
           <TabsContent value="dashboard" className="space-y-6">
             
             {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
               
               {/* Markup Card - Métrica más importante */}
               <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
@@ -1704,6 +1704,56 @@ export default function ProjectDetailsRedesigned() {
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">Evaluación integral</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Precio al Cliente */}
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-100 rounded-lg">
+                        <Building className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <span className="text-sm font-medium text-emerald-700">Precio Cliente</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      Cotizado
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Valor facturado mensual
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Costo Estimado */}
+              <Card className="border-l-4 border-l-rose-600 bg-gradient-to-br from-rose-50 via-rose-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-rose-100 rounded-lg">
+                        <Target className="h-4 w-4 text-rose-600" />
+                      </div>
+                      <span className="text-sm font-medium text-rose-700">Costo Estimado</span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      Interno
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      ${(unifiedData?.quotation?.baseCost || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Costo operativo planificado
+                    </p>
                   </div>
                 </CardContent>
               </Card>
