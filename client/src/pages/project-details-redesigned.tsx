@@ -1646,7 +1646,9 @@ export default function ProjectDetailsRedesigned() {
                         return '0.0';
                       })()}%
                     </p>
-
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>de {unifiedData?.quotation?.estimatedHours || 0}h estimadas</span>
+                    </div>
                     <Progress value={(() => {
                       if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
                         return (unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100;
