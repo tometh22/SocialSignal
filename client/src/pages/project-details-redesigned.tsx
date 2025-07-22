@@ -1621,7 +1621,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Uso del Presupuesto */}
+              {/* Costo Real Trabajado */}
               <Card className="border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1629,23 +1629,24 @@ export default function ProjectDetailsRedesigned() {
                       <div className="p-2 bg-orange-100 rounded-lg">
                         <DollarSign className="h-4 w-4 text-orange-600" />
                       </div>
-                      <span className="text-sm font-medium text-orange-700">Uso de Budget</span>
+                      <span className="text-sm font-medium text-orange-700">Costo Real</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">
-                        ${unifiedData?.actuals?.totalWorkedCost?.toLocaleString() || '0'}
-                      </p>
-                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          return ((unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100).toFixed(0) + '% del budget';
+                        }
+                        return '0%';
+                      })()}
+                    </Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
-                      {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          return ((unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100).toFixed(1);
-                        }
-                        return '0.0';
-                      })()}%
+                      ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
                     </p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>de ${(unifiedData?.quotation?.baseCost || 0).toLocaleString()} estimado</span>
+                    </div>
                     <Progress 
                       value={(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
