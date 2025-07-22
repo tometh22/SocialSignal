@@ -1633,11 +1633,9 @@ export default function ProjectDetailsRedesigned() {
                       </div>
                       <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500">
-                        {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
-                      </p>
-                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
+                    </Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-2xl font-bold text-gray-900">
@@ -1648,6 +1646,7 @@ export default function ProjectDetailsRedesigned() {
                         return '0.0';
                       })()}%
                     </p>
+
                     <Progress value={(() => {
                       if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
                         return (unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100;
