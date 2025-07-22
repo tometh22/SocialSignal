@@ -1766,25 +1766,61 @@ export default function ProjectDetailsRedesigned() {
               </Card>
 
               {/* Estado General */}
-              <Card className="border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${(() => {
+                if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                  const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                  if (budgetUtil <= 85) return 'border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white';
+                  if (budgetUtil <= 100) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
+                  if (budgetUtil <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white';
+                  return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white';
+                }
+                return 'border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white';
+              })()}`}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <Gauge className="h-4 w-4 text-purple-600" />
+                      <div className={`p-2 rounded-lg ${(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          if (budgetUtil <= 85) return 'bg-emerald-100';
+                          if (budgetUtil <= 100) return 'bg-green-100';
+                          if (budgetUtil <= 110) return 'bg-yellow-100';
+                          return 'bg-red-100';
+                        }
+                        return 'bg-purple-100';
+                      })()}`}>
+                        {(() => {
+                          if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                            const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                            if (budgetUtil <= 85) return <Crown className="h-4 w-4 text-emerald-600" />;
+                            if (budgetUtil <= 100) return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+                            if (budgetUtil <= 110) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+                            return <TrendingDown className="h-4 w-4 text-red-600" />;
+                          }
+                          return <Gauge className="h-4 w-4 text-purple-600" />;
+                        })()}
                       </div>
-                      <span className="text-sm font-medium text-purple-700">Estado</span>
+                      <span className={`text-sm font-medium ${(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          if (budgetUtil <= 85) return 'text-emerald-700';
+                          if (budgetUtil <= 100) return 'text-green-700';
+                          if (budgetUtil <= 110) return 'text-yellow-700';
+                          return 'text-red-700';
+                        }
+                        return 'text-purple-700';
+                      })()}`}>Estado</span>
                     </div>
-                    <Badge variant={(() => {
+                    <Badge className={`text-xs ${(() => {
                       if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                         const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
-                        if (budgetUtil <= 85) return 'default';
-                        if (budgetUtil <= 100) return 'secondary';
-                        if (budgetUtil <= 110) return 'outline';
-                        return 'destructive';
+                        if (budgetUtil <= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                        if (budgetUtil <= 100) return 'bg-green-100 text-green-800 border-green-300';
+                        if (budgetUtil <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                        return 'bg-red-100 text-red-800 border-red-300';
                       }
-                      return 'destructive';
-                    })()} className="text-xs">
+                      return 'bg-purple-100 text-purple-800 border-purple-300';
+                    })()}`}>
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
@@ -1793,10 +1829,10 @@ export default function ProjectDetailsRedesigned() {
                             baseCost: unifiedData.quotation.baseCost,
                             budgetUtil 
                           });
-                          if (budgetUtil <= 85) return 'Excelente';
-                          if (budgetUtil <= 100) return 'Bueno';
-                          if (budgetUtil <= 110) return 'Regular';
-                          return 'Crítico';
+                          if (budgetUtil <= 85) return '🏆 Excelente';
+                          if (budgetUtil <= 100) return '✅ Bueno';
+                          if (budgetUtil <= 110) return '🟡 Regular';
+                          return '🔴 Crítico';
                         }
                         return 'Sin datos';
                       })()}
@@ -1807,10 +1843,10 @@ export default function ProjectDetailsRedesigned() {
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
-                          if (budgetUtil <= 85) return 'Excelente';
-                          if (budgetUtil <= 100) return 'Bueno';
-                          if (budgetUtil <= 110) return 'Regular';
-                          return 'Crítico';
+                          if (budgetUtil <= 85) return '🏆 Excelente';
+                          if (budgetUtil <= 100) return '✅ Bueno';
+                          if (budgetUtil <= 110) return '🟡 Regular';
+                          return '🔴 Crítico';
                         }
                         return 'Sin datos';
                       })()}
