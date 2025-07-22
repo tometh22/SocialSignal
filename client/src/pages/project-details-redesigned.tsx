@@ -1222,33 +1222,43 @@ export default function ProjectDetailsRedesigned() {
       {
         label: "Estado",
         value: (() => {
-          // Calcular el estado basado en métricas de proyecto
-          const costOverrun = Math.abs(budgetUtilization - 100);
-          const hoursOverrun = Math.abs(efficiency - 100);
+          // Usar métricas directas de unifiedData para la evaluación
+          console.log('🚨 ESTADO DEBUG:', { 
+            budgetUtilization, 
+            efficiency, 
+            metricsFromUnified: unifiedData?.metrics?.budgetUtilization,
+            actualCost: actuals.totalWorkedCost,
+            baseCost: quotation.baseCost,
+            calculatedBudget: (actuals.totalWorkedCost / quotation.baseCost) * 100
+          });
           
-          if (budgetUtilization <= 85 && efficiency <= 120) return "Excelente";
-          if (budgetUtilization <= 100 && efficiency <= 130) return "Bueno";
-          if (budgetUtilization <= 110 && efficiency <= 150) return "Regular";
+          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          
+          if (actualBudgetUtil <= 85) return "Excelente";
+          if (actualBudgetUtil <= 100) return "Bueno";
+          if (actualBudgetUtil <= 110) return "Regular";
           return "Crítico";
         })(),
-        subtitle: `Evaluación integral`,
+        subtitle: `Semáforo de salud`,
         icon: (() => {
-          const costOverrun = Math.abs(budgetUtilization - 100);
-          if (budgetUtilization <= 85) return Crown;
-          if (budgetUtilization <= 100) return CheckCircle2;
-          if (budgetUtilization <= 110) return AlertTriangle;
+          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          if (actualBudgetUtil <= 85) return Crown;
+          if (actualBudgetUtil <= 100) return CheckCircle2;
+          if (actualBudgetUtil <= 110) return AlertTriangle;
           return TrendingDown;
         })(),
         color: (() => {
-          if (budgetUtilization <= 85) return "text-emerald-700";
-          if (budgetUtilization <= 100) return "text-green-700";
-          if (budgetUtilization <= 110) return "text-yellow-700";
+          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          if (actualBudgetUtil <= 85) return "text-emerald-700";
+          if (actualBudgetUtil <= 100) return "text-green-700";
+          if (actualBudgetUtil <= 110) return "text-yellow-700";
           return "text-red-700";
         })(),
         bgColor: (() => {
-          if (budgetUtilization <= 85) return "bg-emerald-50";
-          if (budgetUtilization <= 100) return "bg-green-50";
-          if (budgetUtilization <= 110) return "bg-yellow-50";
+          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          if (actualBudgetUtil <= 85) return "bg-emerald-50";
+          if (actualBudgetUtil <= 100) return "bg-green-50";
+          if (actualBudgetUtil <= 110) return "bg-yellow-50";
           return "bg-red-50";
         })(),
       }
