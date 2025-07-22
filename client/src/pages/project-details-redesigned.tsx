@@ -1221,13 +1221,36 @@ export default function ProjectDetailsRedesigned() {
       },
       {
         label: "Estado",
-        value: project?.status === 'active' ? 'Activo' : 
-               project?.status === 'paused' ? 'Pausado' : 
-               project?.status === 'completed' ? 'Completado' : 'Desconocido',
-        subtitle: (project as any)?.completionStatus || "Sin actualizar",
-        icon: project?.status === 'active' ? Play : project?.status === 'paused' ? Pause : CheckCircle2,
-        color: statusConfig.color,
-        bgColor: statusConfig.bg,
+        value: (() => {
+          // Calcular el estado basado en métricas de proyecto
+          const costOverrun = Math.abs(budgetUtilization - 100);
+          const hoursOverrun = Math.abs(efficiency - 100);
+          
+          if (budgetUtilization <= 85 && efficiency <= 120) return "Excelente";
+          if (budgetUtilization <= 100 && efficiency <= 130) return "Bueno";
+          if (budgetUtilization <= 110 && efficiency <= 150) return "Regular";
+          return "Crítico";
+        })(),
+        subtitle: `Evaluación integral`,
+        icon: (() => {
+          const costOverrun = Math.abs(budgetUtilization - 100);
+          if (budgetUtilization <= 85) return Crown;
+          if (budgetUtilization <= 100) return CheckCircle2;
+          if (budgetUtilization <= 110) return AlertTriangle;
+          return TrendingDown;
+        })(),
+        color: (() => {
+          if (budgetUtilization <= 85) return "text-emerald-700";
+          if (budgetUtilization <= 100) return "text-green-700";
+          if (budgetUtilization <= 110) return "text-yellow-700";
+          return "text-red-700";
+        })(),
+        bgColor: (() => {
+          if (budgetUtilization <= 85) return "bg-emerald-50";
+          if (budgetUtilization <= 100) return "bg-green-50";
+          if (budgetUtilization <= 110) return "bg-yellow-50";
+          return "bg-red-50";
+        })(),
       }
     ];
   }, [unifiedData, project]);
@@ -1698,12 +1721,11 @@ export default function ProjectDetailsRedesigned() {
                           const estimatedCost = unifiedData.quotation.baseCost;
                           const percentage = (realCost / estimatedCost) * 100;
                           
-                          const percentageText = percentage.toFixed(0) + '% del budget';
-                          if (percentage <= 90) return '✓ ' + percentageText;
-                          if (percentage <= 100) return percentageText;
-                          if (percentage <= 110) return '⚠ ' + percentageText;
-                          if (percentage <= 120) return '🔥 ' + percentageText;
-                          return '🚨 ' + percentageText;
+                          if (percentage <= 90) return `✓ ${Math.abs(percentage - 100).toFixed(0)}% bajo budget`;
+                          if (percentage <= 100) return `${Math.abs(percentage - 100).toFixed(0)}% del budget`;
+                          if (percentage <= 110) return `⚠ +${(percentage - 100).toFixed(0)}% del budget`;
+                          if (percentage <= 120) return `🔥 +${(percentage - 100).toFixed(0)}% del budget`;
+                          return `🚨 +${(percentage - 100).toFixed(0)}% del budget`;
                         }
                         return '0%';
                       })()}
