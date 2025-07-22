@@ -1633,7 +1633,7 @@ export default function ProjectDetailsRedesigned() {
                       </div>
                       <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs h-6 min-w-0 flex items-center">
                       {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
                     </Badge>
                   </div>
@@ -1719,7 +1719,7 @@ export default function ProjectDetailsRedesigned() {
                         return 'destructive'; // Rojo: Crisis
                       }
                       return 'outline';
-                    })()} className={`text-xs ${(() => {
+                    })()} className={`text-xs h-6 min-w-0 flex items-center ${(() => {
                       if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                         const percentage = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
                         if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
