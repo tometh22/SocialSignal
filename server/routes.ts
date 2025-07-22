@@ -608,7 +608,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 6. Calcular métricas consolidadas (ÚNICA FUENTE)
       const efficiency = adjustedEstimatedHours > 0 ? (totalWorkedHours / adjustedEstimatedHours) * 100 : 0;
       const markup = totalWorkedCost > 0 ? adjustedTotalAmount / totalWorkedCost : 0;
-      const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
+      // CORREGIDO: El budgetUtilization debe comparar costo real vs precio total del cliente (no baseCost)
+      const budgetUtilization = adjustedTotalAmount > 0 ? (totalWorkedCost / adjustedTotalAmount) * 100 : 0;
 
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
