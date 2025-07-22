@@ -1234,10 +1234,14 @@ export default function ProjectDetailsRedesigned() {
           
           const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
           
-          if (actualBudgetUtil <= 85) return "Excelente";
-          if (actualBudgetUtil <= 100) return "Bueno";
-          if (actualBudgetUtil <= 110) return "Regular";
-          return "Crítico";
+          let resultado;
+          if (actualBudgetUtil <= 85) resultado = "Excelente";
+          else if (actualBudgetUtil <= 100) resultado = "Bueno";
+          else if (actualBudgetUtil <= 110) resultado = "Regular";
+          else resultado = "Crítico";
+          
+          console.log('🚨 CARD ESTADO RESULT:', { actualBudgetUtil, resultado });
+          return resultado;
         })(),
         subtitle: `Semáforo de salud`,
         icon: (() => {
@@ -1772,20 +1776,26 @@ export default function ProjectDetailsRedesigned() {
                       <span className="text-sm font-medium text-purple-700">Estado</span>
                     </div>
                     <Badge variant={(() => {
-                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
-                        const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
-                        if (markup >= 2.0) return 'default';
-                        if (markup >= 1.5) return 'secondary';
+                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                        const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                        if (budgetUtil <= 85) return 'default';
+                        if (budgetUtil <= 100) return 'secondary';
+                        if (budgetUtil <= 110) return 'outline';
                         return 'destructive';
                       }
                       return 'destructive';
                     })()} className="text-xs">
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
-                          const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
-                          if (markup >= 2.0) return 'Excelente';
-                          if (markup >= 1.5) return 'Bueno';
-                          if (markup >= 1.2) return 'Regular';
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          console.log('🚨 CARD MORADA DEBUG:', { 
+                            actualCost: unifiedData.actuals.totalWorkedCost,
+                            baseCost: unifiedData.quotation.baseCost,
+                            budgetUtil 
+                          });
+                          if (budgetUtil <= 85) return 'Excelente';
+                          if (budgetUtil <= 100) return 'Bueno';
+                          if (budgetUtil <= 110) return 'Regular';
                           return 'Crítico';
                         }
                         return 'Sin datos';
@@ -1795,17 +1805,17 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
-                          const markup = unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedCost;
-                          if (markup >= 2.0) return 'Excelente';
-                          if (markup >= 1.5) return 'Bueno';
-                          if (markup >= 1.2) return 'Regular';
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                          const budgetUtil = (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100;
+                          if (budgetUtil <= 85) return 'Excelente';
+                          if (budgetUtil <= 100) return 'Bueno';
+                          if (budgetUtil <= 110) return 'Regular';
                           return 'Crítico';
                         }
                         return 'Sin datos';
                       })()}
                     </p>
-                    <p className="text-xs text-gray-500">Evaluación integral</p>
+                    <p className="text-xs text-gray-500">Semáforo de salud financiera</p>
                   </div>
                 </CardContent>
               </Card>
