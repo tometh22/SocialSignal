@@ -1914,18 +1914,16 @@ export default function ProjectDetailsRedesigned() {
                       <div className="text-xs text-gray-500 mt-1">vs. objetivo planeado</div>
                     </div>
 
-                    {/* Promedio por Miembro */}
-                    <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
-                        <Activity className="h-6 w-6 text-orange-600" />
+                    {/* Costo Real del Equipo */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-red-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-3">
+                        <DollarSign className="h-6 w-6 text-red-600" />
                       </div>
-                      <div className="text-3xl font-bold text-orange-600 mb-1">
-                        {unifiedData?.actuals?.totalWorkedHours && teamStats && teamStats.length > 0 
-                          ? (unifiedData.actuals.totalWorkedHours / teamStats.length).toFixed(1)
-                          : '0.0'}h
+                      <div className="text-3xl font-bold text-red-600 mb-1">
+                        ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Promedio</div>
-                      <div className="text-xs text-gray-500 mt-1">horas por persona</div>
+                      <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
+                      <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
                     </div>
                   </div>
                 </CardContent>
