@@ -206,15 +206,15 @@ export default function Statistics() {
                 {isLoading ? (
                   <div className="h-64 flex items-center justify-center">Loading chart data...</div>
                 ) : getStatusData().length > 0 ? (
-                  <div className="h-64">
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={getStatusData()}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
+                          labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                          outerRadius={110}
                           fill="#8884d8"
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}

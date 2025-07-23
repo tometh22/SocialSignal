@@ -2910,7 +2910,7 @@ export default function ProjectDetailsRedesigned() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64">
+                  <div className="h-96">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -2934,9 +2934,10 @@ export default function ProjectDetailsRedesigned() {
                           })()}
                           cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={120}
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                          labelLine={{ stroke: "#666", strokeWidth: 1 }}
                         >
                           {(() => {
                             const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6B7280'];
@@ -2976,7 +2977,7 @@ export default function ProjectDetailsRedesigned() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64">
+                  <div className="h-96">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -2997,9 +2998,10 @@ export default function ProjectDetailsRedesigned() {
                           })()}
                           cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={120}
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                          labelLine={{ stroke: "#666", strokeWidth: 1 }}
                         >
                           {(() => {
                             const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#14B8A6'];

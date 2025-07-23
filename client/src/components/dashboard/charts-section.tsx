@@ -281,7 +281,7 @@ export const ChartsSection = ({
             </CardHeader>
             <CardContent>
               {billableDistributionData.length > 0 ? (
-                <div className="h-72 flex items-center justify-center">
+                <div className="h-80 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -289,8 +289,8 @@ export const ChartsSection = ({
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        outerRadius={100}
-                        innerRadius={60}
+                        outerRadius={120}
+                        innerRadius={70}
                         fill="#8884d8"
                         dataKey="value"
                         animationDuration={1500}
