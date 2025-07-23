@@ -11,6 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  CheckCircle,
   CheckCircle2,
   Play,
   Pause,

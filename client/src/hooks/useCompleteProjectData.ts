@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
 interface CompleteProjectData {
-  // Root level properties
+  // Root level properties (for direct access)
   efficiency: number;
   estimatedCost: number;
   estimatedHours: number;
@@ -12,7 +12,7 @@ interface CompleteProjectData {
   workedCost: number;
   workedHours: number;
   
-  // Nested objects
+  // Nested objects (full structure from backend)
   project: {
     id: number;
     name: string;
@@ -35,19 +35,36 @@ interface CompleteProjectData {
       hours: number;
       rate: number;
       cost: number;
+      personnel: {
+        id: number;
+        name: string;
+        email: string;
+        hourlyRate: number;
+        profilePicture: string;
+      };
+      role: {
+        id: number;
+        name: string;
+        description: string;
+      };
     }>;
   };
   actuals: {
     totalWorkedHours: number;
     totalWorkedCost: number;
     totalEntries: number;
-    teamBreakdown?: { [personnelId: string]: {
+    teamBreakdown: Array<{
+      personnelId: number;
       name: string;
       hours: number;
       cost: number;
       entries: number;
       lastActivity: string | null;
-    }};
+      estimatedHours: number;
+      rate: number;
+      isQuoted: boolean;
+      roleName: string;
+    }>;
   };
   metrics: {
     efficiency: number;
@@ -73,11 +90,17 @@ interface CompleteProjectData {
       efficiencyScore: number;
       impactScore: number;
       unifiedScore: number;
+      performanceColor: string;
       efficiencyRank: number;
       impactRank: number;
       unifiedRank: number;
-      performanceColor: string;
     }>;
+    summary: {
+      totalMembers: number;
+      excellentPerformers: number;
+      goodPerformers: number;
+      criticalPerformers: number;
+    };
   };
 }
 
