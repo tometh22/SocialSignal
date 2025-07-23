@@ -283,18 +283,25 @@ export const ChartsSection = ({
               {billableDistributionData.length > 0 ? (
                 <div className="h-80 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <PieChart margin={{ top: 20, right: 80, bottom: 20, left: 80 }}>
                       <Pie
                         data={billableDistributionData}
                         cx="50%"
                         cy="50%"
-                        labelLine={false}
-                        outerRadius={120}
-                        innerRadius={70}
+                        labelLine={{
+                          stroke: "#666",
+                          strokeWidth: 1,
+                          length: 15,
+                          length2: 10
+                        }}
+                        outerRadius={90}
+                        innerRadius={45}
                         fill="#8884d8"
                         dataKey="value"
                         animationDuration={1500}
-                        label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent, value }) => 
+                          `${name}: ${value}h (${(percent * 100).toFixed(0)}%)`
+                        }
                       >
                         {billableDistributionData.map((entry, index) => (
                           <Cell
@@ -305,8 +312,19 @@ export const ChartsSection = ({
                       </Pie>
                       <Tooltip
                         formatter={(value: any, name) => [`${value} horas`, name]}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
                       />
-                      <Legend />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        iconType="circle"
+                        wrapperStyle={{ paddingTop: '20px' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
