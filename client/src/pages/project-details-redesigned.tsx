@@ -802,6 +802,7 @@ export default function ProjectDetailsRedesigned() {
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
+  const [deleteEntryId, setDeleteEntryId] = useState<number | null>(null);
 
   // Estado del filtro temporal - configurado por defecto para mostrar "Este mes" (julio 2025)
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
@@ -1358,6 +1359,13 @@ export default function ProjectDetailsRedesigned() {
   const confirmDelete = () => {
     if (entryToDelete) {
       deleteTimeEntryMutation.mutate(entryToDelete);
+    }
+  };
+
+  const handleDeleteEntry = () => {
+    if (deleteEntryId) {
+      deleteTimeEntryMutation.mutate(deleteEntryId);
+      setDeleteEntryId(null);
     }
   };
 
