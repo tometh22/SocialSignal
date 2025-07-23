@@ -2889,7 +2889,7 @@ export default function ProjectDetailsRedesigned() {
                                project?.status === 'completed' ? 'Completado' : 'En Progreso'}
                             </div>
                             <div className="text-xs text-gray-600">
-                              Filtro: {timeFilter}
+                              Filtro: {timeFilterForHook}
                             </div>
                           </div>
                         </CardContent>
