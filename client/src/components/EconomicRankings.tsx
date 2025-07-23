@@ -12,16 +12,14 @@ interface EconomicRankingsProps {
   rankings: PersonnelMetrics[];
   loading?: boolean;
   projectTotalPrice?: number; // Necesario para recalcular rankings dinámicamente
-  timeFilter?: string; // Para aplicar escalamiento temporal
-  getTimeMultiplier?: () => number; // Función para obtener multiplicador temporal
+  timeFilter?: string; // Para identificar el período seleccionado
 }
 
 export function EconomicRankings({ 
   rankings, 
   loading = false, 
   projectTotalPrice = 100000, 
-  timeFilter = 'current_month',
-  getTimeMultiplier = () => 1 
+  timeFilter = 'current_month'
 }: EconomicRankingsProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [impactWeight, setImpactWeight] = useState(50); // Por defecto 50% impacto, 50% eficiencia

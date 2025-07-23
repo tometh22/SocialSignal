@@ -2,6 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
 interface CompleteProjectData {
+  // Root level properties
+  efficiency: number;
+  estimatedCost: number;
+  estimatedHours: number;
+  isAlwaysOn: boolean;
+  markup: number;
+  timeFilter: string;
+  workedCost: number;
+  workedHours: number;
+  
+  // Nested objects
   project: {
     id: number;
     name: string;
@@ -44,6 +55,29 @@ interface CompleteProjectData {
     budgetUtilization: number;
     hoursDeviation: number;
     costDeviation: number;
+  };
+  rankings: {
+    economicMetrics: Array<{
+      personnelId: number;
+      personnelName: string;
+      estimatedHours: number;
+      actualHours: number;
+      estimatedCost: number;
+      actualCost: number;
+      pricePercentage: number;
+      assignedPrice: number;
+      costDeviation: number;
+      hoursDeviation: number;
+      marginPerHour: number;
+      billingEfficiency: number;
+      efficiencyScore: number;
+      impactScore: number;
+      unifiedScore: number;
+      efficiencyRank: number;
+      impactRank: number;
+      unifiedRank: number;
+      performanceColor: string;
+    }>;
   };
 }
 
