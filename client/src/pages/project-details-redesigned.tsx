@@ -2308,8 +2308,8 @@ export default function ProjectDetailsRedesigned() {
                           </div>
                         </div>
                         
-                        {/* Heat Map Grid - Compact version */}
-                        <div className="grid grid-cols-6 gap-2 max-w-4xl mx-auto">
+                        {/* Heat Map Grid - Ultra compact version */}
+                        <div className="grid grid-cols-8 gap-1.5 max-w-3xl mx-auto">
                           {displayMembers.map((member: any, index: number) => {
                             const name = member.name || member.personnelName || `Miembro ${index + 1}`;
                             const hourlyRate = member.hourlyRate || member.rate || 10;
@@ -2354,15 +2354,15 @@ export default function ProjectDetailsRedesigned() {
                             return (
                               <div 
                                 key={member.personnelId || index}
-                                className={`relative h-16 w-full ${bgColor} rounded-lg p-1 hover:scale-105 transition-transform cursor-pointer group`}
+                                className={`relative h-12 w-full ${bgColor} rounded p-1 hover:scale-105 transition-transform cursor-pointer group`}
                                 style={{ opacity: intensity / 100 }}
                                 title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
                               >
-                                <div className="text-white text-xs font-bold text-center leading-tight truncate">
-                                  {name.length > 10 ? name.substring(0, 10) + '...' : name}
+                                <div className="text-white text-xs font-semibold text-center leading-none truncate">
+                                  {name.length > 8 ? name.substring(0, 8) + '...' : name}
                                 </div>
-                                <div className="text-white text-xs text-center mt-1">
-                                  {Hr.toFixed(1)}h
+                                <div className="text-white text-xs text-center mt-0.5">
+                                  {Hr.toFixed(0)}h
                                 </div>
                                 
                                 {/* Enhanced Tooltip con Nuevas Métricas */}
