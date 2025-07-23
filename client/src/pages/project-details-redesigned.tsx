@@ -7,6 +7,7 @@ import {
   Clock,
   DollarSign,
   Users,
+  User,
   Target,
   TrendingUp,
   TrendingDown,
@@ -73,6 +74,7 @@ import { EconomicRankings } from "@/components/EconomicRankings";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 
 interface ProjectMetric {
@@ -2889,6 +2891,139 @@ export default function ProjectDetailsRedesigned() {
                         style={{ width: '75%' }}
                       />
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cost Distribution Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Cost Distribution by Role */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Distribución de Costos por Rol
+                  </CardTitle>
+                  <CardDescription>
+                    Análisis de gastos según roles del equipo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={(() => {
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            // Agrupar costos por rol
+                            const roleMap = new Map();
+                            (unifiedData as any).actuals.teamBreakdown.forEach((member: any) => {
+                              const role = member.roleName || 'Sin rol';
+                              const currentCost = roleMap.get(role) || 0;
+                              roleMap.set(role, currentCost + (member.cost || 0));
+                            });
+                            
+                            // Convertir a array y ordenar por costo
+                            const roleData = Array.from(roleMap.entries())
+                              .map(([role, cost]) => ({ name: role, value: cost }))
+                              .sort((a, b) => b.value - a.value);
+                            
+                            return roleData;
+                          })()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        >
+                          {(() => {
+                            const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6B7280'];
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            const roleMap = new Map();
+                            (unifiedData as any).actuals.teamBreakdown.forEach((member: any) => {
+                              const role = member.roleName || 'Sin rol';
+                              const currentCost = roleMap.get(role) || 0;
+                              roleMap.set(role, currentCost + (member.cost || 0));
+                            });
+                            
+                            return Array.from(roleMap.entries()).map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ));
+                          })()}
+                        </Pie>
+                        <RechartsTooltip 
+                          formatter={(value: number) => [`$${value.toFixed(0)}`, 'Costo']}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Distribution by Person */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <User className="h-5 w-5 text-green-600" />
+                    Distribución de Costos por Persona
+                  </CardTitle>
+                  <CardDescription>
+                    Top 8 colaboradores con mayor costo en el período
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={(() => {
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            // Obtener los top 8 por costo
+                            const sortedMembers = [...(unifiedData as any).actuals.teamBreakdown]
+                              .filter((member: any) => member.cost > 0)
+                              .sort((a: any, b: any) => b.cost - a.cost)
+                              .slice(0, 8);
+                            
+                            return sortedMembers.map((member: any) => ({
+                              name: member.name.split(' ')[0], // Solo primer nombre
+                              value: member.cost,
+                              fullName: member.name
+                            }));
+                          })()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        >
+                          {(() => {
+                            const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#14B8A6'];
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            const sortedMembers = [...(unifiedData as any).actuals.teamBreakdown]
+                              .filter((member: any) => member.cost > 0)
+                              .sort((a: any, b: any) => b.cost - a.cost)
+                              .slice(0, 8);
+                            
+                            return sortedMembers.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ));
+                          })()}
+                        </Pie>
+                        <RechartsTooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `$${value.toFixed(0)}`, 
+                            props.payload.fullName || name
+                          ]}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
