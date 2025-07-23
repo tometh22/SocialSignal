@@ -572,10 +572,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const monthsToUse = Math.min(actualMonthsWithData, theoreticalMonths) || theoreticalMonths;
         
         if (monthsToUse > 0) {
-          // Las cotizaciones de contratos mensuales son por mes, multiplicamos por el período
-          adjustedEstimatedHours = estimatedHours * monthsToUse;
+          // SOLO escalar costos y montos para contratos de fee mensual, NO las horas
+          // Las horas ya fueron calculadas individualmente con ajustes mensuales
           adjustedBaseCost = baseCost * monthsToUse;
           adjustedTotalAmount = totalAmount * monthsToUse;
+          
+          // Para las horas totales, usar la suma real de las horas ajustadas individuales
+          adjustedEstimatedHours = Object.values(teamBreakdown).reduce((sum, member) => sum + (member.estimatedHours || 0), 0);
           
           console.log(`📊 Monthly contract adjustment for ${monthsToUse} months (${project.quotation?.projectType}):`, {
             theoretical: theoreticalMonths,
@@ -661,6 +664,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
       
+
+      
       // Preparar datos del equipo para rankings - SOLO MIEMBROS CON TIME ENTRIES
       const teamRankingData = Object.values(teamBreakdown)
         .filter(member => (member.hours || 0) > 0) // Solo incluir miembros con horas trabajadas
@@ -683,6 +688,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Debug: Ver datos que van al cálculo de rankings
       console.log(`📊 Team ranking data prepared:`, teamRankingData.slice(0, 2)); // Solo mostrar primeros 2 para debug
       console.log(`📊 Filtered team for rankings: ${teamRankingData.length} members with actual hours`);
+      
+
       
       // Calcular rankings con datos reales del proyecto - solo si hay miembros con horas
       const economicRankings = teamRankingData.length > 0 ? calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
