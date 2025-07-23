@@ -150,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Función para calcular horas estimadas totales para un rango de fechas con ajustes mensuales
-      const getAdjustedHoursForDateRange = (personnelId: number, originalHours: number, startDate: Date, endDate: Date) => {
+      const getAdjustedHoursForDateRange = (personnelId: number, originalMonthlyHours: number, startDate: Date, endDate: Date) => {
         let totalAdjustedHours = 0;
         
         // Crear lista de meses en el rango
@@ -168,11 +168,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Aplicar ajustes para cada mes en el rango
         for (const monthData of months) {
-          const monthlyHours = getAdjustedHours(personnelId, originalHours, monthData.year, monthData.month);
+          // Para cada mes, usar las horas base mensuales de la cotización y aplicar ajustes específicos
+          const monthlyHours = getAdjustedHours(personnelId, originalMonthlyHours, monthData.year, monthData.month);
           totalAdjustedHours += monthlyHours;
+          
+          console.log(`📊 Month ${monthData.year}/${monthData.month}: ${originalMonthlyHours}h → ${monthlyHours}h for personnel ${personnelId}`);
         }
         
-        console.log(`📊 Calculated adjusted hours for personnel ${personnelId} over ${months.length} months: ${totalAdjustedHours}h (${months.map(m => `${m.year}/${m.month}`).join(', ')})`);
+        console.log(`📊 Total adjusted hours for personnel ${personnelId} over ${months.length} months: ${totalAdjustedHours}h`);
         return totalAdjustedHours;
       };
 
