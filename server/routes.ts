@@ -149,6 +149,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return originalHours;
       };
 
+      // Función para calcular horas estimadas totales para un rango de fechas con ajustes mensuales
+      const getAdjustedHoursForDateRange = (personnelId: number, originalHours: number, startDate: Date, endDate: Date) => {
+        let totalAdjustedHours = 0;
+        
+        // Crear lista de meses en el rango
+        const months = [];
+        const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+        
+        while (current <= end) {
+          months.push({
+            year: current.getFullYear(),
+            month: current.getMonth() + 1 // getMonth() returns 0-11, pero los ajustes usan 1-12
+          });
+          current.setMonth(current.getMonth() + 1);
+        }
+        
+        // Aplicar ajustes para cada mes en el rango
+        for (const monthData of months) {
+          const monthlyHours = getAdjustedHours(personnelId, originalHours, monthData.year, monthData.month);
+          totalAdjustedHours += monthlyHours;
+        }
+        
+        console.log(`📊 Calculated adjusted hours for personnel ${personnelId} over ${months.length} months: ${totalAdjustedHours}h (${months.map(m => `${m.year}/${m.month}`).join(', ')})`);
+        return totalAdjustedHours;
+      };
+
       // 3. Función para aplicar filtros temporales
       const getDateRangeForFilter = (filter: string) => {
         const now = new Date();
@@ -370,24 +397,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let estimatedHours = quotationMember ? quotationMember.hours : 0;
           const isQuoted = quotationMember !== undefined;
           
-          // Aplicar ajustes de horas mensuales si el filtro es específico de mes
-          if (dateRange && timeFilter.includes('may_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 5);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied May 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
-            }
-          } else if (dateRange && timeFilter.includes('june_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 6);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied June 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
-            }
-          } else if (dateRange && timeFilter.includes('july_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 7);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied July 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+          // Aplicar ajustes de horas mensuales según el tipo de filtro
+          if (dateRange) {
+            if (timeFilter.includes('may_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 5);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied May 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else if (timeFilter.includes('june_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 6);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied June 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else if (timeFilter.includes('july_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 7);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied July 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else {
+              // Para rangos de múltiples meses (trimestres, semestres, etc.)
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHoursForDateRange(entry.personnelId, estimatedHours, dateRange.startDate, dateRange.endDate);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied range adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+              }
             }
           }
           
@@ -445,24 +481,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!teamBreakdown[personnelId]) {
           let estimatedHours = quotationMember.hours || 0;
           
-          // Aplicar ajustes de horas mensuales si el filtro es específico de mes
-          if (dateRange && timeFilter.includes('may_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 5);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied May 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
-            }
-          } else if (dateRange && timeFilter.includes('june_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 6);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied June 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
-            }
-          } else if (dateRange && timeFilter.includes('july_2025')) {
-            const originalHours = estimatedHours;
-            estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 7);
-            if (originalHours !== estimatedHours) {
-              console.log(`📊 Applied July 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+          // Aplicar ajustes de horas mensuales según el tipo de filtro
+          if (dateRange) {
+            if (timeFilter.includes('may_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 5);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied May 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else if (timeFilter.includes('june_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 6);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied June 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else if (timeFilter.includes('july_2025')) {
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHours(quotationMember.personnelId, estimatedHours, 2025, 7);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied July 2025 adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+              }
+            } else {
+              // Para rangos de múltiples meses (trimestres, semestres, etc.)
+              const originalHours = estimatedHours;
+              estimatedHours = getAdjustedHoursForDateRange(quotationMember.personnelId, estimatedHours, dateRange.startDate, dateRange.endDate);
+              if (originalHours !== estimatedHours) {
+                console.log(`📊 Applied range adjustment for ${quotationMember.personnelName}: ${originalHours}h → ${estimatedHours}h`);
+              }
             }
           }
 
